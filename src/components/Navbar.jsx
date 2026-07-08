@@ -62,7 +62,16 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <Link to="/" className="navbar__logo">
-        TryKai
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <svg width="32" height="32" viewBox="0 0 52 52" fill="none">
+            <rect width="52" height="52" rx="13" fill="#16264B"/>
+            <path d="M16 10 L16 42" stroke="#F4F1EA" strokeWidth="5.5" strokeLinecap="round"/>
+            <path d="M16 26 C20 22 26 18 32 12" stroke="#F4F1EA" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M22 32 C25 35 29 38 34 41" stroke="#F4F1EA" strokeWidth="5.5" strokeLinecap="round"/>
+            <circle cx="40" cy="12" r="3.5" fill="#E8896A"/>
+          </svg>
+          <span style={{ fontFamily: 'Bricolage Grotesque', fontWeight: 700, fontSize: '20px', letterSpacing: '-0.04em', color: '#16264B' }}>trykai</span>
+        </div>
       </Link>
 
       <div className="navbar__actions">
