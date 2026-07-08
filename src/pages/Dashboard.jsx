@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import StarPicker from '../components/StarPicker'
 import {
@@ -26,6 +26,7 @@ function formatSessionDateTime(iso) {
 export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [authChecked, setAuthChecked] = useState(false)
   const [userId, setUserId] = useState(null)
@@ -34,6 +35,9 @@ export default function Dashboard() {
   const [hostSessions, setHostSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  const pendingBookingId = searchParams.get('booking')
+  const [bookingStatusMessage, setBookingStatusMessage] = useState('')
 
   const [activeFormId, setActiveFormId] = useState(null)
   const [sessionDate, setSessionDate] = useState('')
@@ -52,8 +56,11 @@ export default function Dashboard() {
 
   const [confirmCancelBookingId, setConfirmCancelBookingId] = useState(null)
   const [confirmCancelSessionId, setConfirmCancelSessionId] = useState(null)
+  const [confirmDeleteListingId, setConfirmDeleteListingId] = useState(null)
   const [cancelLoading, setCancelLoading] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const [cancelError, setCancelError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     async function checkAuth() {
@@ -79,6 +86,7 @@ export default function Dashboard() {
         .from('listings')
         .select('id, title, area, category')
         .eq('host_id', userId)
+        .eq('is_active', true)
         .order('created_at', { ascending: false }),
       supabase
         .from('bookings')
@@ -162,6 +170,64 @@ export default function Dashboard() {
     if (!userId) return
     loadData()
   }, [userId, loadData])
+
+  useEffect(() => {
+    if (!pendingBookingId || !userId) return
+
+    setBookingStatusMessage('Processing your booking…')
+
+    let cancelled = false
+    let attempts = 0
+    const maxAttempts = 15
+
+    async function pollBookingStatus() {
+      while (!cancelled && attempts < maxAttempts) {
+        const { data, error: fetchError } = await supabase
+          .from('bookings')
+          .select('status')
+          .eq('id', pendingBookingId)
+          .eq('guest_id', userId)
+          .single()
+
+        if (cancelled) return
+
+        if (fetchError || !data) {
+          setBookingStatusMessage('Could not verify your booking. Check My Bookings below.')
+          setSearchParams({}, { replace: true })
+          return
+        }
+
+        if (data.status === 'confirmed') {
+          setBookingStatusMessage('Booking confirmed! Your payment was successful.')
+          setSearchParams({}, { replace: true })
+          await loadData()
+          return
+        }
+
+        if (data.status === 'cancelled') {
+          setBookingStatusMessage('This booking was not completed. You can try booking again.')
+          setSearchParams({}, { replace: true })
+          return
+        }
+
+        attempts += 1
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+      }
+
+      if (!cancelled) {
+        setBookingStatusMessage(
+          'Payment received — your booking should appear shortly. Refresh if it does not update.'
+        )
+        setSearchParams({}, { replace: true })
+      }
+    }
+
+    pollBookingStatus()
+
+    return () => {
+      cancelled = true
+    }
+  }, [pendingBookingId, userId, loadData, setSearchParams])
 
   function openSessionForm(listingId) {
     setActiveFormId(listingId)
@@ -454,6 +520,31 @@ export default function Dashboard() {
     await loadData()
   }
 
+  async function handleDeleteListing(listingId) {
+    setDeleteError('')
+    setDeleteLoading(true)
+
+    const { error: updateError } = await supabase
+      .from('listings')
+      .update({ is_active: false })
+      .eq('id', listingId)
+      .eq('host_id', userId)
+
+    setDeleteLoading(false)
+
+    if (updateError) {
+      setDeleteError(updateError.message)
+      return
+    }
+
+    setConfirmDeleteListingId(null)
+    if (activeFormId === listingId) {
+      closeSessionForm()
+    }
+    setListings((prev) => prev.filter((l) => l.id !== listingId))
+    setHostSessions((prev) => prev.filter((s) => s.listing_id !== listingId))
+  }
+
   if (!authChecked || loading) {
     return <p className="status-message">Loading…</p>
   }
@@ -466,8 +557,13 @@ export default function Dashboard() {
         <p className="success-message">{location.state.message}</p>
       )}
 
+      {bookingStatusMessage && (
+        <p className="success-message">{bookingStatusMessage}</p>
+      )}
+
       {error && <p className="error-message" style={{ marginBottom: '20px' }}>{error}</p>}
       {cancelError && <p className="error-message" style={{ marginBottom: '20px' }}>{cancelError}</p>}
+      {deleteError && <p className="error-message" style={{ marginBottom: '20px' }}>{deleteError}</p>}
 
       <section className="dashboard-section">
         <h2 className="dashboard-section__title">Upcoming Hosted Sessions</h2>
@@ -582,8 +678,48 @@ export default function Dashboard() {
                     >
                       {activeFormId === listing.id ? 'Cancel' : 'Add Session'}
                     </button>
+                    {confirmDeleteListingId !== listing.id && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteError('')
+                          setConfirmDeleteListingId(listing.id)
+                        }}
+                        className="btn btn--ghost"
+                        style={{ padding: '8px 16px', fontSize: '14px', color: 'var(--error)' }}
+                      >
+                        Delete listing
+                      </button>
+                    )}
                   </div>
                 </div>
+
+                {confirmDeleteListingId === listing.id && (
+                  <div className="cancel-confirm">
+                    <p className="cancel-confirm__warning">
+                      Are you sure? This will hide your listing and cannot be undone easily.
+                    </p>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <button
+                        type="button"
+                        disabled={deleteLoading}
+                        onClick={() => handleDeleteListing(listing.id)}
+                        className="btn btn--primary"
+                        style={{ padding: '10px 20px', fontSize: '14px', background: 'var(--error)' }}
+                      >
+                        {deleteLoading ? 'Deleting…' : 'Confirm delete'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteListingId(null)}
+                        className="btn btn--ghost"
+                        style={{ padding: '10px 20px', fontSize: '14px' }}
+                      >
+                        Keep listing
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {activeFormId === listing.id && (
                   <form
