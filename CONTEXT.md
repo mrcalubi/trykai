@@ -10,6 +10,8 @@ Examples: "Learn latte art with me — $20/person", "Boxing basics — $15/30min
 
 For full product, business, and legal decisions, see DECISIONS.md.
 For visual identity (color, type, logo, hero copy), see DESIGN.md.
+For how the system is actually put together (C4 diagrams of context, containers, components and
+runtime flows, plus where the code diverges from this file), see ARCHITECTURE.md.
 Always read DECISIONS.md and DESIGN.md alongside this file before making changes.
 
 ---
