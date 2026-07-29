@@ -10,8 +10,6 @@ Examples: "Learn latte art with me — $20/person", "Boxing basics — $15/30min
 
 For full product, business, and legal decisions, see DECISIONS.md.
 For visual identity (color, type, logo, hero copy), see DESIGN.md.
-For how the system is actually put together (C4 diagrams of context, containers, components and
-runtime flows, plus where the code diverges from this file), see ARCHITECTURE.md.
 Always read DECISIONS.md and DESIGN.md alongside this file before making changes.
 
 ---
@@ -153,7 +151,7 @@ created_at timestamp
 6. **spots_remaining** — must be decremented on confirmed booking and incremented on cancellation. Never allow booking if spots_remaining = 0.
 7. **is_host flag** — set to true on users table when a user successfully creates their first listing.
 8. **Hosts must be verification_status = 'approved'** before they can create or have active listings. Unverified/rejected hosts are redirected to VerifyIdentity.jsx; pending hosts see an under-review message.
-9. **Cancellation policy** — guest cancels 48hrs+ before session: full refund. Guest cancels under 48hrs: 50% refund. Host cancels (any time): full guest refund + host gets a strike. 3 strikes deactivates the host's listing(s). Refund amounts are calculated and stored now; actual refund API calls are deferred until the HitPay integration is complete (see DECISIONS.md).
+9. **Cancellation policy (updated 29 July 2026, supersedes the old 2-tier rule)** — guest cancels 48hrs+ before session: full refund including platform fee. Guest cancels 24 to 48hrs before: 50% of lesson fee refunded, platform fee forfeited. Guest cancels 6 to 24hrs before: 25% of lesson fee refunded, platform fee forfeited. Guest cancels under 6hrs, or no-show: no refund. Host cancels any time: full guest refund including platform fee, host gets 1 strike. Host no-show: full guest refund including platform fee plus possible discretionary compensation, host gets 2 strikes immediately and account is reviewed. 3 strikes deactivates the host's listing(s). Full logic, including reschedule and appeal flows, is at /cancellation-policy — do not assume the old 2-tier rule anywhere in the code. Refund amounts are calculated and stored now; actual refund API calls are deferred until the HitPay integration is complete (see DECISIONS.md).
 
 ---
 
@@ -271,7 +269,7 @@ See DECISIONS.md "What done looks like (MVP)" for the authoritative, up-to-date 
 5. ✅ Guest can book and pay for a session (currently via Stripe; HitPay migration pending)
 6. ✅ Both sides can leave a review after the session
 7. ✅ Host identity verification, with email notifications throughout
-8. ✅ Cancellation policy (UI + database logic; refund API pending HitPay)
+8. 🔄 Cancellation policy — UI and database logic need rebuilding to the new 4-tier structure decided 29 July 2026 (previously built for the old 2-tier rule); refund API still pending HitPay regardless
 9. ⬜ HitPay payment integration (replacing Stripe)
 10. ⬜ Host T&C accepted in-app (layered acceptance flow)
 11. ⬜ Deploy to Vercel + point trykai.sg at it

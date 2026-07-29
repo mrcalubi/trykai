@@ -40,6 +40,79 @@ One account type that can be both host and guest — no separate logins.
 - Dashboard shows both listings (host view) and bookings (guest view)
 - Hosts get a visible "Host" badge on their profile
 
+### Date Mode (decided — to build)
+An optional add-on layer hosts can enable on Lane 1 listings (one-off or short novelty sessions only — not applicable to Lane 2 multi-session courses).
+
+**Host side:**
+- Toggle "Date Mode" on a listing from their dashboard
+- Specify: what's different (e.g. "Private session for two, I'll set the mood with music and lighting"), what's included (e.g. something to take home, a printed photo), and a price premium they set themselves
+- Date Mode is a separate offering from the base listing — not a replacement
+
+**Guest side:**
+- Filter on browse page: "Perfect for dates"
+- Badge on listing cards for Date Mode-enabled listings
+- At checkout: optional checkbox "This is a date / special occasion" + free-text note to host
+- Price shown reflects the host's premium transparently
+
+**Why this works:**
+- Taps a recurring trigger — dates, anniversaries, Valentine's Day, "we need to do something different" — that refuels itself. Not a one-time purchase.
+- Natural upsell for hosts at near-zero extra cost to them
+- Permanently differentiates TryKai from any tuition or experience platform
+- Applies to Lane 1 only — keep entirely separate from Lane 2's multi-session skill-building identity
+
+**Build priority:** Post-MVP, before Lane 2 launch. Spec properly before building.
+
+---
+
+### Identity & Social Layer (decided direction — to build post-MVP)
+The guest profile is not just an account page — it's a public "skills and experiences" artefact that accumulates over time and is worth building, worth showing off, and worth sharing.
+
+**Core mechanic:**
+- Every completed session adds to a visible log on the guest's public profile: "Tried latte art · Completed 3 Japanese sessions · Went axe throwing"
+- Lane 2 progress shown explicitly: "Japanese — 4 sessions completed" with a subtle progress indicator toward a stated goal
+- Profile is public and linkable
+
+**Trophies and tokens:**
+- Named, specific achievements — not generic badges. Examples:
+  - "First Timer" — completed first booking
+  - "Explorer" — tried 5 different categories
+  - "Night Owl" — booked an evening session
+  - "Date Night Pro" — completed 3 Date Mode sessions
+  - "Regulars Club" — booked the same host 3+ times
+  - "Polyglot in Progress" — 3+ language sessions completed
+  - "Still Going" — active streak of 4+ consecutive weeks
+- Trophies are visible to anyone viewing the profile — social, not private
+
+**Streak mechanic:**
+- Session streak visible on profile and dashboard
+- "You've booked something new 3 months in a row"
+- Designed to make stopping feel like breaking something real
+
+**Shareable profile card:**
+- One-tap generated card: name, top skills, session count, recent trophy, TryKai branding
+- Designed to look good as an Instagram Story or WhatsApp share — not a raw screenshot
+- Primary organic acquisition mechanic: every share is a warm referral to the exact target demographic
+
+**Milestone emails:**
+- Triggered at 1st, 3rd, 5th completed booking
+- Framed as identity reinforcement: "You're someone who tries new things. Most people just talk about it."
+- End with curated "what's next?" suggestions — not a generic CTA
+
+**Lane 1 vs Lane 2 social currency — important distinction:**
+- Lane 1 achievements signal *taste and lifestyle* ("look at my interesting life") — closer to how people share restaurant or travel experiences. The shareable card and Explorer-type trophies serve this.
+- Lane 2 achievements signal *struggle and discipline* ("look at what I built") — this is where the Strava comparison holds properly. Streaks, session counts, stated goals met. Stronger social currency because the audience knows it cost something.
+- Do not flatten both lanes into the same achievement framing. Lane 2 profiles with real progress are the platform's most powerful social objects — a profile 8 sessions deep into guitar with a streak and a stated goal is genuinely worth sharing.
+
+**Social comparison — lightweight, no full social graph yet:**
+- Show aggregated area/category activity: "12 people in Tampines completed sessions this month"
+- Social proof without requiring a following system or moderation overhead
+- Full social graph (following, activity feed) is KIV — needs user density to feel alive, and creates moderation surface. Revisit at 500+ active users.
+
+**Sequencing:**
+- Profile artefact and shareable card: can launch early, work even with few users
+- Trophies and streak: launch with MVP social layer
+- Social comparison and leaderboards: only after sufficient user density — empty leaderboards demotivate
+
 ### Location handling
 - Show only general area publicly (e.g. "Tampines", "Tiong Bahru")
 - Full address only revealed after confirmed booking
@@ -197,14 +270,27 @@ Do not build for MVP. Add when hosts start requesting it.
 
 ---
 
-## Cancellation policy (build before launch)
+## Cancellation policy (decided, published, build in progress)
+
+Superseded the original 2-tier structure below with a 4-tier structure once the public Cancellation Policy page was finalized on 29 July 2026. Full published version lives at /cancellation-policy — this section is the internal summary.
 
 | Scenario | Resolution |
 |---|---|
-| Guest cancels 48hrs+ before | Full refund |
-| Guest cancels under 48hrs | 50% refund, host keeps 50% |
-| Host cancels any time | Full guest refund + host gets a strike |
+| Guest cancels 48hrs+ before | Full refund, including platform fee |
+| Guest cancels 24 to 48hrs before | 50% of lesson fee refunded, platform fee forfeited |
+| Guest cancels 6 to 24hrs before | 25% of lesson fee refunded, platform fee forfeited |
+| Guest cancels under 6hrs before, or no-show | No refund |
+| Host cancels any time | Full guest refund including platform fee, host gets 1 strike |
+| Host no-show | Full guest refund including platform fee, guest may receive discretionary compensation (case by case, manual, no fixed formula — to avoid incentivising fake host/guest collusion), host gets 2 strikes immediately and account is reviewed/may be suspended |
 | 3 host strikes | Listing auto-deactivated |
+
+**Reschedule option:** guest can reschedule to a different session with the same host instead of cancelling, once per booking, same 48hr+ cutoff as a full-refund cancellation. Not yet built.
+
+**Host appeals:** a host can appeal a strike within 7 days of the cancellation if it was caused by something genuinely outside their control. Reviewed manually. If successful, strike is removed. Appeal never affects the guest's refund. Not yet built.
+
+**Payout collision:** if a dispute is confirmed after a host's payout has already released (e.g. a safety report surfacing after the 24hr auto-release window), TryKai absorbs the refund cost temporarily and works to claw it back from the host's future payouts. This depends on `release-payout` actually being wired to HitPay, which is not done yet — flagged as a hard dependency.
+
+**Safety reports:** no time limit, ever. Credible safety reports can trigger immediate account suspension, independent of the 3-strike system, and severe violations can result in permanent removal without needing to accumulate 3 strikes first. Not yet built — no suspension mechanism independent of the strike counter exists in the current codebase.
 
 Must be shown clearly to both sides during booking and listing creation.
 Build into the booking flow before real money is involved.
@@ -440,7 +526,7 @@ Things to think through when revisiting:
 - How to structure the conversion to minimise personal liability exposure retroactively (i.e. for activity that happened under the sole prop)
 - Pte Ltd is also required if/when issuing equity to co-founders (Aakash, Airica) — sole proprietorship cannot issue shares
 - Get proper legal advice before this conversion — don't DIY it like the sole prop registration
-- Insurance options for platform liability (e.g. public liability cover) worth investigating even before Pte Ltd conversion
+- **Public liability insurance — researched 29 July 2026, still undecided.** Not legally required in Singapore for a business like TryKai (unlike Work Injury Compensation, which only applies if you have employees). Typical cost for a small, low-physical-footprint business: roughly S$300 to S$500+/year for baseline coverage, scaling with claims history and coverage limits. Given TryKai's real-world, in-person, sometimes physical-activity sessions, and the founders' explicit concern about a safety incident damaging trust in the platform, worth getting an actual quote soon, not treating as a someday-KIV. A quote costs nothing and turns this from a vague worry into a known, budgetable number. Note: this protects against TryKai being sued despite the "marketplace not provider" T&C framing, which doesn't reliably stop a lawsuit from being filed even if it eventually succeeds on that defence.
 
 This connects directly to the equity conversations — the structure decision and the cap table decision should probably happen together.
 
@@ -462,7 +548,9 @@ Rationale: each acknowledgment ties to the specific risky action being taken, wh
 
 ### Key legal risks identified and addressed in the draft
 1. **Age verification gap** — T&C states 18+ requirement, but TryKai has no independent verification (e.g. SingPass MyInfo DOB check), only self-declaration. Flagged as known residual risk, not fully solved. Revisit if this becomes a real incident, or before any major scale-up.
-2. **PDPA — Data Protection Officer requirement** — appointing a DPO is mandatory under PDPA, but registering the appointment with PDPC is NOT a hard legal requirement (only "strongly encouraged" for orgs below $10M turnover, which TryKai is). What IS a hard requirement under Section 11(5): the DPO's contact details must be made publicly available (in the Privacy Policy / on the site). Decided: Caleb is DPO, using personal email (calebong2002@gmail.com) for now — revisit a dedicated email (e.g. privacy@trykai.sg) once domain email is set up. Non-compliance penalty for actual breaches (separate from DPO appointment itself): fines up to $1M or 10% of annual turnover.
+2. **PDPA — Data Protection Officer requirement** — appointing a DPO is mandatory under PDPA, but registering the appointment with PDPC is NOT a hard legal requirement (only "strongly encouraged" for orgs below $10M turnover, which TryKai is). What IS a hard requirement under Section 11(5): the DPO's contact details must be made publicly available (in the Privacy Policy / on the site). Decided: Caleb is DPO, using personal email (calebong2002@gmail.com) for now. Non-compliance penalty for actual breaches (separate from DPO appointment itself): fines up to $1M or 10% of annual turnover.
+
+**Note (29 July 2026):** decided against a domain-hosted Google Workspace setup (`@trykai.sg` mailboxes) for cost reasons pre-revenue — see "Email & contact infrastructure" below. The general business contact is now `trykaisg@gmail.com`, a single shared Gmail account. Whether the DPO contact should also move to this shared address, versus staying on Caleb's personal email, is still an open decision — flagged, not yet resolved.
 3. **NRIC/selfie data handling** — already stored in private Supabase bucket (good practice). Retention periods now decided (see below).
 4. **Liability cap clause** — drafted as cap-to-platform-fee (standard marketplace approach), but flagged for extra lawyer scrutiny because TryKai's sessions are physical/in-person (cooking, fitness, sharp tools) which carries materially higher injury risk than a typical digital marketplace. Could be challenged under Unfair Contract Terms Act if found unreasonable, especially re: personal injury.
 5. **Off-platform leakage clause** — included as deterrent/basis for account suspension, acknowledged as difficult to enforce in practice (consistent with earlier off-platform leakage defence discussion).
@@ -495,6 +583,14 @@ Researched how an existing Singapore middleman platform handles similar real-wor
 7. Publish DPO contact details visibly (Privacy Policy + site footer)
 
 ---
+
+## Email & contact infrastructure (decided 29 July 2026)
+
+Originally planned as Google Workspace (~S$33.60/month for 3 seats). Decided against this pre-revenue, in favour of a single shared Gmail account:
+
+- **trykaisg@gmail.com** — the one shared business address. Caleb, Aakash, and Ruiheng all have the login (password shared via the team's iCloud Keychain group). This is the general contact address used across all public-facing policy pages.
+- Considered domain-forwarding via ForwardEmail.net (~$3/month) to get `hello@trykai.sg` and `privacy@trykai.sg` routing into the shared Gmail, but decided against it for now too — added complexity and cost for a credibility benefit that matters more post-launch (emailing strangers) than during warm-contact beta (emailing friends/family who already know what TryKai is).
+- Revisit real `@trykai.sg` addresses once past beta, when the domain-vs-Gmail credibility gap actually starts to matter to guests who don't already know TryKai.
 
 ## Infrastructure built (operational systems)
 
