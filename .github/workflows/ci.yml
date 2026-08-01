@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_ANON_KEY: test-anon-key
+      VITE_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
