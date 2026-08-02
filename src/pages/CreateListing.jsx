@@ -59,9 +59,12 @@ export default function CreateListing() {
   const [whatsProvided, setWhatsProvided] = useState([])
   const [photos, setPhotos] = useState([])
   const photosRef = useRef(photos)
-  photosRef.current = photos
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    photosRef.current = photos
+  }, [photos])
 
   useEffect(() => {
     async function checkAuth() {

@@ -64,11 +64,14 @@ export default function EditListing() {
   const [existingPhotos, setExistingPhotos] = useState([])
   const [newPhotos, setNewPhotos] = useState([])
   const newPhotosRef = useRef(newPhotos)
-  newPhotosRef.current = newPhotos
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const totalPhotos = existingPhotos.length + newPhotos.length
+
+  useEffect(() => {
+    newPhotosRef.current = newPhotos
+  }, [newPhotos])
 
   useEffect(() => {
     async function checkAuth() {

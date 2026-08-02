@@ -11,24 +11,27 @@ export default function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
   useEffect(() => {
+    function applySession(session) {
+      const nextUser = session?.user ?? null
+      setUser(nextUser)
+      if (!nextUser) setFullName('')
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
+      applySession(session)
     })
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      applySession(session)
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
-    if (!user) {
-      setFullName('')
-      return
-    }
+    if (!user) return
 
     supabase
       .from('users')

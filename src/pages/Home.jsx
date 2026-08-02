@@ -50,20 +50,19 @@ export default function Home() {
     return ['All', ...unique.sort()]
   }, [listings])
 
-  useEffect(() => {
-    if (categoryFilter !== 'All' && !categories.includes(categoryFilter)) {
-      setCategoryFilter('All')
-    }
-  }, [categories, categoryFilter])
+  const activeCategory =
+    categoryFilter === 'All' || categories.includes(categoryFilter)
+      ? categoryFilter
+      : 'All'
 
   const filteredListings = useMemo(() => {
     return listings.filter((listing) => {
       const matchesCategory =
-        categoryFilter === 'All' || listing.category === categoryFilter
+        activeCategory === 'All' || listing.category === activeCategory
       const matchesArea = areaFilter === 'All' || listing.area === areaFilter
       return matchesCategory && matchesArea
     })
-  }, [listings, categoryFilter, areaFilter])
+  }, [listings, activeCategory, areaFilter])
 
   return (
     <div className="page">
@@ -92,7 +91,7 @@ export default function Home() {
                   key={category}
                   type="button"
                   onClick={() => setCategoryFilter(category)}
-                  className={`filter-pill${categoryFilter === category ? ' filter-pill--active' : ''}`}
+                  className={`filter-pill${activeCategory === category ? ' filter-pill--active' : ''}`}
                 >
                   {category}
                 </button>

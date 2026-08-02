@@ -168,19 +168,27 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!userId) return
-    loadData()
+
+    let cancelled = false
+    void Promise.resolve().then(() => {
+      if (!cancelled) loadData()
+    })
+
+    return () => {
+      cancelled = true
+    }
   }, [userId, loadData])
 
   useEffect(() => {
     if (!pendingBookingId || !userId) return
-
-    setBookingStatusMessage('Processing your booking…')
 
     let cancelled = false
     let attempts = 0
     const maxAttempts = 15
 
     async function pollBookingStatus() {
+      setBookingStatusMessage('Processing your booking…')
+
       while (!cancelled && attempts < maxAttempts) {
         const { data, error: fetchError } = await supabase
           .from('bookings')
@@ -222,7 +230,9 @@ export default function Dashboard() {
       }
     }
 
-    pollBookingStatus()
+    void Promise.resolve().then(() => {
+      if (!cancelled) void pollBookingStatus()
+    })
 
     return () => {
       cancelled = true
