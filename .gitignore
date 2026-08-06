@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 .env
 .env
+
+# Generated documents (rebuild with scripts/generate_launch_plan.py)
+*.docx
