@@ -23,7 +23,15 @@ dist-ssr
 *.sln
 *.sw?
 .env
-.env
+.env.local
+.env.*.local
+
+# Test output
+coverage
+playwright-report
+test-results
+blob-report
+.playwright
 
 # Generated documents (rebuild with the generators in scripts/)
 *.docx

@@ -97,6 +97,7 @@ export default function Dashboard() {
           session_id,
           guests_count,
           total_amount,
+          platform_fee,
           sessions (
             starts_at,
             spots_remaining,
@@ -378,7 +379,8 @@ export default function Dashboard() {
 
     const refundAmount = calculateGuestRefund(
       booking.total_amount,
-      booking.sessions.starts_at
+      booking.sessions.starts_at,
+      booking.platform_fee
     )
 
     // HitPay refund API will be wired here during HitPay integration.
@@ -857,7 +859,8 @@ export default function Dashboard() {
                     <p className="cancel-confirm__note">
                       {guestRefundDescription(
                         booking.total_amount,
-                        booking.sessions.starts_at
+                        booking.sessions.starts_at,
+                        booking.platform_fee
                       )}
                     </p>
                     <div style={{ display: 'flex', gap: '12px' }}>
