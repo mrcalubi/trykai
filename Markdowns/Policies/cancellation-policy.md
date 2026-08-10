@@ -57,4 +57,4 @@ Once a cancellation is confirmed, the refund is processed back to your original 
 
 ## Questions or disputes
 
-If you believe a cancellation was handled incorrectly, see our [Dispute Policy](/dispute-policy) or contact us at trykaisg@gmail.com.
+If you believe a cancellation was handled incorrectly, see our [Dispute Policy](/dispute-policy) or contact us at hello@trykai.sg.

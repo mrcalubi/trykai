@@ -12,7 +12,7 @@ There are three kinds of situations this policy covers: complaints about the qua
 
 If a session did not match what was described, or something about the experience fell short (for example, the host was very late, or the session was cut short), you can raise this with us within 7 days of the session.
 
-To raise a complaint, email us at trykaisg@gmail.com with your booking reference, a description of what happened, and any evidence that helps us understand the situation, such as photos or messages. Including evidence upfront generally helps us resolve things faster.
+To raise a complaint, email us at hello@trykai.sg with your booking reference, a description of what happened, and any evidence that helps us understand the situation, such as photos or messages. Including evidence upfront generally helps us resolve things faster.
 
 We aim to respond within 2 business days. Once we have reviewed the situation, possible outcomes include a partial or full refund, a warning to the host, a strike against the host's account, or no action if we find the complaint is not supported.
 
@@ -46,4 +46,4 @@ Reviews are the main long term accountability mechanism on TryKai. We generally 
 
 ## Contact
 
-trykaisg@gmail.com, include your booking reference so we can look into it quickly.
+hello@trykai.sg, include your booking reference so we can look into it quickly.

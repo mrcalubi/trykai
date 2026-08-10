@@ -34,4 +34,4 @@ If your concern involves your safety or someone else's safety, there is no time 
 
 ## Questions
 
-If a refund has not arrived within the window above, or looks incorrect, contact us at trykaisg@gmail.com with your booking reference.
+If a refund has not arrived within the window above, or looks incorrect, contact us at hello@trykai.sg with your booking reference.
