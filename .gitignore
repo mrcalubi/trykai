@@ -25,5 +25,5 @@ dist-ssr
 .env
 .env
 
-# Generated documents (rebuild with scripts/generate_launch_plan.py)
+# Generated documents (rebuild with the generators in scripts/)
 *.docx
