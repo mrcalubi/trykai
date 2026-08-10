@@ -136,7 +136,7 @@ export default function CancellationPolicy() {
       <p>
         If you believe a cancellation was handled incorrectly, see our{' '}
         <Link to="/dispute-policy">Dispute Policy</Link> or contact us at{' '}
-        <a href="mailto:trykaisg@gmail.com">trykaisg@gmail.com</a>.
+        <a href="mailto:hello@trykai.sg">hello@trykai.sg</a>.
       </p>
     </div>
   )

@@ -75,7 +75,7 @@ export default function RefundPolicy() {
       <p>
         If a refund has not arrived within the window above, or looks incorrect,
         contact us at{' '}
-        <a href="mailto:trykaisg@gmail.com">trykaisg@gmail.com</a> with your
+        <a href="mailto:hello@trykai.sg">hello@trykai.sg</a> with your
         booking reference.
       </p>
     </div>

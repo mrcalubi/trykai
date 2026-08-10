@@ -27,7 +27,7 @@ export default function DisputePolicy() {
       </p>
       <p>
         To raise a complaint, email us at{' '}
-        <a href="mailto:trykaisg@gmail.com">trykaisg@gmail.com</a> with your
+        <a href="mailto:hello@trykai.sg">hello@trykai.sg</a> with your
         booking reference, a description of what happened, and any evidence that
         helps us understand the situation, such as photos or messages. Including
         evidence upfront generally helps us resolve things faster.
@@ -112,7 +112,7 @@ export default function DisputePolicy() {
 
       <h2>Contact</h2>
       <p>
-        <a href="mailto:trykaisg@gmail.com">trykaisg@gmail.com</a>, include your
+        <a href="mailto:hello@trykai.sg">hello@trykai.sg</a>, include your
         booking reference so we can look into it quickly.
       </p>
     </div>
