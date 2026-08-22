@@ -185,7 +185,7 @@ export default function ListingDetail() {
 
         if (confirmedBookings?.length) {
           const { data: address } = await supabase.rpc('get_listing_address', {
-            listing_id: id,
+            p_listing_id: id,
           })
           if (address) {
             setRevealedAddress(address)

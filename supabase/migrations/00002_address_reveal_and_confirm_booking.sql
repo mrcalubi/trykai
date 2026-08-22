@@ -3,7 +3,7 @@
 -- confirm_booking is callable by the owning guest so staging can simulate
 -- the payment webhook; revoke authenticated execute once the real webhook lands.
 
-CREATE OR REPLACE FUNCTION public.get_listing_address(listing_id uuid)
+CREATE OR REPLACE FUNCTION public.get_listing_address(p_listing_id uuid)
 RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -22,7 +22,7 @@ BEGIN
     JOIN public.sessions s ON s.id = b.session_id
     WHERE b.guest_id = auth.uid()
       AND b.status = 'confirmed'
-      AND s.listing_id = get_listing_address.listing_id
+      AND s.listing_id = get_listing_address.p_listing_id
   ) THEN
     RETURN NULL;
   END IF;
@@ -30,7 +30,7 @@ BEGIN
   SELECT l.full_address
   INTO v_address
   FROM public.listings l
-  WHERE l.id = get_listing_address.listing_id;
+  WHERE l.id = get_listing_address.p_listing_id;
 
   RETURN v_address;
 END;
@@ -39,7 +39,7 @@ $$;
 REVOKE ALL ON FUNCTION public.get_listing_address(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_listing_address(uuid) TO authenticated;
 
-CREATE OR REPLACE FUNCTION public.confirm_booking(booking_id uuid)
+CREATE OR REPLACE FUNCTION public.confirm_booking(p_booking_id uuid)
 RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -52,7 +52,7 @@ BEGIN
   SELECT *
   INTO v_booking
   FROM public.bookings
-  WHERE id = confirm_booking.booking_id
+  WHERE id = confirm_booking.p_booking_id
     AND status = 'pending'
   FOR UPDATE;
 

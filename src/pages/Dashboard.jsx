@@ -144,7 +144,7 @@ export default function Dashboard() {
           )
           .map(async (booking) => {
             const { data: address } = await supabase.rpc('get_listing_address', {
-              listing_id: booking.sessions.listings.id,
+              p_listing_id: booking.sessions.listings.id,
             })
             return address ? [booking.id, address] : null
           })
@@ -404,7 +404,7 @@ export default function Dashboard() {
     setStagingConfirmId(booking.id)
 
     const { error: confirmError } = await supabase.rpc('confirm_booking', {
-      booking_id: booking.id,
+      p_booking_id: booking.id,
     })
 
     setStagingConfirmId(null)
