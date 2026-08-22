@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from '../lib/supabase'
+import { isStagingMode } from '../lib/staging'
 import ReviewCard from '../components/ReviewCard'
 import { CancellationPolicyCollapsible } from '../components/CancellationPolicy'
 
@@ -243,6 +244,11 @@ export default function ListingDetail() {
 
     if (data?.error) {
       setPaymentError(data.error)
+      return
+    }
+
+    if (isStagingMode() && data?.staging_bypass && data?.booking_id) {
+      navigate(`/dashboard?booking=${data.booking_id}`)
       return
     }
 
