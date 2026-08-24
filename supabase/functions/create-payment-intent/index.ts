@@ -7,6 +7,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+/** Must match src/lib/staging.js — gate payment bypass to the staging project only. */
+const STAGING_PROJECT_REF = 'hzgybclfvpuxkmytdoos'
+
+function isStagingEnvironment() {
+  return (Deno.env.get('SUPABASE_URL') ?? '').includes(STAGING_PROJECT_REF)
+}
+
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
   apiVersion: '2023-10-16',
   httpClient: Stripe.createFetchHttpClient(),
@@ -42,6 +49,37 @@ Deno.serve(async (req) => {
     }
 
     const { totalAmount: total_amount, platformFee: platform_fee } = booking
+
+    if (isStagingEnvironment()) {
+      const { data: booking, error: bookingError } = await supabase
+        .from('bookings')
+        .insert({
+          session_id,
+          guest_id: user.id,
+          guests_count,
+          total_amount,
+          platform_fee,
+          status: 'pending',
+        })
+        .select('id')
+        .single()
+
+      if (bookingError || !booking) {
+        return new Response(JSON.stringify({ error: 'Failed to create booking' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      return new Response(JSON.stringify({
+        staging_bypass: true,
+        booking_id: booking.id,
+        total_amount,
+        platform_fee,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: total_amount,
