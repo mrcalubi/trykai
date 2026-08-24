@@ -732,6 +732,7 @@ a {
   transform-origin: left center;
   transition:
     top 0.18s ease,
+    left 0.18s ease,
     transform 0.18s ease,
     font-size 0.18s ease,
     font-weight 0.18s ease,
@@ -740,6 +741,7 @@ a {
 
 .ui-field--floating.ui-field--floated .ui-field__label {
   top: 0;
+  left: 0;
   font-size: 14px;
   font-weight: 500;
   color: var(--text-h);
