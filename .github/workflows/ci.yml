@@ -1,23 +1,160 @@
 name: CI
 
+# Runs on every pull request into staging or main, and on every push to those
+# branches after a merge. `ci-passed` at the bottom is the single check to mark as
+# required in branch protection.
 on:
   pull_request:
+    branches: [main, staging]
   push:
-    branches: [main]
+    branches: [main, staging]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  # Placeholders only. The unit suite mocks the Supabase client outright and the
+  # end-to-end suite stubs the network in the browser, so no real project,
+  # credentials or test data are needed to run CI.
+  VITE_SUPABASE_URL: https://example.supabase.co
+  VITE_SUPABASE_ANON_KEY: test-anon-key
+  VITE_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
 
 jobs:
-  lint-and-build:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
-    env:
-      VITE_SUPABASE_URL: https://example.supabase.co
-      VITE_SUPABASE_ANON_KEY: test-anon-key
-      VITE_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
       - run: npm run lint
+
+  test:
+    name: Unit and component tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Write coverage to the job summary
+        if: always()
+        run: node scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage
+          retention-days: 7
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
       - run: npm run build
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7
+
+  e2e:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      - name: Resolve the Playwright version
+        id: playwright
+        run: |
+          VERSION=$(node -p "require('@playwright/test/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the browser cache
+        id: browser-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      - name: Install Chromium
+        if: steps.browser-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install system dependencies for the cached browser
+        if: steps.browser-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - run: npm run test:e2e
+
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
+  edge-functions:
+    name: Edge function checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # The shared booking rules have no remote imports, so this check is fast
+      # and cannot be broken by a registry being unavailable.
+      - name: Type-check the shared booking rules
+        run: deno check supabase/functions/_shared/booking.ts
+
+      # The handlers import Stripe and Supabase over the network, so a failure
+      # here can mean a registry outage rather than a real problem. Advisory only.
+      - name: Type-check the function handlers
+        continue-on-error: true
+        run: deno check supabase/functions/*/index.ts
+
+  ci-passed:
+    name: CI passed
+    runs-on: ubuntu-latest
+    needs: [lint, test, build, e2e, edge-functions]
+    if: always()
+    steps:
+      - name: Fail if any job did not succeed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One or more CI jobs failed. See the checks above."
+          exit 1
+      - run: echo "All CI jobs passed."
