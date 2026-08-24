@@ -59,6 +59,18 @@ describe('VerifyIdentity access control', () => {
     expect(currentState().from.pathname).toBe('/verify-identity')
   })
 
+  // The pinned route unmounts the page on redirect, which would mask an auth
+  // effect that re-runs. Mounting at the catch-all keeps the page alive so a
+  // second redirect would be visible.
+  it('keeps the return path when the page outlives the redirect', async () => {
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    const { currentPath, currentState } = renderPage({ path: '*' })
+
+    await waitFor(() => expect(currentPath()).toBe('/login'))
+    expect(currentState().from.pathname).toBe('/verify-identity')
+    expect(supabase.auth.getSession).toHaveBeenCalledTimes(1)
+  })
+
   it('shows the upload form to an unverified host', async () => {
     renderPage()
 

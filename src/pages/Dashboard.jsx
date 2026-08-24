@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { isStagingMode } from '../lib/staging'
@@ -67,7 +67,15 @@ export default function Dashboard() {
   const [stagingConfirmError, setStagingConfirmError] = useState('')
   const stagingMode = isStagingMode()
 
+  const authCheckStarted = useRef(false)
+
   useEffect(() => {
+    // Redirecting changes both `location` and the identity of `navigate`, so
+    // without this guard the effect re-runs from /login and stashes /login as
+    // the place to return to after signing in.
+    if (authCheckStarted.current) return
+    authCheckStarted.current = true
+
     async function checkAuth() {
       const {
         data: { session },

@@ -66,7 +66,15 @@ export default function CreateListing() {
     photosRef.current = photos
   }, [photos])
 
+  const authCheckStarted = useRef(false)
+
   useEffect(() => {
+    // Redirecting changes both `location` and the identity of `navigate`, so
+    // without this guard the effect re-runs from /login and stashes /login as
+    // the place to return to after signing in.
+    if (authCheckStarted.current) return
+    authCheckStarted.current = true
+
     async function checkAuth() {
       const {
         data: { session },
