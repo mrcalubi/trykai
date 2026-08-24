@@ -17,6 +17,28 @@ describe('Input', () => {
     render(<Input id="password" label="Password" type="password" />)
 
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
+    expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
+  })
+
+  it('toggles a password field between masked and plain text', async () => {
+    const user = userEvent.setup()
+    render(<Input id="password" label="Password" type="password" />)
+
+    const field = screen.getByLabelText('Password')
+    const toggle = screen.getByRole('button', { name: 'Show password' })
+
+    await user.click(toggle)
+    expect(field).toHaveAttribute('type', 'text')
+    expect(screen.getByRole('button', { name: 'Hide password' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Hide password' }))
+    expect(field).toHaveAttribute('type', 'password')
+  })
+
+  it('does not show a visibility toggle on text fields', () => {
+    render(<Input id="full-name" label="Full name" />)
+
+    expect(screen.queryByRole('button', { name: 'Show password' })).not.toBeInTheDocument()
   })
 
   it('shows an error message below the field', () => {

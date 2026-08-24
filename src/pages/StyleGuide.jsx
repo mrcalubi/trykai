@@ -67,7 +67,7 @@ export default function StyleGuide() {
           </article>
           <article className="style-guide-card">
             <p className="style-guide-card__label">Password</p>
-            <p className="style-guide-card__usage">Used for login and signup</p>
+            <p className="style-guide-card__usage">Used for login and signup. Eye toggles masked and plain text</p>
             <Input
               id="style-guide-password"
               label="Password"
@@ -75,6 +75,26 @@ export default function StyleGuide() {
               placeholder="••••••••"
               autoComplete="current-password"
             />
+          </article>
+          <article className="style-guide-card">
+            <p className="style-guide-card__label">Forgot password</p>
+            <p className="style-guide-card__usage">
+              Visual placeholder only — password reset is not built yet
+            </p>
+            <div className="style-guide-password-preview">
+              <div className="style-guide-field__label-row">
+                <label htmlFor="style-guide-password-forgot" className="ui-field__label">
+                  Password
+                </label>
+                <span className="style-guide-forgot-link">Forgot password?</span>
+              </div>
+              <Input
+                id="style-guide-password-forgot"
+                type="password"
+                placeholder="••••••••"
+                autoComplete="current-password"
+              />
+            </div>
           </article>
           <article className="style-guide-card">
             <p className="style-guide-card__label">Error</p>
