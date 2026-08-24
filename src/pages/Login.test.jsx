@@ -10,6 +10,7 @@ vi.mock('../lib/supabase')
 function renderLogin({ from } = {}) {
   return renderWithRouter(<Login />, {
     route: { pathname: '/login', state: from ? { from: { pathname: from } } : null },
+    path: '/login',
   })
 }
 
