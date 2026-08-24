@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
-import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom'
+import { useEffect, useState, useCallback } from 'react'
+import { useLocation, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuthedUserId } from '../lib/authedUser'
 import { isStagingMode } from '../lib/staging'
 import StarPicker from '../components/StarPicker'
 import {
@@ -25,12 +26,10 @@ function formatSessionDateTime(iso) {
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
+  const userId = useAuthedUserId()
 
-  const [authChecked, setAuthChecked] = useState(false)
-  const [userId, setUserId] = useState(null)
   const [listings, setListings] = useState([])
   const [bookings, setBookings] = useState([])
   const [hostSessions, setHostSessions] = useState([])
@@ -66,32 +65,6 @@ export default function Dashboard() {
   const [stagingConfirmId, setStagingConfirmId] = useState(null)
   const [stagingConfirmError, setStagingConfirmError] = useState('')
   const stagingMode = isStagingMode()
-
-  const authCheckStarted = useRef(false)
-
-  useEffect(() => {
-    // Redirecting changes both `location` and the identity of `navigate`, so
-    // without this guard the effect re-runs from /login and stashes /login as
-    // the place to return to after signing in.
-    if (authCheckStarted.current) return
-    authCheckStarted.current = true
-
-    async function checkAuth() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session) {
-        navigate('/login', { state: { from: location }, replace: true })
-        return
-      }
-
-      setUserId(session.user.id)
-      setAuthChecked(true)
-    }
-
-    checkAuth()
-  }, [navigate, location])
 
   const loadData = useCallback(async () => {
     const [listingsResult, bookingsResult, reviewsResult] = await Promise.all([
@@ -203,8 +176,6 @@ export default function Dashboard() {
   }, [userId])
 
   useEffect(() => {
-    if (!userId) return
-
     let cancelled = false
     void Promise.resolve().then(() => {
       if (!cancelled) loadData()
@@ -213,10 +184,10 @@ export default function Dashboard() {
     return () => {
       cancelled = true
     }
-  }, [userId, loadData])
+  }, [loadData])
 
   useEffect(() => {
-    if (!pendingBookingId || !userId) return
+    if (!pendingBookingId) return
 
     let cancelled = false
     let attempts = 0
@@ -611,7 +582,7 @@ export default function Dashboard() {
     setHostSessions((prev) => prev.filter((s) => s.listing_id !== listingId))
   }
 
-  if (!authChecked || loading) {
+  if (loading) {
     return <p className="status-message">Loading…</p>
   }
 

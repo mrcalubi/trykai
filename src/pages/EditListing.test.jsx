@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import EditListing from './EditListing'
+import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession, makeListing } from '../test/fixtures'
@@ -34,11 +35,15 @@ function givenListing(overrides = {}) {
   })
 }
 
+// Mounted behind the same guard App.jsx puts it behind, so the page always has
+// a signed-in user. RequireAuth owns the signed-out case and tests it itself.
 function renderPage() {
-  return renderWithRouter(<EditListing />, {
-    route: '/edit-listing/listing-1',
-    path: '/edit-listing/:id',
-  })
+  return renderWithRouter(
+    <RequireAuth>
+      <EditListing />
+    </RequireAuth>,
+    { route: '/edit-listing/listing-1', path: '/edit-listing/:id' }
+  )
 }
 
 async function renderLoaded() {
@@ -58,28 +63,6 @@ beforeEach(() => {
 })
 
 describe('EditListing access control', () => {
-  it('sends signed-out visitors to log in', async () => {
-    supabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
-    const { currentPath, currentState } = renderPage()
-
-    await waitFor(() => expect(currentPath()).toBe('/login'))
-    expect(currentState().from.pathname).toBe('/edit-listing/listing-1')
-  })
-
-  // The pinned route unmounts the page on redirect, which would mask an auth
-  // effect that re-runs. Mounting at the catch-all keeps the page alive so a
-  // second redirect would be visible.
-  it('keeps the return path when the page outlives the redirect', async () => {
-    supabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
-    const { currentPath, currentState } = renderWithRouter(<EditListing />, {
-      route: '/edit-listing/listing-1',
-    })
-
-    await waitFor(() => expect(currentPath()).toBe('/login'))
-    expect(currentState().from.pathname).toBe('/edit-listing/listing-1')
-    expect(supabase.auth.getSession).toHaveBeenCalledTimes(1)
-  })
-
   it('only loads a listing the signed-in user hosts', async () => {
     await renderLoaded()
 
@@ -227,6 +210,21 @@ describe('EditListing saving', () => {
       full_address: '12 Coffee Road',
     })
     expect(call.filters).toContainEqual({ method: 'eq', column: 'host_id', value: HOST_ID })
+  })
+
+  it('saves a listing that has moved to a new address', async () => {
+    const { user } = await renderLoaded()
+    await user.selectOptions(screen.getByLabelText('Area'), 'Tampines')
+    await user.clear(screen.getByLabelText(/^Full address/))
+    await user.type(screen.getByLabelText(/^Full address/), '5 Espresso Lane')
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'update').payload).toMatchObject({
+      area: 'Tampines',
+      full_address: '5 Espresso Lane',
+    })
   })
 
   it('returns to the dashboard with a confirmation', async () => {

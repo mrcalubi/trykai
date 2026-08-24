@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Dashboard from './Dashboard'
+import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { hoursFromNow, makeAuthSession, makeBooking } from '../test/fixtures'
@@ -58,12 +59,15 @@ function makeMyListing(overrides = {}) {
   return { id: 'listing-1', title: 'Latte art', area: 'Bedok', category: 'Food', ...overrides }
 }
 
+// Mounted behind the same guard App.jsx puts it behind, so the page always has
+// a signed-in user. RequireAuth owns the signed-out case and tests it itself.
 async function renderDashboard(options = {}) {
-  const utils = renderWithRouter(<Dashboard />, {
-    route: '/dashboard',
-    path: '/dashboard',
-    ...options,
-  })
+  const utils = renderWithRouter(
+    <RequireAuth>
+      <Dashboard />
+    </RequireAuth>,
+    { route: '/dashboard', path: '/dashboard', ...options }
+  )
   await screen.findByRole('heading', { name: 'Dashboard', level: 1 })
   return utils
 }
@@ -79,31 +83,6 @@ beforeEach(() => {
 })
 
 describe('Dashboard access control', () => {
-  it('sends signed-out visitors to log in', async () => {
-    supabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
-    const { currentPath, currentState } = renderWithRouter(<Dashboard />, {
-      route: '/dashboard',
-      path: '/dashboard',
-    })
-
-    await waitFor(() => expect(currentPath()).toBe('/login'))
-    expect(currentState().from.pathname).toBe('/dashboard')
-  })
-
-  // The pinned route unmounts the page on redirect, which would mask an auth
-  // effect that re-runs. Mounting at the catch-all keeps the page alive so a
-  // second redirect would be visible.
-  it('keeps the return path when the page outlives the redirect', async () => {
-    supabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
-    const { currentPath, currentState } = renderWithRouter(<Dashboard />, {
-      route: '/dashboard',
-    })
-
-    await waitFor(() => expect(currentPath()).toBe('/login'))
-    expect(currentState().from.pathname).toBe('/dashboard')
-    expect(supabase.auth.getSession).toHaveBeenCalledTimes(1)
-  })
-
   it('scopes every query to the signed-in user', async () => {
     givenSignedIn('user-42')
     await renderDashboard()
@@ -746,10 +725,12 @@ describe('Dashboard reviews', () => {
 
 describe('Dashboard post-payment status', () => {
   function renderReturningFromPayment() {
-    return renderWithRouter(<Dashboard />, {
-      route: '/dashboard?booking=booking-1',
-      path: '/dashboard',
-    })
+    return renderWithRouter(
+      <RequireAuth>
+        <Dashboard />
+      </RequireAuth>,
+      { route: '/dashboard?booking=booking-1', path: '/dashboard' }
+    )
   }
 
   it('confirms the booking when the webhook has already landed', async () => {

@@ -96,6 +96,42 @@ the fields it cares about. `renderWithRouter` in `src/test/render.jsx` mounts a
 page inside a router and returns `currentPath()`, `currentSearch()` and
 `currentState()` for asserting on navigation.
 
+### Pinning the route
+
+Always pass `path` for a page, matching the pattern it has in `App.jsx`:
+
+```js
+renderWithRouter(<EditListing />, {
+  route: '/edit-listing/listing-1',
+  path: '/edit-listing/:id',
+})
+```
+
+Without it the element mounts at a catch-all and stays mounted after the app
+navigates away, which the real router never allows. That once hid a redirect
+that overwrote its own return path. The helper now throws when the location
+changes under a catch-all; pass `outlivesNavigation: true` for chrome such as
+the navbar, which genuinely does span routes.
+
+### Pages that need an account
+
+`RequireAuth` owns the session check, so a protected page never renders without
+a user and reads the id from `useAuthedUserId()`. Mount such a page the way
+`App.jsx` does and let the existing `getSession` stub decide who is signed in:
+
+```js
+renderWithRouter(
+  <RequireAuth>
+    <Dashboard />
+  </RequireAuth>,
+  { route: '/dashboard', path: '/dashboard' }
+)
+```
+
+The signed-out redirect is tested once, in `src/components/RequireAuth.test.jsx`.
+`src/App.test.jsx` checks that each protected path is actually wired to the
+guard, which is the part a page test mounting the guard by hand cannot prove.
+
 ### Form validation
 
 Several forms guard in JavaScript behind fields the browser also validates. Where

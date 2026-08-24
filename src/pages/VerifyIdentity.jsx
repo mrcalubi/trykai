@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuthedUserId } from '../lib/authedUser'
 
 export default function VerifyIdentity() {
   const navigate = useNavigate()
   const location = useLocation()
+  const userId = useAuthedUserId()
 
-  const [authChecked, setAuthChecked] = useState(false)
-  const [userId, setUserId] = useState(null)
+  const [statusChecked, setStatusChecked] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState(null)
   const [idPhoto, setIdPhoto] = useState(null)
   const [selfie, setSelfie] = useState(null)
@@ -15,39 +16,20 @@ export default function VerifyIdentity() {
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  const authCheckStarted = useRef(false)
-
   useEffect(() => {
-    // Redirecting changes both `location` and the identity of `navigate`, so
-    // without this guard the effect re-runs from /login and stashes /login as
-    // the place to return to after signing in.
-    if (authCheckStarted.current) return
-    authCheckStarted.current = true
-
-    async function checkAuth() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session) {
-        navigate('/login', { state: { from: location }, replace: true })
-        return
-      }
-
-      setUserId(session.user.id)
-
+    async function loadStatus() {
       const { data } = await supabase
         .from('users')
         .select('verification_status')
-        .eq('id', session.user.id)
+        .eq('id', userId)
         .single()
 
       setVerificationStatus(data?.verification_status || 'unverified')
-      setAuthChecked(true)
+      setStatusChecked(true)
     }
 
-    checkAuth()
-  }, [navigate, location])
+    loadStatus()
+  }, [userId])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -103,7 +85,7 @@ export default function VerifyIdentity() {
     setSubmitted(true)
   }
 
-  if (!authChecked) {
+  if (!statusChecked) {
     return <p className="status-message">Loading…</p>
   }
 
