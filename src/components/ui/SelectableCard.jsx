@@ -31,14 +31,13 @@ export default function SelectableCard({
         {image ? (
           <img src={image} alt={imageAlt} className="ui-selectable-card__image" />
         ) : (
-          <span className="ui-selectable-card__pending" aria-hidden="true">
-            <span className="ui-selectable-card__pending-circle" />
-            <span className="ui-selectable-card__pending-label">artwork pending</span>
-          </span>
+          <span className="ui-selectable-card__pending-circle" aria-hidden="true" />
         )}
       </span>
       <span className="ui-selectable-card__body">
-        {description ? (
+        {placeholder ? (
+          <span className="ui-selectable-card__pending-label">artwork pending</span>
+        ) : description ? (
           <span className="ui-selectable-card__description">{description}</span>
         ) : null}
         {title ? <span className="ui-selectable-card__title">{title}</span> : null}
@@ -50,8 +49,8 @@ export default function SelectableCard({
         {selected ? (
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
+            width="12"
+            height="12"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"

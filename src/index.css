@@ -795,23 +795,23 @@ a {
 }
 
 .ui-selectable-card {
-  position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  flex-direction: row;
+  align-items: center;
   gap: 12px;
   width: 100%;
   min-width: 0;
-  padding: 16px;
+  min-height: 64px;
+  padding: 10px 12px;
   text-align: left;
   font: inherit;
   color: inherit;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .ui-selectable-card:hover {
@@ -821,7 +821,7 @@ a {
 
 .ui-selectable-card--selected {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px var(--primary-bg);
+  box-shadow: 0 0 0 1px var(--primary);
 }
 
 .ui-selectable-card:focus-visible {
@@ -831,34 +831,25 @@ a {
 
 .ui-selectable-card__media {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 88px;
-  height: 88px;
-  margin: 0 auto;
+  width: 44px;
+  height: 44px;
 }
 
 .ui-selectable-card__image {
   display: block;
-  width: 88px;
-  height: 88px;
+  width: 44px;
+  height: 44px;
   object-fit: cover;
   border-radius: 50%;
 }
 
-.ui-selectable-card__pending {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-}
-
 .ui-selectable-card__pending-circle {
   display: block;
-  width: 88px;
-  height: 88px;
+  width: 44px;
+  height: 44px;
   background: var(--cream);
   border: 1px solid var(--border);
   border-radius: 50%;
@@ -866,50 +857,55 @@ a {
 
 .ui-selectable-card__pending-label {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.02em;
+  line-height: 1.2;
   text-transform: uppercase;
   color: var(--navy-muted);
 }
 
 .ui-selectable-card__body {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
-  padding-right: 28px;
 }
 
 .ui-selectable-card__description {
+  overflow: hidden;
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
-  line-height: 1.35;
+  line-height: 1.3;
   color: var(--navy-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ui-selectable-card__title {
+  overflow: hidden;
   font-family: var(--display);
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.25;
   color: var(--text-h);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ui-selectable-card__indicator {
-  position: absolute;
-  top: 14px;
-  right: 14px;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   color: transparent;
   background: transparent;
   border: 1.5px solid var(--border);
-  border-radius: 50%;
+  border-radius: 3px;
 }
 
 .ui-selectable-card__indicator--on {
@@ -1870,7 +1866,7 @@ a {
 
 .style-guide-selectable-grid {
   display: grid;
-  gap: 16px;
+  gap: 8px;
   grid-template-columns: 1fr;
 }
 
@@ -1882,6 +1878,6 @@ a {
 
 @media (min-width: 1024px) {
   .style-guide-selectable-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
