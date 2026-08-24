@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import Input from './Input'
 
@@ -43,5 +44,39 @@ describe('Input', () => {
     const field = screen.getByLabelText('Email')
     expect(field).toBeRequired()
     expect(field).toHaveAttribute('autoComplete', 'email')
+  })
+
+  it('keeps the default label above the field', () => {
+    const { container } = render(<Input id="full-name" label="Full name" />)
+
+    expect(container.querySelector('.ui-field')).not.toHaveClass('ui-field--floating')
+    expect(container.querySelector('.ui-field__control')).not.toBeInTheDocument()
+  })
+
+  it('renders an optional floating label inside the field', () => {
+    const { container } = render(
+      <Input id="full-name-floating" label="Full name" floatingLabel />
+    )
+
+    expect(screen.getByLabelText('Full name')).toBeInTheDocument()
+    expect(container.querySelector('.ui-field')).toHaveClass('ui-field--floating')
+    expect(container.querySelector('.ui-field__control')).toBeInTheDocument()
+  })
+
+  it('floats the label on focus and keeps it up when the field has a value', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <Input id="full-name-floating" label="Full name" floatingLabel />
+    )
+    const field = screen.getByLabelText('Full name')
+
+    expect(container.querySelector('.ui-field')).not.toHaveClass('ui-field--floated')
+
+    await user.click(field)
+    expect(container.querySelector('.ui-field')).toHaveClass('ui-field--floated')
+
+    await user.type(field, 'Mei Ling')
+    await user.tab()
+    expect(container.querySelector('.ui-field')).toHaveClass('ui-field--floated')
   })
 })

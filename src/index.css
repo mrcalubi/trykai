@@ -708,6 +708,54 @@ a {
   box-shadow: 0 0 0 3px rgba(155, 44, 44, 0.12);
 }
 
+.ui-field--floating .ui-field__control {
+  position: relative;
+  padding-top: 22px;
+}
+
+.ui-field--floating .ui-input::placeholder {
+  color: transparent;
+}
+
+.ui-field--floating .ui-field__label {
+  position: absolute;
+  left: 14px;
+  top: calc(22px + 22px);
+  z-index: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--navy-muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+  transform-origin: left center;
+  transition:
+    top 0.18s ease,
+    transform 0.18s ease,
+    font-size 0.18s ease,
+    font-weight 0.18s ease,
+    color 0.18s ease;
+}
+
+.ui-field--floating.ui-field--floated .ui-field__label {
+  top: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-h);
+  transform: none;
+}
+
+.ui-field--floating .ui-input--error ~ .ui-field__label {
+  color: var(--error);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-field--floating .ui-field__label {
+    transition: none;
+  }
+}
+
 .ui-card {
   display: flex;
   flex-direction: column;

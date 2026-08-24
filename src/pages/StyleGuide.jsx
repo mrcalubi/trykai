@@ -44,13 +44,24 @@ export default function StyleGuide() {
         <h2 id="input-preview-heading">Inputs</h2>
         <div className="style-guide-grid">
           <article className="style-guide-card">
-            <p className="style-guide-card__label">Text</p>
-            <p className="style-guide-card__usage">Used for names, titles, and other short text</p>
+            <p className="style-guide-card__label">Default</p>
+            <p className="style-guide-card__usage">Label stays above the field</p>
             <Input
               id="style-guide-full-name"
               label="Full name"
               type="text"
               placeholder="Your name"
+              autoComplete="name"
+            />
+          </article>
+          <article className="style-guide-card">
+            <p className="style-guide-card__label">Floating label</p>
+            <p className="style-guide-card__usage">Sits inside until focus or a value, then floats above</p>
+            <Input
+              id="style-guide-full-name-floating"
+              label="Full name"
+              type="text"
+              floatingLabel
               autoComplete="name"
             />
           </article>
