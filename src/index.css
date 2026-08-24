@@ -708,6 +708,81 @@ a {
   box-shadow: 0 0 0 3px rgba(155, 44, 44, 0.12);
 }
 
+.ui-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  border: 1px solid rgba(22, 38, 75, 0.12);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(22, 38, 75, 0.06);
+}
+
+.ui-card__image-wrap {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--bg-subtle);
+}
+
+.ui-card__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ui-card__placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #ebe7de 0%, #e0dbd0 100%);
+}
+
+.ui-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+}
+
+.ui-card__title {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-h);
+}
+
+.ui-card__meta {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--navy-muted);
+}
+
+.ui-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.ui-card__price {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
 .link-btn {
   padding: 0;
   font-size: inherit;
@@ -1422,6 +1497,12 @@ a {
   font-size: 1.25rem;
 }
 
+.style-guide-section__note {
+  margin: -8px 0 16px;
+  font-size: 14px;
+  color: var(--text);
+}
+
 .style-guide-grid {
   display: grid;
   gap: 16px;
@@ -1455,5 +1536,23 @@ a {
   .style-guide-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: start;
+  }
+}
+
+.style-guide-card-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .style-guide-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .style-guide-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

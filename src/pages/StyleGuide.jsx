@@ -1,5 +1,6 @@
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import Card from '../components/ui/Card'
 
 const BUTTON_PREVIEWS = [
   {
@@ -76,6 +77,25 @@ export default function StyleGuide() {
               autoComplete="email"
             />
           </article>
+        </div>
+      </section>
+
+      <section className="style-guide-section" aria-labelledby="card-preview-heading">
+        <h2 id="card-preview-heading">Cards</h2>
+        <p className="style-guide-section__note">
+          Base for browse listing cards and dashboard booking cards. Full width on phone.
+        </p>
+        <div className="style-guide-card-grid">
+          <Card
+            title="Learn latte art with me"
+            meta={['Mei Ling · Tampines', 'Sat, 30 Aug at 2:00 pm']}
+            footer={
+              <>
+                <span className="ui-card__price">$20/person</span>
+                <Button variant="primary">Book</Button>
+              </>
+            }
+          />
         </div>
       </section>
     </div>
