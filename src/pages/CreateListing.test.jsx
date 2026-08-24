@@ -18,8 +18,14 @@ function givenVerification(status) {
   supabase.__on('users', 'select', { data: { verification_status: status }, error: null })
 }
 
+// The route pattern has to be pinned. Under the helper's catch-all default the
+// page stays mounted after it redirects, which App.jsx never does, and its auth
+// effect fires a second time from /login.
 function renderPage() {
-  return renderWithRouter(<CreateListing />, { route: '/create-listing' })
+  return renderWithRouter(<CreateListing />, {
+    route: '/create-listing',
+    path: '/create-listing',
+  })
 }
 
 /**
@@ -64,6 +70,9 @@ describe('CreateListing access control', () => {
 
     await waitFor(() => expect(currentPath()).toBe('/login'))
     expect(currentState().from.pathname).toBe('/create-listing')
+    // A second auth check would redirect again and overwrite `from` with /login,
+    // leaving the visitor stranded on the login page after they sign in.
+    expect(supabase.auth.getSession).toHaveBeenCalledTimes(1)
   })
 
   it('sends unverified hosts to identity verification with an explanation', async () => {
