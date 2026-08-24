@@ -1,14 +1,22 @@
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import Card from './Card'
+import Button from './Button'
 
 describe('Card', () => {
-  it('renders a title, meta lines, and footer', () => {
+  it('renders booking mode with title, meta lines, and footer', () => {
     render(
       <Card
+        mode="booking"
         title="Learn latte art with me"
         meta={['Mei Ling · Tampines', 'Sat, 30 Aug at 2:00 pm']}
-        footer={<span>$20/person</span>}
+        footer={
+          <>
+            <span className="ui-card__price">$20/person</span>
+            <Button variant="primary">Book</Button>
+          </>
+        }
       />
     )
 
@@ -16,6 +24,7 @@ describe('Card', () => {
     expect(screen.getByText('Mei Ling · Tampines')).toBeInTheDocument()
     expect(screen.getByText('Sat, 30 Aug at 2:00 pm')).toBeInTheDocument()
     expect(screen.getByText('$20/person')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Book' })).toBeInTheDocument()
   })
 
   it('renders the image when a source is provided', () => {
@@ -28,9 +37,61 @@ describe('Card', () => {
   })
 
   it('falls back to a placeholder when there is no image', () => {
-    const { container } = render(<Card title="Boxing basics" />)
+    const { container } = render(<Card mode="browse" title="Boxing basics" />)
 
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
     expect(container.querySelector('.ui-card__placeholder')).toBeInTheDocument()
+  })
+
+  it('omits the image area in booking mode when there is no image', () => {
+    const { container } = render(
+      <Card mode="booking" title="Learn latte art with me" meta="Sat, 30 Aug at 2:00 pm" />
+    )
+
+    expect(container.querySelector('.ui-card__image-wrap')).not.toBeInTheDocument()
+  })
+
+  it('overlays an optional category badge on the image', () => {
+    render(<Card title="Latte art" badge="Food" />)
+
+    expect(screen.getByText('Food')).toBeInTheDocument()
+  })
+
+  it('shows a rating only when a real rating value is passed', () => {
+    const { rerender, container } = render(
+      <Card title="Latte art" meta="Mei Ling · Tampines" rating={4.8} />
+    )
+
+    expect(screen.getByText(/4\.8/)).toBeInTheDocument()
+    expect(container.querySelector('.ui-card__rating')).toBeInTheDocument()
+
+    rerender(<Card title="Latte art" meta="Mei Ling · Tampines" />)
+    expect(container.querySelector('.ui-card__rating')).not.toBeInTheDocument()
+    expect(screen.queryByText('0')).not.toBeInTheDocument()
+    expect(screen.queryByText('—')).not.toBeInTheDocument()
+  })
+
+  it('renders browse mode as a link with badge, compact meta, and price only', () => {
+    render(
+      <MemoryRouter>
+        <Card
+          mode="browse"
+          to="/listings/latte"
+          badge="Food"
+          title="Learn latte art with me"
+          meta="Mei Ling · Tampines"
+          rating={4.8}
+          price="$20/person"
+        />
+      </MemoryRouter>
+    )
+
+    const link = screen.getByRole('link', { name: /Learn latte art with me/ })
+    expect(link).toHaveAttribute('href', '/listings/latte')
+    expect(link.className).toContain('ui-card--browse')
+    expect(screen.getByText('Food')).toBeInTheDocument()
+    expect(screen.getByText('Mei Ling · Tampines')).toBeInTheDocument()
+    expect(screen.getByText('$20/person')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 })

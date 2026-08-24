@@ -143,19 +143,41 @@ export default function StyleGuide() {
       <section className="style-guide-section" aria-labelledby="card-preview-heading">
         <h2 id="card-preview-heading">Cards</h2>
         <p className="style-guide-section__note">
-          Base for browse listing cards and dashboard booking cards. Full width on phone.
+          Borderless grid tiles. Browse is the whole-card link; booking keeps date and actions.
         </p>
         <div className="style-guide-card-grid">
-          <Card
-            title="Learn latte art with me"
-            meta={['Mei Ling · Tampines', 'Sat, 30 Aug at 2:00 pm']}
-            footer={
-              <>
-                <span className="ui-card__price">$20/person</span>
-                <Button variant="primary">Book</Button>
-              </>
-            }
-          />
+          <article className="style-guide-card-example">
+            <p className="style-guide-card__label">Browse card</p>
+            <p className="style-guide-card__usage">
+              Category badge, host · area, optional rating, price only. Whole card clickable.
+            </p>
+            <Card
+              mode="browse"
+              to="/listings/example"
+              badge="Food"
+              title="Learn latte art with me"
+              meta="Mei Ling · Tampines"
+              rating={4.8}
+              price="$20/person"
+            />
+          </article>
+          <article className="style-guide-card-example">
+            <p className="style-guide-card__label">Booking card</p>
+            <p className="style-guide-card__usage">
+              Date, price, and action buttons for the dashboard booking row.
+            </p>
+            <Card
+              mode="booking"
+              title="Learn latte art with me"
+              meta={['Mei Ling · Tampines', 'Sat, 30 Aug at 2:00 pm']}
+              footer={
+                <>
+                  <span className="ui-card__price">$20/person</span>
+                  <Button variant="primary">Book</Button>
+                </>
+              }
+            />
+          </article>
         </div>
       </section>
 
