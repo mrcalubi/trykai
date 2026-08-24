@@ -1,5 +1,6 @@
 import Stripe from 'https://esm.sh/stripe@13.3.0?target=deno'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { prepareBooking } from '../_shared/booking.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,11 +43,12 @@ Deno.serve(async (req) => {
       .eq('id', session_id)
       .single()
 
-    if (!session) return new Response('Session not found', { status: 404, headers: corsHeaders })
-    if (session.spots_remaining < guests_count) return new Response('Not enough spots', { status: 400, headers: corsHeaders })
+    const booking = prepareBooking(session, guests_count)
+    if (!booking.ok) {
+      return new Response(booking.message, { status: booking.status, headers: corsHeaders })
+    }
 
-    const total_amount = session.listings.price_per_person * guests_count
-    const platform_fee = Math.round(total_amount * 0.15)
+    const { totalAmount: total_amount, platformFee: platform_fee } = booking
 
     if (isStagingEnvironment()) {
       const { data: booking, error: bookingError } = await supabase
