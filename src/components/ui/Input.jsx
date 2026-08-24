@@ -123,7 +123,7 @@ export default function Input({
       aria-controls={inputId}
       onClick={() => setPasswordVisible((visible) => !visible)}
     >
-      {passwordVisible ? <EyeOffIcon /> : <EyeIcon />}
+      {passwordVisible ? <EyeIcon /> : <EyeOffIcon />}
     </button>
   ) : null
   const inputWithToggle = isPassword ? (

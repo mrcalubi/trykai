@@ -1,6 +1,32 @@
+import { useState } from 'react'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Card from '../components/ui/Card'
+import SelectableCard from '../components/ui/SelectableCard'
+import foodIcon from '../assets/categories/food.png'
+import fitnessIcon from '../assets/categories/fitness.png'
+import artsIcon from '../assets/categories/arts.png'
+// import musicIcon from '../assets/categories/music.png'
+// import languageIcon from '../assets/categories/language.png'
+// import otherIcon from '../assets/categories/other.png'
+
+const CATEGORY_ICONS = {
+  Food: foodIcon,
+  Fitness: fitnessIcon,
+  Arts: artsIcon,
+  // Music: musicIcon,
+  // Language: languageIcon,
+  // Other: otherIcon,
+}
+
+const BROWSE_CATEGORIES = [
+  { title: 'Food', description: 'Cook, bake, and taste something new' },
+  { title: 'Fitness', description: 'Move, train, and try a workout' },
+  { title: 'Arts', description: 'Make, paint, and create by hand' },
+  { title: 'Music', description: 'Sing, play, or listen together' },
+  { title: 'Language', description: 'Practice conversation and phrases' },
+  { title: 'Other', description: 'Everything that does not fit above' },
+]
 
 const BUTTON_PREVIEWS = [
   {
@@ -24,6 +50,9 @@ const BUTTON_PREVIEWS = [
 ]
 
 export default function StyleGuide() {
+  // Matches Home category pills: single select, one active category at a time.
+  const [selectedCategory, setSelectedCategory] = useState('Food')
+
   return (
     <div className="page">
       <h1>Component preview</h1>
@@ -127,6 +156,31 @@ export default function StyleGuide() {
               </>
             }
           />
+        </div>
+      </section>
+
+      <section className="style-guide-section" aria-labelledby="selectable-card-preview-heading">
+        <h2 id="selectable-card-preview-heading">Selectable cards</h2>
+        <p className="style-guide-section__note">
+          Browse category cards. Single select, same as Home filter pills. Preview only.
+        </p>
+        <div className="style-guide-selectable-grid">
+          {BROWSE_CATEGORIES.map((category) => {
+            const image = CATEGORY_ICONS[category.title]
+            const pending = !image
+            return (
+              <SelectableCard
+                key={category.title}
+                title={category.title}
+                description={category.description}
+                image={image}
+                imageAlt={category.title}
+                placeholder={pending}
+                selected={selectedCategory === category.title}
+                onSelect={() => setSelectedCategory(category.title)}
+              />
+            )
+          })}
         </div>
       </section>
     </div>
