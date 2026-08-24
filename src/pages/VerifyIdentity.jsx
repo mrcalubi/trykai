@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -15,7 +15,15 @@ export default function VerifyIdentity() {
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
+  const authCheckStarted = useRef(false)
+
   useEffect(() => {
+    // Redirecting changes both `location` and the identity of `navigate`, so
+    // without this guard the effect re-runs from /login and stashes /login as
+    // the place to return to after signing in.
+    if (authCheckStarted.current) return
+    authCheckStarted.current = true
+
     async function checkAuth() {
       const {
         data: { session },

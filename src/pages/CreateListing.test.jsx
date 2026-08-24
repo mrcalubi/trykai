@@ -75,6 +75,19 @@ describe('CreateListing access control', () => {
     expect(supabase.auth.getSession).toHaveBeenCalledTimes(1)
   })
 
+  // The pinned route unmounts the page on redirect, which would mask an auth
+  // effect that re-runs. Mounting at the catch-all keeps the page alive so a
+  // second redirect would be visible.
+  it('keeps the return path when the page outlives the redirect', async () => {
+    const { currentPath, currentState } = renderWithRouter(<CreateListing />, {
+      route: '/create-listing',
+    })
+
+    await waitFor(() => expect(currentPath()).toBe('/login'))
+    expect(currentState().from.pathname).toBe('/create-listing')
+    expect(supabase.auth.getSession).toHaveBeenCalledTimes(1)
+  })
+
   it('sends unverified hosts to identity verification with an explanation', async () => {
     givenSignedIn()
     givenVerification('unverified')
