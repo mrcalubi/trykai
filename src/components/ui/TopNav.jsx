@@ -44,8 +44,52 @@ function PersonIcon() {
   )
 }
 
+export function getInitials(name) {
+  if (!name || typeof name !== 'string') return ''
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase()
+}
+
+/** Logged-in account control: photo → initials → person glyph. */
+export function TopNavAccount({ avatarUrl, name, className = '' }) {
+  const initials = getInitials(name)
+  const classes = [
+    'ui-topnav__account',
+    avatarUrl ? 'ui-topnav__account--photo' : '',
+    !avatarUrl && initials ? 'ui-topnav__account--initials' : '',
+    !avatarUrl && !initials ? 'ui-topnav__account--glyph' : '',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <span className={classes} aria-label="Account">
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt=""
+          width="36"
+          height="36"
+          className="ui-topnav__avatar-img"
+        />
+      ) : initials ? (
+        <span className="ui-topnav__avatar-initials" aria-hidden="true">
+          {initials}
+        </span>
+      ) : (
+        <PersonIcon />
+      )}
+    </span>
+  )
+}
+
 export default function TopNav({
   isLoggedIn = false,
+  avatarUrl,
+  name,
   onMenuClick,
   className = '',
 }) {
@@ -126,9 +170,7 @@ export default function TopNav({
 
           <div className="ui-topnav__end">
             {isLoggedIn ? (
-              <span className="ui-topnav__account" aria-label="Account">
-                <PersonIcon />
-              </span>
+              <TopNavAccount avatarUrl={avatarUrl} name={name} />
             ) : (
               <Link to="/login" className="ui-topnav__login">
                 Log in

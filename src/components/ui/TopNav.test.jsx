@@ -2,7 +2,7 @@ import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
-import TopNav from './TopNav'
+import TopNav, { getInitials } from './TopNav'
 
 function renderTopNav(props = {}) {
   return render(
@@ -11,6 +11,15 @@ function renderTopNav(props = {}) {
     </MemoryRouter>
   )
 }
+
+describe('getInitials', () => {
+  it('uses the first letter of the first and last words', () => {
+    expect(getInitials('Mei Ling')).toBe('ML')
+    expect(getInitials('  Ada  Lovelace  ')).toBe('AL')
+    expect(getInitials('Kai')).toBe('K')
+    expect(getInitials('')).toBe('')
+  })
+})
 
 describe('TopNav', () => {
   it('shows the brand mark, wordmark, menu control, and Log in when logged out', () => {
@@ -23,11 +32,29 @@ describe('TopNav', () => {
     expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login')
   })
 
-  it('shows a person icon instead of Log in when logged in', () => {
-    renderTopNav({ isLoggedIn: true })
+  it('shows a circular photo when logged in with avatarUrl', () => {
+    renderTopNav({ isLoggedIn: true, avatarUrl: '/trykai.png', name: 'Mei Ling' })
 
     expect(screen.queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Account')).toBeInTheDocument()
+    const account = screen.getByLabelText('Account')
+    expect(account).toHaveClass('ui-topnav__account--photo')
+    expect(account.querySelector('img')).toHaveAttribute('src', '/trykai.png')
+  })
+
+  it('shows initials when logged in with a name but no avatarUrl', () => {
+    renderTopNav({ isLoggedIn: true, name: 'Mei Ling' })
+
+    const account = screen.getByLabelText('Account')
+    expect(account).toHaveClass('ui-topnav__account--initials')
+    expect(account).toHaveTextContent('ML')
+  })
+
+  it('falls back to the person glyph when logged in with no photo or name', () => {
+    renderTopNav({ isLoggedIn: true })
+
+    const account = screen.getByLabelText('Account')
+    expect(account).toHaveClass('ui-topnav__account--glyph')
+    expect(account.querySelector('svg')).toBeInTheDocument()
   })
 
   it('opens and closes the hamburger menu from the icon', async () => {

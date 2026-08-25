@@ -17,6 +17,8 @@ const LOGGED_IN_LINKS = [
   { label: 'Log out', to: '#' },
 ]
 
+const STAGGER_MS = 45
+
 export default function HamburgerMenu({
   open = false,
   onClose,
@@ -47,18 +49,28 @@ export default function HamburgerMenu({
         aria-label="Main menu"
       >
         <ul className="ui-hamburger__list">
-          {links.map((link) => (
-            <li key={link.label}>
-              <Link
-                to={link.to}
-                className="ui-hamburger__link"
-                tabIndex={open ? 0 : -1}
-                onClick={onClose}
+          {links.map((link, index) => {
+            const delayMs = open
+              ? index * STAGGER_MS
+              : (links.length - 1 - index) * STAGGER_MS
+
+            return (
+              <li
+                key={link.label}
+                className="ui-hamburger__item"
+                style={{ transitionDelay: `${delayMs}ms` }}
               >
-                {link.label}
-              </Link>
-            </li>
-          ))}
+                <Link
+                  to={link.to}
+                  className="ui-hamburger__link"
+                  tabIndex={open ? 0 : -1}
+                  onClick={onClose}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            )
+          })}
         </ul>
       </nav>
     </div>

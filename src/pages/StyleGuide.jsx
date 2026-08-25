@@ -3,13 +3,31 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Card from '../components/ui/Card'
 import SelectableCard from '../components/ui/SelectableCard'
-import TopNav from '../components/ui/TopNav'
+import TopNav, { TopNavAccount } from '../components/ui/TopNav'
 import foodIcon from '../assets/categories/food.png'
 import fitnessIcon from '../assets/categories/fitness.png'
 import artsIcon from '../assets/categories/arts.png'
 // import musicIcon from '../assets/categories/music.png'
 // import languageIcon from '../assets/categories/language.png'
 // import otherIcon from '../assets/categories/other.png'
+
+const ACCOUNT_PREVIEWS = [
+  {
+    label: 'Photo',
+    usage: 'avatarUrl present — image cropped to a circle',
+    avatarUrl: '/trykai.png',
+    name: 'Mei Ling',
+  },
+  {
+    label: 'Initials',
+    usage: 'No photo — first letters of first and last name',
+    name: 'Mei Ling',
+  },
+  {
+    label: 'Glyph',
+    usage: 'No photo and no name — person icon fallback',
+  },
+]
 
 const CATEGORY_ICONS = {
   Food: foodIcon,
@@ -68,6 +86,8 @@ export default function StyleGuide() {
     <div className="style-guide-page">
       <TopNav
         isLoggedIn={previewLoggedIn}
+        avatarUrl="/trykai.png"
+        name="Mei Ling"
         onMenuClick={() => {}}
       />
 
@@ -77,7 +97,7 @@ export default function StyleGuide() {
         <section className="style-guide-section" aria-labelledby="topnav-preview-heading">
           <h2 id="topnav-preview-heading">Top nav</h2>
           <p className="style-guide-section__note">
-            Fixed bar above. Open the hamburger, and scroll to see the bar shrink.
+            Fixed bar above. Open the hamburger (slides in from the left), and scroll to see the bar shrink.
           </p>
           <label className="style-guide-toggle">
             <input
@@ -87,6 +107,21 @@ export default function StyleGuide() {
             />
             Simulate logged in
           </label>
+          <p className="style-guide-section__note style-guide-section__note--spaced">
+            Logged-in account control — photo, initials, then glyph fallback.
+          </p>
+          <div className="style-guide-avatar-row">
+            {ACCOUNT_PREVIEWS.map((preview) => (
+              <article key={preview.label} className="style-guide-avatar-demo">
+                <p className="style-guide-card__label">{preview.label}</p>
+                <p className="style-guide-card__usage">{preview.usage}</p>
+                <TopNavAccount
+                  avatarUrl={preview.avatarUrl}
+                  name={preview.name}
+                />
+              </article>
+            ))}
+          </div>
         </section>
 
       <section className="style-guide-section" aria-labelledby="button-preview-heading">
