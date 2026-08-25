@@ -120,7 +120,11 @@ describe('Navbar account menu', () => {
 
   it('signs the user out and sends them home', async () => {
     signedIn()
-    const { user, currentPath } = renderWithRouter(<Navbar />, { route: '/dashboard' })
+    // The navbar is chrome: it spans routes instead of belonging to one.
+    const { user, currentPath } = renderWithRouter(<Navbar />, {
+      route: '/dashboard',
+      outlivesNavigation: true,
+    })
 
     await user.click(await screen.findByRole('button', { name: 'Account menu' }))
     await user.click(screen.getByRole('button', { name: 'Logout' }))

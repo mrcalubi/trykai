@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from '../lib/supabase'
+import { isStagingMode } from '../lib/staging'
 import ReviewCard from '../components/ReviewCard'
 import { CancellationPolicyCollapsible } from '../components/CancellationPolicy'
 
@@ -98,9 +99,12 @@ export default function ListingDetail() {
   const [totalAmount, setTotalAmount] = useState(null)
   const [bookingLoading, setBookingLoading] = useState(false)
   const [paymentError, setPaymentError] = useState('')
+  const [revealedAddress, setRevealedAddress] = useState(null)
 
   useEffect(() => {
     async function fetchListing() {
+      setRevealedAddress(null)
+
       const { data: listingData, error: listingError } = await supabase
         .from('listings')
         .select(
@@ -132,7 +136,7 @@ export default function ListingDetail() {
 
       setListing(listingData)
 
-      const [sessionsResult, reviewsResult] = await Promise.all([
+      const [sessionsResult, reviewsResult, authResult] = await Promise.all([
         supabase
           .from('sessions')
           .select('id, starts_at, duration_mins, spots_remaining')
@@ -156,6 +160,7 @@ export default function ListingDetail() {
           .eq('reviewee_id', listingData.host_id)
           .eq('role', 'guest')
           .order('created_at', { ascending: false }),
+        supabase.auth.getSession(),
       ])
 
       if (sessionsResult.error) {
@@ -166,6 +171,26 @@ export default function ListingDetail() {
 
       if (!reviewsResult.error) {
         setReviews(reviewsResult.data ?? [])
+      }
+
+      const userId = authResult.data?.session?.user?.id
+      if (userId) {
+        const { data: confirmedBookings } = await supabase
+          .from('bookings')
+          .select('id, sessions!inner(listing_id)')
+          .eq('guest_id', userId)
+          .eq('status', 'confirmed')
+          .eq('sessions.listing_id', id)
+          .limit(1)
+
+        if (confirmedBookings?.length) {
+          const { data: address } = await supabase.rpc('get_listing_address', {
+            p_listing_id: id,
+          })
+          if (address) {
+            setRevealedAddress(address)
+          }
+        }
       }
 
       setLoading(false)
@@ -222,6 +247,11 @@ export default function ListingDetail() {
       return
     }
 
+    if (isStagingMode() && data?.staging_bypass && data?.booking_id) {
+      navigate(`/dashboard?booking=${data.booking_id}`)
+      return
+    }
+
     if (!data?.clientSecret) {
       setPaymentError('Failed to start payment. Please try again.')
       return
@@ -266,7 +296,7 @@ export default function ListingDetail() {
         <div className="detail-main">
           <span className="detail-category">{listing.category}</span>
           <h1 className="detail-title">{listing.title}</h1>
-          <p className="detail-area">{listing.area}</p>
+          <p className="detail-area">{revealedAddress || listing.area}</p>
 
           <div className="detail-host">
             {host?.avatar_url ? (

@@ -2,6 +2,42 @@ function hoursFromNow(hours) {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
 }
 
+export const SIGNED_IN_USER = {
+  id: 'e2e-host',
+  email: 'kai@example.com',
+  password: 'hunter22',
+}
+
+/**
+ * What Supabase returns from the password grant. The client stores this and
+ * answers `getSession()` from it, so the shape has to be complete enough that
+ * the session survives the redirect back from the login form.
+ */
+export function makeAuthSession(user = SIGNED_IN_USER) {
+  const now = new Date().toISOString()
+  return {
+    access_token: 'e2e-access-token',
+    token_type: 'bearer',
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    refresh_token: 'e2e-refresh-token',
+    user: {
+      id: user.id,
+      aud: 'authenticated',
+      role: 'authenticated',
+      email: user.email,
+      email_confirmed_at: now,
+      confirmed_at: now,
+      last_sign_in_at: now,
+      app_metadata: { provider: 'email', providers: ['email'] },
+      user_metadata: {},
+      identities: [],
+      created_at: now,
+      updated_at: now,
+    },
+  }
+}
+
 export const LATTE_ART = {
   id: 'listing-latte',
   title: 'Learn latte art with me',
