@@ -23,10 +23,6 @@ const ACCOUNT_PREVIEWS = [
     usage: 'No photo — first letters of first and last name',
     name: 'Mei Ling',
   },
-  {
-    label: 'Glyph',
-    usage: 'No photo and no name — person icon fallback',
-  },
 ]
 
 const CATEGORY_ICONS = {
@@ -108,7 +104,7 @@ export default function StyleGuide() {
             Simulate logged in
           </label>
           <p className="style-guide-section__note style-guide-section__note--spaced">
-            Logged-in account control — photo, initials, then glyph fallback.
+            Logged-in account control — photo or initials.
           </p>
           <div className="style-guide-avatar-row">
             {ACCOUNT_PREVIEWS.map((preview) => (

@@ -49,14 +49,6 @@ describe('TopNav', () => {
     expect(account).toHaveTextContent('ML')
   })
 
-  it('falls back to the person glyph when logged in with no photo or name', () => {
-    renderTopNav({ isLoggedIn: true })
-
-    const account = screen.getByLabelText('Account')
-    expect(account).toHaveClass('ui-topnav__account--glyph')
-    expect(account.querySelector('svg')).toBeInTheDocument()
-  })
-
   it('opens and closes the hamburger menu from the icon', async () => {
     const user = userEvent.setup()
     const onMenuClick = vi.fn()

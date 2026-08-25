@@ -314,11 +314,6 @@ body:has(.style-guide-page) .navbar {
   border-color: var(--navy);
 }
 
-.ui-topnav__account--glyph {
-  color: var(--text-h);
-  background: var(--primary-bg);
-}
-
 .ui-topnav__avatar-img {
   display: block;
   width: 100%;

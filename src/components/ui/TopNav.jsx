@@ -24,26 +24,6 @@ function MenuIcon() {
   )
 }
 
-function PersonIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="8" r="3.25" />
-      <path d="M5.5 19.5c1.6-3.2 4-4.8 6.5-4.8s4.9 1.6 6.5 4.8" />
-    </svg>
-  )
-}
-
 export function getInitials(name) {
   if (!name || typeof name !== 'string') return ''
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -52,14 +32,12 @@ export function getInitials(name) {
   return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase()
 }
 
-/** Logged-in account control: photo → initials → person glyph. */
+/** Logged-in account control: photo if avatarUrl, otherwise initials from name. */
 export function TopNavAccount({ avatarUrl, name, className = '' }) {
   const initials = getInitials(name)
   const classes = [
     'ui-topnav__account',
-    avatarUrl ? 'ui-topnav__account--photo' : '',
-    !avatarUrl && initials ? 'ui-topnav__account--initials' : '',
-    !avatarUrl && !initials ? 'ui-topnav__account--glyph' : '',
+    avatarUrl ? 'ui-topnav__account--photo' : 'ui-topnav__account--initials',
     className,
   ]
     .filter(Boolean)
@@ -75,12 +53,10 @@ export function TopNavAccount({ avatarUrl, name, className = '' }) {
           height="36"
           className="ui-topnav__avatar-img"
         />
-      ) : initials ? (
+      ) : (
         <span className="ui-topnav__avatar-initials" aria-hidden="true">
           {initials}
         </span>
-      ) : (
-        <PersonIcon />
       )}
     </span>
   )
