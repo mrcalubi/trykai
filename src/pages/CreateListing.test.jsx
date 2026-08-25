@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CreateListing from './CreateListing'
+import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession } from '../test/fixtures'
@@ -18,8 +19,15 @@ function givenVerification(status) {
   supabase.__on('users', 'select', { data: { verification_status: status }, error: null })
 }
 
+// Mounted behind the same guard App.jsx puts it behind, so the page always has
+// a signed-in user. RequireAuth owns the signed-out case and tests it itself.
 function renderPage() {
-  return renderWithRouter(<CreateListing />, { route: '/create-listing' })
+  return renderWithRouter(
+    <RequireAuth>
+      <CreateListing />
+    </RequireAuth>,
+    { route: '/create-listing', path: '/create-listing' }
+  )
 }
 
 /**
@@ -59,13 +67,6 @@ beforeEach(() => {
 })
 
 describe('CreateListing access control', () => {
-  it('sends signed-out visitors to log in and remembers where they were going', async () => {
-    const { currentPath, currentState } = renderPage()
-
-    await waitFor(() => expect(currentPath()).toBe('/login'))
-    expect(currentState().from.pathname).toBe('/create-listing')
-  })
-
   it('sends unverified hosts to identity verification with an explanation', async () => {
     givenSignedIn()
     givenVerification('unverified')
@@ -261,6 +262,18 @@ describe('CreateListing "what is provided"', () => {
       'Materials',
       'Equipment',
     ])
+  })
+
+  it('unticks an option that was chosen by mistake', async () => {
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await user.click(screen.getByRole('checkbox', { name: 'Materials' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Equipment' }))
+
+    await user.click(screen.getByRole('checkbox', { name: 'Materials' }))
+
+    expect(screen.getByRole('checkbox', { name: 'Materials' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Equipment' })).toBeChecked()
   })
 
   it('clears the other options when "None" is chosen', async () => {

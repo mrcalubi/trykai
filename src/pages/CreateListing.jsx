@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuthedUserId } from '../lib/authedUser'
 import { CancellationPolicyInfo } from '../components/CancellationPolicy'
 
 const MAX_PHOTOS = 5
@@ -43,10 +44,8 @@ const WHATS_PROVIDED_OPTIONS = ['Materials', 'Equipment', 'Food & drinks', 'None
 
 export default function CreateListing() {
   const navigate = useNavigate()
-  const location = useLocation()
+  const userId = useAuthedUserId()
 
-  const [authChecked, setAuthChecked] = useState(false)
-  const [userId, setUserId] = useState(null)
   const [verificationStatus, setVerificationStatus] = useState(null)
   const [verificationChecked, setVerificationChecked] = useState(false)
   const [title, setTitle] = useState('')
@@ -67,26 +66,6 @@ export default function CreateListing() {
   }, [photos])
 
   useEffect(() => {
-    async function checkAuth() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session) {
-        navigate('/login', { state: { from: location }, replace: true })
-        return
-      }
-
-      setUserId(session.user.id)
-      setAuthChecked(true)
-    }
-
-    checkAuth()
-  }, [navigate, location])
-
-  useEffect(() => {
-    if (!userId) return
-
     async function checkVerification() {
       const { data } = await supabase
         .from('users')
@@ -255,7 +234,7 @@ export default function CreateListing() {
     navigate('/dashboard', { replace: true })
   }
 
-  if (!authChecked || !verificationChecked) {
+  if (!verificationChecked) {
     return <p className="status-message">Loading…</p>
   }
 

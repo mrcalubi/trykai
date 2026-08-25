@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useLocation, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuthedUserId } from '../lib/authedUser'
 
 const MAX_PHOTOS = 5
 
@@ -48,10 +49,8 @@ function centsToDollars(cents) {
 export default function EditListing() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const location = useLocation()
+  const userId = useAuthedUserId()
 
-  const [authChecked, setAuthChecked] = useState(false)
-  const [userId, setUserId] = useState(null)
   const [fetching, setFetching] = useState(true)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -74,26 +73,6 @@ export default function EditListing() {
   }, [newPhotos])
 
   useEffect(() => {
-    async function checkAuth() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session) {
-        navigate('/login', { state: { from: location }, replace: true })
-        return
-      }
-
-      setUserId(session.user.id)
-      setAuthChecked(true)
-    }
-
-    checkAuth()
-  }, [navigate, location])
-
-  useEffect(() => {
-    if (!userId) return
-
     async function fetchListing() {
       const { data, error: fetchError } = await supabase
         .from('listings')
@@ -266,7 +245,7 @@ export default function EditListing() {
     })
   }
 
-  if (!authChecked || fetching) {
+  if (fetching) {
     return <p className="status-message">Loading…</p>
   }
 

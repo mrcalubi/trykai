@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom'
+import { useLocation, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuthedUserId } from '../lib/authedUser'
+import { isStagingMode } from '../lib/staging'
 import StarPicker from '../components/StarPicker'
 import {
   calculateGuestRefund,
@@ -24,12 +26,10 @@ function formatSessionDateTime(iso) {
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
+  const userId = useAuthedUserId()
 
-  const [authChecked, setAuthChecked] = useState(false)
-  const [userId, setUserId] = useState(null)
   const [listings, setListings] = useState([])
   const [bookings, setBookings] = useState([])
   const [hostSessions, setHostSessions] = useState([])
@@ -61,24 +61,10 @@ export default function Dashboard() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [cancelError, setCancelError] = useState('')
   const [deleteError, setDeleteError] = useState('')
-
-  useEffect(() => {
-    async function checkAuth() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session) {
-        navigate('/login', { state: { from: location }, replace: true })
-        return
-      }
-
-      setUserId(session.user.id)
-      setAuthChecked(true)
-    }
-
-    checkAuth()
-  }, [navigate, location])
+  const [bookingAddresses, setBookingAddresses] = useState({})
+  const [stagingConfirmId, setStagingConfirmId] = useState(null)
+  const [stagingConfirmError, setStagingConfirmError] = useState('')
+  const stagingMode = isStagingMode()
 
   const loadData = useCallback(async () => {
     const [listingsResult, bookingsResult, reviewsResult] = await Promise.all([
@@ -102,6 +88,7 @@ export default function Dashboard() {
             starts_at,
             spots_remaining,
             listings (
+              id,
               title,
               host_id
             )
@@ -127,6 +114,27 @@ export default function Dashboard() {
       setError((prev) => prev || bookingsResult.error.message)
     } else {
       setBookings(bookingsResult.data)
+
+      const addressEntries = await Promise.all(
+        (bookingsResult.data ?? [])
+          .filter(
+            (booking) =>
+              booking.status === 'confirmed' &&
+              booking.sessions?.starts_at &&
+              new Date(booking.sessions.starts_at) > new Date() &&
+              booking.sessions?.listings?.id
+          )
+          .map(async (booking) => {
+            const { data: address } = await supabase.rpc('get_listing_address', {
+              p_listing_id: booking.sessions.listings.id,
+            })
+            return address ? [booking.id, address] : null
+          })
+      )
+
+      setBookingAddresses(
+        Object.fromEntries(addressEntries.filter(Boolean))
+      )
     }
 
     if (!reviewsResult.error && reviewsResult.data) {
@@ -168,8 +176,6 @@ export default function Dashboard() {
   }, [userId])
 
   useEffect(() => {
-    if (!userId) return
-
     let cancelled = false
     void Promise.resolve().then(() => {
       if (!cancelled) loadData()
@@ -178,10 +184,10 @@ export default function Dashboard() {
     return () => {
       cancelled = true
     }
-  }, [userId, loadData])
+  }, [loadData])
 
   useEffect(() => {
-    if (!pendingBookingId || !userId) return
+    if (!pendingBookingId) return
 
     let cancelled = false
     let attempts = 0
@@ -373,6 +379,25 @@ export default function Dashboard() {
     closeReviewForm()
   }
 
+  async function handleStagingConfirmBooking(booking) {
+    setStagingConfirmError('')
+    setStagingConfirmId(booking.id)
+
+    const { error: confirmError } = await supabase.rpc('confirm_booking', {
+      p_booking_id: booking.id,
+    })
+
+    setStagingConfirmId(null)
+
+    if (confirmError) {
+      setStagingConfirmError(confirmError.message)
+      return
+    }
+
+    setBookingStatusMessage('Staging: booking marked as paid and confirmed.')
+    await loadData()
+  }
+
   async function handleGuestCancelBooking(booking) {
     setCancelError('')
     setCancelLoading(true)
@@ -557,7 +582,7 @@ export default function Dashboard() {
     setHostSessions((prev) => prev.filter((s) => s.listing_id !== listingId))
   }
 
-  if (!authChecked || loading) {
+  if (loading) {
     return <p className="status-message">Loading…</p>
   }
 
@@ -576,6 +601,15 @@ export default function Dashboard() {
       {error && <p className="error-message" style={{ marginBottom: '20px' }}>{error}</p>}
       {cancelError && <p className="error-message" style={{ marginBottom: '20px' }}>{cancelError}</p>}
       {deleteError && <p className="error-message" style={{ marginBottom: '20px' }}>{deleteError}</p>}
+      {stagingConfirmError && (
+        <p className="error-message" style={{ marginBottom: '20px' }}>{stagingConfirmError}</p>
+      )}
+
+      {stagingMode && (
+        <p className="staging-test-banner">
+          Staging mode — test tools are visible. Do not use against production.
+        </p>
+      )}
 
       <section className="dashboard-section">
         <h2 className="dashboard-section__title">Upcoming Hosted Sessions</h2>
@@ -821,11 +855,32 @@ export default function Dashboard() {
                   {booking.sessions?.starts_at
                     ? formatSessionDateTime(booking.sessions.starts_at)
                     : 'Date TBC'}
+                  {bookingAddresses[booking.id] && (
+                    <>
+                      {' · '}
+                      {bookingAddresses[booking.id]}
+                    </>
+                  )}
                 </p>
                 <div className="booking-card__actions">
                   <span className={`badge badge--${booking.status}`}>
                     {booking.status}
                   </span>
+                  {stagingMode &&
+                    booking.status === 'pending' &&
+                    confirmCancelBookingId !== booking.id && (
+                      <button
+                        type="button"
+                        disabled={stagingConfirmId === booking.id}
+                        onClick={() => handleStagingConfirmBooking(booking)}
+                        className="btn btn--staging-test"
+                        title="Staging only — simulates the payment webhook"
+                      >
+                        {stagingConfirmId === booking.id
+                          ? 'Confirming…'
+                          : 'Mark as paid (staging test only)'}
+                      </button>
+                    )}
                   {canLeaveReview(booking) && activeReviewBookingId !== booking.id && (
                     <button
                       type="button"
