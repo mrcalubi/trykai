@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import HamburgerMenu from './HamburgerMenu'
 
 const SCROLL_THRESHOLD = 48
 
@@ -49,6 +50,7 @@ export default function TopNav({
   className = '',
 }) {
   const [compact, setCompact] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     function updateCompact() {
@@ -60,49 +62,87 @@ export default function TopNav({
     return () => window.removeEventListener('scroll', updateCompact)
   }, [])
 
-  const classes = [
+  useEffect(() => {
+    if (!menuOpen) return undefined
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [menuOpen])
+
+  function handleMenuToggle() {
+    setMenuOpen((open) => !open)
+    onMenuClick?.()
+  }
+
+  function handleMenuClose() {
+    setMenuOpen(false)
+  }
+
+  const shellClasses = [
+    'ui-topnav-shell',
+    compact ? 'ui-topnav-shell--compact' : '',
+    menuOpen ? 'ui-topnav-shell--menu-open' : '',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const barClasses = [
     'ui-topnav',
     compact ? 'ui-topnav--compact' : '',
-    className,
   ]
     .filter(Boolean)
     .join(' ')
 
   return (
     <>
-      <header className={classes}>
-        <button
-          type="button"
-          className="ui-topnav__menu"
-          aria-label="Open menu"
-          onClick={onMenuClick}
-        >
-          <MenuIcon />
-        </button>
+      <div className={shellClasses}>
+        <header className={barClasses}>
+          <button
+            type="button"
+            className="ui-topnav__menu"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+            aria-controls="ui-hamburger-panel"
+            onClick={handleMenuToggle}
+          >
+            <MenuIcon />
+          </button>
 
-        <Link to="/" className="ui-topnav__brand" aria-label="TryKai home">
-          <img
-            src="/trykai.png"
-            alt=""
-            width="40"
-            height="40"
-            className="ui-topnav__mark"
-          />
-          <span className="ui-topnav__wordmark">TryKai</span>
-        </Link>
+          <Link to="/" className="ui-topnav__brand" aria-label="TryKai home">
+            <img
+              src="/trykai.png"
+              alt=""
+              width="40"
+              height="40"
+              className="ui-topnav__mark"
+            />
+            <span className="ui-topnav__wordmark">TryKai</span>
+          </Link>
 
-        <div className="ui-topnav__end">
-          {isLoggedIn ? (
-            <span className="ui-topnav__account" aria-label="Account">
-              <PersonIcon />
-            </span>
-          ) : (
-            <Link to="/login" className="ui-topnav__login">
-              Log in
-            </Link>
-          )}
-        </div>
-      </header>
+          <div className="ui-topnav__end">
+            {isLoggedIn ? (
+              <span className="ui-topnav__account" aria-label="Account">
+                <PersonIcon />
+              </span>
+            ) : (
+              <Link to="/login" className="ui-topnav__login">
+                Log in
+              </Link>
+            )}
+          </div>
+        </header>
+
+        <HamburgerMenu
+          open={menuOpen}
+          onClose={handleMenuClose}
+          isLoggedIn={isLoggedIn}
+        />
+      </div>
       <div
         className={`ui-topnav-spacer${compact ? ' ui-topnav-spacer--compact' : ''}`}
         aria-hidden="true"

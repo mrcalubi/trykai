@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -30,13 +30,41 @@ describe('TopNav', () => {
     expect(screen.getByLabelText('Account')).toBeInTheDocument()
   })
 
-  it('calls onMenuClick when the hamburger is pressed', async () => {
+  it('opens and closes the hamburger menu from the icon', async () => {
     const user = userEvent.setup()
     const onMenuClick = vi.fn()
     renderTopNav({ onMenuClick })
 
-    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    const toggle = screen.getByRole('button', { name: 'Open menu' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(toggle)
     expect(onMenuClick).toHaveBeenCalledTimes(1)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(toggle).toHaveAccessibleName('Close menu')
+    expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).toHaveClass(
+      'ui-hamburger--open'
+    )
+    expect(screen.getByRole('link', { name: 'Log in or sign up' })).toBeInTheDocument()
+
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle).toHaveAccessibleName('Open menu')
+    expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).not.toHaveClass(
+      'ui-hamburger--open'
+    )
+  })
+
+  it('closes the menu when the backdrop is pressed', async () => {
+    const user = userEvent.setup()
+    renderTopNav()
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    const menu = screen.getByLabelText('Main menu').closest('.ui-hamburger')
+    expect(menu).toHaveClass('ui-hamburger--open')
+
+    await user.click(within(menu).getByRole('button', { name: 'Close menu' }))
+    expect(menu).not.toHaveClass('ui-hamburger--open')
   })
 
   it('compacts after scrolling past the threshold and expands again at the top', () => {

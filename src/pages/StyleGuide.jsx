@@ -77,7 +77,7 @@ export default function StyleGuide() {
         <section className="style-guide-section" aria-labelledby="topnav-preview-heading">
           <h2 id="topnav-preview-heading">Top nav</h2>
           <p className="style-guide-section__note">
-            Fixed bar above. Scroll this page to see the wordmark hide and the bar shrink.
+            Fixed bar above. Open the hamburger, and scroll to see the bar shrink.
           </p>
           <label className="style-guide-toggle">
             <input
@@ -85,7 +85,7 @@ export default function StyleGuide() {
               checked={previewLoggedIn}
               onChange={(event) => setPreviewLoggedIn(event.target.checked)}
             />
-            Preview logged-in account icon
+            Simulate logged in
           </label>
         </section>
 
