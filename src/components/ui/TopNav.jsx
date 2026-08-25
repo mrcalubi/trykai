@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import HamburgerMenu from './HamburgerMenu'
+import { getInitials } from './getInitials'
 
 const SCROLL_THRESHOLD = 48
 
@@ -22,14 +23,6 @@ function MenuIcon() {
       <path d="M4 17h16" />
     </svg>
   )
-}
-
-export function getInitials(name) {
-  if (!name || typeof name !== 'string') return ''
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return ''
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-  return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase()
 }
 
 /** Logged-in account control: photo if avatarUrl, otherwise initials from name. */

@@ -2,7 +2,8 @@ import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
-import TopNav, { getInitials } from './TopNav'
+import TopNav from './TopNav'
+import { getInitials } from './getInitials'
 
 function renderTopNav(props = {}) {
   return render(
