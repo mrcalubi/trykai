@@ -8,25 +8,37 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 
 ## Current status
 
-*Updated 16 August 2026. This block is updated at every Saturday scrum. Everything else in these documents changes only when a decision changes it.*
+*Updated 25 August 2026. This block is updated at every Saturday scrum. Everything else in these documents changes only when a decision changes it.*
 
 | | |
 |---|---|
-| **Phase** | Pre launch, week 3 of 13 |
+| **Phase** | Pre launch, roughly week 4 of 13 |
 | **Soft launch target** | Week of 20 October 2026, warm contacts only, 15 to 20 listings |
 | **Revenue to date** | Zero |
 | **Entity** | TRYKAI, sole proprietorship, UEN 53526159D |
 | **Banking** | Aspire business account, approved 13 August 2026 |
-| **Payments** | Moving to **Stripe Connect**, separate charges and transfers. In sandbox, not yet built. HitPay abandoned after payment capability was disabled on 13 August. |
+| **Payments** | **Stripe Connect**, separate charges and transfers, decided 16 August. Still in sandbox, real payment flow not yet built. A largely complete webhook and fee logic exist but are pointed at HitPay, stashed as `hitpay-wip-2026-08`, and need swapping to Stripe rather than rebuilding from scratch. |
 
-**Blocked right now**
-- Nothing hard blocked. The payment path is decided (Stripe Connect) but unbuilt, and it remains the largest single risk to the October date.
+**Now working, tested on staging this session (22 to 25 August)**
+- Staging Supabase environment stood up and in active use
+- Canonical schema in version control
+- Signup fixed (was fully broken by an RLS gap), host verification submission fixed, suspension fields added, captured in `00003_staging_hotfixes_22aug.sql`
+- Atomic `spots_remaining` decrement built and tested via `confirm_booking`
+- Full address reveal on confirmed bookings, via `get_listing_address`
+- Four tier cancellation refund built by Ruiheng and verified correct
+- Automated CI test suite plus branch protection added by Ruiheng, every merge now runs checks
+- A component library and top nav built on the `style-guide-page-staging` branch, previewable at `/style-guide`
+
+**Blocked or in flight right now**
+- The component library PR is waiting to merge. Ruiheng's auth fix for the CreateListing redirect landed on `main`, the component PR targets `staging`, so the two may be out of sync. Open question with Ruiheng: retarget the PR to main, or bring staging up to date with main first.
+- The staging database hotfixes may not yet be applied to production. Needs confirming with Ruiheng.
 
 **Open and unstarted**
-- Internal safety response protocol, not drafted
-- Public liability insurance, not yet quoted
+- Internal safety response protocol, **now drafted** (`SAFETY_RESPONSE_PROTOCOL.md`), not yet ratified or built into the app
+- Public liability insurance, still not quoted
 - Terms of Service and Privacy Policy, drafted but not lawyer reviewed or published
 - Founders' agreement, not yet signed
+- Ruiheng still not told about the three way equal profit share
 
 ---
 
@@ -43,6 +55,7 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 | **HOST_ONBOARDING.md** | Internal onboarding process, plus host facing guidelines on pricing, photos, and policies. |
 | **DESIGN.md** | Visual identity: palette, typography, logo direction, messaging, photography policy. |
 | **FOUNDERS_AGREEMENT.md** | The signed record of equity, profit sharing, roles, and how disputes between founders are handled. |
+| **SAFETY_RESPONSE_PROTOCOL.md** | Internal process behind the public promise to suspend on a credible safety report. Drafted 23 August, not yet ratified. |
 
 Published website content, kept separate because it is public facing:
 `cancellation-policy.md`, `refund-policy.md`, `dispute-policy.md`

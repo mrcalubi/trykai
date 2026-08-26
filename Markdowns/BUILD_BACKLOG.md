@@ -11,7 +11,7 @@ Derived by walking every end to end flow the platform promises and marking where
 Three questions, in order:
 
 1. **Does soft launch fail without it?** If a warm contact books a session and something in this list is missing, does that booking break, or does TryKai break a published promise?
-2. **Is it blocked by the payment decision?** Payments are unresolved. Anything that depends on knowing the provider is deferred, not because it is unimportant but because building it now risks building it twice.
+2. **Is it blocked by the payment build?** The provider is now decided (Stripe Connect, 16 August), so P1 is no longer blocked on a decision, only on the build itself. The stashed HitPay work in progress shortens that build considerably.
 3. **What does it cost if we get it wrong?** Money and safety rank above convenience.
 
 **P0** blocks launch and is buildable now.
@@ -52,7 +52,10 @@ Verification approval survives being done in a database table. Paying eleven hos
 
 ## P0: blocks launch, buildable now
 
-### P0.1 — Host payout details
+> **Status, 25 August 2026.** Several P0 items are now done or changed, marked inline below. Done: P0.5 (cancellation, built by Ruiheng, verified), P0.6 (spots decrement, via `confirm_booking`), P0.7 (address reveal, via `get_listing_address`). Changed: P0.1 likely dissolves under Stripe Connect. Partly done: P0.4 (suspension fields exist, app enforcement pending). Still fully open: P0.2, P0.3, P0.8, and the admin UI generally.
+
+### P0.1 — Host payout details — LIKELY OBSOLETED
+> Under Stripe Connect Express (decided 16 August), Stripe collects the host's bank details at onboarding and pays them via the connected account. So `stripe_account_id` becomes the payout handle and the manual columns below are probably unnecessary. Confirm in the Stripe sandbox before building anything here. Do not add the manual columns unless the sandbox shows manual disbursement is needed.
 **Flow:** host completes verification → enters payout details → can receive money
 **Today:** no field exists anywhere
 
@@ -86,9 +89,9 @@ A single screen listing every payout that is due:
 
 *Why: this one genuinely works today, so it is lower risk than the rest of P0, but it is the highest frequency admin task before launch and doing it in a database table invites approving the wrong row.*
 
-### P0.4 — Admin: account suspension
+### P0.4 — Admin: account suspension — PARTLY DONE
 **Flow:** credible safety report → account suspended immediately, pending review
-**Today:** nothing. The only path to deactivation is accumulating three strikes.
+**Today:** the database fields exist (`is_suspended`, `suspended_at`, `suspension_reason`, added 22 August), and suspension can be done by hand in the Table Editor. What is missing: the app does not yet enforce suspension, so a suspended account's listings are not automatically hidden and bookings not automatically blocked. And there is no one click admin button. The SAFETY_RESPONSE_PROTOCOL.md assumes the manual Table Editor path for now.
 
 - Suspend a user, immediately deactivating their listings and blocking new bookings
 - Independent of `host_strikes`, per the published dispute policy
@@ -96,28 +99,14 @@ A single screen listing every payout that is due:
 
 *Why: the dispute policy publicly commits to immediate suspension on a credible safety report. Right now that commitment cannot be honoured. This is the single largest gap between what is published and what exists.*
 
-### P0.5 — Cancellation logic rebuilt to four tiers
-**Flow:** guest cancels → correct refund calculated and shown before confirming
-**Today:** `cancellationPolicy.js` implements the superseded two tier rule
+### P0.5 — Cancellation logic rebuilt to four tiers — DONE
+**Built by Ruiheng, verified 23 August.** `calculateGuestRefund` now implements 100 / 50 / 25 / 0 at the 48, 24, and 6 hour boundaries, platform fee forfeited on partial tiers, measured cancellation moment to session start. Verified correct against the published policy by direct testing. Cancellation also now correctly returns the spot to `spots_remaining`. Caleb has a standing KIV to re run the four tier refund check on `main` after merges settle.
 
-- 100 / 50 / 25 / 0 at the 48, 24, and 6 hour boundaries
-- Platform fee forfeited on all partial tiers
-- Singapore time, measured cancellation moment to session start, 48:00:00 exactly falls inside the 48 hour tier
-- Amount shown to the guest before they confirm, and included in the confirmation email
+### P0.6 — Spots decrement, atomically — DONE
+**Built and tested this session.** `confirm_booking(booking_id)` decrements `spots_remaining` by `guests_count` atomically under a row lock, in the same operation that flips the booking to confirmed. A CHECK constraint guarantees it can never go below zero. Currently exercised via a staging only "Mark as paid" test button; the real trigger is the payment webhook (P1.1), which will call the same function.
 
-*Why: the published policy and the code disagree. Whichever is wrong, a guest will find out at the worst possible moment.*
-
-### P0.6 — Spots decrement, atomically
-**Flow:** booking confirmed → capacity reduced, in the same transaction
-**Today:** never decremented. Sessions can be booked past capacity.
-
-*Note: the trigger for this is payment confirmation, so the wiring waits on P1.1. Build and test the decrement itself now with a manual trigger, so only the connection is left.*
-
-### P0.7 — Full address reveal
-**Flow:** booking confirmed → guest can see where to go
-**Today:** written at listing creation, never read anywhere
-
-Without this a guest pays and has no idea where the session is. Gate on a confirmed booking for that session, enforced by RLS, not just hidden in the UI.
+### P0.7 — Full address reveal — DONE
+**Built and tested this session.** `get_listing_address(listing_id)` returns `full_address` only to the owning host or a guest with a confirmed booking for one of the listing's sessions. Enforced at the data layer, `full_address` has no direct read grant at all. Wired into ListingDetail and the guest dashboard.
 
 ### P0.8 — Real email delivery
 **Flow:** anything happens → the relevant person is told
@@ -127,20 +116,18 @@ Verify trykai.sg in Resend and switch all four over. **Ship the shared secret he
 
 ---
 
-## P1: blocks launch, waits on the payment decision
+## P1: blocks launch, the payment build
 
-Do not start these until the provider and account model are settled. Building them now risks building them twice.
+Provider is now decided (Stripe Connect), so these are no longer blocked on a decision, only on the build. The stashed HitPay work in progress (`hitpay-wip-2026-08`) already contains most of P1.1 and P1.2 pointed at the wrong provider, so the job is closer to swapping the API target than building from scratch.
 
-### P1.1 — Payment confirmation
+### P1.1 — Payment confirmation webhook
 **Flow:** guest pays → booking becomes confirmed → capacity reduced → both parties emailed
-**Today:** no webhook. A guest can pay and the booking sits at `pending` forever.
+**Today:** no live webhook. But the confirmation step it calls, `confirm_booking`, is built and tested. The webhook verifies the Stripe signature then calls that function. The stashed HitPay webhook has this shape already.
 
 With signature verification. An unverified endpoint that flips bookings to confirmed means anyone who finds the URL grants themselves free sessions.
 
-### P1.2 — Fee calculation
-Hardcoded at a flat 15 per cent. Should be 10 per cent guest, S$2 floor, 8 per cent on PayNow, host fee waived at Stage 1.
-
-*Buildable now as pure logic, testable in isolation, only the wiring waits. Worth pulling forward if there is idle time.*
+### P1.2 — Fee calculation — DECIDED, ADAPTABLE
+The structure is now decided (see DECISIONS.md and ENGINEERING.md section 5): 12% card with a S$2.50 floor rounded up to a clean all in total, PayNow shown as a flat 5% discount at checkout, host fee 10% per host from the fourth booking. The stashed HitPay work contains a fee calc close to this to adapt. Also gate: delete or staging-lock the temporary "Mark as paid" test button before real payments go live.
 
 ### P1.3 — Refund execution
 Refund amounts are calculated and stored but no refund is ever actually issued. Needs the provider.

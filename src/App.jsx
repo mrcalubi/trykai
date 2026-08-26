@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard'
 import RefundPolicy from './pages/RefundPolicy'
 import CancellationPolicy from './pages/CancellationPolicy'
 import DisputePolicy from './pages/DisputePolicy'
+import StyleGuide from './pages/StyleGuide'
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/refund-policy" element={<RefundPolicy />} />
         <Route path="/cancellation-policy" element={<CancellationPolicy />} />
         <Route path="/dispute-policy" element={<DisputePolicy />} />
+        <Route path="/style-guide" element={<StyleGuide />} />
       </Routes>
       <Footer />
     </BrowserRouter>

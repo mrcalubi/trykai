@@ -75,15 +75,30 @@ The guest profile is a public artefact that accumulates, not just an account pag
 
 
 ### Host fees and the founding cohort
-*Decided 16 August 2026.*
+*Decided 16 August 2026. Trigger mechanism revised 23 August 2026.*
 
 **The founding hosts are grandfathered permanently. No host fee, ever.**
 
-The eleven warm contacts are doing TryKai a favour at a point when the platform has nothing to offer them. Introducing a charge at booking 500, after they helped reach it, is the shape of a bait and switch and they would be right to feel it.
+The eleven warm contacts are doing TryKai a favour at a point when the platform has nothing to offer them. Charging them after the fact is the shape of a bait and switch and they would be right to feel it.
 
 Cost: if eleven hosts each complete 50 bookings a year at S$25, the forgone host fee is about S$1,375 a year. Against year three revenue of roughly S$27,000 that is affordable. What it buys is eleven people who feel like founders rather than suppliers, a genuinely scarce "founding host" status, and eleven advocates during the period when there is no other marketing.
 
 **Every host recruited after the founding cohort is told about the host fee before they list.** A fee disclosed upfront is a term of the deal. The same fee introduced later is a betrayal. Identical money, completely different relationship.
+
+**Trigger: per host, not platform wide.** Every non founding host's first three bookings are free. Their fourth booking onward pays the 10 per cent host fee, starting immediately, with no platform wide cumulative count.
+
+This replaces the original 500 cumulative bookings trigger, which turned out to be effectively "no host fee in year one at all": year one is projected at 481 total bookings, which never reaches 500. A platform wide trigger also means a host's fee timing depends on how fast the whole platform grows rather than on their own activity, which is both an unfair thing to explain to a host and a mechanism that can silently never activate, which is exactly what happened here.
+
+The per host version fixes both problems. It starts earning from day one regardless of overall platform pace, and it is a cleaner promise to make a new host: your first three are free, then it is ten per cent. Illustrative year one revenue under this mechanism, depending on how much volume shifts to non founding hosts over the year, is roughly S$250 to S$750, well below the S$1,200 ceiling previously cited, since that figure assumed every booking all year paid the fee with no exemptions at all.
+
+**Is 10 per cent fair to a host?** Checked two ways. It removes exactly 14.7 per cent of a host's after materials profit at every group size, one guest or four, since both materials cost and the fee scale with headcount identically. It is not harsher on a small session than a full one. And against real comparables it is generous: Airbnb moved to a 15.5 per cent host only fee in 2026, and GrabFood and Foodpanda charge Singapore merchants roughly 15 to 30 per cent, a well known local grievance among small F&B operators. TryKai's 10 per cent sits meaningfully below both.
+
+**Watch for off platform leakage risk specifically where all three of these overlap**, most likely in Lane 2:
+1. The fee is painful enough to notice, illustratively upwards of S$10 lost on a booking or accumulating over a repeat relationship.
+2. Going direct would benefit both guest and host, not just the host, since a guest has no reason to go along with an arrangement that only saves the host money.
+3. A real relationship has formed between the two parties.
+
+All three have to be true together, not just one. A host irritated by the fee with no relationship yet has no way to act on it. A host with a great relationship where going direct saves the guest nothing has no reason to. This is why leakage risk concentrates in Lane 2's repeat, multi session relationships far more than in a one off Lane 1 booking, and worth noting that the per host waiver mechanism above means the fee starts biting a host at roughly the same point a repeat relationship with a guest would start to form. Not a reason to change the mechanism, but worth designing Lane 2's defences with this overlap specifically in mind when that lane is built.
 
 ### Group bookings
 *Decided 16 August 2026.*
@@ -174,8 +189,16 @@ Card settlement moved to T+1 in August 2026. A separate S$0.50 in person termina
 3. **HitPay standard merchant account with manual PayNow disbursement.** What Aditya approved on 11 August and compliance then blocked on 13 August. Awaiting resolution.
 4. **Fully manual.** PayNow QR direct to the business account, manual confirmation and manual payout. No processor can switch it off. Costs automated payment confirmation, which means guests wait for a human before their booking is confirmed, and reconciliation is fiddly without per booking references.
 
-### PayNow discount mechanic
-At checkout the guest sees two prices, e.g. card $22.00 versus PayNow $21.20, save $0.80. Processing drops from about $1.06 to $0.18 on PayNow, so most of the saving is passed to the guest and TryKai still keeps slightly more. Nudges volume toward the cheapest rail.
+### Guest fee structure and PayNow discount mechanic
+*Decided 23 August 2026. Supersedes the flat 10 per cent, $2 floor structure and the two prices at checkout mechanic.*
+
+**One all in total, shown identically from the browse card through to card checkout.** The guest never sees a separate fee line and the number never changes between browsing and paying. Card fee is 12 per cent of the lesson price with a $2.50 floor, then the total is rounded up to the nearest whole dollar so it can never dip below the floor. This is the number shown everywhere on the card path.
+
+**PayNow shows a flat 5 per cent off that same total, displayed prominently at checkout, never before.** The price only ever gets cheaper than what was advertised, never more expensive, which is what makes this impossible to read as a bait and switch.
+
+Why 5 per cent and not a smaller or larger figure: tested at 4, 5, 6, and 8 per cent across the S$10 to S$40 band. At 4 per cent the saving is too small to register, as low as $0.52. At 6 and 8 per cent TryKai's margin on PayNow starts collapsing at exactly the price points hosts are told to target, recreating the original dead spot problem in a new place. 5 per cent is the point where the guest saving is real everywhere, roughly $0.65 to $2.25 across the band, and TryKai's net stays healthy throughout, never dropping below $1.25 on card or PayNow.
+
+Worked example at the target $25 host price: guest sees $28 everywhere. Choosing PayNow drops it to $26.60 at the final step, shown as a bold percentage saving rather than a dollar amount, since the percentage registers far more strongly than the underlying few dollars.
 
 ---
 
@@ -316,7 +339,11 @@ Full visual identity is in DESIGN.md.
 
 ## Off platform leakage
 
-Guests and hosts bypassing TryKai after a first meeting is a real risk, particularly for Lane 2 repeat sessions. Defences, in order of actual strength:
+Guests and hosts bypassing TryKai after a first meeting is a real risk, particularly for Lane 2 repeat sessions.
+
+**When it actually happens: three conditions, all required together.** Not just fee irritation on its own. 1) The host fee is painful enough to notice, illustratively upwards of S$10 lost on a booking or accumulated over a repeat relationship. 2) Going direct benefits both parties, not just the host, since a guest has no reason to cooperate with something that only saves the host money. 3) A real relationship has formed between guest and host. All three overlapping is far more likely in Lane 2's repeat sessions than in a Lane 1 one off booking, and worth noting that the per host fee waiver (see Host fees section above) means the fee starts applying to a host at roughly the point a repeat relationship would start forming, concentrating the risk. See DECISIONS.md Part B, 2026-08-23.
+
+Defences, in order of actual strength:
 
 1. **Reviews only exist here.** The host loses their reputation asset off platform.
 2. **The identity artefact.** A guest profile worth building is worth keeping on platform. This is why the social layer is strategic rather than cosmetic.
@@ -387,15 +414,15 @@ Guests and hosts bypassing TryKai after a first meeting is a real risk, particul
 
 **2026-08-16 — Businesses presented as a filter at launch, promoted to a tab at 15 to 20 business listings.** Middle ground between visibility for businesses and browse density at launch volume.
 
+**2026-08-23 — Guest fee restructured to an all in total with a 5 per cent PayNow discount.** Supersedes the flat 10 per cent, $2 floor structure. Card fee is 12 per cent with a $2.50 floor, rounded up to the nearest dollar, shown identically from browse to checkout so the price never rises between viewing and paying. PayNow shows a flat 5 per cent off at checkout, tested against 4, 6, and 8 per cent; 5 per cent was the point where the guest saving stays meaningful and TryKai's margin stays healthy across the full S$10 to S$40 band without recreating a dead spot.
+
+**2026-08-23 — Host fee trigger changed from a platform wide cumulative count to a per host mechanism.** Supersedes the 500 cumulative bookings trigger, which was never going to activate in year one since projected year one volume of 481 bookings never reaches it. Every non founding host's first three bookings are free; their fourth booking onward pays the 10 per cent fee immediately, independent of overall platform pace. Checked against Airbnb's 15.5 per cent host only fee and GrabFood and Foodpanda's 15 to 30 per cent Singapore merchant commissions; 10 per cent sits below both. Off platform leakage risk flagged as most likely where fee pain, mutual benefit to going direct, and an established relationship all overlap, expected mainly in Lane 2.
+
 ---
 
 # Analysed but not decided
 
 Live questions with work already done. Each needs a call.
-
-**Fee restructure.** Modelling on Stripe's Singapore rates found that S$20 is the worst possible price point on card, netting S$0.75 against S$1.09 at S$10, because the S$2 floor stops binding before the percentage starts working. A proposed structure of card at 12 per cent with a S$2.50 floor and PayNow at 8 per cent with a S$2.00 floor removes the trough, doubles the visible PayNow saving at S$25, and adds roughly S$70 across year one. Analysed 16 August, not decided.
-
-**Host fee trigger.** Currently set at 500 cumulative bookings. On the modelling, a 10 per cent host fee multiplies net per booking by about 2.17x, worth roughly S$1,200 in year one, which is more than every other pricing lever combined. Waiving it for each host's first three bookings would retain most of the recruitment benefit at a fraction of the cost. Not decided.
 
 **Price ceiling for businesses.** If businesses are positioned as the more professional option, does the S$10 to S$40 band still apply to them? If yes they cannot really be premium. If no, the band that defines TryKai's identity has a hole in it. Not decided.
 
