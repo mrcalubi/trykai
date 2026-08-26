@@ -30,10 +30,11 @@ function json(route, body, status = 200) {
 /**
  * Answers every Supabase REST read with the rows supplied per table.
  *
- * @param page   Playwright page
- * @param tables map of table name to the rows that table should return
+ * @param page    Playwright page
+ * @param tables  map of table name to the rows that table should return
+ * @param session session the password grant should hand back, or null to reject it
  */
-export async function stubSupabase(page, tables = {}) {
+export async function stubSupabase(page, tables = {}, { session = null } = {}) {
   await page.route(`${SUPABASE_URL}/**`, async (route) => {
     const request = route.request()
 
@@ -46,6 +47,12 @@ export async function stubSupabase(page, tables = {}) {
           'Access-Control-Allow-Methods': '*',
         },
       })
+    }
+
+    if (request.url().includes('/auth/v1/')) {
+      return session
+        ? json(route, session)
+        : json(route, { error: 'invalid_grant', error_description: 'Invalid login credentials' }, 400)
     }
 
     if (!request.url().includes('/rest/v1/')) {
@@ -82,7 +89,7 @@ export async function stubStripe(page) {
   )
 }
 
-export async function stubAllExternalCalls(page, tables) {
+export async function stubAllExternalCalls(page, tables, options) {
   await stubStripe(page)
-  await stubSupabase(page, tables)
+  await stubSupabase(page, tables, options)
 }

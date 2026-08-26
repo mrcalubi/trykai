@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
+import RequireAuth from './components/RequireAuth'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import ListingDetail from './pages/ListingDetail'
@@ -21,10 +22,38 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/listings/:id" element={<ListingDetail />} />
-        <Route path="/create-listing" element={<CreateListing />} />
-        <Route path="/verify-identity" element={<VerifyIdentity />} />
-        <Route path="/edit-listing/:id" element={<EditListing />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route
+          path="/create-listing"
+          element={
+            <RequireAuth>
+              <CreateListing />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/verify-identity"
+          element={
+            <RequireAuth>
+              <VerifyIdentity />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/edit-listing/:id"
+          element={
+            <RequireAuth>
+              <EditListing />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <RequireAuth>
+              <Dashboard />
+            </RequireAuth>
+          }
+        />
         <Route path="/refund-policy" element={<RefundPolicy />} />
         <Route path="/cancellation-policy" element={<CancellationPolicy />} />
         <Route path="/dispute-policy" element={<DisputePolicy />} />

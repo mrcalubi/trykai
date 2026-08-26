@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { stubAllExternalCalls } from './support/network'
-import { LATTE_ART } from './support/fixtures'
+import { LATTE_ART, SIGNED_IN_USER, makeAuthSession } from './support/fixtures'
 
 const POLICY_PAGES = [
   ['Refund Policy', '/refund-policy'],
@@ -85,13 +85,22 @@ test.describe('signed-out navigation', () => {
   })
 
   test('returns the visitor to where they were headed after logging in', async ({ page }) => {
-    await stubAllExternalCalls(page, {})
+    await stubAllExternalCalls(
+      page,
+      { users: [{ id: SIGNED_IN_USER.id, verification_status: 'approved' }] },
+      { session: makeAuthSession() }
+    )
     await page.goto('/create-listing')
     await expect(page).toHaveURL(/\/login$/)
 
-    // The pending destination is carried in router state, so the form should be
-    // ready to send the visitor back rather than dropping them on the home page.
-    await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
+    await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+    await page.getByLabel('Password').fill(SIGNED_IN_USER.password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+
+    // The whole point of stashing the destination: the visitor lands back on the
+    // form they asked for, not on the home page.
+    await expect(page).toHaveURL(/\/create-listing$/)
+    await expect(page.getByLabel('Title')).toBeVisible()
   })
 
   test('renders the home page without console errors', async ({ page }) => {
