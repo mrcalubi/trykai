@@ -65,12 +65,61 @@ The founding insight: Singapore is perceived as expensive and boring, and there 
 | Airbnb Experiences | Global curated experiences | Paused 2022 to 2024 for losing its way, relaunched 2025 targeting locals | Even a giant struggled here, and is now entering our lane with vastly more capital |
 
 ### Position against alternatives
-| | TryKai | Airbnb Experiences | Klook | Private tutors |
-|---|---|---|---|---|
-| Audience | Local Singaporeans | Tourists | Tourists | Serious learners |
-| Host type | Individuals and small operators | Semi professional | Licensed operators | Credentialed |
-| Price point | S$10 to S$40 | S$50 to S$150 | S$30 to S$100 | S$40 to S$100/hr |
-| Barrier to list | Low | High | High | High |
+| | TryKai | ToGatherSG | Airbnb Experiences | Klook | Private tutors |
+|---|---|---|---|---|---|
+| Audience | Local Singaporeans, 18 to 28 primarily | Muddied, no clear archetype | Tourists | Tourists | Serious learners |
+| Host type | Individuals and small operators | Individuals | Semi professional | Licensed operators | Credentialed |
+| Price point | S$10 to S$40 | S$15 to S$125, no anchor | S$50 to S$150 | S$30 to S$100 | S$40 to S$100/hr |
+| Barrier to list | Low, unified account | Medium, separate host app required | High | High | High |
+| Browse without install | Yes, web | No, app only | Yes | Yes | N/A |
+| Date framing | Explicit, Date Mode planned | Absent | Absent | Absent | N/A |
+
+### The direct peer competitor: ToGatherSG
+
+*Observed 23 August 2026. Website: togathersg.com. iOS apps live June 2026. Building since October 2025.*
+
+**Positioning:** "Singapore's first marketplace for home-based experiences." Same core idea as TryKai, similar target market, launched a few months earlier.
+
+**Current state after roughly two months live:**
+- 22 experiences live
+- 5 total reviews across all 22 experiences, concentrated on two listings (a mosaic workshop and a matcha and crafts session)
+- Price spread S$15 to S$125 for a two hour session, wide fluctuation with no clear anchor band
+- Session model appears to depend on group minimums, some listings state "cancelled and refunded if minimum not reached"
+
+**What the head start has and has not produced.** Eight months of build plus two to three months live has produced supply but essentially no reputation, five reviews across twenty two listings. The market is not locked up. TryKai is not late to this, TryKai is early to the part that actually compounds, which is reviews and trust.
+
+#### Weaknesses to exploit
+
+1. **App download required to browse.** The website's sole call to action is "Download Now." No listings are visible without installing. For an "I'm bored on Friday" use case, that install step is a real drop off. TryKai runs in a browser, someone can share a listing link and the recipient sees it instantly with no install and no account. Worth stating explicitly in messaging: browse now, no app needed.
+
+2. **Two separate apps, one for guests and one for hosts.** A would be host has to discover, download, and set up a second app before they can even fill in the onboarding form. That is a hurdle at the top of the recruitment funnel, exactly where friction hurts most. TryKai's unified account, guest by default, becomes a host on first listing, is the correct answer and matches how Airbnb, Carousell, and every serious marketplace works. Do not deviate from this.
+
+3. **No romantic or occasion framing anywhere.** Zero mention of couples, dates, or occasions across the app or the website after eight months of building. This is real world validation that Date Mode is genuinely unclaimed territory, not a crowded angle. Worth leaning into more explicitly at launch than the current soft "solo, with friends, or on a date" subhead does.
+
+4. **Group minimum session model.** Listings that require a minimum guest count to run mean a guest can book, feel committed, and have the experience cancelled because strangers did not fill it. TryKai's smaller session model does not have this failure mode. Worth stating implicitly as a guarantee: your booking is not contingent on strangers.
+
+5. **Muddied target audience.** The app does not produce a strong "I want to try this" reaction. No clear guest archetype, no clear use case anchor. TryKai's positioning around identity building, date planning, and the cinema ticket price point is sharper.
+
+6. **Price spread is chaotic.** Session prices range from S$15 to S$125 with no discernible anchor band, which reads as an aggregator rather than a curated marketplace. TryKai's disciplined S$10 to S$40 band is a positioning asset, not just a pricing preference. Do not drift out of it under supply side pressure.
+
+#### What to respect, not imitate
+
+**Their design is polished, and it is polished for a different audience than ours.** Cartoon mascots, comic style banners, bright purple. That is a considered aesthetic choice for a casual, gamified feel, and it is literally the exact direction DESIGN.md considered and rejected on the grounds that comic and bubble undermines trust in a platform handling real money and real strangers meeting up. TryKai's navy and cream, warm but credible palette is the more disciplined choice for the actual positioning, and should not be softened to look more like theirs.
+
+**Their host onboarding flow is decent as a form.** Photo, address, phone, categories, optional social, optional food safety, submit for review. The flow itself is coherent. What is wrong is that it lives in a separate app. When TryKai builds equivalent host onboarding, it should match this level of structure while staying inside one unified account.
+
+#### One small UX tell worth noting
+
+**"Delete my account" appears on the same screen as "Submit for review."** A destructive action on the same surface as a happy path action is the kind of thing a design review catches. Minor on its own, but evidence the app's UX is shakier than the visual surface suggests. Reinforces that "looks beautiful" is not the same as "is well designed," and imitating the surface would import the underlying weaknesses too.
+
+#### One caution before betting the strategy on this analysis
+
+The observations above are from a single browsing session on 23 August 2026. Reviewing them again in a month or two makes sense, since:
+- 22 live listings is a real supply base, they can plausibly reach 50+ by TryKai's launch
+- Their review count is thin now but could grow quickly if they hit an inflection
+- Two separate apps could be consolidated into one at any point
+
+Nothing here suggests they are a serious existential threat today. It does suggest the market is genuinely open, and it validates several of TryKai's already made decisions rather than requiring new ones.
 
 ### Lane 2 specific competition
 | Competitor | Threat | Why |
