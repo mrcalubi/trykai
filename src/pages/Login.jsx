@@ -40,36 +40,30 @@ export default function Login() {
     e.preventDefault()
     setError('')
     setMessage('')
+
+    const name = fullName.trim()
+    if (!name) {
+      setError('Please enter your full name.')
+      return
+    }
+
     setLoading(true)
 
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
-    })
-
-    if (authError) {
-      setLoading(false)
-      setError(authError.message)
-      return
-    }
-
-    const user = data.user
-    if (!user) {
-      setLoading(false)
-      setError('Signup failed. Please try again.')
-      return
-    }
-
-    const { error: profileError } = await supabase.from('users').insert({
-      id: user.id,
-      email,
-      full_name: fullName.trim() || null,
+      options: { data: { full_name: name } },
     })
 
     setLoading(false)
 
-    if (profileError) {
-      setError(profileError.message)
+    if (authError) {
+      setError(authError.message)
+      return
+    }
+
+    if (!data.user) {
+      setError('Signup failed. Please try again.')
       return
     }
 
@@ -116,6 +110,7 @@ export default function Login() {
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Your name"
                 autoComplete="name"
+                required
                 className="input"
               />
             </label>
