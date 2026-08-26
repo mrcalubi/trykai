@@ -1,6 +1,6 @@
 # TryKai (Kai) — Design & Visual Identity
 
-Companion document to DECISIONS.md (product/technical/legal) and STRATEGY.md (business model, positioning, team). This document covers visual identity: palette, typography, logo direction, messaging, and photography policy.
+Companion document to DECISIONS.md (product/technical/legal) and BUSINESS.md (business model, positioning, team). This document covers visual identity: palette, typography, logo direction, messaging, and photography policy.
 
 ---
 
@@ -47,7 +47,7 @@ One type system, shared across both lanes:
 ### Decided
 - Direction: legible, warm, friendly-but-credible — not script, not comic-bubble, not editorial-cutout, not cold-minimal
 - Locality/"neighbour" language is a strong tagline candidate from early exploration — not finalized as the permanent tagline, but the leading reference point
-- "Skip the course. Just learn the basics." is a strong line, **banked for Lane 2 only** — it's a direct jab at tutoring/Skillshare-style incumbents, which are explicitly Lane 2's competitive set per STRATEGY.md, not Lane 1's
+- "Skip the course. Just learn the basics." is a strong line, **banked for Lane 2 only** — it's a direct jab at tutoring/Skillshare-style incumbents, which are explicitly Lane 2's competitive set per BUSINESS.md, not Lane 1's
 
 ### Open
 Final wordmark execution not yet locked — direction is set; the specific lettering/logo treatment itself still needs to be designed (separately from the Bricolage Grotesque system, though likely related to it).
@@ -77,11 +77,32 @@ Final wordmark execution not yet locked — direction is set; the specific lette
 
 ---
 
-## 7. Open items / to revisit
+## 7. Component library and UI decisions (built 24 to 25 August 2026)
+
+A reusable component library now exists, built in plain CSS matching `index.css` (the project does not use Tailwind), previewable at a private `/style-guide` route. All on the `style-guide-page-staging` branch, not yet merged at time of writing. Components: Button (primary, secondary, destructive), Input (with label, error state, optional floating-label mode, password show/hide), Card (borderless browse mode and boxed booking mode), SelectableCard (compact horizontal category bar), TopNav, HamburgerMenu.
+
+**Decisions locked while building these, mobile-first throughout:**
+
+- **Prices and utility text use the monospace face**, as section 3 specifies. Caleb noted he does not love it once seen but it is not wrong; parked, not changed.
+- **Category icons.** Custom flat illustrations, one per category (Food, Fitness, Arts, Music, Language, Other), navy `#16264B` and coral `#D97756` only, transparent background with no circle or border, roughly half navy-dominant and half coral-dominant across the set to avoid a monotone row. AI-generated to a fixed style prompt. Food, Fitness, Arts done; Music, Language, Other pending. These deliberately avoid ToGatherSG's brighter cartoon palette.
+- **Top nav.** Centered logo with a Mous-style scroll behaviour: at the top it shows the logo mark plus "TryKai" wordmark at full height; on scroll the wordmark hides and the bar shrinks; returns on scroll to top. Hamburger top-left, login top-right. Logged-out shows a "Log in" link; logged-in shows the user's avatar (photo, or initials in a navy/cream circle if no photo).
+- **Navigation is top nav, not bottom nav, for launch.** A bottom tab bar was wanted but rejected for now because as a mobile website (not an app) it collides with the browser's own bottom chrome. Revisit a bottom nav when TryKai becomes a native app, which is the right time to get it properly rather than a compromised web version.
+- **Hamburger menu** slides in from the left with a slight staggered fade per row. Contents adapt to logged-in state.
+- **Category filter row** sits directly below the top nav as a horizontal band, scrollable sideways, and scrolls away with the content rather than staying pinned.
+
+**Browse experience decided (not all built):**
+- The listings grid leads on the home page, no hero banner or persistent search bar for launch. Two columns on phone (matching Airbnb's mobile browse density), three on tablet, four on desktop.
+- Card shows the category badge overlaid on the image top-left, title, a compact meta line with price and, only if a rating exists, the rating after a dot. A brand-new listing shows price only, never an empty star, deliberately unlike ToGatherSG's "0 reviews" look.
+- Only honest scarcity and real discounts as conversion nudges (real "spots left", real PayNow saving). No fabricated urgency, no fake "people viewing now".
+
+---
+
+## 8. Open items / to revisit
 
 - Final wordmark/logo execution (direction set, specific design not yet built)
 - Lane 2's own small wordmark or section-header treatment, if any (optional, deferred)
-- Mobile hero treatment — not yet mocked up
-- Icon system formalization — early mockup used Tabler-style outline icons; not yet confirmed as the permanent system
+- The three remaining category icons (Music, Language, Other)
+- Whether to keep the monospace price face (Caleb ambivalent)
 - Exact tagline under the logo (locality/"neighbour" language is the leading candidate, not finalized)
 - Lane 2's exact spacing/density/accent-reduction specifics — direction agreed ("quieter, same system"), precise values not yet defined
+- Wiring the built components into the real pages (Home first), still to do after the component branch merges

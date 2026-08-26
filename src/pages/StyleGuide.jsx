@@ -3,12 +3,27 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Card from '../components/ui/Card'
 import SelectableCard from '../components/ui/SelectableCard'
+import TopNav, { TopNavAccount } from '../components/ui/TopNav'
 import foodIcon from '../assets/categories/food.png'
 import fitnessIcon from '../assets/categories/fitness.png'
 import artsIcon from '../assets/categories/arts.png'
 // import musicIcon from '../assets/categories/music.png'
 // import languageIcon from '../assets/categories/language.png'
 // import otherIcon from '../assets/categories/other.png'
+
+const ACCOUNT_PREVIEWS = [
+  {
+    label: 'Photo',
+    usage: 'avatarUrl present — image cropped to a circle',
+    avatarUrl: '/trykai.png',
+    name: 'Mei Ling',
+  },
+  {
+    label: 'Initials',
+    usage: 'No photo — first letters of first and last name',
+    name: 'Mei Ling',
+  },
+]
 
 const CATEGORY_ICONS = {
   Food: foodIcon,
@@ -49,13 +64,62 @@ const BUTTON_PREVIEWS = [
   },
 ]
 
+const SCROLL_FILLERS = [
+  'Scroll down to see the TopNav shrink — the TryKai wordmark hides and the bar gets shorter.',
+  'Keep scrolling. The logo mark stays centered while the left menu and right account stay pinned to the edges.',
+  'Scroll back to the top and the wordmark returns with the full-height bar.',
+  'This block is only here so the style-guide page is tall enough to exercise that scroll behavior.',
+  'More filler space for phone-width testing of the compact TopNav.',
+  'Still more room — stop when you have checked both the expanded and compact states.',
+]
+
 export default function StyleGuide() {
   // Matches Home category pills: single select, one active category at a time.
   const [selectedCategory, setSelectedCategory] = useState('Food')
+  const [previewLoggedIn, setPreviewLoggedIn] = useState(false)
 
   return (
-    <div className="page">
-      <h1>Component preview</h1>
+    <div className="style-guide-page">
+      <TopNav
+        isLoggedIn={previewLoggedIn}
+        avatarUrl="/trykai.png"
+        name="Mei Ling"
+        onMenuClick={() => {}}
+      />
+
+      <div className="page">
+        <h1>Component preview</h1>
+
+        <section className="style-guide-section" aria-labelledby="topnav-preview-heading">
+          <h2 id="topnav-preview-heading">Top nav</h2>
+          <p className="style-guide-section__note">
+            Fixed bar above. Open the hamburger (slides in from the left), and scroll to see the bar shrink.
+          </p>
+          <label className="style-guide-toggle">
+            <input
+              type="checkbox"
+              checked={previewLoggedIn}
+              onChange={(event) => setPreviewLoggedIn(event.target.checked)}
+            />
+            Simulate logged in
+          </label>
+          <p className="style-guide-section__note style-guide-section__note--spaced">
+            Logged-in account control — photo or initials.
+          </p>
+          <div className="style-guide-avatar-row">
+            {ACCOUNT_PREVIEWS.map((preview) => (
+              <article key={preview.label} className="style-guide-avatar-demo">
+                <p className="style-guide-card__label">{preview.label}</p>
+                <p className="style-guide-card__usage">{preview.usage}</p>
+                <TopNavAccount
+                  avatarUrl={preview.avatarUrl}
+                  name={preview.name}
+                />
+              </article>
+            ))}
+          </div>
+        </section>
+
       <section className="style-guide-section" aria-labelledby="button-preview-heading">
         <h2 id="button-preview-heading">Buttons</h2>
         <div className="style-guide-grid">
@@ -205,6 +269,21 @@ export default function StyleGuide() {
           })}
         </div>
       </section>
+
+        <section className="style-guide-section" aria-labelledby="topnav-scroll-heading">
+          <h2 id="topnav-scroll-heading">Scroll space</h2>
+          <p className="style-guide-section__note">
+            Placeholder content so you can scroll and check the TopNav compact state.
+          </p>
+          <div className="style-guide-scroll-fill">
+            {SCROLL_FILLERS.map((line) => (
+              <p key={line} className="style-guide-scroll-fill__block">
+                {line}
+              </p>
+            ))}
+          </div>
+        </section>
+      </div>
     </div>
   )
 }

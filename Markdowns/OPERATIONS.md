@@ -27,6 +27,32 @@ Each week has three sections, one per founder, tagged **[CRITICAL]**, **[HIGH]**
 
 ---
 
+## Progress snapshot, 25 August 2026
+
+A working session across 22 to 25 August closed out a large block of foundation work, some of it ahead of its planned week. This block records what is now genuinely done, so the week by week sections below are read as the historical plan rather than the current state.
+
+**Done and verified on staging:**
+- Staging Supabase environment stood up and in active use. Closes the carried forward week 2 and 3 item.
+- Canonical schema in version control. Closes the top priority technical fix carried from week 2.
+- Signup was completely broken by an RLS gap that stopped a new account writing its own row. Fixed. Host verification submission was blocked the same way. Fixed. Suspension fields added. All captured in `00003_staging_hotfixes_22aug.sql`. The three security self audit holes from week 2 and 3 (self approving `verification_status`, resetting `host_strikes`, reading another user's verification documents) are closed by column grants, RLS policies, and a guard trigger.
+- Atomic `spots_remaining` decrement built and tested via a `confirm_booking` security definer function. This was a week 5 critical item, now done early.
+- Full address reveal on confirmed bookings, via a `get_listing_address` security definer function. Closes the `full_address` written but never read gap.
+- Four tier cancellation refund built by Ruiheng and verified correct against the published policy. This was a week 5 item.
+- Automated CI test suite (318 unit and component tests plus 58 browser tests) and branch protection added by Ruiheng. Every merge now runs checks. This is new infrastructure not in the original plan.
+- A UI component library and top nav built: Button, Input, Card, SelectableCard, TopNav, HamburgerMenu, previewable at a private `/style-guide` route. On the `style-guide-page-staging` branch, not yet merged.
+
+**Still open from the plan:**
+- Safety response protocol is now drafted (`SAFETY_RESPONSE_PROTOCOL.md`) but not ratified or enforced in the app. The suspension fields exist but nothing in the app enforces them yet, so a suspended account's listings are not automatically hidden.
+- Insurance quote, still not obtained.
+- Founders' agreement, still unsigned. Ruiheng still not told about the three way equal profit share.
+- The two pricing decisions (guest fee restructure and host fee trigger) are now **decided**, see DECISIONS.md, so the week 5 fee rebuild has final numbers to build against.
+
+**In flight, needs Ruiheng:**
+- The component library PR is waiting to merge. Ruiheng's CreateListing auth fix landed on `main`, the PR targets `staging`, so they may be out of sync. Resolve whether to retarget the PR or sync staging with main.
+- Confirm the staging database hotfixes have been applied to production, since they do not travel through a code merge.
+
+---
+
 ## WEEK 1 ✅ complete
 *28 July to 3 August*
 
@@ -103,7 +129,7 @@ Each week has three sections, one per founder, tagged **[CRITICAL]**, **[HIGH]**
 
 ### RUIHENG
 - [CRITICAL] Close out any carried over foundation items
-- [HIGH] Review the fee structure ahead of building it: 10% guest, 10% host for peer hosts, S$2 floor, PayNow discount, new host waiver
+- [HIGH] Review the fee structure ahead of building it. Now decided, see DECISIONS.md: guest fee 12% card with S$2.50 floor rounded up to a clean all in total shown from browse through checkout, PayNow shown as a flat 5% discount at checkout, host fee 10% starting per host from their fourth booking with the first three free.
 - [STANDARD] Mobile responsiveness on real devices, iOS Safari and Android Chrome
 - [STANDARD] C4 diagram for architectural reference
 
@@ -125,7 +151,7 @@ Each week has three sections, one per founder, tagged **[CRITICAL]**, **[HIGH]**
 **Goal:** platform fee rebuilt correctly. This starts the critical path. Protect Ruiheng's time from here on; this work does not survive being fragmented into small evening slices.
 
 ### RUIHENG
-- [CRITICAL] Rebuild the fee module, replacing the hardcoded flat 15% with the real tiered structure. Built first because it is pure logic, easy to test in isolation, and the piece most likely to be silently wrong.
+- [CRITICAL] Rebuild the fee module to the structure decided on 23 August (see DECISIONS.md), replacing the old hardcoded flat fee. Built first because it is pure logic, easy to test in isolation, and the piece most likely to be silently wrong. Note the stashed HitPay work in progress already contains a fee calculation that can be adapted rather than starting from nothing.
 
 ### CALEB
 - [CRITICAL] Layered T&C acceptance flow: signup, create listing, checkout. Legal requirement, do not skip.
