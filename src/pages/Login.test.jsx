@@ -19,6 +19,11 @@ async function fillCredentials(user, { email = 'kai@example.com', password = 'hu
   await user.type(screen.getByLabelText('Password'), password)
 }
 
+async function fillSignup(user, { name = 'Mei Ling', email = 'kai@example.com', password = 'hunter22' } = {}) {
+  await user.type(screen.getByLabelText('Full name'), name)
+  await fillCredentials(user, { email, password })
+}
+
 async function switchToSignup(user) {
   await user.click(screen.getByRole('button', { name: 'Sign up' }))
 }
@@ -48,6 +53,12 @@ describe('Login form', () => {
   it('requires a password of at least six characters', () => {
     renderLogin()
     expect(screen.getByLabelText('Password')).toHaveAttribute('minLength', '6')
+  })
+
+  it('marks the full name field as required on the signup form', async () => {
+    const { user } = renderLogin()
+    await switchToSignup(user)
+    expect(screen.getByLabelText('Full name')).toBeRequired()
   })
 })
 
@@ -113,40 +124,41 @@ describe('Signing up', () => {
     })
   }
 
-  it('creates the auth user and a matching profile row', async () => {
+  it('sends the trimmed name in signup metadata and does not insert a profile row', async () => {
     givenSignupSucceeds()
     const { user } = renderLogin()
     await switchToSignup(user)
-    await user.type(screen.getByLabelText('Full name'), '  Mei Ling  ')
-    await fillCredentials(user, { email: 'mei@example.com' })
+    await fillSignup(user, { name: '  Mei Ling  ', email: 'mei@example.com' })
 
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
 
-    await waitFor(() => expect(supabase.__calls('users', 'insert')).toHaveLength(1))
-    expect(supabase.__lastCall('users', 'insert').payload).toEqual({
-      id: 'new-user',
+    await waitFor(() => expect(supabase.auth.signUp).toHaveBeenCalledTimes(1))
+    expect(supabase.auth.signUp).toHaveBeenCalledWith({
       email: 'mei@example.com',
-      full_name: 'Mei Ling',
+      password: 'hunter22',
+      options: { data: { full_name: 'Mei Ling' } },
     })
+    expect(supabase.__calls('users', 'insert')).toHaveLength(0)
   })
 
-  it('stores a null name rather than an empty string', async () => {
+  it('requires a full name before calling signup', async () => {
     givenSignupSucceeds()
     const { user } = renderLogin()
     await switchToSignup(user)
+    await user.type(screen.getByLabelText('Full name'), '   ')
     await fillCredentials(user)
 
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
 
-    await waitFor(() => expect(supabase.__calls('users', 'insert')).toHaveLength(1))
-    expect(supabase.__lastCall('users', 'insert').payload.full_name).toBeNull()
+    expect(await screen.findByText('Please enter your full name.')).toBeInTheDocument()
+    expect(supabase.auth.signUp).not.toHaveBeenCalled()
   })
 
   it('navigates straight in when the signup returns a session', async () => {
     givenSignupSucceeds()
     const { user, currentPath } = renderLogin({ from: '/dashboard' })
     await switchToSignup(user)
-    await fillCredentials(user)
+    await fillSignup(user)
 
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
 
@@ -157,7 +169,7 @@ describe('Signing up', () => {
     givenSignupSucceeds({ session: null })
     const { user, currentPath } = renderLogin()
     await switchToSignup(user)
-    await fillCredentials(user)
+    await fillSignup(user)
 
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
 
@@ -175,7 +187,7 @@ describe('Signing up', () => {
     })
     const { user } = renderLogin()
     await switchToSignup(user)
-    await fillCredentials(user)
+    await fillSignup(user)
 
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
 
@@ -187,24 +199,11 @@ describe('Signing up', () => {
     supabase.auth.signUp.mockResolvedValue({ data: { user: null, session: null }, error: null })
     const { user } = renderLogin()
     await switchToSignup(user)
-    await fillCredentials(user)
+    await fillSignup(user)
 
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
 
     expect(await screen.findByText('Signup failed. Please try again.')).toBeInTheDocument()
-  })
-
-  it('surfaces a failure to write the profile row', async () => {
-    givenSignupSucceeds()
-    supabase.__on('users', 'insert', { error: { message: 'duplicate key' } })
-    const { user, currentPath } = renderLogin()
-    await switchToSignup(user)
-    await fillCredentials(user)
-
-    await user.click(screen.getByRole('button', { name: 'Sign up' }))
-
-    expect(await screen.findByText('duplicate key')).toBeInTheDocument()
-    expect(currentPath()).toBe('/login')
   })
 
   it('clears a previous error when switching modes', async () => {
