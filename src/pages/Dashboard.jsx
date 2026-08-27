@@ -255,12 +255,23 @@ export default function Dashboard() {
   }, [pendingBookingId, userId, loadData, setSearchParams])
 
   useEffect(() => {
-    if (connectStatus === 'return') {
-      setBookingStatusMessage('Payout setup submitted. It can take a minute for Stripe to confirm.')
+    if (connectStatus !== 'return' && connectStatus !== 'refresh') return
+
+    let cancelled = false
+    void Promise.resolve().then(() => {
+      if (cancelled) return
+      if (connectStatus === 'return') {
+        setBookingStatusMessage(
+          'Payout setup submitted. It can take a minute for Stripe to confirm.',
+        )
+      } else {
+        setPayoutSetupError('Please finish payout setup to receive payments.')
+      }
       setSearchParams({}, { replace: true })
-    } else if (connectStatus === 'refresh') {
-      setPayoutSetupError('Please finish payout setup to receive payments.')
-      setSearchParams({}, { replace: true })
+    })
+
+    return () => {
+      cancelled = true
     }
   }, [connectStatus, setSearchParams])
 

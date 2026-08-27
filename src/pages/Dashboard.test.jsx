@@ -457,6 +457,34 @@ describe('Dashboard payout setup', () => {
     })
     expect(await screen.findByText('Payouts are set up. You can take bookings.')).toBeInTheDocument()
   })
+
+  it('explains a successful return from Stripe onboarding', async () => {
+    givenData({ listings: [makeMyListing()] })
+    renderWithRouter(
+      <RequireAuth>
+        <Dashboard />
+      </RequireAuth>,
+      { route: '/dashboard?connect=return', path: '/dashboard' }
+    )
+
+    expect(
+      await screen.findByText('Payout setup submitted. It can take a minute for Stripe to confirm.')
+    ).toBeInTheDocument()
+  })
+
+  it('asks the host to finish onboarding when Stripe sends them back to refresh', async () => {
+    givenData({ listings: [makeMyListing()] })
+    renderWithRouter(
+      <RequireAuth>
+        <Dashboard />
+      </RequireAuth>,
+      { route: '/dashboard?connect=refresh', path: '/dashboard' }
+    )
+
+    expect(
+      await screen.findByText('Please finish payout setup to receive payments.')
+    ).toBeInTheDocument()
+  })
 })
 
 describe('Dashboard reviews', () => {
