@@ -9,7 +9,7 @@ import {
   guestRefundTier,
   hoursUntilSession,
 } from './cancellationPolicy'
-import { PLATFORM_FEE_RATE as EDGE_PLATFORM_FEE_RATE } from '../../supabase/functions/_shared/booking.ts'
+import { LEGACY_PLATFORM_FEE_RATE as EDGE_PLATFORM_FEE_RATE } from '../../supabase/functions/_shared/booking.ts'
 import { hoursFromNow } from '../test/fixtures'
 
 const NOW = new Date('2026-06-15T10:00:00.000Z')
@@ -249,7 +249,8 @@ describe('CANCELLATION_POLICY_ITEMS', () => {
 })
 
 describe('platform fee rate', () => {
-  it('is the same rate the edge function charges', () => {
+  it('matches the edge-function fallback for bookings that predate a stored fee', () => {
     expect(PLATFORM_FEE_RATE).toBe(EDGE_PLATFORM_FEE_RATE)
+    expect(PLATFORM_FEE_RATE).toBe(0.15)
   })
 })

@@ -1,12 +1,12 @@
 # Refund Policy
 
-Last updated: 29 July 2026
+Last updated: 27 August 2026
 
 ## How refunds work
 
 Refund eligibility is set by our [Cancellation Policy](/cancellation-policy). This page covers how and when you actually get your money back once a refund has been approved.
 
-Refunds are issued to your original payment method through HitPay, our payment processor. You never need to do anything to receive a refund once a cancellation is confirmed, it happens automatically and the amount is shown to you immediately in your cancellation confirmation email.
+Refunds are issued to your original payment method through Stripe, our payment processor. You never need to do anything to receive a refund once a cancellation is confirmed, it happens automatically and the amount is shown to you immediately in your cancellation confirmation email.
 
 ## Processing time
 
@@ -14,7 +14,6 @@ Processing time depends on how you originally paid:
 
 - **Card:** 3 to 5 business days
 - **PayNow:** usually reflects within a few hours, and no more than 1 business day
-- **GrabPay:** usually reflects within a few hours, and no more than 1 business day
 
 Business days refer to Singapore business days, and exclude weekends and Singapore public holidays.
 
@@ -24,7 +23,7 @@ You are never charged any additional fee to receive a refund. The amount you get
 
 ## Failed or declined payments
 
-If a payment fails or is declined at checkout, no booking is created and no charge is made. There is nothing to refund because the transaction never completed.
+If a payment fails or is declined at checkout, no booking is confirmed and no charge is kept. There is nothing to refund because the transaction never completed.
 
 ## If you have a complaint about the session itself
 

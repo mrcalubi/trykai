@@ -4,7 +4,7 @@ export default function RefundPolicy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Refund Policy</h1>
-      <p className="policy-page__updated">Last updated: 29 July 2026</p>
+      <p className="policy-page__updated">Last updated: 27 August 2026</p>
 
       <h2>How refunds work</h2>
       <p>
@@ -14,7 +14,7 @@ export default function RefundPolicy() {
         been approved.
       </p>
       <p>
-        Refunds are issued to your original payment method through HitPay, our
+        Refunds are issued to your original payment method through Stripe, our
         payment processor. You never need to do anything to receive a refund
         once a cancellation is confirmed, it happens automatically and the
         amount is shown to you immediately in your cancellation confirmation
@@ -29,10 +29,6 @@ export default function RefundPolicy() {
         </li>
         <li>
           <strong>PayNow:</strong> usually reflects within a few hours, and no
-          more than 1 business day
-        </li>
-        <li>
-          <strong>GrabPay:</strong> usually reflects within a few hours, and no
           more than 1 business day
         </li>
       </ul>
@@ -50,9 +46,9 @@ export default function RefundPolicy() {
 
       <h2>Failed or declined payments</h2>
       <p>
-        If a payment fails or is declined at checkout, no booking is created and
-        no charge is made. There is nothing to refund because the transaction
-        never completed.
+        If a payment fails or is declined at checkout, no booking is confirmed
+        and no charge is kept. There is nothing to refund because the
+        transaction never completed.
       </p>
 
       <h2>If you have a complaint about the session itself</h2>

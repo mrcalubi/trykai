@@ -455,3 +455,33 @@ entrypoint = "./functions/notify-verification-result/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/notify-verification-result/*.html" ]
+
+[functions.stripe-webhook]
+enabled = true
+verify_jwt = false
+import_map = "./functions/stripe-webhook/deno.json"
+entrypoint = "./functions/stripe-webhook/index.ts"
+
+[functions.create-connect-account]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-connect-account/deno.json"
+entrypoint = "./functions/create-connect-account/index.ts"
+
+[functions.create-account-link]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-account-link/deno.json"
+entrypoint = "./functions/create-account-link/index.ts"
+
+[functions.cancel-booking]
+enabled = true
+verify_jwt = false
+import_map = "./functions/cancel-booking/deno.json"
+entrypoint = "./functions/cancel-booking/index.ts"
+
+[functions.admin-cancel-booking]
+enabled = true
+verify_jwt = false
+import_map = "./functions/admin-cancel-booking/deno.json"
+entrypoint = "./functions/admin-cancel-booking/index.ts"

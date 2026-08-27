@@ -1641,10 +1641,80 @@ body:has(.style-guide-page) .navbar {
   gap: 16px;
 }
 
-.payment-form__actions {
+.payment-rails {
   display: flex;
+  flex-direction: column;
   gap: 12px;
-  justify-content: flex-end;
+}
+
+.payment-rails__hint {
+  margin: 0;
+  font-size: 13px;
+}
+
+.payment-rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.payment-rail:hover:not(:disabled),
+.payment-rail:focus-visible {
+  border-color: var(--navy);
+}
+
+.payment-rail:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.payment-rail__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.payment-rail__hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.payment-rail__price {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--text-h);
+  letter-spacing: -0.02em;
+}
+
+.payout-setup {
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+
+.payout-setup__title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--text-h);
+}
+
+.payout-setup__copy {
+  margin: 0 0 12px;
+  font-size: 14px;
 }
 
 /* Dashboard */
@@ -1899,37 +1969,6 @@ body:has(.style-guide-page) .navbar {
   gap: 12px;
   margin-top: 12px;
   flex-wrap: wrap;
-}
-
-.staging-test-banner {
-  margin-bottom: 20px;
-  padding: 12px 16px;
-  border: 2px dashed #b45309;
-  border-radius: var(--radius-sm);
-  background: #fff7ed;
-  color: #9a3412;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.btn--staging-test {
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #9a3412;
-  background: #fff7ed;
-  border: 2px dashed #b45309;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.btn--staging-test:hover:not(:disabled) {
-  background: #ffedd5;
-}
-
-.btn--staging-test:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 /* Cancellation policy */

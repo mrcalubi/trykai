@@ -41,7 +41,10 @@ function givenData({
       ? { data: { spots_remaining: spotsRemaining }, error: null }
       : { data: hostSessions, error: null }
   )
-  supabase.__on('users', 'select', { data: { host_strikes: hostStrikes }, error: null })
+  supabase.__on('users', 'select', {
+    data: { stripe_payouts_enabled: true, is_host: listings.length > 0, host_strikes: hostStrikes },
+    error: null,
+  })
 }
 
 function makeHostSession(overrides = {}) {
@@ -334,89 +337,33 @@ describe('Dashboard guest cancellation', () => {
     expect(screen.getByText(new RegExp(quote.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeInTheDocument()
   })
 
-  it.each([
-    [72, 4500],
-    [30, 1913],
-    [12, 956],
-    [3, 0],
-  ])('records a %i-hour cancellation as a refund of %i cents', async (hours, refund) => {
-    givenData({ bookings: [bookingCancelledAt(hours)] })
-    const { user } = await renderDashboard()
-
-    await user.click(screen.getByRole('button', { name: 'Cancel booking' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
-
-    await waitFor(() => expect(supabase.__calls('bookings', 'update')).toHaveLength(1))
-    const call = supabase.__lastCall('bookings', 'update')
-    expect(call.payload).toMatchObject({
-      status: 'cancelled',
-      cancelled_by: 'guest',
-      refund_amount: refund,
-    })
-    expect(call.payload.cancelled_at).toEqual(expect.any(String))
-  })
-
-  it('still frees the spot when the cancellation earns no refund', async () => {
-    givenData({ bookings: [bookingCancelledAt(3)], spotsRemaining: 1 })
-    const { user } = await renderDashboard()
-
-    await user.click(screen.getByRole('button', { name: 'Cancel booking' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
-
-    await waitFor(() => expect(supabase.__calls('sessions', 'update')).toHaveLength(1))
-    expect(supabase.__lastCall('sessions', 'update').payload).toEqual({ spots_remaining: 2 })
-  })
-
-  it('only lets a guest cancel their own booking', async () => {
+  it('asks the cancel-booking function to refund the guest', async () => {
     givenData({ bookings: [makeBooking()] })
+    supabase.functions.invoke.mockResolvedValue({ data: { ok: true, refund_amount: 4500 }, error: null })
     const { user } = await renderDashboard()
 
     await user.click(screen.getByRole('button', { name: 'Cancel booking' }))
     await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
 
-    await waitFor(() => expect(supabase.__calls('bookings', 'update')).toHaveLength(1))
-    expect(supabase.__lastCall('bookings', 'update').filters).toContainEqual({
-      method: 'eq',
-      column: 'guest_id',
-      value: USER_ID,
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalled())
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('cancel-booking', {
+      body: { booking_id: 'booking-1' },
+      headers: { Authorization: 'Bearer test-access-token' },
     })
   })
 
-  it('returns the freed spots to the session', async () => {
-    givenData({ bookings: [makeBooking({ guests_count: 2 })], spotsRemaining: 1 })
-    const { user } = await renderDashboard()
-
-    await user.click(screen.getByRole('button', { name: 'Cancel booking' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
-
-    await waitFor(() => expect(supabase.__calls('sessions', 'update')).toHaveLength(1))
-    expect(supabase.__lastCall('sessions', 'update').payload).toEqual({ spots_remaining: 3 })
-  })
-
-  it('does not free any spots if the booking update fails', async () => {
+  it('shows an error from the cancel function', async () => {
     givenData({ bookings: [makeBooking()] })
-    supabase.__on('bookings', 'update', { error: { message: 'already cancelled' } })
+    supabase.functions.invoke.mockResolvedValue({
+      data: null,
+      error: { message: 'already cancelled' },
+    })
     const { user } = await renderDashboard()
 
     await user.click(screen.getByRole('button', { name: 'Cancel booking' }))
     await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
 
     expect(await screen.findByText('already cancelled')).toBeInTheDocument()
-    expect(supabase.__calls('sessions', 'update')).toHaveLength(0)
-  })
-
-  it('stops before touching the booking if the session cannot be read', async () => {
-    givenData({ bookings: [makeBooking()] })
-    supabase.__on('sessions', 'select', (call) =>
-      call.single ? { data: null, error: { message: 'session gone' } } : { data: [], error: null }
-    )
-    const { user } = await renderDashboard()
-
-    await user.click(screen.getByRole('button', { name: 'Cancel booking' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
-
-    expect(await screen.findByText('session gone')).toBeInTheDocument()
-    expect(supabase.__calls('bookings', 'update')).toHaveLength(0)
   })
 })
 
@@ -447,153 +394,68 @@ describe('Dashboard host cancellation', () => {
     expect(screen.getByText('Full refund of $90')).toBeInTheDocument()
   })
 
-  it('refunds every active guest in full', async () => {
-    givenData({
-      listings: [makeMyListing()],
-      hostSessions: [
-        makeHostSession({
-          bookings: [
-            { id: 'b-1', status: 'confirmed', guests_count: 1, total_amount: 4500 },
-            { id: 'b-2', status: 'pending', guests_count: 2, total_amount: 9000 },
-            { id: 'b-3', status: 'cancelled', guests_count: 1, total_amount: 4500 },
-          ],
-        }),
-      ],
-    })
+  it('asks the cancel-booking function to cancel the whole session', async () => {
+    givenData({ listings: [makeMyListing()], hostSessions: [makeHostSession()] })
+    supabase.functions.invoke.mockResolvedValue({ data: { cancelled: 1 }, error: null })
     const { user } = await renderDashboard()
 
     await user.click(screen.getByRole('button', { name: 'Cancel session' }))
     await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
 
-    await waitFor(() => expect(supabase.__calls('bookings', 'update')).toHaveLength(2))
-    const updates = supabase.__calls('bookings', 'update')
-    expect(updates.map((call) => call.payload.refund_amount)).toEqual([4500, 9000])
-    for (const call of updates) {
-      expect(call.payload).toMatchObject({ status: 'cancelled', cancelled_by: 'host' })
-    }
-  })
-
-  it('returns every booked spot to the session', async () => {
-    givenData({
-      listings: [makeMyListing()],
-      hostSessions: [
-        makeHostSession({
-          bookings: [
-            { id: 'b-1', status: 'confirmed', guests_count: 1, total_amount: 4500 },
-            { id: 'b-2', status: 'pending', guests_count: 2, total_amount: 9000 },
-          ],
-        }),
-      ],
-      spotsRemaining: 1,
-    })
-    const { user } = await renderDashboard()
-
-    await user.click(screen.getByRole('button', { name: 'Cancel session' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
-
-    await waitFor(() => expect(supabase.__calls('sessions', 'update')).toHaveLength(1))
-    expect(supabase.__lastCall('sessions', 'update').payload).toEqual({ spots_remaining: 4 })
-  })
-
-  it('adds a strike to the host', async () => {
-    givenData({
-      listings: [makeMyListing()],
-      hostSessions: [makeHostSession()],
-      hostStrikes: 0,
-    })
-    const { user } = await renderDashboard()
-
-    await user.click(screen.getByRole('button', { name: 'Cancel session' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
-
-    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
-    expect(supabase.__lastCall('users', 'update').payload).toEqual({ host_strikes: 1 })
-  })
-
-  it('leaves the listing active on the second strike', async () => {
-    givenData({
-      listings: [makeMyListing()],
-      hostSessions: [makeHostSession()],
-      hostStrikes: 1,
-    })
-    const { user } = await renderDashboard()
-
-    await user.click(screen.getByRole('button', { name: 'Cancel session' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
-
-    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
-    expect(supabase.__lastCall('users', 'update').payload).toEqual({ host_strikes: 2 })
-    expect(supabase.__calls('listings', 'update')).toHaveLength(0)
-  })
-
-  it('deactivates the listing on the third strike', async () => {
-    givenData({
-      listings: [makeMyListing()],
-      hostSessions: [makeHostSession()],
-      hostStrikes: 2,
-    })
-    const { user } = await renderDashboard()
-
-    await user.click(screen.getByRole('button', { name: 'Cancel session' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
-
-    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
-    expect(supabase.__lastCall('listings', 'update').payload).toEqual({ is_active: false })
-    expect(supabase.__lastCall('listings', 'update').filters).toContainEqual({
-      method: 'eq',
-      column: 'id',
-      value: 'listing-1',
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalled())
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('cancel-booking', {
+      body: { session_id: 'session-1' },
+      headers: { Authorization: 'Bearer test-access-token' },
     })
   })
 
-  it('treats a host with no strike record as being on their first strike', async () => {
-    givenData({
-      listings: [makeMyListing()],
-      hostSessions: [makeHostSession()],
+  it('shows an error from the cancel function', async () => {
+    givenData({ listings: [makeMyListing()], hostSessions: [makeHostSession()] })
+    supabase.functions.invoke.mockResolvedValue({
+      data: { error: 'refund failed' },
+      error: null,
     })
-    supabase.__on('users', 'select', { data: { host_strikes: null }, error: null })
-    const { user } = await renderDashboard()
-
-    await user.click(screen.getByRole('button', { name: 'Cancel session' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
-
-    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
-    expect(supabase.__lastCall('users', 'update').payload).toEqual({ host_strikes: 1 })
-  })
-
-  it('stops at the first booking that fails to cancel', async () => {
-    givenData({
-      listings: [makeMyListing()],
-      hostSessions: [
-        makeHostSession({
-          bookings: [
-            { id: 'b-1', status: 'confirmed', guests_count: 1, total_amount: 4500 },
-            { id: 'b-2', status: 'confirmed', guests_count: 1, total_amount: 4500 },
-          ],
-        }),
-      ],
-    })
-    supabase.__on('bookings', 'update', { error: { message: 'refund failed' } })
     const { user } = await renderDashboard()
 
     await user.click(screen.getByRole('button', { name: 'Cancel session' }))
     await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
 
     expect(await screen.findByText('refund failed')).toBeInTheDocument()
-    expect(supabase.__calls('bookings', 'update')).toHaveLength(1)
-    expect(supabase.__calls('users', 'update')).toHaveLength(0)
+  })
+})
+
+describe('Dashboard payout setup', () => {
+  it('asks a host without payouts enabled to set them up', async () => {
+    givenData({ listings: [makeMyListing()] })
+    supabase.__on('users', 'select', {
+      data: { stripe_payouts_enabled: false, is_host: true },
+      error: null,
+    })
+    await renderDashboard()
+
+    expect(screen.getByRole('heading', { name: 'Set up payouts' })).toBeInTheDocument()
   })
 
-  it('does not strike the host when the session cannot be cancelled', async () => {
-    givenData({ listings: [makeMyListing()], hostSessions: [makeHostSession()] })
-    supabase.__on('sessions', 'update', { error: { message: 'spots locked' } })
+  it('asks Stripe for an account link when payouts are not set up', async () => {
+    givenData({ listings: [makeMyListing()] })
+    supabase.__on('users', 'select', {
+      data: { stripe_payouts_enabled: false, is_host: true },
+      error: null,
+    })
+    supabase.functions.invoke.mockResolvedValue({
+      data: { stripe_payouts_enabled: true, url: null },
+      error: null,
+    })
     const { user } = await renderDashboard()
 
-    await user.click(screen.getByRole('button', { name: 'Cancel session' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
+    await user.click(screen.getByRole('button', { name: 'Set up payouts' }))
 
-    expect(await screen.findByText('spots locked')).toBeInTheDocument()
-    expect(supabase.__calls('users', 'update')).toHaveLength(0)
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalled())
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('create-account-link', {
+      body: {},
+      headers: { Authorization: 'Bearer test-access-token' },
+    })
+    expect(await screen.findByText('Payouts are set up. You can take bookings.')).toBeInTheDocument()
   })
 })
 

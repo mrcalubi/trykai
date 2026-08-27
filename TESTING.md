@@ -176,21 +176,9 @@ arithmetic all agree, so moving one without the others fails CI.
 Things the suite deliberately does not cover yet, so they are visible rather than
 assumed:
 
-- **No payment webhook exists.** Nothing moves a booking from `pending` to
-  `confirmed` on payment success except `release-payout` running 24 hours later,
-  so there is no webhook handler to test.
-- **`spots_remaining` is never decremented when a booking is made.** Cancellation
-  adds spots back, which means a cancelled booking can inflate a session beyond
-  `spots_total`. Tests cover the code as written.
-- **No refund is actually issued.** Cancelling records a `refund_amount` but calls
-  no payment provider.
-- **`full_address` is never revealed to a confirmed guest**, despite the form
-  telling hosts it will be.
-- **No signed-in end-to-end journey.** The browser suite covers signed-out
-  journeys only; authenticated flows are covered at the page level instead.
-- **Edge function handlers are not executed in tests.** Their business rules were
-  extracted to `supabase/functions/_shared/booking.ts` and are fully covered
-  there; the request plumbing around them is only type-checked.
+- **Edge function handlers are not executed in tests.** Their business rules live in `supabase/functions/_shared/*.ts` and are covered there; Stripe signature verification and the HTTP plumbing are type-checked. Missing/invalid webhook signatures return 400 in `stripe-webhook`.
+- **No signed-in end-to-end journey against a real Stripe account.** The browser suite stubs the network. Staging test-mode (test cards + PayNow test) is the remaining live check.
+- **`full_address` reveal** is covered at the page level via `get_listing_address`; the browser suite does not log in.
 
 ## Adding another browser
 

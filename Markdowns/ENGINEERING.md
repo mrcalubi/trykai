@@ -4,10 +4,10 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 
 **Always read this and DECISIONS.md before making changes.** Visual identity is in DESIGN.md.
 
-> **Read before you start, updated 25 August 2026.**
-> 1. **Payment provider is decided: Stripe Connect, separate charges and transfers, decided 16 August 2026.** Building against Stripe Connect is now correct. The real payment flow is not built yet, but a largely complete webhook and fee calculation exist, pointed at HitPay, stashed as `hitpay-wip-2026-08`. Adapt that to Stripe rather than rebuilding from scratch. See DECISIONS.md.
-> 2. **The four tier cancellation logic has now been built and verified correct** (Ruiheng, 23 August). The old two tier rule is gone. The correct rule is in section 4 below and in DECISIONS.md.
-> 3. **A staging Supabase environment now exists** and is the place to test database and flow changes. The canonical schema is in version control at `supabase/schema.sql`. Hotfixes applied by hand to staging on 22 August are captured in `00003_staging_hotfixes_22aug.sql`, confirm these are also applied to production.
+> **Read before you start, updated 27 August 2026.**
+> 1. **Stripe Connect is live in code: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 24 hours after `starts_at`. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
+> 2. **The four tier cancellation logic has now been built and verified correct** (Ruiheng, 23 August). The old two tier rule is gone. The correct rule is in section 4 below and in DECISIONS.md. Refunds are issued by the `cancel-booking` Edge Function, not the browser.
+> 3. **Schema lives in `supabase/migrations/`.** A staging Supabase environment exists. Apply new migrations there before production. Do not expect `supabase/schema.sql` — that file is gone.
 > 4. **A CI test suite and branch protection now gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`, the project does not use Tailwind.
 
 ---
@@ -29,7 +29,7 @@ Two user types, one account. A user is a guest by default and becomes a host whe
 | Routing | React Router v6 | |
 | Backend, DB, Auth, Storage | Supabase | Handles backend, auth, storage, and RLS out of the box |
 | Hosting | Vercel | Free tier, auto deploy on push |
-| Payments | **Stripe Connect**, separate charges and transfers, Express accounts | Decided 16 August. Supports PayNow in Singapore at 1.3%, platform is merchant of record, transfers can be held until 24h after the session. Real flow not built yet; adaptable webhook and fee logic stashed as `hitpay-wip-2026-08`. |
+| Payments | **Stripe Connect**, separate charges and transfers, Express accounts | Decided 16 August. Supports PayNow in Singapore at 1.3%, platform is merchant of record, Transfers held until 24h after the session. Implemented: Payment Element + webhook confirmation, Connect onboarding, refunds, hourly Transfer job. |
 | Transactional email | Resend | **Currently on a shared test domain, delivers only to Caleb** |
 | Business email | Zoho Mail Lite | caleb@, aakash@, ruiheng@trykai.sg |
 | AI coding | Cursor | Implementation. Claude handles architecture. |
@@ -47,7 +47,9 @@ phone text
 phone_verified boolean default false
 avatar_url text
 is_host boolean default false
-stripe_account_id text           -- Stripe Connect Express account id, the host payout handle
+stripe_account_id text           -- Stripe Connect Express account id, the host payout handle. Not client-readable.
+stripe_payouts_enabled boolean default false  -- synced from Stripe account.updated; gates Book
+is_founding_host boolean default false        -- Table Editor for the eleven; never a host fee
 id_photo_url text                -- private, verification-docs bucket
 selfie_url text                  -- private, verification-docs bucket
 verification_status text default 'unverified'  -- unverified | pending | approved | rejected
@@ -95,9 +97,16 @@ id uuid PK
 session_id uuid FK → sessions
 guest_id uuid FK → users
 guests_count integer default 1
-total_amount integer      -- cents
-platform_fee integer      -- cents, tiered, see section 5
-stripe_payment_id text    -- legacy, payment provider unresolved
+total_amount integer      -- cents, guest all-in for the chosen rail
+platform_fee integer      -- cents, total_amount - lesson; rounded-up remainder is platform margin
+payment_rail text         -- 'card' | 'paynow'
+host_fee integer          -- cents, frozen at confirmation
+host_payout_amount integer -- cents, lesson minus host_fee, frozen at confirmation
+stripe_payment_id text    -- PaymentIntent id
+stripe_charge_id text     -- Charge id, used as Transfer source_transaction
+stripe_transfer_id text
+stripe_refund_id text
+payout_released_at timestamptz  -- booking-level; do not use sessions.payout_released_at for this
 status text               -- 'pending' | 'confirmed' | 'cancelled'
 cancelled_by text         -- 'guest' | 'host'
 cancelled_at timestamptz
@@ -117,7 +126,7 @@ role text                -- 'host' | 'guest'
 created_at timestamp
 ```
 
-**No schema exists in the repository.** The live Supabase database has no version history and cannot be rebuilt from source. This is the top priority technical fix and it is also what blocks a proper staging environment.
+**Schema is in `supabase/migrations/`**, starting at `00001_baseline.sql`. New money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`.
 
 ---
 
@@ -162,17 +171,19 @@ Also decided but **not yet built**: reschedule, once per booking, same 48 hour c
 
 **Host fee.** 10% of the booking, triggered per host: every non founding host's first three bookings are free, their fourth booking onward pays the fee, starting immediately with no platform wide cumulative count. Founding hosts are grandfathered permanently and never pay.
 
-Do not hardcode a flat percentage. The old flat fee in `create-payment-intent` is superseded. The stashed HitPay work in progress contains a fee calculation close to this that can be adapted.
+Do not hardcode a flat percentage. Guest totals are calculated in `supabase/functions/_shared/booking.ts` (`calculateGuestCharge`) and shown on browse via `src/lib/pricing.js`. Worked checks: $10 → $13, $20 → $23, $25 → $28, $30 → $34, $40 → $45.
 
 ---
 
 ## 6. Payout model
 
-**Provider decided 16 August 2026: Stripe Connect, separate charges and transfers, Express accounts.** The real flow is not built yet, but the model is settled.
+**Provider decided 16 August 2026: Stripe Connect, separate charges and transfers, Express accounts.** This is implemented.
 
-The host's share is released **24 hours after the session has taken place**, not 24 hours after the guest pays. Guests book days or weeks ahead, and the hold is what makes the published refund guarantees possible. Stripe Connect with separate charges and transfers preserves this, transfers can be delayed until after the session. Any implementation must keep the hold.
+The host's share is released **24 hours after `starts_at`**, not 24 hours after the guest pays. `release-payout` creates a Transfer with `transfer_group = booking_id` and `source_transaction = stripe_charge_id`. It is secret-gated (`PAYOUT_CRON_SECRET`); schedule it hourly.
 
-Under Express accounts, Stripe collects the host's bank details at onboarding and pays them via the connected account, so `stripe_account_id` is the payout handle and no manual payout details are stored, pending a sandbox confirmation.
+**Ops:** set platform Stripe payouts to **manual** (or keep a reserve covering outstanding host liability). Automatic platform payouts to Aspire would leave nothing to Transfer.
+
+Under Express accounts, Stripe collects the host's bank details at onboarding. `stripe_account_id` is the payout handle. Hosts must finish Connect onboarding (`stripe_payouts_enabled`) before guests can Book. Creating a listing stays allowed.
 
 ---
 
@@ -184,9 +195,10 @@ Supabase built in auth, email and password for MVP. On signup, a row is created 
 
 **RLS review, now done (22 August).** The three flagged holes are closed. A logged in user physically cannot write their own `verification_status`, `host_strikes`, or suspension fields, because those columns are simply not granted to the authenticated role; only the service role (admin) or the controlled functions below can change them. Cross user reads of verification documents are blocked by row level policies and a safe public profile view.
 
-**Three security definer functions carry the transitions that must be trusted:**
+**Trusted functions that move money or status:**
 - `submit_verification(id_photo_url, selfie_url)` moves a user from unverified or rejected to pending and sets their document urls. There is no path to approved, so a user can request review but never approve themselves.
-- `confirm_booking(booking_id)` flips a pending booking to confirmed and decrements `spots_remaining` atomically under a row lock. Granted to the service role only, so the payment webhook calls it and no logged in user can confirm without paying. Testable directly on a pending booking, which is how the spots decrement was verified this session.
+- `confirm_paid_booking(...)` (and the `confirm_booking` wrapper) flips a pending booking to confirmed and decrements `spots_remaining` atomically under a row lock. **Service role only.** The Stripe webhook calls it. If spots are gone, the webhook refunds instead of confirming.
+- `apply_host_strike(host_id)` increments strikes and deactivates listings at 3. Service role only; the client cannot write `host_strikes`.
 - `get_listing_address(listing_id)` returns `full_address` only to the owning host or a guest holding a confirmed booking for one of the listing's sessions. This is the only read path for `full_address`.
 
 Admin actions (approve verification, add strikes, suspend) run as the service role, currently via the Supabase Table Editor by hand, and bypass RLS. The admin UI to replace the manual Table Editor work is still the P0.4 build item.
@@ -199,27 +211,34 @@ Admin actions (approve verification, add strikes, suspend) run as the service ro
 src/
 ├── lib/
 │   ├── supabase.js            # Supabase client init
-│   └── cancellationPolicy.js  # Shared refund calculation — WRONG, still 2-tier
+│   ├── cancellationPolicy.js  # Four-tier guest refund copy + arithmetic
+│   └── pricing.js             # All-in card price shown on browse and listing
 ├── pages/
 │   ├── Home.jsx               # Browse, category + area filters
 │   ├── Login.jsx              # Auth, login + signup
-│   ├── ListingDetail.jsx      # Single listing, booking, cancellation policy
+│   ├── ListingDetail.jsx      # Single listing, rail picker, Payment Element
 │   ├── CreateListing.jsx      # Host creates listing, requires verification
 │   ├── EditListing.jsx        # Host edits listing
 │   ├── VerifyIdentity.jsx     # Host ID + selfie submission
-│   └── Dashboard.jsx          # Host + guest views
+│   └── Dashboard.jsx          # Host + guest views, Connect payout setup, cancel via function
 ├── components/
 │   ├── Navbar.jsx
-│   ├── ListingCard.jsx
+│   ├── ListingCard.jsx        # Shows all-in card total, never the raw lesson
 │   └── ReviewCard.jsx
 ├── App.jsx                    # Routes
 └── main.jsx
 
 supabase/functions/
-├── create-payment-intent/         # Booking + payment + host notification
+├── _shared/booking.ts             # Guest charge, host fee, refunds
+├── create-payment-intent/         # Pending booking + PaymentIntent (no emails)
+├── stripe-webhook/                # Signature verify → confirm_paid_booking + emails
+├── create-connect-account/        # Express account for the signed-in host
+├── create-account-link/           # Account Links back to /dashboard?connect=
+├── cancel-booking/                # Guest or host cancel + Stripe refund + strikes
+├── admin-cancel-booking/          # Shared-secret full refund (P1.4, no admin UI)
 ├── notify-verification-pending/   # Emails Caleb on submission
 ├── notify-verification-result/    # Emails host on approval/rejection
-└── release-payout/                # KIV, not wired to any provider
+└── release-payout/                # Secret-gated Transfer 24h after starts_at
 ```
 
 | Looking for | Where |
@@ -231,9 +250,13 @@ supabase/functions/
 | Edit listing | `src/pages/EditListing.jsx` |
 | Host verification upload | `src/pages/VerifyIdentity.jsx` |
 | Dashboard, both views | `src/pages/Dashboard.jsx` |
-| Cancellation logic | `src/lib/cancellationPolicy.js` |
+| Cancellation logic | `src/lib/cancellationPolicy.js` and `supabase/functions/_shared/booking.ts` |
+| Guest-facing prices | `src/lib/pricing.js` |
 | Routes | `src/App.jsx` |
 | Payment and booking creation | `supabase/functions/create-payment-intent/` |
+| Payment confirmation | `supabase/functions/stripe-webhook/` |
+| Refunds | `supabase/functions/cancel-booking/` |
+| Host payouts | `supabase/functions/release-payout/` |
 
 ---
 
@@ -244,23 +267,23 @@ Use these alongside the code. When you are reading a file and wondering what it 
 ### Scenario 1: Guest books a session
 *Sarah, 23, saw a latte art session shared on Instagram.*
 
-**1. Lands on trykai.sg.** `Home.jsx` fetches all listings where `is_active = true`, renders each as a `ListingCard` showing photo, title, host name and avatar, area, price, average rating. `full_address` is not fetched at this stage.
+**1. Lands on trykai.sg.** `Home.jsx` fetches all listings where `is_active = true`, renders each as a `ListingCard` showing photo, title, host name, area, and the **all-in card price**. `full_address` is not fetched at this stage.
 
 **2. Filters by category.** Filtering is client side on the already fetched array. Category pills and the area dropdown combine. No additional database call.
 
-**3. Opens the listing.** `ListingDetail.jsx` fetches the listing, its open sessions, the host profile, and existing reviews. Cancellation policy shown collapsed above the Book button. `full_address` still not shown.
+**3. Opens the listing.** `ListingDetail.jsx` fetches the listing, its open sessions, the host profile (including `stripe_payouts_enabled`), and existing reviews. Cancellation policy shown collapsed above the Book button. `full_address` still not shown. Book is disabled until the host can receive payouts.
 
 **4. Not logged in.** Redirected to `Login.jsx`, then back to the listing after auth. On signup a row is inserted into `users` with `is_host = false`.
 
-**5. Phone verification.** OTP required before booking, per progressive disclosure. Ask for information at the moment it is relevant, not upfront.
+**5. Phone verification.** OTP required before booking, per progressive disclosure. **Not built.** Ask for information at the moment it is relevant, not upfront.
 
-**6. Checkout.** Session selection updates the total. PayNow shows the discounted fee with the saving stated explicitly. Calls the `create-payment-intent` Edge Function, which validates spots remaining, calculates the platform fee, creates the payment request, and returns a redirect URL. A booking row is created with `status = 'pending'`.
+**6. Checkout.** Guest picks Card or PayNow (5% off, shown only here) *before* `create-payment-intent`. The function creates a pending booking, then a PaymentIntent locked to that rail (`payment_method_types`, amount, `transfer_group = booking_id`). No host email is sent here.
 
-**7. Payment.** The real payment webhook is not built yet, this is still the gap on the critical path. But the confirmation step it needs to call now exists and is tested: `confirm_booking(booking_id)` sets `status = 'confirmed'` and decrements `spots_remaining` atomically. The webhook, once built on Stripe, verifies the signature then calls this function. A staging only "Mark as paid" test button currently calls it manually so the downstream flow can be exercised; that button must be gated to staging or removed before real payments go live. Confirmation emails to both parties still to be wired.
+**7. Payment.** Payment Element `confirmPayment` uses `return_url=/dashboard?booking=<id>`. `stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, freezes host fee/payout, emails guest and host. Failed/canceled intents mark the pending row cancelled without touching spots. Oversell refunds immediately.
 
-**8. Confirmation.** `Dashboard.jsx` shows the booking as confirmed. Because the user now holds a confirmed booking for that session, `full_address` is returned. RLS enforces this.
+**8. Confirmation.** `Dashboard.jsx` polls `/dashboard?booking=` until status is `confirmed`. Because the user now holds a confirmed booking for that session, `full_address` is returned. RLS enforces this.
 
-**9. Session happens.** `sessions.status` moves to `completed` once `starts_at` passes. Review prompts appear for both parties. Payout releases 24 hours after `starts_at`, via `release-payout`, which is not built.
+**9. Session happens.** Payout releases 24 hours after `starts_at`, via `release-payout` (no session auto-complete required). Review prompts appear for both parties after `starts_at`.
 
 **10. Review.** Allowed only if the booking is `confirmed`, `starts_at` has passed, and no review exists from this reviewer for this booking. Inserts into `reviews` and recalculates the host's average.
 
@@ -279,12 +302,12 @@ Use these alongside the code. When you are reading a file and wondering what it 
 ### Scenario 3: Host cancels
 Warning shown: cancelling results in a strike, three strikes deactivates listings, all guests receive a full refund.
 
-On confirmation: booking `status = 'cancelled'`, `cancelled_by = 'host'`, `refund_amount` set to the full `total_amount`, `host_strikes` incremented, listings deactivated if strikes reach 3, emails to both parties. The refund is calculated and stored; the actual refund call depends on the unresolved payment integration.
+On confirmation the dashboard calls `cancel-booking` with `session_id`. The function issues Stripe refunds for confirmed bookings (or cancels unpaid PaymentIntents), restores spots only for confirmed rows, sets `cancelled_by = 'host'`, and calls `apply_host_strike`.
 
 ### Scenario 4: Guest cancels
-`cancellationPolicy.js` calculates the refund. **This file currently implements the old two tier rule and must be rebuilt to the four tier structure in section 4.**
+`cancellationPolicy.js` quotes the refund; `cancel-booking` recomputes it with `calculateGuestRefund` / `refundAmountForCancel` and creates the Stripe refund. Pending unpaid cancel voids the PaymentIntent and does not restore spots (none were taken).
 
-On confirmation: `status = 'cancelled'`, `cancelled_by = 'guest'`, `refund_amount` stored, `spots_remaining` incremented back, emails to both parties.
+On confirmation: `status = 'cancelled'`, `cancelled_by = 'guest'`, `refund_amount` and `stripe_refund_id` stored.
 
 ### Scenario 5: Verification rejected
 Caleb sets `verification_status = 'rejected'`. Webhook fires `notify-verification-result` with a resubmit prompt. The form becomes available again. Rejected documents are scheduled for deletion after 30 days, via an Edge Function that is not yet built.
@@ -314,24 +337,20 @@ Caleb sets `verification_status = 'rejected'`. Webhook fires `notify-verificatio
 Ordered roughly by consequence. Full engineering sequencing is in `TryKai-Launch-Plan.docx`, 2 August 2026, which is authoritative on implementation order.
 
 **Launch blocking**
-- No payment confirmation webhook. Bookings never leave `pending`.
-- `spots_remaining` is never decremented. Sessions can be booked past capacity.
-- All four Edge Functions send from Resend's shared test domain, delivering only to Caleb's address. Real users receive nothing.
-- Payment provider and account model unresolved.
+- All Edge Function emails still send from Resend's shared test domain, delivering only to Caleb's address. Real users receive nothing until trykai.sg is verified.
+- Staging must run this money path in Stripe **test mode** (test cards + PayNow test) and apply `00005` before production. One real test booking on production before warm-contact launch.
+- Platform Stripe payouts must be switched to manual (or a reserve). Confirm Singapore Connect per-active-account fee (still unverified in DECISIONS.md). Mark the eleven founding hosts `is_founding_host = true` in Table Editor.
 
 **Serious**
-- No database schema in version control. The live database cannot be rebuilt from source.
-- Platform fee hardcoded at a flat 15%.
-- `full_address` is written at listing creation but never read anywhere. The reveal after confirmed booking promise does not functionally exist.
-- Cancellation logic implements the superseded two tier rule.
-- RLS policy review not done. Privilege escalation risks unverified.
-- Review gating accepts `pending` bookings, should require `confirmed`.
+- Review gating still accepts `pending` bookings in the dashboard UI, should require `confirmed` (P2.3).
+- P0.4 suspension fields exist; the app does not yet hide listings or block bookings for a suspended account.
+- Host no-show reporting, reschedule, and session auto-complete are not built.
 
 **Not built, decided**
 - Reschedule flow
 - Host no show reporting, distinct from host initiated cancellation
 - Host strike appeals
-- Admin initiated cancellation
+- Admin UI for `admin-cancel-booking` (the function exists; Caleb can call it with `ADMIN_FUNCTION_SECRET`)
 - Immediate account suspension independent of the strike counter
 - Refund amount included directly in the cancellation confirmation email
 - Payout clawback where a dispute is confirmed after release
@@ -346,6 +365,6 @@ Ordered roughly by consequence. Full engineering sequencing is in `TryKai-Launch
 - Never store prices as floats
 - Never allow a review without a confirmed booking
 - Never assume a flat platform fee
-- Never assume a payment provider is wired in. Check current status first.
+- Never confirm a booking from the browser. The webhook is the source of truth.
 - Do not over engineer the MVP. Keep it simple and shippable.
 - Do not add features that are not in DECISIONS.md without asking

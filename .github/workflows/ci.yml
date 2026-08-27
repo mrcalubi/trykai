@@ -135,10 +135,10 @@ jobs:
         with:
           deno-version: v2.x
 
-      # The shared booking rules have no remote imports, so this check is fast
-      # and cannot be broken by a registry being unavailable.
+      # Shared money and Connect helpers have no remote imports, so this check
+      # is fast and cannot be broken by a registry being unavailable.
       - name: Type-check the shared booking rules
-        run: deno check supabase/functions/_shared/booking.ts
+        run: deno check supabase/functions/_shared/*.ts
 
       # The handlers import Stripe and Supabase over the network, so a failure
       # here can mean a registry outage rather than a real problem. Advisory only.
