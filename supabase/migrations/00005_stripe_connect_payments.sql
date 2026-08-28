@@ -172,9 +172,11 @@ $$;
 revoke all on function public.confirm_paid_booking(uuid, text, integer, integer) from public, anon, authenticated;
 grant execute on function public.confirm_paid_booking(uuid, text, integer, integer) to service_role;
 
--- Staging-only guest execute is revoked once the real webhook is the confirm path.
-revoke all on function public.confirm_booking(uuid) from public, anon, authenticated;
-grant execute on function public.confirm_booking(uuid) to service_role;
+-- CREATE OR REPLACE cannot change a function's return type (42P13). Staging may
+-- already have confirm_booking(uuid) from 00002 or a dashboard hotfix with a
+-- different return type, so drop it first. Input args identify the function;
+-- grants go with it and are re-applied below.
+drop function if exists public.confirm_booking(uuid);
 
 -- Keep confirm_booking working for anything still calling it, but only as service role,
 -- and without the guest-uid check so the webhook can use either name.
