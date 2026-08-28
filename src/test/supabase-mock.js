@@ -175,10 +175,13 @@ export function createSupabaseMock() {
     invoke: vi.fn(async () => ({ data: null, error: null })),
   }
 
+  const rpc = vi.fn(async () => ({ data: null, error: null }))
+
   const supabase = {
     from: vi.fn(from),
     auth,
     functions,
+    rpc,
     storage: { from: vi.fn(bucket) },
 
     /** Register a persistent response for a table + operation. */
@@ -221,6 +224,8 @@ export function createSupabaseMock() {
       supabase.storage.from.mockClear()
       functions.invoke.mockReset()
       functions.invoke.mockImplementation(async () => ({ data: null, error: null }))
+      rpc.mockReset()
+      rpc.mockImplementation(async () => ({ data: null, error: null }))
       for (const [name, impl] of Object.entries(authDefaults)) {
         auth[name].mockReset()
         auth[name].mockImplementation(impl)

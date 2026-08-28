@@ -12,6 +12,7 @@ test.describe('listing detail', () => {
     await page.goto('/listings/listing-latte')
 
     await expect(page.getByText('Hosted by Mei Ling')).toBeVisible()
+    await expect(page.getByText('$51').first()).toBeVisible()
     await expect(page.getByText('No reviews yet', { exact: true })).toBeVisible()
     await expect(page.getByText('Pull your first rosetta in ninety minutes.')).toBeVisible()
     await expect(page.getByRole('listitem').filter({ hasText: 'Materials' })).toBeVisible()

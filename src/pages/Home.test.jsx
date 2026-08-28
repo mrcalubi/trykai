@@ -72,6 +72,7 @@ describe('Home listing grid', () => {
     renderWithRouter(<Home />)
 
     expect(await screen.findByText('Latte art')).toBeInTheDocument()
+    expect(screen.getByText(/\$51\/person/)).toBeInTheDocument()
     expect(screen.getByText('Boxing basics')).toBeInTheDocument()
   })
 

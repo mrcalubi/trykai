@@ -38,7 +38,7 @@ Live data deliberately kept out of markdown: host roster in a Google Sheet, expe
 
 ## State of play, 25 August
 
-**Payments.** Stripe Connect, separate charges and transfers, Express accounts, decided 16 August. Still in sandbox, the real flow is not built. The important nuance: a largely complete payment webhook and fee calculation already exist, built against HitPay before it was dropped, stashed on the `hitpay-wip-2026-08` git stash. The remaining job is closer to swapping the API target to Stripe than building from scratch. This is the biggest open build and the main thing gating launch.
+**Payments.** Stripe Connect, separate charges and transfers, Express accounts, decided 16 August. The money loop is now in the codebase: all-in card prices, Card vs PayNow PaymentIntents, signed `stripe-webhook` → `confirm_paid_booking`, Connect Express onboarding, `cancel-booking` refunds, and `release-payout` Transfers 24h after `starts_at`. Do not adapt the HitPay stash. Ops still required: Stripe Dashboard webhook + secrets, platform payouts set to **manual**, founding hosts flagged `is_founding_host`, staging test-mode booking.
 
 **The requirement that constrains all payment design:** the host's share is held until 24 hours after the session takes place, not after the guest pays. Guests book weeks ahead. Every published refund guarantee depends on that hold. Stripe Connect preserves it.
 
@@ -125,6 +125,6 @@ Cheap date band: S$15 to S$25 per person, since under S$60 for two is where the 
 1. Resolve the component PR merge with Ruiheng (retarget to main, or sync staging), then merge it and confirm checks are green.
 2. Confirm the staging hotfixes are applied to production, signup may be broken on the live site until then.
 3. Wire the built components into the real pages, Home first, then continue the mobile-first browse build.
-4. The Stripe payment build (webhook plus host onboarding), adapting the stashed HitPay work. This is the critical path and mostly Ruiheng's.
+4. Stripe ops: apply `00005` on staging, wire the webhook, set platform payouts to manual, run one test-mode booking. The code path is in the repo.
 5. Get the insurance quote. Tell Ruiheng about the profit share, then circulate the founders' agreement.
 6. Push the updated docs (this whole set) to the repo so Cursor reads current versions, this is the first thing to do after starting the new chat.

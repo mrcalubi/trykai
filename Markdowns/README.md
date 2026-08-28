@@ -17,7 +17,7 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 | **Revenue to date** | Zero |
 | **Entity** | TRYKAI, sole proprietorship, UEN 53526159D |
 | **Banking** | Aspire business account, approved 13 August 2026 |
-| **Payments** | **Stripe Connect**, separate charges and transfers, decided 16 August. Still in sandbox, real payment flow not yet built. A largely complete webhook and fee logic exist but are pointed at HitPay, stashed as `hitpay-wip-2026-08`, and need swapping to Stripe rather than rebuilding from scratch. |
+| **Payments** | **Stripe Connect**, separate charges and transfers, Express accounts. Guest checkout, webhook confirmation, Connect onboarding, refunds, and 24h Transfers are in the app. Staging still needs Stripe test-mode E2E and `00005` applied; platform payouts must be set to manual. |
 
 **Now working, tested on staging this session (22 to 25 August)**
 - Staging Supabase environment stood up and in active use

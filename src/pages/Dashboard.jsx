@@ -2,10 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useLocation, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
-import { isStagingMode } from '../lib/staging'
 import StarPicker from '../components/StarPicker'
 import {
-  calculateGuestRefund,
   formatCents,
   guestRefundDescription,
 } from '../lib/cancellationPolicy'
@@ -37,6 +35,7 @@ export default function Dashboard() {
   const [error, setError] = useState('')
 
   const pendingBookingId = searchParams.get('booking')
+  const connectStatus = searchParams.get('connect')
   const [bookingStatusMessage, setBookingStatusMessage] = useState('')
 
   const [activeFormId, setActiveFormId] = useState(null)
@@ -62,12 +61,12 @@ export default function Dashboard() {
   const [cancelError, setCancelError] = useState('')
   const [deleteError, setDeleteError] = useState('')
   const [bookingAddresses, setBookingAddresses] = useState({})
-  const [stagingConfirmId, setStagingConfirmId] = useState(null)
-  const [stagingConfirmError, setStagingConfirmError] = useState('')
-  const stagingMode = isStagingMode()
+  const [payoutsEnabled, setPayoutsEnabled] = useState(true)
+  const [payoutSetupLoading, setPayoutSetupLoading] = useState(false)
+  const [payoutSetupError, setPayoutSetupError] = useState('')
 
   const loadData = useCallback(async () => {
-    const [listingsResult, bookingsResult, reviewsResult] = await Promise.all([
+    const [listingsResult, bookingsResult, reviewsResult, profileResult] = await Promise.all([
       supabase
         .from('listings')
         .select('id, title, area, category')
@@ -102,6 +101,11 @@ export default function Dashboard() {
         .select('booking_id')
         .eq('reviewer_id', userId)
         .eq('role', 'guest'),
+      supabase
+        .from('users')
+        .select('stripe_payouts_enabled, is_host')
+        .eq('id', userId)
+        .single(),
     ])
 
     if (listingsResult.error) {
@@ -139,6 +143,10 @@ export default function Dashboard() {
 
     if (!reviewsResult.error && reviewsResult.data) {
       setReviewedBookingIds(new Set(reviewsResult.data.map((r) => r.booking_id)))
+    }
+
+    if (!profileResult.error) {
+      setPayoutsEnabled(Boolean(profileResult.data?.stripe_payouts_enabled))
     }
 
     const listingIds = listingsResult.data?.map((l) => l.id) ?? []
@@ -245,6 +253,27 @@ export default function Dashboard() {
       cancelled = true
     }
   }, [pendingBookingId, userId, loadData, setSearchParams])
+
+  useEffect(() => {
+    if (connectStatus !== 'return' && connectStatus !== 'refresh') return
+
+    let cancelled = false
+    void Promise.resolve().then(() => {
+      if (cancelled) return
+      if (connectStatus === 'return') {
+        setBookingStatusMessage(
+          'Payout setup submitted. It can take a minute for Stripe to confirm.',
+        )
+      } else {
+        setPayoutSetupError('Please finish payout setup to receive payments.')
+      }
+      setSearchParams({}, { replace: true })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [connectStatus, setSearchParams])
 
   function openSessionForm(listingId) {
     setActiveFormId(listingId)
@@ -379,77 +408,58 @@ export default function Dashboard() {
     closeReviewForm()
   }
 
-  async function handleStagingConfirmBooking(booking) {
-    setStagingConfirmError('')
-    setStagingConfirmId(booking.id)
-
-    const { error: confirmError } = await supabase.rpc('confirm_booking', {
-      p_booking_id: booking.id,
+  async function invokeAuthed(name, body) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    return supabase.functions.invoke(name, {
+      body,
+      headers: { Authorization: `Bearer ${session?.access_token}` },
     })
+  }
 
-    setStagingConfirmId(null)
+  async function handlePayoutSetup() {
+    setPayoutSetupError('')
+    setPayoutSetupLoading(true)
+    const { data, error: fnError } = await invokeAuthed('create-account-link', {})
+    setPayoutSetupLoading(false)
 
-    if (confirmError) {
-      setStagingConfirmError(confirmError.message)
+    if (fnError) {
+      setPayoutSetupError(fnError.message)
       return
     }
-
-    setBookingStatusMessage('Staging: booking marked as paid and confirmed.')
-    await loadData()
+    if (data?.error) {
+      setPayoutSetupError(data.error)
+      return
+    }
+    if (data?.stripe_payouts_enabled) {
+      setPayoutsEnabled(true)
+      setBookingStatusMessage('Payouts are set up. You can take bookings.')
+      return
+    }
+    if (data?.url) {
+      window.location.assign(data.url)
+      return
+    }
+    setPayoutSetupError('Could not start payout setup. Please try again.')
   }
 
   async function handleGuestCancelBooking(booking) {
     setCancelError('')
     setCancelLoading(true)
 
-    const refundAmount = calculateGuestRefund(
-      booking.total_amount,
-      booking.sessions.starts_at,
-      booking.platform_fee
-    )
-
-    // HitPay refund API will be wired here during HitPay integration.
-
-    const { data: session, error: sessionFetchError } = await supabase
-      .from('sessions')
-      .select('spots_remaining')
-      .eq('id', booking.session_id)
-      .single()
-
-    if (sessionFetchError) {
-      setCancelLoading(false)
-      setCancelError(sessionFetchError.message)
-      return
-    }
-
-    const { error: bookingError } = await supabase
-      .from('bookings')
-      .update({
-        status: 'cancelled',
-        cancelled_by: 'guest',
-        cancelled_at: new Date().toISOString(),
-        refund_amount: refundAmount,
-      })
-      .eq('id', booking.id)
-      .eq('guest_id', userId)
-
-    if (bookingError) {
-      setCancelLoading(false)
-      setCancelError(bookingError.message)
-      return
-    }
-
-    const { error: spotsError } = await supabase
-      .from('sessions')
-      .update({
-        spots_remaining: session.spots_remaining + booking.guests_count,
-      })
-      .eq('id', booking.session_id)
+    const { data, error: fnError } = await invokeAuthed('cancel-booking', {
+      booking_id: booking.id,
+    })
 
     setCancelLoading(false)
 
-    if (spotsError) {
-      setCancelError(spotsError.message)
+    if (fnError) {
+      setCancelError(fnError.message)
+      return
+    }
+    if (data?.error) {
+      setCancelError(data.error)
       return
     }
 
@@ -461,98 +471,21 @@ export default function Dashboard() {
     setCancelError('')
     setCancelLoading(true)
 
-    const activeBookings = (session.bookings ?? []).filter(
-      (b) => b.status === 'pending' || b.status === 'confirmed'
-    )
-
-    // HitPay refund API will be wired here during HitPay integration.
-
-    for (const booking of activeBookings) {
-      const { error: bookingError } = await supabase
-        .from('bookings')
-        .update({
-          status: 'cancelled',
-          cancelled_by: 'host',
-          cancelled_at: new Date().toISOString(),
-          refund_amount: booking.total_amount,
-        })
-        .eq('id', booking.id)
-
-      if (bookingError) {
-        setCancelLoading(false)
-        setCancelError(bookingError.message)
-        return
-      }
-    }
-
-    const totalGuests = activeBookings.reduce((sum, b) => sum + b.guests_count, 0)
-
-    if (totalGuests > 0) {
-      const { data: sessionData, error: sessionFetchError } = await supabase
-        .from('sessions')
-        .select('spots_remaining')
-        .eq('id', session.id)
-        .single()
-
-      if (sessionFetchError) {
-        setCancelLoading(false)
-        setCancelError(sessionFetchError.message)
-        return
-      }
-
-      const { error: spotsError } = await supabase
-        .from('sessions')
-        .update({
-          spots_remaining: sessionData.spots_remaining + totalGuests,
-        })
-        .eq('id', session.id)
-
-      if (spotsError) {
-        setCancelLoading(false)
-        setCancelError(spotsError.message)
-        return
-      }
-    }
-
-    const { data: host, error: hostFetchError } = await supabase
-      .from('users')
-      .select('host_strikes')
-      .eq('id', userId)
-      .single()
-
-    if (hostFetchError) {
-      setCancelLoading(false)
-      setCancelError(hostFetchError.message)
-      return
-    }
-
-    const newStrikes = (host?.host_strikes ?? 0) + 1
-
-    const { error: strikesError } = await supabase
-      .from('users')
-      .update({ host_strikes: newStrikes })
-      .eq('id', userId)
-
-    if (strikesError) {
-      setCancelLoading(false)
-      setCancelError(strikesError.message)
-      return
-    }
-
-    if (newStrikes >= 3) {
-      const { error: listingError } = await supabase
-        .from('listings')
-        .update({ is_active: false })
-        .eq('id', session.listing_id)
-
-      if (listingError) {
-        setCancelLoading(false)
-        setCancelError(listingError.message)
-        return
-      }
-    }
+    const { data, error: fnError } = await invokeAuthed('cancel-booking', {
+      session_id: session.id,
+    })
 
     setCancelLoading(false)
+
+    if (fnError) {
+      setCancelError(fnError.message)
+      return
+    }
+    if (data?.error) {
+      setCancelError(data.error)
+      return
+    }
+
     setConfirmCancelSessionId(null)
     await loadData()
   }
@@ -601,14 +534,26 @@ export default function Dashboard() {
       {error && <p className="error-message" style={{ marginBottom: '20px' }}>{error}</p>}
       {cancelError && <p className="error-message" style={{ marginBottom: '20px' }}>{cancelError}</p>}
       {deleteError && <p className="error-message" style={{ marginBottom: '20px' }}>{deleteError}</p>}
-      {stagingConfirmError && (
-        <p className="error-message" style={{ marginBottom: '20px' }}>{stagingConfirmError}</p>
+      {payoutSetupError && (
+        <p className="error-message" style={{ marginBottom: '20px' }}>{payoutSetupError}</p>
       )}
 
-      {stagingMode && (
-        <p className="staging-test-banner">
-          Staging mode — test tools are visible. Do not use against production.
-        </p>
+      {listings.length > 0 && !payoutsEnabled && (
+        <div className="payout-setup">
+          <h2 className="payout-setup__title">Set up payouts</h2>
+          <p className="payout-setup__copy">
+            Stripe needs your identity and bank details before guests can book. This is
+            separate from TryKai&apos;s own ID check, and it is how you get paid.
+          </p>
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={payoutSetupLoading}
+            onClick={handlePayoutSetup}
+          >
+            {payoutSetupLoading ? 'Opening Stripe…' : 'Set up payouts'}
+          </button>
+        </div>
       )}
 
       <section className="dashboard-section">
@@ -866,21 +811,6 @@ export default function Dashboard() {
                   <span className={`badge badge--${booking.status}`}>
                     {booking.status}
                   </span>
-                  {stagingMode &&
-                    booking.status === 'pending' &&
-                    confirmCancelBookingId !== booking.id && (
-                      <button
-                        type="button"
-                        disabled={stagingConfirmId === booking.id}
-                        onClick={() => handleStagingConfirmBooking(booking)}
-                        className="btn btn--staging-test"
-                        title="Staging only — simulates the payment webhook"
-                      >
-                        {stagingConfirmId === booking.id
-                          ? 'Confirming…'
-                          : 'Mark as paid (staging test only)'}
-                      </button>
-                    )}
                   {canLeaveReview(booking) && activeReviewBookingId !== booking.id && (
                     <button
                       type="button"

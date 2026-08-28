@@ -49,7 +49,7 @@ export const LATTE_ART = {
   whats_provided: ['Materials'],
   host_id: 'host-1',
   host: { full_name: 'Mei Ling' },
-  users: { full_name: 'Mei Ling', avatar_url: null },
+  users: { full_name: 'Mei Ling', avatar_url: null, stripe_payouts_enabled: true },
 }
 
 export const BOXING = {
@@ -63,7 +63,7 @@ export const BOXING = {
   whats_provided: ['Equipment'],
   host_id: 'host-2',
   host: { full_name: 'Arun' },
-  users: { full_name: 'Arun', avatar_url: null },
+  users: { full_name: 'Arun', avatar_url: null, stripe_payouts_enabled: true },
 }
 
 export const OPEN_SESSION = {

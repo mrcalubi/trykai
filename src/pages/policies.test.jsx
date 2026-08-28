@@ -63,7 +63,8 @@ describe('Refund Policy page', () => {
     expect(screen.getByText('Card:')).toBeInTheDocument()
     expect(screen.getByText(/3 to 5 business days/)).toBeInTheDocument()
     expect(screen.getByText('PayNow:')).toBeInTheDocument()
-    expect(screen.getByText('GrabPay:')).toBeInTheDocument()
+    expect(screen.queryByText('GrabPay:')).not.toBeInTheDocument()
+    expect(screen.getByText(/through Stripe/)).toBeInTheDocument()
   })
 
   it('promises no fee is charged to receive a refund', () => {

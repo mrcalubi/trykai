@@ -93,6 +93,14 @@ describe('ListingDetail content', () => {
     expect(screen.getByText('Pull your first rosetta in ninety minutes.')).toBeInTheDocument()
   })
 
+  it('shows the card all-in total, not the raw lesson price', async () => {
+    givenListing(makeListing({ price_per_person: 4500 }))
+    renderPage()
+
+    expect(await screen.findByText(/\$51/)).toBeInTheDocument()
+    expect(screen.queryByText('$45')).not.toBeInTheDocument()
+  })
+
   it('names the host', async () => {
     givenListing(makeListing({ users: { full_name: 'Mei Ling', avatar_url: null } }))
     renderPage()
@@ -216,19 +224,33 @@ describe('ListingDetail booking', () => {
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
   })
 
-  it('asks the edge function for a payment intent for one guest', async () => {
+  it('offers PayNow at 5% off the advertised card total before creating a PaymentIntent', async () => {
+    givenSignedIn()
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    expect(supabase.functions.invoke).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /Pay by card/ })).toHaveTextContent('$51')
+    expect(screen.getByRole('button', { name: /PayNow/ })).toHaveTextContent('$48.45')
+  })
+
+  it('asks the edge function for a card payment intent after the guest picks a rail', async () => {
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({
-      data: { clientSecret: 'cs_test_1', total_amount: 4500 },
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 5100 },
       error: null,
     })
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(supabase.functions.invoke).not.toHaveBeenCalled()
+
+    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
 
     await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
     expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
-      body: { session_id: 'session-7', guests_count: 1 },
+      body: { session_id: 'session-7', guests_count: 1, payment_rail: 'card' },
       headers: { Authorization: 'Bearer test-access-token' },
     })
   })
@@ -236,12 +258,13 @@ describe('ListingDetail booking', () => {
   it('opens the payment panel with the amount returned by the server', async () => {
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({
-      data: { clientSecret: 'cs_test_1', total_amount: 9000 },
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 9000 },
       error: null,
     })
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
 
     expect(await screen.findByTestId('stripe-elements')).toBeInTheDocument()
     expect(screen.getByText('Total: $90')).toBeInTheDocument()
@@ -254,6 +277,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
 
     expect(await screen.findByText('Failed to fetch')).toBeInTheDocument()
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
@@ -265,6 +289,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
 
     expect(await screen.findByText('Not enough spots')).toBeInTheDocument()
   })
@@ -275,8 +300,41 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
 
     expect(await screen.findByText('Failed to start payment. Please try again.')).toBeInTheDocument()
+  })
+
+  it('asks the edge function for a PayNow intent when that rail is chosen', async () => {
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 2660 },
+      error: null,
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(await screen.findByRole('button', { name: /PayNow/ }))
+
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
+      body: { session_id: 'session-7', guests_count: 1, payment_rail: 'paynow' },
+      headers: { Authorization: 'Bearer test-access-token' },
+    })
+  })
+
+  it('does not start payment when the host cannot receive payouts', async () => {
+    givenListing(
+      makeListing({
+        users: { full_name: 'Mei Ling', avatar_url: null, stripe_payouts_enabled: false },
+      }),
+    )
+    givenSignedIn()
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Book' })).toBeDisabled()
+    expect(screen.getByText(/still setting up payouts/)).toBeInTheDocument()
+    expect(supabase.functions.invoke).not.toHaveBeenCalled()
   })
 })
 
@@ -286,11 +344,12 @@ describe('ListingDetail checkout', () => {
     givenSessions([makeSession({ id: 'session-7' })])
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({
-      data: { clientSecret: 'cs_test_1', total_amount: 4500 },
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 4500 },
       error: null,
     })
     const utils = renderPage()
     await utils.user.click(await screen.findByRole('button', { name: 'Book' }))
+    await utils.user.click(await screen.findByRole('button', { name: /Pay by card/ }))
     await screen.findByTestId('stripe-elements')
     return utils
   }
@@ -303,16 +362,19 @@ describe('ListingDetail checkout', () => {
     expect(stripe.instance.confirmPayment).toHaveBeenCalledOnce()
     expect(stripe.instance.confirmPayment.mock.calls[0][0]).toMatchObject({
       redirect: 'if_required',
+      confirmParams: {
+        return_url: expect.stringContaining('/dashboard?booking=booking-1'),
+      },
     })
   })
 
-  it('sends the guest to the dashboard with a confirmation once paid', async () => {
-    const { user, currentPath, currentState } = await openCheckout()
+  it('sends the guest to the dashboard to wait for the webhook', async () => {
+    const { user, currentPath, currentSearch } = await openCheckout()
 
     await user.click(screen.getByRole('button', { name: 'Pay now' }))
 
     await waitFor(() => expect(currentPath()).toBe('/dashboard'))
-    expect(currentState().message).toBe('Booking confirmed! Your payment was successful.')
+    expect(currentSearch()).toBe('?booking=booking-1')
   })
 
   it('keeps the guest on the page and shows why the card was declined', async () => {

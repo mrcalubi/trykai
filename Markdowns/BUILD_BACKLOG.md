@@ -52,7 +52,7 @@ Verification approval survives being done in a database table. Paying eleven hos
 
 ## P0: blocks launch, buildable now
 
-> **Status, 25 August 2026.** Several P0 items are now done or changed, marked inline below. Done: P0.5 (cancellation, built by Ruiheng, verified), P0.6 (spots decrement, via `confirm_booking`), P0.7 (address reveal, via `get_listing_address`). Changed: P0.1 likely dissolves under Stripe Connect. Partly done: P0.4 (suspension fields exist, app enforcement pending). Still fully open: P0.2, P0.3, P0.8, and the admin UI generally.
+> **Status, 27 August 2026.** Payment loop is in code (P1.1–P1.3, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, P0.7. Changed: P0.1 obsolete under Connect Express; P0.2 is a later exception log, not a launch blocker. Partly done: P0.4. Still open: P0.3, P0.8, P2 items, and the admin UI generally.
 
 ### P0.1 — Host payout details — LIKELY OBSOLETED
 > Under Stripe Connect Express (decided 16 August), Stripe collects the host's bank details at onboarding and pays them via the connected account. So `stripe_account_id` becomes the payout handle and the manual columns below are probably unnecessary. Confirm in the Stripe sandbox before building anything here. Do not add the manual columns unless the sandbox shows manual disbursement is needed.
@@ -103,7 +103,7 @@ A single screen listing every payout that is due:
 **Built by Ruiheng, verified 23 August.** `calculateGuestRefund` now implements 100 / 50 / 25 / 0 at the 48, 24, and 6 hour boundaries, platform fee forfeited on partial tiers, measured cancellation moment to session start. Verified correct against the published policy by direct testing. Cancellation also now correctly returns the spot to `spots_remaining`. Caleb has a standing KIV to re run the four tier refund check on `main` after merges settle.
 
 ### P0.6 — Spots decrement, atomically — DONE
-**Built and tested this session.** `confirm_booking(booking_id)` decrements `spots_remaining` by `guests_count` atomically under a row lock, in the same operation that flips the booking to confirmed. A CHECK constraint guarantees it can never go below zero. Currently exercised via a staging only "Mark as paid" test button; the real trigger is the payment webhook (P1.1), which will call the same function.
+**Built and tested this session.** `confirm_paid_booking` (and the `confirm_booking` wrapper) decrements `spots_remaining` by `guests_count` atomically under a row lock, in the same operation that flips the booking to confirmed. A CHECK constraint guarantees it can never go below zero. The Stripe webhook is the caller. The old staging "Mark as paid" button is gone.
 
 ### P0.7 — Full address reveal — DONE
 **Built and tested this session.** `get_listing_address(listing_id)` returns `full_address` only to the owning host or a guest with a confirmed booking for one of the listing's sessions. Enforced at the data layer, `full_address` has no direct read grant at all. Wired into ListingDetail and the guest dashboard.
@@ -116,24 +116,23 @@ Verify trykai.sg in Resend and switch all four over. **Ship the shared secret he
 
 ---
 
-## P1: blocks launch, the payment build
+## P1: the payment build — DONE IN CODE, 27 August 2026
 
-Provider is now decided (Stripe Connect), so these are no longer blocked on a decision, only on the build. The stashed HitPay work in progress (`hitpay-wip-2026-08`) already contains most of P1.1 and P1.2 pointed at the wrong provider, so the job is closer to swapping the API target than building from scratch.
+Stripe Connect (separate charges and transfers, Express) is implemented. Do not adapt `hitpay-wip-2026-08`. Remaining work is ops: apply `00005`, Stripe Dashboard webhook + secrets, platform payouts manual, founding-host flags, staging test-mode booking.
 
-### P1.1 — Payment confirmation webhook
-**Flow:** guest pays → booking becomes confirmed → capacity reduced → both parties emailed
-**Today:** no live webhook. But the confirmation step it calls, `confirm_booking`, is built and tested. The webhook verifies the Stripe signature then calls that function. The stashed HitPay webhook has this shape already.
+### P1.1 — Payment confirmation webhook — DONE
+`supabase/functions/stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, emails both parties, refunds on oversell, cancels pending on failed/canceled intents, syncs `stripe_payouts_enabled` from `account.updated`.
 
-With signature verification. An unverified endpoint that flips bookings to confirmed means anyone who finds the URL grants themselves free sessions.
+### P1.2 — Fee calculation — DONE
+`calculateGuestCharge` in `_shared/booking.ts`: 12% + S$2.50 floor, round up to a whole dollar, PayNow 5% off that total. Browse and listing show the card all-in price. Host fee 10% from the fourth confirmed booking; founding hosts never. Staging "Mark as paid" removed.
 
-### P1.2 — Fee calculation — DECIDED, ADAPTABLE
-The structure is now decided (see DECISIONS.md and ENGINEERING.md section 5): 12% card with a S$2.50 floor rounded up to a clean all in total, PayNow shown as a flat 5% discount at checkout, host fee 10% per host from the fourth booking. The stashed HitPay work contains a fee calc close to this to adapt. Also gate: delete or staging-lock the temporary "Mark as paid" test button before real payments go live.
+### P1.3 — Refund execution — DONE
+`cancel-booking` (JWT) issues Stripe refunds, restores spots for confirmed rows only, and applies host strikes server-side.
 
-### P1.3 — Refund execution
-Refund amounts are calculated and stored but no refund is ever actually issued. Needs the provider.
+### P1.4 — Admin: issue refund and cancel a booking — SMALLEST PATH DONE
+`admin-cancel-booking` accepts `x-admin-secret` / `ADMIN_FUNCTION_SECRET` and fully refunds. No admin UI yet.
 
-### P1.4 — Admin: issue refund and cancel a booking
-TryKai has published the right to cancel a booking for safety, fraud, or policy violation, with a full refund. There is no mechanism to do either.
+Connect onboarding (`create-connect-account`, `create-account-link`) and the hourly Transfer job (`release-payout`) shipped with this build. P0.2 copy-paste payout queue is not needed for launch.
 
 ---
 
