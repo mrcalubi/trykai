@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useLocation, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
+import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import StarPicker from '../components/StarPicker'
 import {
   formatCents,
@@ -424,12 +425,8 @@ export default function Dashboard() {
     const { data, error: fnError } = await invokeAuthed('create-account-link', {})
     setPayoutSetupLoading(false)
 
-    if (fnError) {
-      setPayoutSetupError(fnError.message)
-      return
-    }
-    if (data?.error) {
-      setPayoutSetupError(data.error)
+    if (fnError || data?.error) {
+      setPayoutSetupError(await edgeFunctionErrorMessage(fnError, data))
       return
     }
     if (data?.stripe_payouts_enabled) {
@@ -454,12 +451,8 @@ export default function Dashboard() {
 
     setCancelLoading(false)
 
-    if (fnError) {
-      setCancelError(fnError.message)
-      return
-    }
-    if (data?.error) {
-      setCancelError(data.error)
+    if (fnError || data?.error) {
+      setCancelError(await edgeFunctionErrorMessage(fnError, data))
       return
     }
 
@@ -477,12 +470,8 @@ export default function Dashboard() {
 
     setCancelLoading(false)
 
-    if (fnError) {
-      setCancelError(fnError.message)
-      return
-    }
-    if (data?.error) {
-      setCancelError(data.error)
+    if (fnError || data?.error) {
+      setCancelError(await edgeFunctionErrorMessage(fnError, data))
       return
     }
 

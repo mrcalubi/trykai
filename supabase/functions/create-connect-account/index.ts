@@ -68,6 +68,8 @@ Deno.serve(async (req) => {
       stripe_payouts_enabled: Boolean(updated?.stripe_payouts_enabled),
     })
   } catch (err) {
-    return jsonResponse({ error: err.message }, 500)
+    const message = err instanceof Error ? err.message : 'Unexpected error'
+    console.error('create-connect-account failed', message)
+    return jsonResponse({ error: message }, 500)
   }
 })
