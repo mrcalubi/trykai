@@ -3,14 +3,20 @@ import {
   accountLinkParams,
   connectAccountCreateParams,
   payoutsEnabledFromAccount,
+  siteUrlForAccountLinks,
 } from './connect.ts'
 
 describe('connectAccountCreateParams', () => {
   it('opens an Express account in Singapore that can receive transfers', () => {
     expect(connectAccountCreateParams({ id: 'user-1', email: 'host@trykai.sg' })).toEqual({
-      type: 'express',
       country: 'SG',
       email: 'host@trykai.sg',
+      controller: {
+        fees: { payer: 'application' },
+        losses: { payments: 'application' },
+        requirement_collection: 'stripe',
+        stripe_dashboard: { type: 'express' },
+      },
       capabilities: { transfers: { requested: true } },
       business_profile: {
         mcc: '8299',
@@ -35,6 +41,17 @@ describe('accountLinkParams', () => {
       refresh_url: 'https://trykai.sg/dashboard?connect=refresh',
       return_url: 'https://trykai.sg/dashboard?connect=return',
     })
+  })
+})
+
+describe('siteUrlForAccountLinks', () => {
+  it('defaults to trykai.sg when unset', () => {
+    expect(siteUrlForAccountLinks(undefined)).toBe('https://trykai.sg')
+    expect(siteUrlForAccountLinks('')).toBe('https://trykai.sg')
+  })
+
+  it('rejects a value that is not a URL', () => {
+    expect(() => siteUrlForAccountLinks('trykai.sg')).toThrow(/SITE_URL must be a full URL/)
   })
 })
 

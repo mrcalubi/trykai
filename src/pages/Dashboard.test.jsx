@@ -458,6 +458,34 @@ describe('Dashboard payout setup', () => {
     expect(await screen.findByText('Payouts are set up. You can take bookings.')).toBeInTheDocument()
   })
 
+  it('shows Stripe’s actual error when payout setup fails', async () => {
+    givenData({ listings: [makeMyListing()] })
+    supabase.__on('users', 'select', {
+      data: { stripe_payouts_enabled: false, is_host: true },
+      error: null,
+    })
+    supabase.functions.invoke.mockResolvedValue({
+      data: null,
+      error: {
+        message: 'Edge Function returned a non-2xx status code',
+        context: {
+          json: async () => ({
+            error: 'You cannot create Account Links until your platform branding is configured.',
+          }),
+        },
+      },
+    })
+    const { user } = await renderDashboard()
+
+    await user.click(screen.getByRole('button', { name: 'Set up payouts' }))
+
+    expect(
+      await screen.findByText(
+        'You cannot create Account Links until your platform branding is configured.'
+      )
+    ).toBeInTheDocument()
+  })
+
   it('explains a successful return from Stripe onboarding', async () => {
     givenData({ listings: [makeMyListing()] })
     renderWithRouter(

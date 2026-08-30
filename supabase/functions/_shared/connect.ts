@@ -2,23 +2,38 @@ export function connectAccountCreateParams(user: {
   id: string
   email?: string | null
 }): {
-  type: 'express'
   country: 'SG'
   email?: string
+  controller: {
+    fees: { payer: 'application' }
+    losses: { payments: 'application' }
+    requirement_collection: 'stripe'
+    stripe_dashboard: { type: 'express' }
+  }
   capabilities: { transfers: { requested: true } }
   business_profile: { mcc: string; product_description: string }
   metadata: { user_id: string }
 } {
   const params: {
-    type: 'express'
     country: 'SG'
     email?: string
+    controller: {
+      fees: { payer: 'application' }
+      losses: { payments: 'application' }
+      requirement_collection: 'stripe'
+      stripe_dashboard: { type: 'express' }
+    }
     capabilities: { transfers: { requested: true } }
     business_profile: { mcc: string; product_description: string }
     metadata: { user_id: string }
   } = {
-    type: 'express',
     country: 'SG',
+    controller: {
+      fees: { payer: 'application' },
+      losses: { payments: 'application' },
+      requirement_collection: 'stripe',
+      stripe_dashboard: { type: 'express' },
+    },
     capabilities: { transfers: { requested: true } },
     business_profile: {
       mcc: '8299',
@@ -30,6 +45,24 @@ export function connectAccountCreateParams(user: {
   return params
 }
 
+export function siteUrlForAccountLinks(raw: string | undefined): string {
+  const value = (raw ?? '').trim() || 'https://trykai.sg'
+  let parsed: URL
+  try {
+    parsed = new URL(value)
+  } catch {
+    throw new Error(
+      `SITE_URL must be a full URL starting with https:// (got "${value}"). Set it in Edge Function secrets.`,
+    )
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(
+      `SITE_URL must be a full URL starting with https:// (got "${value}"). Set it in Edge Function secrets.`,
+    )
+  }
+  return value.replace(/\/$/, '')
+}
+
 export function accountLinkParams(
   accountId: string,
   siteUrl: string,
@@ -39,7 +72,7 @@ export function accountLinkParams(
   refresh_url: string
   return_url: string
 } {
-  const base = siteUrl.replace(/\/$/, '')
+  const base = siteUrlForAccountLinks(siteUrl)
   return {
     account: accountId,
     type: 'account_onboarding',

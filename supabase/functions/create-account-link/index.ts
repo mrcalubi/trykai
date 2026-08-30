@@ -69,6 +69,8 @@ Deno.serve(async (req) => {
     const link = await stripe.accountLinks.create(accountLinkParams(accountId, siteUrl))
     return jsonResponse({ url: link.url, stripe_payouts_enabled: false })
   } catch (err) {
-    return jsonResponse({ error: err.message }, 500)
+    const message = err instanceof Error ? err.message : 'Unexpected error'
+    console.error('create-account-link failed', message)
+    return jsonResponse({ error: message }, 500)
   }
 })
