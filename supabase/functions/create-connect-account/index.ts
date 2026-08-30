@@ -1,6 +1,6 @@
 import Stripe from 'https://esm.sh/stripe@13.3.0?target=deno'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { connectAccountCreateParams, payoutsEnabledFromAccount } from '../_shared/connect.ts'
+import { createConnectedAccount, payoutsEnabledFromAccount } from '../_shared/connect.ts'
 import { jsonResponse, textResponse } from '../_shared/http.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
 
     const { data: profile, error } = await admin
       .from('users')
-      .select('id, email, stripe_account_id, stripe_payouts_enabled')
+      .select('id, email, full_name, stripe_account_id, stripe_payouts_enabled')
       .eq('id', user.id)
       .single()
 
@@ -40,13 +40,13 @@ Deno.serve(async (req) => {
 
     let accountId = profile.stripe_account_id
     if (!accountId) {
-      const account = await stripe.accounts.create(connectAccountCreateParams(profile))
-      accountId = account.id
+      const created = await createConnectedAccount(Deno.env.get('STRIPE_SECRET_KEY') ?? '', profile)
+      accountId = created.id
       await admin
         .from('users')
         .update({
           stripe_account_id: accountId,
-          stripe_payouts_enabled: payoutsEnabledFromAccount(account),
+          stripe_payouts_enabled: false,
         })
         .eq('id', user.id)
     } else {
