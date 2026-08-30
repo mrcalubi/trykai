@@ -283,6 +283,44 @@ describe('ListingDetail booking', () => {
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
   })
 
+  it('shows Stripe’s actual error when create-payment-intent returns non-2xx', async () => {
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: null,
+      error: {
+        message: 'Edge Function returned a non-2xx status code',
+        context: {
+          json: async () => ({ error: 'This host cannot take bookings yet.' }),
+        },
+      },
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+
+    expect(await screen.findByText('This host cannot take bookings yet.')).toBeInTheDocument()
+  })
+
+  it('switches the booking total to the PayNow price when that rail is chosen', async () => {
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: null,
+      error: { message: 'Edge Function returned a non-2xx status code' },
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$51')
+
+    await user.click(await screen.findByRole('button', { name: /PayNow/ }))
+
+    expect(await screen.findByText('PayNow · 5% off the advertised price')).toBeInTheDocument()
+    expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$48.45')
+    expect(document.querySelector('.session-card__price')).toHaveTextContent('$48.45')
+    expect(screen.getByRole('button', { name: /PayNow/ })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('reports a business error returned in the response body', async () => {
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({ data: { error: 'Not enough spots' }, error: null })

@@ -1667,6 +1667,11 @@ body:has(.style-guide-page) .navbar {
   color: inherit;
 }
 
+.payment-rail[aria-pressed='true'] {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 1px var(--navy);
+}
+
 .payment-rail:hover:not(:disabled),
 .payment-rail:focus-visible {
   border-color: var(--navy);
