@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     const {
       data: { user },
     } = await supabaseAuth.auth.getUser()
-    if (!user) return textResponse('Unauthorized', 401)
+    if (!user) return jsonResponse({ error: 'Unauthorized' }, 401)
 
     const admin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
       payment_rail ?? 'card',
     )
     if (!bookingPrep.ok) {
-      return textResponse(bookingPrep.message, bookingPrep.status)
+      return jsonResponse({ error: bookingPrep.message }, bookingPrep.status)
     }
 
     const { totalAmount, platformFee, paymentRail, guestsCount } = bookingPrep
@@ -80,7 +80,10 @@ Deno.serve(async (req) => {
       .single()
 
     if (bookingError || !booking) {
-      return jsonResponse({ error: 'Failed to create booking' }, 500)
+      return jsonResponse(
+        { error: bookingError?.message || 'Failed to create booking' },
+        500,
+      )
     }
 
     let paymentIntent
@@ -118,6 +121,8 @@ Deno.serve(async (req) => {
       payment_rail: paymentRail,
     })
   } catch (err) {
-    return jsonResponse({ error: err.message }, 500)
+    const message = err instanceof Error ? err.message : 'Unexpected error'
+    console.error('create-payment-intent failed', message)
+    return jsonResponse({ error: message }, 500)
   }
 })

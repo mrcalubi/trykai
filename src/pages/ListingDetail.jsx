@@ -6,7 +6,13 @@ import { supabase } from '../lib/supabase'
 import ReviewCard from '../components/ReviewCard'
 import { CancellationPolicyCollapsible } from '../components/CancellationPolicy'
 import { formatCents } from '../lib/cancellationPolicy'
-import { formatGuestFacingPrice, guestFacingPriceCents, paynowPriceCents } from '../lib/pricing'
+import {
+  checkoutPriceCents,
+  formatGuestFacingPrice,
+  guestFacingPriceCents,
+  paynowPriceCents,
+} from '../lib/pricing'
+import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -95,6 +101,7 @@ export default function ListingDetail() {
   const [error, setError] = useState('')
 
   const [checkoutSessionId, setCheckoutSessionId] = useState(null)
+  const [checkoutRail, setCheckoutRail] = useState(null)
   const [clientSecret, setClientSecret] = useState(null)
   const [bookingId, setBookingId] = useState(null)
   const [totalAmount, setTotalAmount] = useState(null)
@@ -203,6 +210,7 @@ export default function ListingDetail() {
 
   function cancelPayment() {
     setCheckoutSessionId(null)
+    setCheckoutRail(null)
     setClientSecret(null)
     setBookingId(null)
     setTotalAmount(null)
@@ -236,6 +244,7 @@ export default function ListingDetail() {
     setClientSecret(null)
     setBookingId(null)
     setTotalAmount(null)
+    setCheckoutRail(null)
     setCheckoutSessionId(sessionId)
   }
 
@@ -246,6 +255,7 @@ export default function ListingDetail() {
 
     if (!session || !checkoutSessionId) return
 
+    setCheckoutRail(paymentRail)
     setBookingLoading(true)
     setPaymentError('')
 
@@ -262,13 +272,8 @@ export default function ListingDetail() {
 
     setBookingLoading(false)
 
-    if (fnError) {
-      setPaymentError(fnError.message)
-      return
-    }
-
-    if (data?.error) {
-      setPaymentError(data.error)
+    if (fnError || data?.error) {
+      setPaymentError(await edgeFunctionErrorMessage(fnError, data))
       return
     }
 
@@ -302,6 +307,9 @@ export default function ListingDetail() {
   const avgRating = averageRating(reviews)
   const cardPrice = guestFacingPriceCents(listing.price_per_person)
   const paynowPrice = paynowPriceCents(listing.price_per_person)
+  const checkoutPrice = checkoutRail
+    ? checkoutPriceCents(listing.price_per_person, checkoutRail)
+    : cardPrice
   const canTakePayments = hostCanTakePayments()
 
   return (
@@ -373,13 +381,17 @@ export default function ListingDetail() {
         <aside className="detail-sidebar">
           <div className="detail-booking-card">
             <p className="detail-booking-card__price">
-              {formatGuestFacingPrice(listing.price_per_person)}
+              {formatCents(checkoutPrice)}
               <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--text)' }}>
                 {' '}
                 / person
               </span>
             </p>
-            <p className="detail-booking-card__note">Select a session to book</p>
+            <p className="detail-booking-card__note">
+              {checkoutRail === 'paynow'
+                ? 'PayNow · 5% off the advertised price'
+                : 'Select a session to book'}
+            </p>
 
             <CancellationPolicyCollapsible />
 
@@ -397,6 +409,7 @@ export default function ListingDetail() {
                       type="button"
                       className="payment-rail"
                       disabled={bookingLoading}
+                      aria-pressed={checkoutRail === 'card'}
                       onClick={() => startPayment('card')}
                     >
                       <span>
@@ -409,6 +422,7 @@ export default function ListingDetail() {
                       type="button"
                       className="payment-rail"
                       disabled={bookingLoading}
+                      aria-pressed={checkoutRail === 'paynow'}
                       onClick={() => startPayment('paynow')}
                     >
                       <span>
@@ -452,7 +466,9 @@ export default function ListingDetail() {
                     </div>
                     <div className="session-card__actions">
                       <span className="session-card__price">
-                        {formatGuestFacingPrice(listing.price_per_person)}
+                        {session.id === checkoutSessionId
+                          ? formatCents(checkoutPrice)
+                          : formatGuestFacingPrice(listing.price_per_person)}
                       </span>
                       <button
                         type="button"

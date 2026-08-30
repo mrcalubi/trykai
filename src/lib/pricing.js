@@ -17,3 +17,13 @@ export function formatGuestFacingPrice(pricePerPersonCents) {
 export function paynowPriceCents(pricePerPersonCents) {
   return calculateGuestCharge(pricePerPersonCents, 'paynow').totalAmount
 }
+
+export function checkoutPriceCents(pricePerPersonCents, rail = 'card') {
+  return rail === 'paynow'
+    ? paynowPriceCents(pricePerPersonCents)
+    : guestFacingPriceCents(pricePerPersonCents)
+}
+
+export function formatCheckoutPrice(pricePerPersonCents, rail = 'card') {
+  return formatCents(checkoutPriceCents(pricePerPersonCents, rail))
+}
