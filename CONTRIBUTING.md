@@ -52,7 +52,7 @@ parallel:
 | Unit and component tests | The Vitest suite with coverage thresholds enforced |
 | Production build | `vite build` succeeds |
 | End-to-end tests | Playwright against a production build, desktop and phone viewports |
-| Edge function checks | Deno type-check of the shared booking rules |
+| Edge function checks | Deno type-check of `_shared/{booking,http,connect,email,payouts}.ts`. Handler type-check is advisory (`continue-on-error`). |
 
 A sixth job, **CI passed**, waits on the other five and fails if any of them did.
 That is the single check to require in branch protection, so adding or renaming a

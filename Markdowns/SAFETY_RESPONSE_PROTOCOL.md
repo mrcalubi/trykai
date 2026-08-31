@@ -22,7 +22,7 @@ There is no time limit on a safety report. One can arrive weeks after a session 
 
 Do these in order, the moment a credible safety report comes in. Credible means specific and plausible, not proven. You are not judging guilt at this stage, you are removing risk while you look.
 
-1. **Suspend the reported account.** In the Supabase Table Editor, on the users table, set `is_suspended` to true, `suspended_at` to the current time, and `suspension_reason` to a short note. This deactivates their listings and blocks new bookings. Do this before replying to anyone.
+1. **Suspend the reported account.** In the Supabase Table Editor, on the users table, set `is_suspended` to true, `suspended_at` to the current time, and `suspension_reason` to a short note. **Then set that host's listings to `is_active = false`.** The app does not read `is_suspended`, so the flag alone does not hide listings or block booking. Do this before replying to anyone.
 
 2. **Cancel that account's upcoming sessions and refund every affected guest in full.** No guest should attend a session with a host under active safety review. Each affected guest gets a full refund including the platform fee, regardless of timing, the same as a host cancellation.
 
@@ -64,9 +64,9 @@ TryKai is not an investigator and cannot resolve a crime. Where a report describ
 
 ## What this depends on, and the current gap
 
-This protocol assumes suspension is done by hand in the Table Editor, which works today. Two things make it more reliable and are on the build list, not blockers to running the protocol now:
+This protocol assumes suspension is done by hand in the Table Editor, which is still the process. Two things make it more reliable and are on the build list, not blockers to running the protocol now:
 
-- The suspension fields (`is_suspended`, `suspended_at`, `suspension_reason`) exist on the users table as of 22 August, but nothing in the app yet enforces them, meaning a suspended account's listings need to be confirmed as actually hidden. Until the app enforces suspension, verify by hand that the suspended account's listings no longer appear and cannot be booked.
-- An admin suspension button, so this is one click rather than a manual table edit, is the P0.4 build item that makes this protocol safe to run under pressure.
+- The suspension fields (`is_suspended`, `suspended_at`, `suspension_reason`) exist on the users table as of 22 August. **Nothing in `src/` queries them.** A suspended account's listings stay visible if `is_active` is still true, and guests can still open Book. Until the app enforces suspension, always set those listings to `is_active = false` in the same sitting, then verify on the live browse page that they are gone.
+- An admin suspension button, so this is one click rather than a manual table edit, is still P0.4. The filter in the app is the launch-blocking half of that item.
 
 Until those land, this protocol still works, it just takes more manual care. That is acceptable at launch volume. It is not acceptable to have the public promise without this process, which is why this document exists now rather than later.
