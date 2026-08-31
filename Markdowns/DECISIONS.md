@@ -24,20 +24,22 @@ Ask for information when it becomes relevant, not upfront.
 - Do not ask for date of birth or address at signup
 
 ### Location handling
-Public listings show general area only, e.g. "Tampines". Full address is revealed only after a confirmed booking, and never appears in a browse or search query. Mirrors Airbnb, protects host privacy.
+Public listings show general area only, e.g. "Tampines". Full address is revealed only after a confirmed booking, and must never appear in a browse or search query. Mirrors Airbnb, protects host privacy.
+
+**Implementation, 31 August:** guests get the address via `get_listing_address` (confirmed booking only). Public pages do not SELECT `full_address`. The column is still granted on `listings` from `00001`, so a crafted query can still read it. Hosts edit the address via listings SELECT; the RPC does not return it to the owning host.
 
 ### Trust layer
 Reviews are the core trust mechanism, not vetting.
-- Reviews only after a confirmed booking, both directions
+- Reviews only after a confirmed booking, both directions. **Not how the app behaves today:** dashboard allows `pending`, RLS insert is guest-only and does not require confirmed. See BUILD_BACKLOG P2.3 / P2.4.
 - Profile photo required to host, non negotiable
 - Phone OTP on signup
 - Trust badges on listings: phone verified, ID verified, review count
 
 ### Host identity verification
-Manual for MVP. Host uploads NRIC or passport plus a live selfie to a private Supabase bucket. Caleb reviews and approves in the dashboard. Status flow: unverified → pending → approved → rejected. Only approved hosts can hold active listings. Automate with Stripe Identity or Veriff once manual review becomes painful, roughly 50+ new hosts a month.
+Manual for MVP. Host uploads NRIC or passport plus a live selfie to a private Supabase bucket. Caleb reviews and approves in the **Supabase Table Editor** (there is no verification dashboard). Status flow: unverified → pending → approved → rejected. Only approved hosts can hold active listings. Automate with Stripe Identity or Veriff once manual review becomes painful, roughly 50+ new hosts a month.
 
 ### Browse
-Live now: category pills (All, Food, Fitness, Arts, Music, Language, Other), area dropdown, both combinable. Sort by newest, price, most reviewed.
+Live now: category pills (built from listing data, not a fixed six-item list) and an area dropdown, both combinable. Order is newest (`created_at` desc). **Sort by price or most reviewed is not built.**
 Stage 2: "This weekend" filter, price range slider.
 Stage 3: personalisation from booking history.
 
@@ -148,10 +150,12 @@ Ask instead for one of two things:
 
 ## Payments
 
-### Status: moving to Stripe Connect
-**Decided 16 August 2026.** After HitPay disabled payment capability on 13 August, and after their Platform account route was found to be the same split model already ruled out, TryKai is moving to **Stripe Connect using separate charges and transfers**.
+### Status: Stripe Connect is in the repo
+**Decided 16 August 2026. Implementation walked 31 August 2026.** After HitPay disabled payment capability on 13 August, and after their Platform account route was found to be the same split model already ruled out, TryKai moved to **Stripe Connect using separate charges and transfers**.
 
-Why: it is the only option that does what TryKai needs *without requiring anyone's approval*. Publicly documented, supported in Singapore, transfers delayable up to 90 days, and the codebase is already on Stripe. HitPay said no twice, the second time overturning their own CEO's explicit approval two days earlier.
+The money loop is now in this tree: Payment Element checkout, signed `stripe-webhook` → `confirm_paid_booking`, Connect Express onboarding, `cancel-booking` refunds, `release-payout` Transfers 24 hours after `starts_at`. Remaining work is ops (apply `00005`, Dashboard webhook + secrets, platform payouts **manual**, founding-host flags, staging test-mode booking), not a second provider decision. See BUILD_BACKLOG.md.
+
+Why Connect: it is the only option that does what TryKai needs *without requiring anyone's approval*. Publicly documented, supported in Singapore, transfers delayable up to 90 days, and the codebase is already on Stripe. HitPay said no twice, the second time overturning their own CEO's explicit approval two days earlier.
 
 **Correcting an earlier assumption:** moving to Stripe does not mean losing PayNow. Stripe supports PayNow in Singapore at 1.3 per cent and it works with Connect. The real cost difference is about 15 cents a booking, roughly S$75 across year one. Materially smaller than previously assumed.
 
@@ -222,11 +226,11 @@ Published at /cancellation-policy, /refund-policy, /dispute-policy. Finalised 29
 
 **Host no show compensation is deliberately discretionary** rather than a fixed formula, to avoid creating an incentive for collusion between a fake host and a fake guest.
 
-**Safety reports have no time limit, ever.** Credible reports can trigger immediate suspension independent of the strike counter, and severe violations can mean permanent removal without accumulating three strikes. Not built; no suspension mechanism independent of the counter exists today.
+**Safety reports have no time limit, ever.** Credible reports can trigger immediate suspension independent of the strike counter, and severe violations can mean permanent removal without accumulating three strikes. Columns `is_suspended`, `suspended_at`, `suspension_reason` exist as of 22 August. **The app does not query them.** Setting the flag in Table Editor does not hide listings or block booking until listings are also set `is_active = false` by hand. See SAFETY_RESPONSE_PROTOCOL.md and BUILD_BACKLOG P0.4.
 
 **Quality complaints:** 7 day window, 2 business day response target.
 
-**Payout collision:** if a dispute is confirmed after a payout has released, TryKai refunds the guest first, absorbs the cost, and recovers from the host including from future payouts. Depends on payout infrastructure that does not exist yet.
+**Payout collision:** if a dispute is confirmed after a payout has released, TryKai refunds the guest first, absorbs the cost, and recovers from the host including from future payouts. `release-payout` now exists and Transfers 24h after `starts_at`. It does **not** hold for open disputes; it only skips rows with `stripe_refund_id` set. Clawback after release is still not built.
 
 ---
 
@@ -298,7 +302,7 @@ Onboarding required a business plan with three year projections, since there is 
 **Access control:** do not share the login. If Aakash needs spending ability, issue an Aspire card with a set limit instead.
 
 ### Transactional email
-Three flows live via Resend: new booking to host, new verification submission to Caleb, verification result to host. **All send from Resend's shared test domain and deliver only to Caleb's address.** Non functional for real users until trykai.sg is verified in Resend.
+Three flows live via Resend: new booking to host and guest (from `stripe-webhook`), new verification submission to Caleb, verification result to host. **All send from Resend's shared test domain (`TryKai <onboarding@resend.dev>`) and deliver only to Caleb's address.** Non functional for real users until trykai.sg is verified in Resend. Cancellation does not send email. The two notify-verification functions have no shared-secret header.
 
 ### Domain
 trykai.sg via Vodien, two years, ~$75.98. SGNIC identity verification completed.
@@ -417,6 +421,8 @@ Defences, in order of actual strength:
 **2026-08-23 — Guest fee restructured to an all in total with a 5 per cent PayNow discount.** Supersedes the flat 10 per cent, $2 floor structure. Card fee is 12 per cent with a $2.50 floor, rounded up to the nearest dollar, shown identically from browse to checkout so the price never rises between viewing and paying. PayNow shows a flat 5 per cent off at checkout, tested against 4, 6, and 8 per cent; 5 per cent was the point where the guest saving stays meaningful and TryKai's margin stays healthy across the full S$10 to S$40 band without recreating a dead spot.
 
 **2026-08-23 — Host fee trigger changed from a platform wide cumulative count to a per host mechanism.** Supersedes the 500 cumulative bookings trigger, which was never going to activate in year one since projected year one volume of 481 bookings never reaches it. Every non founding host's first three bookings are free; their fourth booking onward pays the 10 per cent fee immediately, independent of overall platform pace. Checked against Airbnb's 15.5 per cent host only fee and GrabFood and Foodpanda's 15 to 30 per cent Singapore merchant commissions; 10 per cent sits below both. Off platform leakage risk flagged as most likely where fee pain, mutual benefit to going direct, and an established relationship all overlap, expected mainly in Lane 2.
+
+**2026-08-31 — Stripe Connect payment loop is in the repo.** Implementation status, not a new product decision. Guest checkout, webhook confirmation, Connect Express onboarding, refunds, and 24h Transfers are in this tree as of this date. Remaining work is ops plus BUILD_BACKLOG (real email, notify-function secrets, suspension enforcement, `full_address` grant, missing StyleGuide/logo assets). Supersedes the 16 August "moving to Stripe" wording in Part A as a plan rather than a build.
 
 ---
 

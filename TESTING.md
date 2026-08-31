@@ -21,8 +21,10 @@ The browser suite needs Chromium once: `npx playwright install chromium`.
 **Unit** — `src/lib/*.test.js`, `supabase/functions/_shared/*.test.ts`
 
 Pure functions, no DOM, no mocks. This is where the money rules live: refund
-tiers, the platform fee, and guest-count validation. These are the tests to reach
-for first when changing anything that decides an amount.
+tiers, the platform fee, Connect helpers, payout eligibility, and guest-count
+validation. Shared Edge modules under `supabase/functions/_shared/`
+(`booking`, `http`, `connect`, `email`, `payouts`) are covered here. These are
+the tests to reach for first when changing anything that decides an amount.
 
 **Component** — `src/components/*.test.jsx`
 
@@ -33,7 +35,7 @@ classes, so they survive restyling but catch a broken label or a lost button.
 **Page** — `src/pages/*.test.jsx`, `src/App.test.jsx`
 
 Whole pages against a mocked Supabase client, covering the flows that matter:
-signup writing a profile row, the host verification gate, booking, cancellation
+signup (Login does not insert a profile row; `handle_new_user` does that in the database), the host verification gate, booking, cancellation
 refunds, host strikes, and the review rules. `App.test.jsx` drives the real
 router so a mis-wired route fails here rather than in production.
 
@@ -142,11 +144,11 @@ a test needs to reach the JavaScript guard it submits the form directly with
 
 Thresholds are enforced in `vitest.config.js` and CI fails below them.
 
-| Scope | Lines | Branches |
-| --- | --- | --- |
-| Whole project | 92% | 87% |
-| `src/lib/cancellationPolicy.js` | 100% | 100% |
-| `supabase/functions/_shared/booking.ts` | 100% | 100% |
+| Scope | Lines | Branches | Functions |
+| --- | --- | --- | --- |
+| Whole project | 92% | 87% | 90% |
+| `src/lib/cancellationPolicy.js` | 100% | 100% | 100% |
+| `supabase/functions/_shared/booking.ts` | 100% | 100% | 100% |
 
 The two per-file rules are the point of the exercise: the code that decides how
 much money moves stays fully covered. Raise the global numbers as coverage
@@ -179,6 +181,8 @@ assumed:
 - **Edge function handlers are not executed in tests.** Their business rules live in `supabase/functions/_shared/*.ts` and are covered there; Stripe signature verification and the HTTP plumbing are type-checked. Missing/invalid webhook signatures return 400 in `stripe-webhook`.
 - **No signed-in end-to-end journey against a real Stripe account.** The browser suite stubs the network. Staging test-mode (test cards + PayNow test) is the remaining live check.
 - **`full_address` reveal** is covered at the page level via `get_listing_address`; the browser suite does not log in.
+- **Review gating** still allows `pending` in the dashboard UI; tests describe current behaviour, they do not yet enforce the product rule.
+- **StyleGuide category PNGs** (`src/assets/categories/food.png` and siblings) are imported but not in the repo. That can fail `vite build` because `App.jsx` always imports StyleGuide. Not covered by a dedicated test.
 
 ## Adding another browser
 
