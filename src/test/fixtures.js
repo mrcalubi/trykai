@@ -43,6 +43,11 @@ export function makeListing(overrides = {}) {
     whats_provided: ['Materials'],
     host_id: 'host-1',
     is_active: true,
+    users: {
+      full_name: 'Mei Ling',
+      avatar_url: null,
+      stripe_payouts_enabled: true,
+    },
     ...overrides,
   }
 }

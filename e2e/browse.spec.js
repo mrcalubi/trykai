@@ -16,7 +16,7 @@ test.describe('browsing listings', () => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART] })
     await page.goto('/')
 
-    await expect(page.getByText('Mei Ling · Tiong Bahru · $45/person')).toBeVisible()
+    await expect(page.getByText('Mei Ling · Tiong Bahru · $51/person')).toBeVisible()
   })
 
   test('filters by category', async ({ page }) => {

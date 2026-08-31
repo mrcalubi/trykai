@@ -27,19 +27,42 @@ Each week has three sections, one per founder, tagged **[CRITICAL]**, **[HIGH]**
 
 ---
 
+## Progress snapshot, 31 August 2026
+
+Week 5 of the original plan (25–31 August) is ending. The week-by-week sections below stay as the historical plan. Read this snapshot first.
+
+**Payment code (original weeks 5–7 and most of 9) is in the tree:**
+- Fee module matches DECISIONS.md: 12% card fee, S$2.50 floor, round up to a whole dollar, PayNow 5% off that all-in total, host fee 10% from the fourth confirmed booking, founding hosts never
+- `stripe-webhook` confirms bookings, `confirm_paid_booking` decrements spots, `cancel-booking` refunds on the four-tier rule
+- Connect Express onboarding and `release-payout` Transfers 24h after `starts_at`
+- Guest `full_address` reveal via RPC. Column grant on `listings` still too wide
+
+**Still the original week 8:** trykai.sg is not verified in Resend. Notify-verification functions have no shared-secret header.
+
+**Also in the tree since 22–25 August:** staging project, migrations `00001`–`00005`, signup trigger, verification guard, suspension columns (unenforced in the app), CI, component library at `/style-guide` (not wired).
+
+**Ops, not code:** apply `00005` on staging, Stripe Dashboard webhook + secrets, platform payouts manual, `is_founding_host` flags, one test-mode booking. Confirm whether production has the 22 August signup hotfix.
+
+**Carried non-engineering:** insurance quote, unsigned founders' agreement, Ruiheng not told about profit share, safety protocol drafted but not ratified.
+
+The 25 August snapshot below is kept for history. It still says the component library was on a side branch; that is no longer true.
+
+---
+
 ## Progress snapshot, 25 August 2026
+
 
 A working session across 22 to 25 August closed out a large block of foundation work, some of it ahead of its planned week. This block records what is now genuinely done, so the week by week sections below are read as the historical plan rather than the current state.
 
 **Done and verified on staging:**
 - Staging Supabase environment stood up and in active use. Closes the carried forward week 2 and 3 item.
 - Canonical schema in version control. Closes the top priority technical fix carried from week 2.
-- Signup was completely broken by an RLS gap that stopped a new account writing its own row. Fixed. Host verification submission was blocked the same way. Fixed. Suspension fields added. All captured in `00003_staging_hotfixes_22aug.sql`. The three security self audit holes from week 2 and 3 (self approving `verification_status`, resetting `host_strikes`, reading another user's verification documents) are closed by column grants, RLS policies, and a guard trigger.
+- Signup was completely broken by an RLS gap that stopped a new account writing its own row. Fixed. Host verification submission was blocked the same way. Fixed. Suspension fields added. Captured in what is now `00003_signup_verification_and_suspension.sql` (this snapshot originally called it `00003_staging_hotfixes_22aug.sql`). The three security self audit holes from week 2 and 3 (self approving `verification_status`, resetting `host_strikes`, reading another user's verification documents) are closed by column grants, RLS policies, and a guard trigger.
 - Atomic `spots_remaining` decrement built and tested via a `confirm_booking` security definer function. This was a week 5 critical item, now done early.
 - Full address reveal on confirmed bookings, via a `get_listing_address` security definer function. Closes the `full_address` written but never read gap.
 - Four tier cancellation refund built by Ruiheng and verified correct against the published policy. This was a week 5 item.
 - Automated CI test suite (318 unit and component tests plus 58 browser tests) and branch protection added by Ruiheng. Every merge now runs checks. This is new infrastructure not in the original plan.
-- A UI component library and top nav built: Button, Input, Card, SelectableCard, TopNav, HamburgerMenu, previewable at a private `/style-guide` route. On the `style-guide-page-staging` branch, not yet merged.
+- A UI component library and top nav built: Button, Input, Card, SelectableCard, TopNav, HamburgerMenu, previewable at a private `/style-guide` route. **(Updated 31 August: this is in the current tree, not waiting on a merge. Still not wired into Home or Navbar.)**
 
 **Still open from the plan:**
 - Safety response protocol is now drafted (`SAFETY_RESPONSE_PROTOCOL.md`) but not ratified or enforced in the app. The suspension fields exist but nothing in the app enforces them yet, so a suspended account's listings are not automatically hidden.
@@ -47,8 +70,7 @@ A working session across 22 to 25 August closed out a large block of foundation 
 - Founders' agreement, still unsigned. Ruiheng still not told about the three way equal profit share.
 - The two pricing decisions (guest fee restructure and host fee trigger) are now **decided**, see DECISIONS.md, so the week 5 fee rebuild has final numbers to build against.
 
-**In flight, needs Ruiheng:**
-- The component library PR is waiting to merge. Ruiheng's CreateListing auth fix landed on `main`, the PR targets `staging`, so they may be out of sync. Resolve whether to retarget the PR or sync staging with main.
+**In flight, needs Ruiheng (as of 25 August; see 31 August snapshot above):**
 - Confirm the staging database hotfixes have been applied to production, since they do not travel through a code merge.
 
 ---
@@ -98,7 +120,7 @@ A working session across 22 to 25 August closed out a large block of foundation 
 
 ---
 
-## WEEK 3, current
+## WEEK 3
 *11 to 17 August*
 
 ### CALEB
@@ -318,7 +340,7 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| **Payment provider unresolved** | **Live now** | **Critical** | Decide by end of week 4 regardless of HitPay's response. Fallbacks documented in DECISIONS.md. |
+| **Payment provider unresolved** | Closed 16 August (Stripe Connect). Remaining risk is ops: secrets, `00005`, manual platform payouts, test-mode booking. | **Critical** | Code is in the tree. Do not reopen HitPay as a blocker. |
 | Payment weeks 5 to 8 get fragmented | High | High | Protect these as blocked, uninterrupted time. Fragment weeks 1 to 4 or 9 to 12 instead if something must give. |
 | Estimates prove optimistic for a solo dev on unfamiliar code | Medium | Medium | Honest checkpoint at the week 5 scrum. The carry over process makes slippage visible weekly rather than all at once. |
 | Warm contact hosts go quiet over a longer runway | Medium | High | One to one confirmation, repeated close to week 10, not assumed from week 1 commitments. |
@@ -335,15 +357,15 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 Run through this before soft launch. Mark every item done, not done, or blocked.
 
 ## Payments
-- [ ] Payment provider and account model resolved
-- [ ] End to end flow working: guest pays → booking confirmed → host notified
-- [ ] Booking status updates correctly, pending to confirmed
-- [ ] Booking confirmation email to guest
-- [ ] Booking notification email to host
-- [ ] Platform fee correctly calculated, tiered not flat, S$2 floor applied
-- [ ] PayNow discount working at checkout, 8% versus 10%
+- [x] Payment provider and account model resolved (Stripe Connect, separate charges and transfers, Express, 16 August)
+- [ ] End to end flow working on staging test-mode: guest pays → booking confirmed → host notified
+- [ ] Booking status updates correctly, pending to confirmed (code path exists; needs a live Stripe test)
+- [ ] Booking confirmation email to guest (code path exists; Resend still on test domain)
+- [ ] Booking notification email to host (same)
+- [ ] Platform fee correctly calculated: 12% of lesson, S$2.50 floor, round up to a whole dollar (see DECISIONS.md). Code exists in `_shared/booking.ts`
+- [ ] PayNow 5% off the advertised all-in total at checkout (not 8% versus 10%)
 - [ ] Failed payment handled gracefully, clear error, no ghost booking
-- [ ] Payout flow tested, released 24 hours after the session
+- [ ] Payout flow tested, Transfer 24 hours after the session (`release-payout`; platform payouts must be manual)
 - [x] Refund, cancellation, and dispute policy pages live
 - [x] Policy page URLs resolve when typed directly, not just via in site navigation
 

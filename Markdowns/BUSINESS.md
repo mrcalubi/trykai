@@ -219,27 +219,13 @@ The desires that do not self extinguish:
 
 | Stage | Trigger | Structure |
 |---|---|---|
-| Stage 1 | Now to 500 bookings | Guest booking fee only, 10 per cent with S$2 floor. PayNow discount. Host fee waived to build supply. |
-| Stage 2 | 500 to 2,000 bookings | Host fee introduced, 10 per cent for peer hosts. Credit bundles, multi session courses, group discounts. |
+| Stage 1 | Launch, supply-building | Guest booking fee. Host fee waived for founding hosts permanently; other hosts get three free bookings then 10%. |
+| Stage 2 | Repeat behaviour, 500+ bookings historically used as the volume marker | Credit bundles, multi session courses, group discounts. Host fee already running per host, not waiting on a platform-wide count. |
 | Stage 3 | 2,000+ bookings | Host subscription tier, around S$29/month. Primary long term margin driver. |
 
-**Fee structure**
-- Peer hosts: 10 per cent guest fee + 10 per cent host fee at Stage 2 = 20 per cent total take
-- Small businesses: 10 per cent guest fee only
-- PayNow discount: 2 percentage points off the guest fee
-- Minimum booking fee: S$2 floor, calculated as max(10 per cent, S$2)
-- New peer host incentive: host fee waived on first three bookings
+**Fee numbers live in DECISIONS.md** (guest fee 12% with S$2.50 floor, round up, PayNow 5% off the all-in total, host fee 10% from the fourth confirmed booking). Do not copy them here. The 10 per cent / S$2 floor / 8-versus-10 PayNow figures that used to sit in this section were superseded on 23 August 2026.
 
-**Unit economics at Stage 1**, on a S$25 session:
-
-| | Card | PayNow |
-|---|---|---|
-| Collected from guest | 27.50 | 27.00 |
-| Booking fee to TryKai | 2.50 | 2.00 |
-| Payment processing cost | 1.27 | 0.21 |
-| **Net to TryKai** | **1.23** | **1.79** |
-
-Two things follow. A PayNow booking is worth more to us than a card booking even after the discount, which is why PayNow is shown as the cheaper option at checkout. And at a blended net of about S$1.57 per booking, **Stage 1 pricing does not produce meaningful profit at low volume**, roughly 320 bookings a month would be needed to clear S$500. Margin improvement comes from the Stage 2 host fee and from shifting payment mix toward PayNow, not from raising the guest fee.
+At a S$25 lesson the guest sees S$28 on card and S$26.60 on PayNow. Year one still does not produce meaningful profit at low volume; margin improvement comes from the host fee and from PayNow mix, not from raising the guest fee. Worked net-per-booking figures are in HANDOVER.md / the 23 August decision, not restated here.
 
 **Wants versus needs.** Pure needs categories, tutoring and certifications, are dominated by entrenched incumbents. Target the overlap instead: things that feel like wants but function like needs. Resume relevant upskilling is the clearest example.
 

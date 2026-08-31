@@ -1,6 +1,6 @@
 # TryKai: Handover
 
-*Written 25 August 2026 to carry context into a new conversation. Paste this at the start of a fresh chat, along with the other documents. Supersedes the 16 August handover.*
+*Written 25 August 2026, status brought in line with the tree on 31 August 2026. Paste this at the start of a fresh chat, along with the other documents. Supersedes the 16 August handover.*
 
 ---
 
@@ -23,9 +23,9 @@ Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. Pre launch, zero 
 | DECISIONS.md | Current state by theme, an append only log, and an explicit list of things analysed but not decided |
 | ENGINEERING.md | Stack, schema, business rules, file map, end to end flows. The document Cursor reads first. |
 | BUILD_BACKLOG.md | Prioritised build queue, P0 to P3, with done items marked |
-| OPERATIONS.md | Week by week plan and pre launch checklist, plus a 25 August progress snapshot |
+| OPERATIONS.md | Week by week plan and pre launch checklist, plus progress snapshots |
 | HOST_ONBOARDING.md | Internal onboarding process plus host facing guidelines |
-| DESIGN.md | Visual identity, plus the component library and UI decisions built this session |
+| DESIGN.md | Visual identity, plus the component library (in this tree at `/style-guide`, not wired into real pages) |
 | SAFETY_RESPONSE_PROTOCOL.md | Drafted 23 August, the process behind the public suspension promise, not yet ratified |
 | FOUNDERS_AGREEMENT.md | Unsigned. Equity, profit sharing, roles, removal process |
 | cancellation / refund / dispute policy | Published website content |
@@ -36,28 +36,30 @@ Live data deliberately kept out of markdown: host roster in a Google Sheet, expe
 
 ---
 
-## State of play, 25 August
+## State of play, 31 August
 
-**Payments.** Stripe Connect, separate charges and transfers, Express accounts, decided 16 August. Still in sandbox, the real flow is not built. The important nuance: a largely complete payment webhook and fee calculation already exist, built against HitPay before it was dropped, stashed on the `hitpay-wip-2026-08` git stash. The remaining job is closer to swapping the API target to Stripe than building from scratch. This is the biggest open build and the main thing gating launch.
+**Payments.** Stripe Connect, separate charges and transfers, Express accounts, decided 16 August. The money loop is **in this tree**: all-in card prices, Card vs PayNow PaymentIntents, signed `stripe-webhook` → `confirm_paid_booking`, Connect Express onboarding, `cancel-booking` refunds, and `release-payout` Transfers 24h after `starts_at`. Do not adapt the HitPay stash. Ops still required: apply `00005` on staging, Stripe Dashboard webhook + secrets, platform payouts set to **manual**, founding hosts flagged `is_founding_host`, staging test-mode booking.
 
 **The requirement that constrains all payment design:** the host's share is held until 24 hours after the session takes place, not after the guest pays. Guests book weeks ahead. Every published refund guarantee depends on that hold. Stripe Connect preserves it.
 
-**What now works, all built and tested on staging this session (22 to 25 August):**
+**What is in the repo (walked 31 August), including work from 22 to 25 August:**
 - Staging Supabase environment exists and is in active use, it is a full copy of the live database.
-- Canonical schema in version control.
-- Signup was completely broken by an RLS gap that stopped a new account writing its own row. Fixed. Host verification submission was blocked the same way. Fixed. Suspension fields added. All captured in `00003_staging_hotfixes_22aug.sql`.
-- The three flagged RLS escalation holes are closed: a user can no longer self approve verification, reset their own strikes, or read another user's verification documents.
-- Three trusted security definer functions exist: `submit_verification` (user can reach pending, never approved), `confirm_booking` (atomic spots decrement, tested), `get_listing_address` (address only for host or confirmed guest).
-- Full end to end guest and host journey works on staging: signup, verification, create listing, browse, book, confirm, address reveal, cancel with correct four tier refund.
-- Ruiheng added an automated CI test suite (318 unit and component tests plus 58 browser tests) and branch protection. Every merge now runs checks. Do not expect to merge with red checks.
-- A UI component library and top nav built on `style-guide-page-staging`, previewable at `/style-guide`.
+- Canonical schema in `supabase/migrations/` (`00001`–`00005`). There is no `schema.sql`.
+- Signup profile rows are created by `handle_new_user` on `auth.users`. Login.jsx does not insert a profile. Host verification is a client UPDATE to pending, blocked from self-approval by `guard_user_self_update`. Suspension fields exist. There is **no** `submit_verification` function.
+- A user cannot write their own strikes, suspension, stripe, or founding-host fields. Verification documents live in a private bucket. `id_photo_url` / `selfie_url` are still granted SELECT to authenticated; the bucket is the real barrier.
+- Trusted functions: `handle_new_user`, the two guards, `get_listing_address` (confirmed **guest** only), `confirm_paid_booking` / `confirm_booking` (service role only), `apply_host_strike` (service role only).
+- Guest address reveal is wired. `listings.full_address` is still `GRANT ALL` from the baseline migration.
+- Four tier cancellation refunds run in `cancel-booking`. That function does not send email.
+- CI gates every merge: Vitest with coverage floors, production build, Playwright at two viewports, Deno type-check of shared Edge modules. Roughly 325 frontend cases, 72 shared Edge cases, 30 Playwright specs each run on desktop and phone. Do not expect to merge with red checks.
+- Component library and TopNav are **in this tree**, previewable at `/style-guide`. They are not wired into Home or Navbar. StyleGuide imports category PNGs that are not in the repo.
 
-**In flight, needs Ruiheng:**
-- The component PR is waiting to merge. Ruiheng's CreateListing auth fix landed on `main`; the PR targets `staging`; they may be out of sync. Open question sent to him: retarget the PR to main, or sync staging with main first.
-- Confirm the staging database hotfixes have been applied to production, since they do not travel through a code merge. Signup being broken is very likely also true on production until this is done.
+**In flight, needs Ruiheng / ops:**
+- Confirm whether `00005` and the 22 August hotfixes are applied on staging and production. Signup being broken is very likely still true on production until `00004` / the hotfix path is applied there.
+- P0.8 Resend domain plus secrets on the notify-verification functions.
+- P0.4: the app ignores `is_suspended`.
 
 **Banking.** Aspire, approved 13 August.
-**Email.** Zoho Mail Lite for team mail, Resend for transactional (still on a shared test domain, delivers only to Caleb, needs the real domain verified).
+**Email.** Zoho Mail Lite for team mail, Resend for transactional (still on a shared test domain, from-address `TryKai <onboarding@resend.dev>`, delivers only to Caleb, needs the real domain verified).
 
 ---
 
@@ -73,7 +75,7 @@ All logged in DECISIONS.md Part B. The two big pricing decisions that were previ
 
 **Competitor on record: ToGatherSG.** Direct peer, same idea, launched June 2026, building since October 2025. After roughly two months live: 22 listings, only 5 reviews. Weaknesses to exploit: app download required to browse, two separate apps for host and guest, no date/couples framing, group minimum sessions, chaotic S$15 to S$125 pricing. Their design is polished but cartoonish, the exact direction DESIGN.md already rejected. Full writeup in BUSINESS.md.
 
-**Also this session:** safety response protocol drafted. Component library and top nav built. Mobile-first, top nav not bottom nav for launch (bottom nav collides with browser chrome on the web; revisit when TryKai is an app).
+**Also this session (22–25 August):** safety response protocol drafted. Component library and top nav built; as of 31 August they are in this tree at `/style-guide`, still not replacing Navbar. Mobile-first, top nav not bottom nav for launch (bottom nav collides with browser chrome on the web; revisit when TryKai is an app).
 
 ---
 
@@ -82,7 +84,7 @@ All logged in DECISIONS.md Part B. The two big pricing decisions that were previ
 - **Insurance quote**, slipped three times now. Non technical, genuinely just requesting one. Real launch blocker.
 - **Founders' agreement unsigned**, and Ruiheng still has not been told about the three way equal profit share.
 - **Safety protocol** drafted but not ratified, and the app does not yet enforce the suspension fields that exist.
-- Remaining P0 admin work: the payout queue and suspension enforcement are the two that are genuinely dangerous to keep doing by hand. Verification approval survives the Table Editor for now.
+- Remaining P0 admin work: suspension enforcement in the app is the one that is genuinely dangerous to keep doing by hand (the Table Editor flag does nothing until listings are also deactivated). Verification approval survives the Table Editor for now. The Connect Transfer job replaced the copy-paste payout queue.
 - Still deferred in DECISIONS.md: price ceiling for businesses, which axis drives top level navigation, five year transaction retention.
 - Caleb has a standing KIV to re run the four tier cancellation refund check on `main` once the merges settle.
 
@@ -122,9 +124,10 @@ Cheap date band: S$15 to S$25 per person, since under S$60 for two is where the 
 
 ## What to pick up next
 
-1. Resolve the component PR merge with Ruiheng (retarget to main, or sync staging), then merge it and confirm checks are green.
-2. Confirm the staging hotfixes are applied to production, signup may be broken on the live site until then.
-3. Wire the built components into the real pages, Home first, then continue the mobile-first browse build.
-4. The Stripe payment build (webhook plus host onboarding), adapting the stashed HitPay work. This is the critical path and mostly Ruiheng's.
-5. Get the insurance quote. Tell Ruiheng about the profit share, then circulate the founders' agreement.
-6. Push the updated docs (this whole set) to the repo so Cursor reads current versions, this is the first thing to do after starting the new chat.
+1. Stripe ops: apply `00005` on staging, wire the webhook, set platform payouts to manual, run one test-mode booking. The code path is in the repo.
+2. Confirm the 22 August signup/verification hotfixes (and `00004`) are applied to production. Signup may be broken on the live site until then.
+3. P0.8: verify trykai.sg in Resend, and put a shared secret on the notify-verification functions the same week.
+4. P0.4: make the app honour `is_suspended`. Until then, a Table Editor suspend must also set listings `is_active = false` by hand.
+5. Fix missing StyleGuide category PNGs and `/trykai.png` if CI or chrome is broken without them.
+6. Wire the built components into the real pages, Home first. The library is already on this branch.
+7. Get the insurance quote. Tell Ruiheng about the profit share, then circulate the founders' agreement.

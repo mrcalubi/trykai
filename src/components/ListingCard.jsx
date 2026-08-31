@@ -1,9 +1,5 @@
 import { Link } from 'react-router-dom'
-
-function formatPrice(cents) {
-  const dollars = cents / 100
-  return dollars % 1 === 0 ? `$${dollars}` : `$${dollars.toFixed(2)}`
-}
+import { formatGuestFacingPrice } from '../lib/pricing'
 
 function getHostName(listing) {
   const host = listing.host ?? listing.users
@@ -18,7 +14,7 @@ export default function ListingCard({ listing }) {
   const metaLine = [
     hostName,
     listing.area,
-    `${formatPrice(listing.price_per_person)}/person`,
+    `${formatGuestFacingPrice(listing.price_per_person)}/person`,
   ]
     .filter(Boolean)
     .join(' · ')

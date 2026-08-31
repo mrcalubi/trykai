@@ -6,6 +6,8 @@
 // than added on top. So "the lesson fee" is `total_amount - platform_fee`, and a
 // refund "including the platform fee" is the whole `total_amount`.
 
+// Legacy fallback only: bookings taken before `platform_fee` was stored used a
+// 15% carve-out. Live charges use calculateGuestCharge in booking.ts.
 export const PLATFORM_FEE_RATE = 0.15
 
 export const CANCELLATION_POLICY_ITEMS = [

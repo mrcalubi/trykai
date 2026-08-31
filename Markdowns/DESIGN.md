@@ -79,12 +79,12 @@ Final wordmark execution not yet locked — direction is set; the specific lette
 
 ## 7. Component library and UI decisions (built 24 to 25 August 2026)
 
-A reusable component library now exists, built in plain CSS matching `index.css` (the project does not use Tailwind), previewable at a private `/style-guide` route. All on the `style-guide-page-staging` branch, not yet merged at time of writing. Components: Button (primary, secondary, destructive), Input (with label, error state, optional floating-label mode, password show/hide), Card (borderless browse mode and boxed booking mode), SelectableCard (compact horizontal category bar), TopNav, HamburgerMenu.
+A reusable component library now exists in this tree, built in plain CSS matching `index.css` (the project does not use Tailwind), previewable at a private `/style-guide` route. **Not wired into real pages.** Live chrome is still `Navbar.jsx`. Components: Button (primary, secondary, destructive), Input (with label, error state, optional floating-label mode, password show/hide), Card (borderless browse mode and boxed booking mode), SelectableCard (compact horizontal category bar), TopNav, HamburgerMenu.
 
 **Decisions locked while building these, mobile-first throughout:**
 
 - **Prices and utility text use the monospace face**, as section 3 specifies. Caleb noted he does not love it once seen but it is not wrong; parked, not changed.
-- **Category icons.** Custom flat illustrations, one per category (Food, Fitness, Arts, Music, Language, Other), navy `#16264B` and coral `#D97756` only, transparent background with no circle or border, roughly half navy-dominant and half coral-dominant across the set to avoid a monotone row. AI-generated to a fixed style prompt. Food, Fitness, Arts done; Music, Language, Other pending. These deliberately avoid ToGatherSG's brighter cartoon palette.
+- **Category icons.** Custom flat illustrations, one per category (Food, Fitness, Arts, Music, Language, Other), navy `#16264B` and coral `#D97756` only, transparent background with no circle or border, roughly half navy-dominant and half coral-dominant across the set to avoid a monotone row. AI-generated to a fixed style prompt. StyleGuide imports Food, Fitness, and Arts from `src/assets/categories/`; **those PNGs are not in the repo.** Music, Language, Other imports are commented out. These deliberately avoid ToGatherSG's brighter cartoon palette.
 - **Top nav.** Centered logo with a Mous-style scroll behaviour: at the top it shows the logo mark plus "TryKai" wordmark at full height; on scroll the wordmark hides and the bar shrinks; returns on scroll to top. Hamburger top-left, login top-right. Logged-out shows a "Log in" link; logged-in shows the user's avatar (photo, or initials in a navy/cream circle if no photo).
 - **Navigation is top nav, not bottom nav, for launch.** A bottom tab bar was wanted but rejected for now because as a mobile website (not an app) it collides with the browser's own bottom chrome. Revisit a bottom nav when TryKai becomes a native app, which is the right time to get it properly rather than a compromised web version.
 - **Hamburger menu** slides in from the left with a slight staggered fade per row. Contents adapt to logged-in state.
@@ -94,6 +94,8 @@ A reusable component library now exists, built in plain CSS matching `index.css`
 - The listings grid leads on the home page, no hero banner or persistent search bar for launch. Two columns on phone (matching Airbnb's mobile browse density), three on tablet, four on desktop.
 - Card shows the category badge overlaid on the image top-left, title, a compact meta line with price and, only if a rating exists, the rating after a dot. A brand-new listing shows price only, never an empty star, deliberately unlike ToGatherSG's "0 reviews" look.
 - Only honest scarcity and real discounts as conversion nudges (real "spots left", real PayNow saving). No fabricated urgency, no fake "people viewing now".
+
+**What Home actually does today:** it still has a hero. Grid is 1 column on phone, 2 from 640px, 3 from 1024px. ListingCard has the category overlay, but the meta line is still `host · area · price`, with no rating. Sort is newest only.
 
 ---
 
@@ -105,4 +107,5 @@ A reusable component library now exists, built in plain CSS matching `index.css`
 - Whether to keep the monospace price face (Caleb ambivalent)
 - Exact tagline under the logo (locality/"neighbour" language is the leading candidate, not finalized)
 - Lane 2's exact spacing/density/accent-reduction specifics — direction agreed ("quieter, same system"), precise values not yet defined
-- Wiring the built components into the real pages (Home first), still to do after the component branch merges
+- Wiring the built components into the real pages (Home first). The library is already in this tree; Navbar is still the live chrome
+- Food / Fitness / Arts PNGs that StyleGuide imports, and `/trykai.png` that Navbar and TopNav request

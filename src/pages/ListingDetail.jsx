@@ -3,16 +3,18 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from '../lib/supabase'
-import { isStagingMode } from '../lib/staging'
 import ReviewCard from '../components/ReviewCard'
 import { CancellationPolicyCollapsible } from '../components/CancellationPolicy'
+import { formatCents } from '../lib/cancellationPolicy'
+import {
+  checkoutPriceCents,
+  formatGuestFacingPrice,
+  guestFacingPriceCents,
+  paynowPriceCents,
+} from '../lib/pricing'
+import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
-
-function formatPrice(cents) {
-  const dollars = cents / 100
-  return dollars % 1 === 0 ? `$${dollars}` : `$${dollars.toFixed(2)}`
-}
 
 function formatSessionDate(iso) {
   return new Intl.DateTimeFormat('en-SG', {
@@ -37,7 +39,7 @@ function averageRating(reviews) {
   return (sum / reviews.length).toFixed(1)
 }
 
-function CheckoutForm({ totalAmount, onSuccess, onCancel }) {
+function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel }) {
   const stripe = useStripe()
   const elements = useElements()
   const [error, setError] = useState('')
@@ -52,6 +54,9 @@ function CheckoutForm({ totalAmount, onSuccess, onCancel }) {
 
     const { error: confirmError } = await stripe.confirmPayment({
       elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/dashboard?booking=${bookingId}`,
+      },
       redirect: 'if_required',
     })
 
@@ -68,7 +73,7 @@ function CheckoutForm({ totalAmount, onSuccess, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="payment-form">
       <p className="payment-form__total">
-        Total: {formatPrice(totalAmount)}
+        Total: {formatCents(totalAmount)}
       </p>
       <PaymentElement />
       {error && <p className="error-message">{error}</p>}
@@ -95,7 +100,10 @@ export default function ListingDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  const [checkoutSessionId, setCheckoutSessionId] = useState(null)
+  const [checkoutRail, setCheckoutRail] = useState(null)
   const [clientSecret, setClientSecret] = useState(null)
+  const [bookingId, setBookingId] = useState(null)
   const [totalAmount, setTotalAmount] = useState(null)
   const [bookingLoading, setBookingLoading] = useState(false)
   const [paymentError, setPaymentError] = useState('')
@@ -120,7 +128,8 @@ export default function ListingDetail() {
           host_id,
           users!host_id (
             full_name,
-            avatar_url
+            avatar_url,
+            stripe_payouts_enabled
           )
         `
         )
@@ -200,15 +209,20 @@ export default function ListingDetail() {
   }, [id])
 
   function cancelPayment() {
+    setCheckoutSessionId(null)
+    setCheckoutRail(null)
     setClientSecret(null)
+    setBookingId(null)
     setTotalAmount(null)
     setPaymentError('')
   }
 
   function handlePaymentSuccess() {
-    navigate('/dashboard', {
-      state: { message: 'Booking confirmed! Your payment was successful.' },
-    })
+    navigate(`/dashboard?booking=${bookingId}`)
+  }
+
+  function hostCanTakePayments() {
+    return listing?.users?.stripe_payouts_enabled === true
   }
 
   async function handleBook(sessionId) {
@@ -221,14 +235,35 @@ export default function ListingDetail() {
       return
     }
 
+    if (!hostCanTakePayments()) {
+      setPaymentError('This host is still setting up payouts, so this session cannot be booked yet.')
+      return
+    }
+
+    setPaymentError('')
+    setClientSecret(null)
+    setBookingId(null)
+    setTotalAmount(null)
+    setCheckoutRail(null)
+    setCheckoutSessionId(sessionId)
+  }
+
+  async function startPayment(paymentRail) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session || !checkoutSessionId) return
+
+    setCheckoutRail(paymentRail)
     setBookingLoading(true)
     setPaymentError('')
-    cancelPayment()
 
     const { data, error: fnError } = await supabase.functions.invoke('create-payment-intent', {
       body: {
-        session_id: sessionId,
+        session_id: checkoutSessionId,
         guests_count: 1,
+        payment_rail: paymentRail,
       },
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -237,27 +272,18 @@ export default function ListingDetail() {
 
     setBookingLoading(false)
 
-    if (fnError) {
-      setPaymentError(fnError.message)
+    if (fnError || data?.error) {
+      setPaymentError(await edgeFunctionErrorMessage(fnError, data))
       return
     }
 
-    if (data?.error) {
-      setPaymentError(data.error)
-      return
-    }
-
-    if (isStagingMode() && data?.staging_bypass && data?.booking_id) {
-      navigate(`/dashboard?booking=${data.booking_id}`)
-      return
-    }
-
-    if (!data?.clientSecret) {
+    if (!data?.clientSecret || !data?.booking_id) {
       setPaymentError('Failed to start payment. Please try again.')
       return
     }
 
     setClientSecret(data.clientSecret)
+    setBookingId(data.booking_id)
     setTotalAmount(data.total_amount)
   }
 
@@ -279,6 +305,12 @@ export default function ListingDetail() {
   const host = listing.users
   const photos = listing.photo_urls?.length ? listing.photo_urls : []
   const avgRating = averageRating(reviews)
+  const cardPrice = guestFacingPriceCents(listing.price_per_person)
+  const paynowPrice = paynowPriceCents(listing.price_per_person)
+  const checkoutPrice = checkoutRail
+    ? checkoutPriceCents(listing.price_per_person, checkoutRail)
+    : cardPrice
+  const canTakePayments = hostCanTakePayments()
 
   return (
     <div className="page">
@@ -349,28 +381,72 @@ export default function ListingDetail() {
         <aside className="detail-sidebar">
           <div className="detail-booking-card">
             <p className="detail-booking-card__price">
-              {formatPrice(listing.price_per_person)}
+              {formatCents(checkoutPrice)}
               <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--text)' }}>
                 {' '}
                 / person
               </span>
             </p>
-            <p className="detail-booking-card__note">Select a session to book</p>
+            <p className="detail-booking-card__note">
+              {checkoutRail === 'paynow'
+                ? 'PayNow · 5% off the advertised price'
+                : 'Select a session to book'}
+            </p>
 
             <CancellationPolicyCollapsible />
 
             {paymentError && <p className="error-message" style={{ marginBottom: '16px' }}>{paymentError}</p>}
 
-            {clientSecret && (
+            {checkoutSessionId && (
               <div className="payment-panel">
                 <h3 className="payment-panel__title">Complete your booking</h3>
-                <Elements stripe={stripePromise} options={{ clientSecret }}>
-                  <CheckoutForm
-                    totalAmount={totalAmount}
-                    onSuccess={handlePaymentSuccess}
-                    onCancel={cancelPayment}
-                  />
-                </Elements>
+                {!clientSecret ? (
+                  <div className="payment-rails">
+                    <p className="payment-rails__hint">
+                      Card is the price shown everywhere. PayNow is 5% off at checkout only.
+                    </p>
+                    <button
+                      type="button"
+                      className="payment-rail"
+                      disabled={bookingLoading}
+                      aria-pressed={checkoutRail === 'card'}
+                      onClick={() => startPayment('card')}
+                    >
+                      <span>
+                        <span className="payment-rail__label">Pay by card</span>
+                        <span className="payment-rail__hint">The advertised price</span>
+                      </span>
+                      <span className="payment-rail__price">{formatCents(cardPrice)}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="payment-rail"
+                      disabled={bookingLoading}
+                      aria-pressed={checkoutRail === 'paynow'}
+                      onClick={() => startPayment('paynow')}
+                    >
+                      <span>
+                        <span className="payment-rail__label">
+                          PayNow <span className="paynow-badge">5% off</span>
+                        </span>
+                        <span className="payment-rail__hint">Cheaper than the advertised price</span>
+                      </span>
+                      <span className="payment-rail__price">{formatCents(paynowPrice)}</span>
+                    </button>
+                    <button type="button" onClick={cancelPayment} className="btn btn--ghost">
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <Elements stripe={stripePromise} options={{ clientSecret }}>
+                    <CheckoutForm
+                      totalAmount={totalAmount}
+                      bookingId={bookingId}
+                      onSuccess={handlePaymentSuccess}
+                      onCancel={cancelPayment}
+                    />
+                  </Elements>
+                )}
               </div>
             )}
 
@@ -390,12 +466,14 @@ export default function ListingDetail() {
                     </div>
                     <div className="session-card__actions">
                       <span className="session-card__price">
-                        {formatPrice(listing.price_per_person)}
+                        {session.id === checkoutSessionId
+                          ? formatCents(checkoutPrice)
+                          : formatGuestFacingPrice(listing.price_per_person)}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleBook(session.id)}
-                        disabled={session.spots_remaining === 0 || bookingLoading}
+                        disabled={session.spots_remaining === 0 || bookingLoading || !canTakePayments}
                         className="btn btn--book"
                       >
                         {bookingLoading ? 'Loading…' : 'Book'}
@@ -404,6 +482,12 @@ export default function ListingDetail() {
                   </div>
                 ))}
               </div>
+            )}
+
+            {!canTakePayments && sessions.length > 0 && (
+              <p className="hint" style={{ marginTop: '12px' }}>
+                This host is still setting up payouts. Booking will open once that is complete.
+              </p>
             )}
           </div>
         </aside>
