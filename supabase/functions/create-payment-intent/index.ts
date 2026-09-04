@@ -1,6 +1,10 @@
 import Stripe from 'https://esm.sh/stripe@13.3.0?target=deno'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { paymentIntentCreateParams, prepareBooking } from '../_shared/booking.ts'
+import {
+  isHostBookingOwnListing,
+  paymentIntentCreateParams,
+  prepareBooking,
+} from '../_shared/booking.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
@@ -49,6 +53,11 @@ Deno.serve(async (req) => {
     }
 
     const listing = asRecord(session.listings)
+
+    if (isHostBookingOwnListing({ spots_remaining: session.spots_remaining, listings: listing }, user.id)) {
+      return jsonResponse({ error: 'You cannot book your own listing.' }, 403)
+    }
+
     const host = asRecord(listing?.users)
     if (!host?.stripe_payouts_enabled) {
       return jsonResponse({ error: 'This host cannot take bookings yet.' }, 400)
@@ -58,6 +67,7 @@ Deno.serve(async (req) => {
       { spots_remaining: session.spots_remaining, listings: listing },
       guests_count,
       payment_rail ?? 'card',
+      user.id,
     )
     if (!bookingPrep.ok) {
       return jsonResponse({ error: bookingPrep.message }, bookingPrep.status)
