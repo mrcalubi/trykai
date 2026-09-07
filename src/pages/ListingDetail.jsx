@@ -108,6 +108,7 @@ export default function ListingDetail() {
   const [bookingLoading, setBookingLoading] = useState(false)
   const [paymentError, setPaymentError] = useState('')
   const [revealedAddress, setRevealedAddress] = useState(null)
+  const [viewerId, setViewerId] = useState(null)
 
   useEffect(() => {
     async function fetchListing() {
@@ -183,6 +184,7 @@ export default function ListingDetail() {
       }
 
       const userId = authResult.data?.session?.user?.id
+      setViewerId(userId ?? null)
       if (userId) {
         const { data: confirmedBookings } = await supabase
           .from('bookings')
@@ -225,6 +227,10 @@ export default function ListingDetail() {
     return listing?.users?.stripe_payouts_enabled === true
   }
 
+  function viewerIsHost() {
+    return Boolean(viewerId) && listing?.host_id === viewerId
+  }
+
   async function handleBook(sessionId) {
     const {
       data: { session },
@@ -232,6 +238,11 @@ export default function ListingDetail() {
 
     if (!session) {
       navigate('/login', { state: { from: location } })
+      return
+    }
+
+    if (session.user?.id && listing?.host_id === session.user.id) {
+      setPaymentError('This is your own listing, so you cannot book it.')
       return
     }
 
@@ -311,6 +322,7 @@ export default function ListingDetail() {
     ? checkoutPriceCents(listing.price_per_person, checkoutRail)
     : cardPrice
   const canTakePayments = hostCanTakePayments()
+  const isOwnListing = viewerIsHost()
 
   return (
     <div className="page">
@@ -473,7 +485,12 @@ export default function ListingDetail() {
                       <button
                         type="button"
                         onClick={() => handleBook(session.id)}
-                        disabled={session.spots_remaining === 0 || bookingLoading || !canTakePayments}
+                        disabled={
+                          session.spots_remaining === 0 ||
+                          bookingLoading ||
+                          !canTakePayments ||
+                          isOwnListing
+                        }
                         className="btn btn--book"
                       >
                         {bookingLoading ? 'Loading…' : 'Book'}
@@ -484,7 +501,13 @@ export default function ListingDetail() {
               </div>
             )}
 
-            {!canTakePayments && sessions.length > 0 && (
+            {isOwnListing && sessions.length > 0 && (
+              <p className="hint" style={{ marginTop: '12px' }}>
+                This is your own listing. Hosts cannot book their own sessions.
+              </p>
+            )}
+
+            {!isOwnListing && !canTakePayments && sessions.length > 0 && (
               <p className="hint" style={{ marginTop: '12px' }}>
                 This host is still setting up payouts. Booking will open once that is complete.
               </p>

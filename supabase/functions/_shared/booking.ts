@@ -16,7 +16,7 @@ export type PaymentRail = (typeof PAYMENT_RAILS)[number]
 
 export interface BookingSession {
   spots_remaining: number
-  listings?: { price_per_person?: number | null } | null
+  listings?: { price_per_person?: number | null; host_id?: string | null } | null
 }
 
 export interface GuestCharge {
@@ -114,13 +114,37 @@ export function isValidGuestsCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
 
+/**
+ * A host booking their own session would pay themselves through the platform:
+ * the guest charge lands in TryKai's balance and the 24h Transfer sends the
+ * host share straight back, so the only real movement is Stripe's processing
+ * fee out of TryKai. It also takes a spot off their own listing.
+ */
+export function isHostBookingOwnListing(
+  session: BookingSession | null | undefined,
+  guestId: string | null | undefined,
+): boolean {
+  const hostId = session?.listings?.host_id
+  if (!hostId || !guestId) return false
+  return hostId === guestId
+}
+
 export function prepareBooking(
   session: BookingSession | null | undefined,
   guestsCount: unknown,
   paymentRail: unknown = 'card',
+  guestId?: string | null,
 ): BookingAcceptance | BookingRejection {
   if (!session) {
     return { ok: false, status: 404, message: 'Session not found' }
+  }
+
+  if (isHostBookingOwnListing(session, guestId)) {
+    return {
+      ok: false,
+      status: 403,
+      message: 'You cannot book your own listing.',
+    }
   }
 
   if (!isValidGuestsCount(guestsCount)) {

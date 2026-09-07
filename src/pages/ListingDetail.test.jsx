@@ -361,6 +361,27 @@ describe('ListingDetail booking', () => {
     })
   })
 
+  it('does not let a host book their own listing', async () => {
+    givenSignedIn(makeAuthSession({ user: { id: 'host-1' } }))
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Book' })).toBeDisabled()
+    expect(
+      screen.getByText('This is your own listing. Hosts cannot book their own sessions.')
+    ).toBeInTheDocument()
+    expect(supabase.functions.invoke).not.toHaveBeenCalled()
+  })
+
+  it('still lets a different signed-in guest book', async () => {
+    givenSignedIn(makeAuthSession({ user: { id: 'user-1' } }))
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Book' })).toBeEnabled()
+    expect(
+      screen.queryByText('This is your own listing. Hosts cannot book their own sessions.')
+    ).not.toBeInTheDocument()
+  })
+
   it('does not start payment when the host cannot receive payouts', async () => {
     givenListing(
       makeListing({
