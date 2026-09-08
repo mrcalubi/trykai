@@ -15,6 +15,7 @@ import {
   isValidGuestsCount,
   nextHostStrikeState,
   paymentIntentCreateParams,
+  isHostBookingOwnListing,
   prepareBooking,
   refundAmountForCancel,
   roundUpToDollar,
@@ -24,7 +25,7 @@ import {
 function sessionWith(overrides: Record<string, unknown> = {}) {
   return {
     spots_remaining: 4,
-    listings: { price_per_person: 2500 },
+    listings: { price_per_person: 2500, host_id: 'host-1' },
     ...overrides,
   }
 }
@@ -185,6 +186,21 @@ describe('isValidGuestsCount', () => {
   })
 })
 
+describe('isHostBookingOwnListing', () => {
+  it('is true only when the buyer is the listing host', () => {
+    expect(isHostBookingOwnListing(sessionWith(), 'host-1')).toBe(true)
+    expect(isHostBookingOwnListing(sessionWith(), 'guest-1')).toBe(false)
+  })
+
+  it('is false when either id is missing', () => {
+    expect(isHostBookingOwnListing(sessionWith(), null)).toBe(false)
+    expect(isHostBookingOwnListing(sessionWith(), undefined)).toBe(false)
+    expect(isHostBookingOwnListing(sessionWith({ listings: { price_per_person: 2500 } }), 'host-1'))
+      .toBe(false)
+    expect(isHostBookingOwnListing(null, 'host-1')).toBe(false)
+  })
+})
+
 describe('prepareBooking', () => {
   it('accepts a valid booking and returns the card amounts to charge', () => {
     expect(prepareBooking(sessionWith(), 2, 'card')).toEqual({
@@ -208,6 +224,19 @@ describe('prepareBooking', () => {
     const result = prepareBooking(sessionWith(), 1)
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.paymentRail).toBe('card')
+  })
+
+  it('403s when the host tries to book their own listing', () => {
+    expect(prepareBooking(sessionWith(), 1, 'card', 'host-1')).toEqual({
+      ok: false,
+      status: 403,
+      message: 'You cannot book your own listing.',
+    })
+  })
+
+  it('still accepts a booking from anyone who is not the host', () => {
+    expect(prepareBooking(sessionWith(), 1, 'card', 'guest-1').ok).toBe(true)
+    expect(prepareBooking(sessionWith(), 1, 'card').ok).toBe(true)
   })
 
   it('404s when the session does not exist', () => {
