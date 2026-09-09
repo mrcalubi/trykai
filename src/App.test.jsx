@@ -25,18 +25,25 @@ afterEach(() => {
 })
 
 describe('App chrome', () => {
-  it('shows the navbar and footer on every page', async () => {
+  it('shows the top nav and footer on every page', async () => {
     renderAt('/')
 
-    expect(await screen.findByRole('link', { name: 'Login' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Log in' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Refund Policy' })).toBeInTheDocument()
   })
 
   it('keeps the chrome on an unknown path', async () => {
     renderAt('/does-not-exist')
 
-    expect(await screen.findByRole('link', { name: 'Login' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Log in' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Dispute Policy' })).toBeInTheDocument()
+  })
+
+  it('mounts exactly one nav on the style-guide route', async () => {
+    renderAt('/style-guide')
+
+    expect(await screen.findByRole('heading', { name: 'Component preview' })).toBeInTheDocument()
+    expect(screen.getAllByRole('banner')).toHaveLength(1)
   })
 })
 

@@ -4,14 +4,18 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 
 **Always read this and DECISIONS.md before making changes.** Visual identity is in DESIGN.md. The remaining build queue is in BUILD_BACKLOG.md.
 
-> **Read before you start, updated 31 August 2026.**
+> **Read before you start, updated 9 September 2026.**
+>
 > 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 24 hours after `starts_at`. Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. The function does not send cancellation emails.
-> 3. **Schema lives in `supabase/migrations/` (`00001` through `00005`).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
+> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00005`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
-> 5. **Live chrome is still `Navbar.jsx`.** The UI kit in `src/components/ui/` is used only by `/style-guide`. Do not assume TopNav is wired into real pages.
+> 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** The rest of the UI kit in `src/components/ui/` (Button, Input, Card, SelectableCard) is still used only by `/style-guide`: Home still has its hero and still renders `ListingCard`, not `Card`.
+> 6. **All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a hex value in a component. See section 2, Styling.
 
 ---
+
+
 
 ## 1. What the platform does
 
@@ -22,26 +26,50 @@ Two user types, one account. A user is a guest by default and becomes a host whe
 
 ---
 
+
+
 ## 2. Stack
 
-| Layer | Choice | Why |
-|---|---|---|
-| Frontend | React 19 + Vite 8 | Familiar, fast, well supported by Cursor |
-| Routing | React Router v7 | |
-| Backend, DB, Auth, Storage | Supabase | Handles backend, auth, storage, and RLS out of the box |
-| Hosting | Vercel | Free tier, auto deploy on push |
-| Payments | **Stripe Connect**, separate charges and transfers, Express accounts | Decided 16 August. Supports PayNow in Singapore at 1.3%, platform is merchant of record, Transfers held until 24h after the session. In code: Payment Element + webhook confirmation, Connect onboarding, refunds, hourly Transfer job. Connect account creation uses Stripe Accounts **v2** (`2026-08-26.preview`) in `_shared/connect.ts`. |
-| Transactional email | Resend | **Still on the shared test domain.** From-address in code is `TryKai <onboarding@resend.dev>`. Delivers only to Caleb until trykai.sg is verified. |
-| Business email | Zoho Mail Lite | caleb@, aakash@, ruiheng@trykai.sg |
-| AI coding | Cursor | Implementation. Claude handles architecture. |
+
+| Layer                      | Choice                                                               | Why                                                                                                                                                                                                                                                                                                                                          |
+| -------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend                   | React 19 + Vite 8                                                    | Familiar, fast, well supported by Cursor                                                                                                                                                                                                                                                                                                     |
+| Routing                    | React Router v7                                                      |                                                                                                                                                                                                                                                                                                                                              |
+| Backend, DB, Auth, Storage | Supabase                                                             | Handles backend, auth, storage, and RLS out of the box                                                                                                                                                                                                                                                                                       |
+| Hosting                    | Vercel                                                               | Free tier, auto deploy on push                                                                                                                                                                                                                                                                                                               |
+| Payments                   | **Stripe Connect**, separate charges and transfers, Express accounts | Decided 16 August. Supports PayNow in Singapore at 1.3%, platform is merchant of record, Transfers held until 24h after the session. In code: Payment Element + webhook confirmation, Connect onboarding, refunds, hourly Transfer job. Connect account creation uses Stripe Accounts **v2** (`2026-08-26.preview`) in `_shared/connect.ts`. |
+| Transactional email        | Resend                                                               | **Still on the shared test domain.** From-address in code is `TryKai <onboarding@resend.dev>`. Delivers only to Caleb until trykai.sg is verified.                                                                                                                                                                                           |
+| Business email             | Zoho Mail Lite                                                       | caleb@, aakash@, [ruiheng@trykai.sg](mailto:ruiheng@trykai.sg)                                                                                                                                                                                                                                                                               |
+| AI coding                  | Cursor                                                               | Implementation. Claude handles architecture.                                                                                                                                                                                                                                                                                                 |
+
 
 **CI** (`.github/workflows/ci.yml`): lint, Vitest with coverage, `vite build`, Playwright (desktop + phone Chromium), Deno type-check of `_shared/{booking,http,connect,email,payouts}.ts`. Handler type-check is advisory (`continue-on-error`). Coverage floors: lines 92%, functions 90%, branches 87%; money files 100%.
 
+### Styling
+
+Plain CSS in `src/index.css`. No Tailwind, no CSS modules, no styling dependencies.
+
+**All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a
+hex value in a component. The full set and the usage rules are in DECISIONS.md
+(9 September entry) and DESIGN.md section 7.
+
+**Mobile first.** Base styles are written for phone with no media query, then
+scaled up with `min-width` queries only. Never `max-width`.
+
+Fonts are referenced through `--display` (Bricolage Grotesque), `--sans`
+(Manrope), and `--mono` (Space Mono) so the typefaces can be changed in one
+place. `--heading` and `--logo` alias `--display`.
+
 ---
+
+
 
 ## 3. Database schema
 
+
+
 ### users
+
 ```sql
 id uuid PK                       -- references auth.users(id); created by handle_new_user on auth.users insert
 full_name text
@@ -62,9 +90,11 @@ suspended_at timestamptz
 suspension_reason text
 created_at timestamptz default now()
 ```
+
 Manual payout columns (payout_method, identifier, name) were considered and not added. Under Stripe Connect Express, Stripe collects the host's bank details at onboarding. `stripe_account_id` is the payout handle.
 
 ### listings
+
 ```sql
 id uuid PK
 host_id uuid FK → users
@@ -80,9 +110,11 @@ whats_provided text[]
 is_active boolean default true
 created_at timestamp
 ```
+
 `00001` still `GRANT ALL` on `listings` to anon and authenticated. Public pages do not SELECT `full_address`, but a crafted query against an active listing can still read the column. P0.7 is incomplete at the data layer. See BUILD_BACKLOG.
 
 ### sessions
+
 ```sql
 id uuid PK
 listing_id uuid FK → listings
@@ -94,9 +126,11 @@ status text              -- documented as 'open' | 'full' | 'completed'
 payout_released_at timestamp  -- unused for Connect payouts; booking.payout_released_at is the field that matters
 created_at timestamp
 ```
+
 `completed` is never written. There is no session auto-complete job.
 
 ### bookings
+
 ```sql
 id uuid PK
 session_id uuid FK → sessions
@@ -118,9 +152,11 @@ cancelled_at timestamptz
 refund_amount integer     -- cents
 created_at timestamp
 ```
+
 After `00005`, anon/authenticated cannot INSERT or UPDATE bookings. Money movement goes through service-role Edge Functions. Authenticated can SELECT (guest own rows + host session bookings).
 
 ### reviews
+
 ```sql
 id uuid PK
 booking_id uuid FK → bookings
@@ -131,37 +167,45 @@ comment text
 role text                -- 'host' | 'guest'
 created_at timestamp
 ```
+
 Insert policy is guest-only: reviewer is the guest on that booking, `role = 'guest'`. It does **not** require `bookings.status = 'confirmed'`. Host→guest reviews have no insert path.
 
-**Schema is in `supabase/migrations/`**, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`.
+**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`.
 
 ---
+
+
 
 ## 4. Rules that must never be broken
 
 These are enforced in code. If you are about to change logic around any of them, flag Caleb first.
 
 1. **Prices are always integers in cents.** $20 = 2000. Never floats. Never dollars in the database.
-2. **`full_address` must not appear in a public query.** Guest reveal is `get_listing_address` after a confirmed booking. Do not add `full_address` to Home or ListingDetail selects. The column grant on `listings` is still too wide; do not widen it further.
+2. `full_address` **must not appear in a public query.** Guest reveal is `get_listing_address` after a confirmed booking. Do not add `full_address` to Home or ListingDetail selects. The column grant on `listings` is still too wide; do not widen it further.
 3. **Reviews are gated.** The product rule is: a user may only review if they hold a `confirmed` booking for that session, one review per booking per direction. The dashboard UI still allows `pending`. RLS only checks that a guest booking exists.
-4. **`spots_remaining` must never go below zero.** Decrement on confirmation (`confirm_paid_booking`), increment on cancellation of confirmed rows only.
+4. `spots_remaining` **must never go below zero.** Decrement on confirmation (`confirm_paid_booking`), increment on cancellation of confirmed rows only.
 5. **Only approved hosts can hold active listings.** `verification_status = 'approved'` is the CreateListing gate. There is no server-side block that prevents an unverified user from inserting a listing if they bypass the form.
 6. **The platform fee is not a flat percentage.** Guest totals live in `supabase/functions/_shared/booking.ts`. See section 5.
 7. **The cancellation policy is four tier**, per below. Do not assume the old two tier rule anywhere.
 8. **Never confirm a booking from the browser.** The Stripe webhook is the source of truth. `confirm_paid_booking` and `confirm_booking` are service_role only.
 
+
+
 ### Cancellation policy, correct version
+
 *Updated 29 July 2026. Supersedes the old two tier rule. Published at /cancellation-policy.*
 
-| Scenario | Outcome |
-|---|---|
-| Guest cancels 48hrs+ before | Full refund, including platform fee |
-| Guest cancels 24 to 48hrs before | 50% of lesson fee, platform fee forfeited |
-| Guest cancels 6 to 24hrs before | 25% of lesson fee, platform fee forfeited |
-| Guest cancels under 6hrs, or no shows | No refund |
-| Host cancels, any time | Full guest refund including platform fee. Host receives 1 strike. |
-| Host no show | Full guest refund including platform fee, plus discretionary compensation at TryKai's judgement. Host receives 2 strikes immediately and the account is reviewed. |
-| 3 host strikes | Listings auto deactivated (`apply_host_strike` at 3) |
+
+| Scenario                              | Outcome                                                                                                                                                           |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Guest cancels 48hrs+ before           | Full refund, including platform fee                                                                                                                               |
+| Guest cancels 24 to 48hrs before      | 50% of lesson fee, platform fee forfeited                                                                                                                         |
+| Guest cancels 6 to 24hrs before       | 25% of lesson fee, platform fee forfeited                                                                                                                         |
+| Guest cancels under 6hrs, or no shows | No refund                                                                                                                                                         |
+| Host cancels, any time                | Full guest refund including platform fee. Host receives 1 strike.                                                                                                 |
+| Host no show                          | Full guest refund including platform fee, plus discretionary compensation at TryKai's judgement. Host receives 2 strikes immediately and the account is reviewed. |
+| 3 host strikes                        | Listings auto deactivated (`apply_host_strike` at 3)                                                                                                              |
+
 
 All boundaries are measured in Singapore time, from the moment of cancellation to session start. Exactly 48:00:00 counts as within the 48 hour tier.
 
@@ -169,9 +213,11 @@ Also decided but **not yet built**: reschedule, once per booking, same 48 hour c
 
 ---
 
+
+
 ## 5. Fee structure
 
-*Decided 23 August 2026. See DECISIONS.md for the full modelling and rationale. Code of record: `supabase/functions/_shared/booking.ts` and `src/lib/pricing.js`.*
+*Decided 23 August 2026. See DECISIONS.md for the full modelling and rationale. Code of record:* `supabase/functions/_shared/booking.ts` *and* `src/lib/pricing.js`*.*
 
 **Guest fee.** Card fee is 12% of the lesson price with a S$2.50 floor, then the total is rounded UP to the nearest whole dollar so it can never dip below the floor. This all in total is shown identically from the browse card through to card checkout, the price never rises between viewing and paying.
 
@@ -183,11 +229,13 @@ Do not hardcode a flat percentage. Worked checks: $10 → $13, $20 → $23, $25 
 
 ---
 
+
+
 ## 6. Payout model
 
 **Provider decided 16 August 2026: Stripe Connect, separate charges and transfers, Express accounts.** This is implemented in code.
 
-The host's share is released **24 hours after `starts_at`**, not 24 hours after the guest pays. `release-payout` creates a Transfer with `transfer_group = booking_id` and `source_transaction = stripe_charge_id`. It is secret-gated (`PAYOUT_CRON_SECRET` or `CRON_SECRET`); schedule it hourly.
+The host's share is released **24 hours after** `starts_at`, not 24 hours after the guest pays. `release-payout` creates a Transfer with `transfer_group = booking_id` and `source_transaction = stripe_charge_id`. It is secret-gated (`PAYOUT_CRON_SECRET` or `CRON_SECRET`); schedule it hourly.
 
 It does **not** check for open disputes. The only money hold besides the 24h timer is `stripe_refund_id IS NULL`.
 
@@ -197,6 +245,8 @@ Under Express accounts, Stripe collects the host's bank details at onboarding. H
 
 ---
 
+
+
 ## 7. Auth, RLS, and the trusted functions
 
 Supabase built in auth, email and password for MVP. Session handling is Supabase's default; no manual JWT management.
@@ -205,13 +255,14 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 
 **Signup note:** a required email confirmation setting plus the free tier mailer's low hourly send limit was silently breaking signup. Email confirmation was turned off on staging to unblock testing. Confirm the production setting deliberately before launch.
 
-There is **no `submit_verification` function.** VerifyIdentity uploads to the private `verification-docs` bucket, then a client `UPDATE` of `id_photo_url`, `selfie_url`, and `verification_status: 'pending'`. The guard is `guard_user_self_update`: authenticated users may only move unverified/rejected → pending; they cannot self-approve; they cannot write strikes, suspension, stripe, or founding-host fields.
+There is **no** `submit_verification` **function.** VerifyIdentity uploads to the private `verification-docs` bucket, then a client `UPDATE` of `id_photo_url`, `selfie_url`, and `verification_status: 'pending'`. The guard is `guard_user_self_update`: authenticated users may only move unverified/rejected → pending; they cannot self-approve; they cannot write strikes, suspension, stripe, or founding-host fields.
 
-**Column grants (after `00005`), not a public-profile VIEW.** `00005` revokes ALL on `users` then re-grants specific columns. `verification_status` **is** granted for UPDATE (needed for pending). `id_photo_url` and `selfie_url` **are** granted SELECT to authenticated. RLS `"Anyone can view host profiles" USING (true)` still exists. The real barrier for ID images is the private storage bucket, not a missing SELECT grant.
+**Column grants (after** `00005`**), not a public-profile VIEW.** `00005` revokes ALL on `users` then re-grants specific columns. `verification_status` **is** granted for UPDATE (needed for pending). `id_photo_url` and `selfie_url` **are** granted SELECT to authenticated. RLS `"Anyone can view host profiles" USING (true)` still exists. The real barrier for ID images is the private storage bucket, not a missing SELECT grant.
 
-**`full_address`.** `get_listing_address(listing_id)` returns the address only to a **confirmed guest** for that listing. It does **not** return to the owning host. Hosts read `full_address` via listings SELECT (EditListing). Public pages do not select the column.
+`full_address`**.** `get_listing_address(listing_id)` returns the address only to a **confirmed guest** for that listing. It does **not** return to the owning host. Hosts read `full_address` via listings SELECT (EditListing). Public pages do not select the column.
 
 **Trusted functions that move money or status:**
+
 - `handle_new_user()` — trigger on `auth.users`. Creates the profile row.
 - `guard_user_self_update()` / `guard_user_self_insert()` — block self-approval, strike/suspension/stripe/founding-host writes.
 - `get_listing_address(listing_id)` — confirmed guest only.
@@ -221,6 +272,8 @@ There is **no `submit_verification` function.** VerifyIdentity uploads to the pr
 Admin actions (approve verification, set `is_founding_host`, suspend) run as the service role, currently via the Supabase Table Editor. There is no admin UI. `admin-cancel-booking` exists and is secret-gated; it writes `cancelled_by: 'host'`.
 
 ---
+
+
 
 ## 8. File map
 
@@ -245,14 +298,21 @@ src/
 │   ├── CancellationPolicy.jsx
 │   └── DisputePolicy.jsx
 ├── components/
-│   ├── Navbar.jsx               # Live chrome (not TopNav)
+│   ├── SiteNav.jsx              # Live chrome: feeds real auth into TopNav
 │   ├── Footer.jsx               # Policy links only
 │   ├── RequireAuth.jsx
 │   ├── ListingCard.jsx          # All-in card total; category overlay; host · area · price
 │   ├── ReviewCard.jsx
 │   ├── StarPicker.jsx
 │   ├── CancellationPolicy.jsx   # Collapsible / info blocks
-│   └── ui/                      # Button, Input, Card, SelectableCard, TopNav, HamburgerMenu
+│   └── ui/
+│       ├── TopNav.jsx           # Global top bar, mounted once via SiteNav
+│       ├── HamburgerMenu.jsx    # Slide-in panel, contents adapt to auth state
+│       ├── Button.jsx           # /style-guide only
+│       ├── Input.jsx            # /style-guide only
+│       ├── Card.jsx             # Browse and booking modes; /style-guide only
+│       ├── SelectableCard.jsx   # Category cards; /style-guide only
+│       └── getInitials.js       # Avatar fallback initials
 ├── App.jsx
 └── main.jsx
 
@@ -281,35 +341,42 @@ supabase/functions/
 └── release-payout/              # x-cron-secret Transfer 24h after starts_at
 ```
 
-| Looking for | Where |
-|---|---|
-| Browse page and filters | `src/pages/Home.jsx` |
-| Listing detail and booking | `src/pages/ListingDetail.jsx` |
-| Login and signup | `src/pages/Login.jsx` |
-| Create listing | `src/pages/CreateListing.jsx` |
-| Edit listing | `src/pages/EditListing.jsx` |
-| Host verification upload | `src/pages/VerifyIdentity.jsx` |
-| Dashboard, both views | `src/pages/Dashboard.jsx` |
-| Live nav | `src/components/Navbar.jsx` |
-| UI kit (not wired) | `src/components/ui/`, `src/pages/StyleGuide.jsx` |
-| Cancellation arithmetic | `src/lib/cancellationPolicy.js` and `supabase/functions/_shared/booking.ts` |
-| Guest-facing prices | `src/lib/pricing.js` |
-| Routes | `src/App.jsx` |
-| Payment and booking creation | `supabase/functions/create-payment-intent/` |
-| Payment confirmation | `supabase/functions/stripe-webhook/` |
-| Refunds | `supabase/functions/cancel-booking/` |
-| Host payouts | `supabase/functions/release-payout/` |
-| Connect onboarding | `supabase/functions/create-account-link/` |
 
-**Routes in `App.jsx`:** `/`, `/login`, `/listings/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/dashboard` (the last four behind `RequireAuth`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render Navbar + Footer.
+| Looking for                                                | Where                                                                                               |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Browse page and filters                                    | `src/pages/Home.jsx`                                                                                |
+| Listing detail and booking                                 | `src/pages/ListingDetail.jsx`                                                                       |
+| Login and signup                                           | `src/pages/Login.jsx`                                                                               |
+| Create listing                                             | `src/pages/CreateListing.jsx`                                                                       |
+| Edit listing                                               | `src/pages/EditListing.jsx`                                                                         |
+| Host verification upload                                   | `src/pages/VerifyIdentity.jsx`                                                                      |
+| Dashboard, both views                                      | `src/pages/Dashboard.jsx`                                                                           |
+| Global nav and hamburger                                   | `src/components/SiteNav.jsx`, `src/components/ui/TopNav.jsx`, `src/components/ui/HamburgerMenu.jsx` |
+| UI kit not yet wired (Button, Input, Card, SelectableCard) | `src/components/ui/`, `src/pages/StyleGuide.jsx`                                                    |
+| Colour tokens and all styling                              | `src/index.css`                                                                                     |
+| Component preview                                          | `/style-guide` route                                                                                |
+| Cancellation arithmetic                                    | `src/lib/cancellationPolicy.js` and `supabase/functions/_shared/booking.ts`                         |
+| Guest-facing prices                                        | `src/lib/pricing.js`                                                                                |
+| Routes                                                     | `src/App.jsx`                                                                                       |
+| Payment and booking creation                               | `supabase/functions/create-payment-intent/`                                                         |
+| Payment confirmation                                       | `supabase/functions/stripe-webhook/`                                                                |
+| Refunds                                                    | `supabase/functions/cancel-booking/`                                                                |
+| Host payouts                                               | `supabase/functions/release-payout/`                                                                |
+| Connect onboarding                                         | `supabase/functions/create-account-link/`                                                           |
+
+
+**Routes in** `App.jsx`**:** `/`, `/login`, `/listings/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/dashboard` (the last four behind `RequireAuth`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render SiteNav + Footer.
 
 ---
+
+
 
 ## 9. End to end flows
 
 Use these alongside the code. When you are reading a file and wondering what it is actually for, find the relevant scenario here.
 
 ### Scenario 1: Guest books a session
+
 *Sarah, 23, saw a latte art session shared on Instagram.*
 
 **1. Lands on trykai.sg.** `Home.jsx` still has a hero. It fetches listings where `is_active = true`, ordered `created_at` desc, renders each as a `ListingCard` showing photo, category overlay, title, and `host · area · all-in card price`. No sort UI. Grid is 1 column on phone, 2 from 640px, 3 from 1024px. `full_address` is not fetched. `is_suspended` is not queried; a suspended host's active listings still appear.
@@ -333,6 +400,7 @@ Use these alongside the code. When you are reading a file and wondering what it 
 **10. Review.** Dashboard allows a review if the booking is past, status is `pending` or `confirmed`, and this reviewer has not already reviewed. Inserts into `reviews` as `role: 'guest'`. RLS does not require confirmed.
 
 ### Scenario 2: Host creates a listing
+
 *Martin, 27, wants to offer cocktail mixology.*
 
 1. **Signs up.** Same as any guest. `is_host = false` initially. Profile row comes from `handle_new_user`.
@@ -345,7 +413,10 @@ Use these alongside the code. When you are reading a file and wondering what it 
 8. **Receives bookings.** Email from `stripe-webhook` after confirmation, with guest name, session details, guest count.
 9. **Edits.** `EditListing.jsx` checks `host_id = current user`. Soft-delete is `is_active = false` from the dashboard.
 
+
+
 ### Scenario 3: Host cancels
+
 Warning shown: cancelling results in a strike, three strikes deactivates listings, all guests receive a full refund.
 
 On confirmation the dashboard calls `cancel-booking` with `session_id`. The function issues Stripe refunds for confirmed bookings (or cancels unpaid PaymentIntents), restores spots only for confirmed rows, sets `cancelled_by = 'host'`, and calls `apply_host_strike`. **No emails.**
@@ -353,14 +424,18 @@ On confirmation the dashboard calls `cancel-booking` with `session_id`. The func
 Host upcoming list is sessions that already have pending or confirmed bookings, not every open session.
 
 ### Scenario 4: Guest cancels
+
 `cancellationPolicy.js` quotes the refund; `cancel-booking` recomputes it and creates the Stripe refund. Pending unpaid cancel voids the PaymentIntent and does not restore spots (none were taken). **No emails**, so the published promise that the refund amount appears in the cancellation email is not kept.
 
 On confirmation: `status = 'cancelled'`, `cancelled_by = 'guest'`, `refund_amount` and `stripe_refund_id` stored.
 
 ### Scenario 5: Verification rejected
+
 Caleb sets `verification_status = 'rejected'`. Webhook should fire `notify-verification-result` with a resubmit prompt. The form becomes available again. Rejected documents are scheduled for deletion after 30 days, via an Edge Function that is not yet built.
 
 ---
+
+
 
 ## 10. Pages (what they actually do)
 
@@ -378,29 +453,35 @@ Caleb sets `verification_status = 'rejected'`. Webhook should fire `notify-verif
 
 **Dashboard.jsx** — Connect payout setup. Host: listings with Add Session, Edit, soft-delete; upcoming sessions that have active bookings, with Cancel and strike warning. Guest: upcoming and past bookings, Cancel with calculated refund shown, leave review after `starts_at` on pending or confirmed. Polls `?booking=` after Payment Element return.
 
-**StyleGuide.jsx** — private preview of the UI kit at `/style-guide`. Imports `src/assets/categories/{food,fitness,arts}.png`. Those files are **not in the repo**. Music/Language/Other imports are commented out. App always imports this page, so a missing asset can fail `vite build`.
+**StyleGuide.jsx** — private preview of the UI kit at `/style-guide`. Imports `src/assets/categories/{food,fitness,arts,music}.png`, all four of which are now in the repo. Language/Other imports are still commented out; uncommenting either without adding the PNG fails `vite build`, because App always imports this page. It no longer mounts its own TopNav: the live `SiteNav` bar serves the page, and the preview-only "Simulate logged in" toggle is gone.
 
 ---
+
+
 
 ## 11. Known gaps
 
 Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 
 **Launch blocking**
+
 - All Edge Function emails still send from Resend's shared test domain. Real users receive nothing until trykai.sg is verified. **Same week:** shared-secret header on `notify-verification-pending` and `notify-verification-result` (release-payout and admin-cancel-booking are already secret-gated; the webhook uses Stripe-Signature).
 - Staging must apply `00005` and run this money path in Stripe **test mode** before production. Platform Stripe payouts must be switched to manual. Mark the eleven founding hosts `is_founding_host = true` in Table Editor. One real test booking on production before warm-contact launch.
 - `is_suspended` is never queried in `src/`. Setting the flag in Table Editor does not hide listings or block booking. SAFETY_RESPONSE_PROTOCOL.md still requires a hand check that listings are `is_active = false`.
 - `listings.full_address` is still `GRANT ALL` from `00001`.
-- `StyleGuide.jsx` imports category PNGs that are not in the repo; Navbar requests `/trykai.png`, which is not in `public/` (only `favicon.svg`).
+- `StyleGuide.jsx` ~~imports category PNGs that are not in the repo; Navbar requests~~ `/trykai.png`~~, which is not in~~ `public/`~~.~~ **Resolved 9 September:** `food`, `fitness`, `arts`, and `music` PNGs are in `src/assets/categories/`, and `public/trykai.png` exists.
 
 **Serious**
+
 - Review gating still accepts `pending` in the dashboard UI, and RLS does not require confirmed (P2.3).
 - Host no-show reporting, reschedule, session auto-complete, host→guest reviews: not built.
 - `cancel-booking` does not email either party.
 - Admin verification review is still Table Editor (P0.3).
-- UI kit not wired; Home still has a hero; grid is 1/2/3 not 2/3/4; ListingCard meta is still host · area · price.
+- UI kit only partly wired: the nav is live, but Home still has a hero, still renders `ListingCard` rather than the kit's `Card`, the grid is 1/2/3 not 2/3/4, and `ListingCard` meta is still host · area · price with no rating.
+- A host who exits Stripe Connect onboarding without completing it still sees a "Payout setup submitted" success message on the dashboard, because `?connect=return` is treated as success without re-checking `stripe_payouts_enabled`. That host believes they can be paid and cannot. If they take a booking, the guest pays and there is no payout path, discovered after the session.
 
 **Not built, decided**
+
 - Phone OTP before booking
 - Password reset
 - Terms of Service and Privacy Policy routes
@@ -417,6 +498,8 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 
 ---
 
+
+
 ## 12. Things to avoid
 
 - Never expose `full_address` in a public query
@@ -426,4 +509,6 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 - Never confirm a booking from the browser. The webhook is the source of truth.
 - Do not over engineer the MVP. Keep it simple and shippable.
 - Do not add features that are not in DECISIONS.md without asking
-- Do not treat `/style-guide` components as live chrome until they replace `Navbar.jsx`
+- Do not hardcode a colour in a component; use the tokens at `:root` in `index.css`
+- Do not mount a nav on a page. `SiteNav` in `App.jsx` is the only one.
+
