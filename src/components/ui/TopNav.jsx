@@ -60,6 +60,7 @@ export default function TopNav({
   avatarUrl,
   name,
   onMenuClick,
+  onLogout,
   className = '',
 }) {
   const [compact, setCompact] = useState(false)
@@ -151,6 +152,7 @@ export default function TopNav({
         <HamburgerMenu
           open={menuOpen}
           onClose={handleMenuClose}
+          onLogout={onLogout}
           isLoggedIn={isLoggedIn}
         />
       </div>

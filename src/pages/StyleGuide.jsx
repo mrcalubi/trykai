@@ -3,11 +3,11 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Card from '../components/ui/Card'
 import SelectableCard from '../components/ui/SelectableCard'
-import TopNav, { TopNavAccount } from '../components/ui/TopNav'
+import { TopNavAccount } from '../components/ui/TopNav'
 import foodIcon from '../assets/categories/food.png'
 import fitnessIcon from '../assets/categories/fitness.png'
 import artsIcon from '../assets/categories/arts.png'
-// import musicIcon from '../assets/categories/music.png'
+import musicIcon from '../assets/categories/music.png'
 // import languageIcon from '../assets/categories/language.png'
 // import otherIcon from '../assets/categories/other.png'
 
@@ -29,7 +29,7 @@ const CATEGORY_ICONS = {
   Food: foodIcon,
   Fitness: fitnessIcon,
   Arts: artsIcon,
-  // Music: musicIcon,
+  Music: musicIcon,
   // Language: languageIcon,
   // Other: otherIcon,
 }
@@ -76,33 +76,18 @@ const SCROLL_FILLERS = [
 export default function StyleGuide() {
   // Matches Home category pills: single select, one active category at a time.
   const [selectedCategory, setSelectedCategory] = useState('Food')
-  const [previewLoggedIn, setPreviewLoggedIn] = useState(false)
 
   return (
     <div className="style-guide-page">
-      <TopNav
-        isLoggedIn={previewLoggedIn}
-        avatarUrl="/trykai.png"
-        name="Mei Ling"
-        onMenuClick={() => {}}
-      />
-
       <div className="page">
         <h1>Component preview</h1>
 
         <section className="style-guide-section" aria-labelledby="topnav-preview-heading">
           <h2 id="topnav-preview-heading">Top nav</h2>
           <p className="style-guide-section__note">
-            Fixed bar above. Open the hamburger (slides in from the left), and scroll to see the bar shrink.
+            The live bar above is this component, now wired to the real session.
+            Open the hamburger (slides in from the left), and scroll to see the bar shrink.
           </p>
-          <label className="style-guide-toggle">
-            <input
-              type="checkbox"
-              checked={previewLoggedIn}
-              onChange={(event) => setPreviewLoggedIn(event.target.checked)}
-            />
-            Simulate logged in
-          </label>
           <p className="style-guide-section__note style-guide-section__note--spaced">
             Logged-in account control — photo or initials.
           </p>
