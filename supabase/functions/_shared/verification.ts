@@ -14,6 +14,12 @@ export type VerificationMethod = (typeof VERIFICATION_METHODS)[number]
 /** Free text reaches the host by email, so it is bounded. */
 export const MAX_REJECTION_REASON_LENGTH = 500
 
+/**
+ * Long enough for a reviewer to read both documents and decide, short enough
+ * that a copied URL is useless soon after.
+ */
+export const SIGNED_URL_TTL_SECONDS = 300
+
 export function isVerificationStatus(value: unknown): value is VerificationStatus {
   return VERIFICATION_STATUSES.includes(value as VerificationStatus)
 }

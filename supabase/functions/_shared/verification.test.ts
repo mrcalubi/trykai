@@ -7,9 +7,17 @@ import {
   MAX_REJECTION_REASON_LENGTH,
   normalizeVerificationStatus,
   prepareVerificationReview,
+  SIGNED_URL_TTL_SECONDS,
   verificationDocumentPaths,
   VERIFICATION_STATUSES,
 } from './verification.ts'
+
+describe('SIGNED_URL_TTL_SECONDS', () => {
+  it('is long enough to review two documents and short enough to expire', () => {
+    expect(SIGNED_URL_TTL_SECONDS).toBeGreaterThanOrEqual(60)
+    expect(SIGNED_URL_TTL_SECONDS).toBeLessThanOrEqual(900)
+  })
+})
 
 describe('isVerificationStatus', () => {
   it('accepts only the four statuses the column allows', () => {

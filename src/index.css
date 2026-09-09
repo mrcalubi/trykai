@@ -1872,6 +1872,32 @@ a {
   flex-wrap: wrap;
 }
 
+/* Verification review, internal only */
+.verification-review__docs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.verification-review__doc {
+  margin: 0;
+}
+
+.verification-review__doc figcaption {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin-bottom: 6px;
+}
+
+.verification-review__doc img {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
 /* Cancellation policy */
 .cancellation-policy {
   margin-bottom: 20px;

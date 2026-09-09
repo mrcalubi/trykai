@@ -37,14 +37,14 @@ Every operational promise still depends on Caleb performing a manual action. Som
 
 | Promise | How it happens today |
 |---|---|
-| Hosts verified before listings go live | Supabase Table Editor |
+| Hosts verified before listings go live | `/admin/verifications`, gated by `is_admin`. The listing and session insert policies now require `approved` and not suspended (`00007`), so this is enforced by the database rather than by CreateListing.jsx. |
 | Hosts paid 24 hours after their session | `release-payout` (cron + secret). Needs scheduling and platform payouts set to manual. |
 | Refunds issued per the cancellation policy | `cancel-booking` from the dashboard. No cancellation emails. |
 | TryKai can cancel a booking | `admin-cancel-booking` with `ADMIN_FUNCTION_SECRET`. No admin UI. Writes `cancelled_by: 'host'`. |
 | Credible safety reports trigger immediate suspension | Table Editor sets `is_suspended`. **The app does not read that flag.** Listings stay visible unless someone also sets `is_active = false`. |
 | Quality disputes resolved within 2 business days | Email, then nothing |
 
-Verification approval can survive the Table Editor at eleven hosts. Suspension that does not hide listings cannot. That is the remaining operational hole that is dangerous under the published dispute policy.
+Verification approval is now on the platform. Suspension that does not hide listings is the remaining operational hole, and it is the dangerous one under the published dispute policy.
 
 ---
 
@@ -57,9 +57,8 @@ Not a calendar. Capacity is 8 hours a week.
 3. **P0.4** app actually filters `is_suspended` (hide listings, block booking, block login or host actions). One-click admin can wait if Table Editor plus this filter is reliable.
 4. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
 5. **Missing assets:** category PNGs imported by StyleGuide (can fail `vite build` because `App.jsx` always imports that page); `/trykai.png` referenced by Navbar and not present in `public/`.
-6. **P0.3** verification review UI if Table Editor is getting painful.
-7. Wire the UI kit (Home first) to the browse decisions in DESIGN.md.
-8. **P2.3** review gating, then the rest of P2 in listed order.
+6. Wire the UI kit (Home first) to the browse decisions in DESIGN.md.
+7. **P2.3** review gating, then the rest of P2 in listed order.
 
 ---
 
@@ -73,15 +72,12 @@ Under Stripe Connect Express, Stripe collects the host's bank details. Do not ad
 ### P0.2 — Admin: payout queue — NOT NEEDED FOR CONNECT LAUNCH
 The copy-paste PayNow queue assumed manual disbursement. `release-payout` Transfers 24h after `starts_at`. Keep a later exception log in mind for clawback and disputes; do not build the clipboard UI for launch.
 
-### P0.3 — Admin: verification review — OPEN
+### P0.3 — Admin: verification review — DONE
 **Flow:** host submits ID and selfie → Caleb reviews → approve or reject
-**Today:** works, entirely in the Supabase Table Editor
 
-- List of pending submissions with ID photo and selfie side by side
-- Approve or reject, with a rejection reason that goes into the email
-- Never expose these images in any public or authenticated non admin route
+`/admin/verifications`, gated by `is_admin`, lists pending submissions oldest first with the ID photo and selfie side by side. Approve, or reject with a reason that is emailed to the host and shown to them on `/verify-identity` when they resubmit. `admin-verifications` authenticates the reviewer's own JWT and re-checks `is_admin` server-side; the images are served through signed URLs minted with the service role, so they are never reachable from a public or authenticated non-admin route. `review_verification` writes every decision alongside a `verification_reviews` audit row.
 
-*Why it is still P0: highest frequency admin task before launch, and a wrong-row approve in the Table Editor is easy. Survivable at eleven hosts if Caleb is careful.*
+Still manual in the Table Editor: granting `is_admin`, which is a one-time action, and `is_founding_host`.
 
 ### P0.4 — Admin: account suspension — FIELDS EXIST, APP DOES NOT ENFORCE
 **Flow:** credible safety report → account suspended immediately, pending review
