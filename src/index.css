@@ -687,6 +687,20 @@ a {
   color: var(--text-h);
 }
 
+.label--inline {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.label--inline input[type='checkbox'] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
 .input {
   padding: 12px 14px;
   font-size: 16px;

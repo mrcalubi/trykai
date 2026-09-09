@@ -81,9 +81,16 @@ is_host boolean default false
 stripe_account_id text           -- Stripe Connect Express account id. Not granted to anon/authenticated SELECT.
 stripe_payouts_enabled boolean default false  -- synced from Stripe account.updated; gates Book
 is_founding_host boolean default false        -- Table Editor for the eleven; never a host fee. Not client-writable.
-id_photo_url text                -- path in private verification-docs bucket
-selfie_url text                  -- path in private verification-docs bucket
-verification_status text default 'unverified'  -- unverified | pending | approved | rejected
+is_admin boolean default false   -- gates the verification review UI. Not client-writable or readable.
+id_photo_url text                -- path in private verification-docs bucket. No client SELECT grant.
+selfie_url text                  -- path in private verification-docs bucket. No client SELECT grant.
+verification_status text not null default 'unverified'  -- CHECK: unverified | pending | approved | rejected
+verification_method text         -- manual | stripe_identity
+stripe_identity_session_id text  -- set once Stripe Identity is wired (slice 3)
+verification_submitted_at timestamptz
+verification_reviewed_at timestamptz
+verification_rejection_reason text  -- shown to the host on resubmit, emailed on rejection
+verification_consent_at timestamptz -- PDPA: when the host consented to the ID check
 host_strikes integer default 0   -- not client-writable; apply_host_strike is service_role only
 is_suspended boolean default false
 suspended_at timestamptz
@@ -170,7 +177,21 @@ created_at timestamp
 
 Insert policy is guest-only: reviewer is the guest on that booking, `role = 'guest'`. It does **not** require `bookings.status = 'confirmed'`. Host→guest reviews have no insert path.
 
-**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`.
+### verification_reviews
+
+```sql
+id uuid PK
+user_id uuid FK → users        -- the host who was reviewed
+reviewer_id uuid FK → users    -- who decided; null for an automated decision
+decision text                  -- 'approved' | 'rejected'
+reason text                    -- required on rejection
+method text                    -- 'manual' | 'stripe_identity'
+created_at timestamptz
+```
+
+Append-only, service role only, no client grant of any kind. Written by `review_verification` in the same transaction as the status change, so a decision cannot be applied without a record. This is both the PDPA justification trail for holding NRIC copies and the review history the safety protocol assumes.
+
+**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`.
 
 ---
 
@@ -255,16 +276,21 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 
 **Signup note:** a required email confirmation setting plus the free tier mailer's low hourly send limit was silently breaking signup. Email confirmation was turned off on staging to unblock testing. Confirm the production setting deliberately before launch.
 
-There is **no** `submit_verification` **function.** VerifyIdentity uploads to the private `verification-docs` bucket, then a client `UPDATE` of `id_photo_url`, `selfie_url`, and `verification_status: 'pending'`. The guard is `guard_user_self_update`: authenticated users may only move unverified/rejected → pending; they cannot self-approve; they cannot write strikes, suspension, stripe, or founding-host fields.
+**Verification submission goes through** `submit_verification` **(**`00007`**).** VerifyIdentity uploads to the private `verification-docs` bucket, then calls the RPC with both paths and an explicit consent flag. The client has **no** UPDATE grant on `verification_status`, `id_photo_url`, or `selfie_url`. The RPC is security definer and still trips `guard_user_self_update`, which permits only unverified/rejected → pending, so it cannot be used to self-approve. A host reads their own state via `my_verification()`.
 
-**Column grants (after** `00005`**), not a public-profile VIEW.** `00005` revokes ALL on `users` then re-grants specific columns. `verification_status` **is** granted for UPDATE (needed for pending). `id_photo_url` and `selfie_url` **are** granted SELECT to authenticated. RLS `"Anyone can view host profiles" USING (true)` still exists. The real barrier for ID images is the private storage bucket, not a missing SELECT grant.
+**Column grants (after** `00007`**), not a public-profile VIEW.** `00005` revokes ALL on `users` then re-grants specific columns; `00007` narrows that further. `verification_status` is still granted SELECT, because the ID-verified trust badge is meant to be public. `id_photo_url` and `selfie_url` are granted to **neither** anon nor authenticated, so the storage bucket is no longer the only barrier. `is_admin` and the verification metadata columns are granted to no client role at all, which is why `my_verification()` exists instead of a wider SELECT grant. RLS `"Anyone can view host profiles" USING (true)` still exists.
+
+**The listing gate is enforced in the database.** `hosts_create_listings_verified` and `hosts_create_sessions_verified` (`00007`) require `verification_status = 'approved'` and `not is_suspended`. Before `00007` the only check was `auth.uid() = host_id`, so an unverified account could insert a listing straight through PostgREST; the approval check lived only in `CreateListing.jsx`.
 
 `full_address`**.** `get_listing_address(listing_id)` returns the address only to a **confirmed guest** for that listing. It does **not** return to the owning host. Hosts read `full_address` via listings SELECT (EditListing). Public pages do not select the column.
 
 **Trusted functions that move money or status:**
 
 - `handle_new_user()` — trigger on `auth.users`. Creates the profile row.
-- `guard_user_self_update()` / `guard_user_self_insert()` — block self-approval, strike/suspension/stripe/founding-host writes.
+- `guard_user_self_update()` / `guard_user_self_insert()` — block self-approval and strike/suspension/stripe/founding-host/admin writes.
+- `submit_verification(id_photo_url, selfie_url, consent)` — the only way a client reaches `pending`. Requires consent.
+- `my_verification()` — the caller's own verification state, so a rejection reason and `is_admin` need no table-wide SELECT grant.
+- `review_verification(user_id, decision, reason, method, reviewer_id)` — writes the decision and an audit row together. **Service role only.**
 - `get_listing_address(listing_id)` — confirmed guest only.
 - `confirm_paid_booking(...)` and `confirm_booking` wrapper — flip pending → confirmed and decrement `spots_remaining` atomically under a row lock. **Service role only.** The Stripe webhook calls `confirm_paid_booking`. If spots are gone, the webhook refunds instead of confirming.
 - `apply_host_strike(host_id)` — increments strikes and deactivates listings at 3. **Service role only.**
@@ -405,8 +431,8 @@ Use these alongside the code. When you are reading a file and wondering what it 
 
 1. **Signs up.** Same as any guest. `is_host = false` initially. Profile row comes from `handle_new_user`.
 2. **Clicks Create Listing.** `CreateListing.jsx` checks `verification_status` on mount. `unverified` or `rejected` redirects to `/verify-identity`. `pending` blocks the form with an under review message. `approved` shows the form.
-3. **Submits verification.** ID photo and live selfie upload to the private `verification-docs` bucket. A client UPDATE sets urls + `pending`. The trigger blocks any other status change. A database webhook is expected to fire `notify-verification-pending`, emailing `calebong2002@gmail.com`. That function has **no shared-secret header**.
-4. **Caleb reviews.** Compares photos in Supabase Storage, sets `approved` or `rejected` in the Table Editor. The status change should fire `notify-verification-result`. Same unauthenticated-endpoint problem.
+3. **Submits verification.** ID photo and live selfie upload to the private `verification-docs` bucket, scoped to a folder named after the user id, which the storage policy enforces. A consent checkbox is required, and `submit_verification` records `verification_consent_at` alongside the paths and `pending`. A database webhook is expected to fire `notify-verification-pending`, emailing `calebong2002@gmail.com`. That function has **no shared-secret header**.
+4. **Caleb reviews.** Still the Table Editor today, which is what P0.3 replaces. `review_verification` (`00007`, service role only) is the function a review UI calls: it writes the decision, the rejection reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record. A rejected host sees the reason on `/verify-identity` when they resubmit.
 5. **Creates the listing.** Title, description, category, price in cents, max guests, public area, private full address, up to 5 photos, what's provided. Inserts into `listings`, sets `is_host = true`, navigates to dashboard. **Does not create the first session in the same form.** No photography guidance. No T&C checkbox.
 6. **Adds a session** from Dashboard “Add Session”. Date, time, duration, spots. `spots_total` and `spots_remaining` both set to the entered number, `status = 'open'`.
 7. **Payout setup.** Dashboard “Set up payouts” → `create-account-link` → Stripe Express onboarding. Book stays disabled for guests until `stripe_payouts_enabled`.
