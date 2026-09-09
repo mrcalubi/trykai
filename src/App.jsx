@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Navbar from './components/Navbar'
+import SiteNav from './components/SiteNav'
 import Footer from './components/Footer'
 import RequireAuth from './components/RequireAuth'
 import Home from './pages/Home'
@@ -17,7 +17,7 @@ import StyleGuide from './pages/StyleGuide'
 export default function App() {
   return (
     <BrowserRouter>
-      <Navbar />
+      <SiteNav />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />

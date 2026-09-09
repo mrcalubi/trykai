@@ -46,18 +46,28 @@ test.describe('signed-out navigation', () => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART] })
     await page.goto('/')
 
-    await expect(page.getByRole('link', { name: 'Login' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Log in', exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Create listing' })).toBeHidden()
-    await expect(page.getByRole('link', { name: 'Dashboard' })).toBeHidden()
+    await expect(page.getByRole('link', { name: 'My bookings' })).toBeHidden()
   })
 
-  test('opens the login page from the navbar', async ({ page }) => {
+  test('opens the login page from the top nav', async ({ page }) => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART] })
     await page.goto('/')
 
-    await page.getByRole('link', { name: 'Login' }).click()
+    await page.getByRole('link', { name: 'Log in', exact: true }).click()
 
     await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
+  })
+
+  test('reaches the policy pages from the hamburger menu', async ({ page }) => {
+    await stubAllExternalCalls(page, { listings: [LATTE_ART] })
+    await page.goto('/')
+
+    await page.getByRole('button', { name: 'Open menu' }).click()
+    await page.getByRole('link', { name: 'Cancellation policy' }).click()
+
+    await expect(page).toHaveURL(/\/cancellation-policy$/)
   })
 
   test('switches between logging in and signing up', async ({ page }) => {

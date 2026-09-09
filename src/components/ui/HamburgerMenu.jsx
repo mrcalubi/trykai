@@ -14,7 +14,7 @@ const LOGGED_IN_LINKS = [
   { label: 'Create listing', to: '/create-listing' },
   { label: 'Profile', to: '#' },
   { label: 'Settings', to: '#' },
-  { label: 'Log out', to: '#' },
+  { label: 'Log out', to: '#', action: 'logout' },
 ]
 
 const STAGGER_MS = 45
@@ -22,10 +22,19 @@ const STAGGER_MS = 45
 export default function HamburgerMenu({
   open = false,
   onClose,
+  onLogout,
   isLoggedIn = false,
   className = '',
 }) {
   const links = isLoggedIn ? LOGGED_IN_LINKS : LOGGED_OUT_LINKS
+
+  function handleLinkClick(event, link) {
+    if (link.action === 'logout' && onLogout) {
+      event.preventDefault()
+      onLogout()
+    }
+    onClose?.()
+  }
   const classes = [
     'ui-hamburger',
     open ? 'ui-hamburger--open' : '',
@@ -64,7 +73,7 @@ export default function HamburgerMenu({
                   to={link.to}
                   className="ui-hamburger__link"
                   tabIndex={open ? 0 : -1}
-                  onClick={onClose}
+                  onClick={(event) => handleLinkClick(event, link)}
                 >
                   {link.label}
                 </Link>
