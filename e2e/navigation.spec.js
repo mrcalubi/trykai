@@ -60,14 +60,24 @@ test.describe('signed-out navigation', () => {
     await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
   })
 
+  // The published terms have to be reachable from the nav while signed out, not
+  // only from the footer. Both places link the same routes, so this has to be
+  // scoped to the menu or it binds to the footer link of the same name.
   test('reaches the policy pages from the hamburger menu', async ({ page }) => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART] })
     await page.goto('/')
 
     await page.getByRole('button', { name: 'Open menu' }).click()
-    await page.getByRole('link', { name: 'Cancellation policy' }).click()
+    const menu = page.getByRole('navigation', { name: 'Main menu' })
+
+    await expect(menu.getByRole('link', { name: 'Refund policy' })).toBeVisible()
+    await expect(menu.getByRole('link', { name: 'Dispute policy' })).toBeVisible()
+    await menu.getByRole('link', { name: 'Cancellation policy' }).click()
 
     await expect(page).toHaveURL(/\/cancellation-policy$/)
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Cancellation Policy' })
+    ).toBeVisible()
   })
 
   test('switches between logging in and signing up', async ({ page }) => {
