@@ -295,7 +295,9 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 - `confirm_paid_booking(...)` and `confirm_booking` wrapper — flip pending → confirmed and decrement `spots_remaining` atomically under a row lock. **Service role only.** The Stripe webhook calls `confirm_paid_booking`. If spots are gone, the webhook refunds instead of confirming.
 - `apply_host_strike(host_id)` — increments strikes and deactivates listings at 3. **Service role only.**
 
-Admin actions (approve verification, set `is_founding_host`, suspend) run as the service role, currently via the Supabase Table Editor. There is no admin UI. `admin-cancel-booking` exists and is secret-gated; it writes `cancelled_by: 'host'`.
+**Verification review is on the platform** at `/admin/verifications`, gated by `is_admin`. `admin-verifications` authenticates the reviewer's own JWT and then re-checks `is_admin` server-side, because a shared secret cannot be shipped to a browser. Document images are served through signed URLs minted with the service role and valid for `SIGNED_URL_TTL_SECONDS`, so they are never reachable from a public or authenticated non-admin route. The result email, including the rejection reason, is sent from that function rather than a database webhook, the same way booking emails moved into `stripe-webhook`.
+
+The remaining admin actions (set `is_founding_host`, suspend, grant `is_admin`) still run as the service role via the Supabase Table Editor. `admin-cancel-booking` exists and is secret-gated; it writes `cancelled_by: 'host'`.
 
 ---
 
@@ -317,7 +319,8 @@ src/
 │   ├── ListingDetail.jsx        # Listing, rail picker, Payment Element
 │   ├── CreateListing.jsx        # Verification gate, listing insert, is_host=true
 │   ├── EditListing.jsx          # Host edits listing, including full_address
-│   ├── VerifyIdentity.jsx       # Client UPDATE to pending after private uploads
+│   ├── VerifyIdentity.jsx       # Private uploads + consent, then submit_verification
+│   ├── AdminVerifications.jsx   # /admin/verifications review queue, is_admin only
 │   ├── Dashboard.jsx            # Both views, Connect setup, cancel via function
 │   ├── StyleGuide.jsx           # UI kit preview at /style-guide
 │   ├── RefundPolicy.jsx
@@ -327,6 +330,7 @@ src/
 │   ├── SiteNav.jsx              # Live chrome: feeds real auth into TopNav
 │   ├── Footer.jsx               # Policy links only
 │   ├── RequireAuth.jsx
+│   ├── RequireAdmin.jsx         # is_admin via my_verification(); renders only
 │   ├── ListingCard.jsx          # Superseded by ui/Card browse mode; no page renders it
 │   ├── ReviewCard.jsx
 │   ├── StarPicker.jsx
@@ -362,6 +366,7 @@ supabase/functions/
 ├── create-account-link/         # Creates account if needed, Account Link to /dashboard?connect=
 ├── cancel-booking/              # Guest or host cancel + Stripe refund + strikes; no emails
 ├── admin-cancel-booking/        # x-admin-secret full refund; cancelled_by='host'; no UI
+├── admin-verifications/         # JWT + is_admin; signed-URL queue, review + result email
 ├── notify-verification-pending/ # Emails Caleb; no shared-secret header
 ├── notify-verification-result/  # Emails host on approval/rejection; no shared-secret header
 └── release-payout/              # x-cron-secret Transfer 24h after starts_at
@@ -432,7 +437,7 @@ Use these alongside the code. When you are reading a file and wondering what it 
 1. **Signs up.** Same as any guest. `is_host = false` initially. Profile row comes from `handle_new_user`.
 2. **Clicks Create Listing.** `CreateListing.jsx` checks `verification_status` on mount. `unverified` or `rejected` redirects to `/verify-identity`. `pending` blocks the form with an under review message. `approved` shows the form.
 3. **Submits verification.** ID photo and live selfie upload to the private `verification-docs` bucket, scoped to a folder named after the user id, which the storage policy enforces. A consent checkbox is required, and `submit_verification` records `verification_consent_at` alongside the paths and `pending`. A database webhook is expected to fire `notify-verification-pending`, emailing `calebong2002@gmail.com`. That function has **no shared-secret header**.
-4. **Caleb reviews.** Still the Table Editor today, which is what P0.3 replaces. `review_verification` (`00007`, service role only) is the function a review UI calls: it writes the decision, the rejection reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record. A rejected host sees the reason on `/verify-identity` when they resubmit.
+4. **Caleb reviews** at `/admin/verifications`: both documents side by side, approve, or reject with a reason. `admin-verifications` calls `review_verification` (`00007`, service role only), which writes the decision, the reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record. The function then emails the host. A rejected host also sees the reason on `/verify-identity` when they resubmit.
 5. **Creates the listing.** Title, description, category, price in cents, max guests, public area, private full address, up to 5 photos, what's provided. Inserts into `listings`, sets `is_host = true`, navigates to dashboard. **Does not create the first session in the same form.** No photography guidance. No T&C checkbox.
 6. **Adds a session** from Dashboard “Add Session”. Date, time, duration, spots. `spots_total` and `spots_remaining` both set to the entered number, `status = 'open'`.
 7. **Payout setup.** Dashboard “Set up payouts” → `create-account-link` → Stripe Express onboarding. Book stays disabled for guests until `stripe_payouts_enabled`.
@@ -502,7 +507,6 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 - Review gating still accepts `pending` in the dashboard UI, and RLS does not require confirmed (P2.3).
 - Host no-show reporting, reschedule, session auto-complete, host→guest reviews: not built.
 - `cancel-booking` does not email either party.
-- Admin verification review is still Table Editor (P0.3).
 - UI kit only partly wired: the nav and the browse `Card` are live, but Button, Input, and SelectableCard are still `/style-guide` only. `ListingCard.jsx` and its `.listing-card` CSS are now dead code that only its own test renders; deleting them is a separate cleanup.
 - The browse card can never show a rating: the `listings` select does not fetch one and there is no aggregate rating column, so `Card` gets no `rating` prop from Home. The price-only card is correct for a new listing but wrong for a listing with reviews.
 - A host who exits Stripe Connect onboarding without completing it still sees a "Payout setup submitted" success message on the dashboard, because `?connect=return` is treated as success without re-checking `stripe_payouts_enabled`. That host believes they can be paid and cannot. If they take a booking, the guest pays and there is no payout path, discovered after the session.

@@ -485,3 +485,11 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/admin-cancel-booking/deno.json"
 entrypoint = "./functions/admin-cancel-booking/index.ts"
+
+# verify_jwt is false because the function authenticates the caller itself and
+# returns 401 or 403 with a readable body rather than the platform's opaque 401.
+[functions.admin-verifications]
+enabled = true
+verify_jwt = false
+import_map = "./functions/admin-verifications/deno.json"
+entrypoint = "./functions/admin-verifications/index.ts"
