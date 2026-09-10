@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   canHost,
   canSubmitVerification,
+  IDENTITY_FALLBACK_REASON,
+  IDENTITY_FAILURE_REASONS,
+  identityEventOutcome,
+  identityFailureReason,
+  identitySessionCreateParams,
   isVerificationMethod,
   isVerificationStatus,
   MAX_REJECTION_REASON_LENGTH,
@@ -133,6 +138,94 @@ describe('prepareVerificationReview', () => {
       status: 400,
       message: 'Invalid verification method',
     })
+  })
+})
+
+describe('identitySessionCreateParams', () => {
+  it('requires a live selfie matched against an NRIC or passport', () => {
+    expect(
+      identitySessionCreateParams({ userId: 'host-9', siteUrl: 'https://trykai.sg' }),
+    ).toEqual({
+      type: 'document',
+      options: {
+        document: {
+          require_matching_selfie: true,
+          require_live_capture: true,
+          allowed_types: ['passport', 'id_card'],
+        },
+      },
+      metadata: { user_id: 'host-9' },
+      client_reference_id: 'host-9',
+      return_url: 'https://trykai.sg/verify-identity?identity=return',
+    })
+  })
+
+  it('does not double the slash when SITE_URL has a trailing one', () => {
+    const params = identitySessionCreateParams({
+      userId: 'host-9',
+      siteUrl: 'https://staging.trykai.sg/',
+    })
+    expect(params.return_url).toBe('https://staging.trykai.sg/verify-identity?identity=return')
+  })
+})
+
+describe('identityFailureReason', () => {
+  it('prefers copy that says what to do next', () => {
+    expect(identityFailureReason({ code: 'selfie_face_mismatch', reason: 'Selfie mismatch' })).toBe(
+      IDENTITY_FAILURE_REASONS.selfie_face_mismatch,
+    )
+  })
+
+  it('points a host who declined the biometric check at manual review', () => {
+    expect(identityFailureReason({ code: 'consent_declined' })).toContain('manual review')
+  })
+
+  it('falls back to Stripe’s own reason for an unmapped code', () => {
+    expect(identityFailureReason({ code: 'something_new', reason: 'Stripe said no' })).toBe(
+      'Stripe said no',
+    )
+  })
+
+  it('bounds Stripe’s reason to what the email column accepts', () => {
+    const reason = identityFailureReason({ code: 'x', reason: 'y'.repeat(900) })
+    expect(reason.length).toBe(MAX_REJECTION_REASON_LENGTH)
+  })
+
+  it('has something to say when Stripe sends neither', () => {
+    expect(identityFailureReason(null)).toBe(IDENTITY_FALLBACK_REASON)
+    expect(identityFailureReason({})).toBe(IDENTITY_FALLBACK_REASON)
+  })
+})
+
+describe('identityEventOutcome', () => {
+  it('approves on a verified session', () => {
+    expect(identityEventOutcome('identity.verification_session.verified', {})).toEqual({
+      action: 'approve',
+    })
+  })
+
+  it('rejects a failed check with a reason the host can act on', () => {
+    expect(
+      identityEventOutcome('identity.verification_session.requires_input', {
+        last_error: { code: 'document_expired' },
+      }),
+    ).toEqual({ action: 'reject', reason: IDENTITY_FAILURE_REASONS.document_expired })
+  })
+
+  it('ignores requires_input with no error, since that is a fresh session', () => {
+    expect(
+      identityEventOutcome('identity.verification_session.requires_input', { last_error: null }),
+    ).toEqual({ action: 'ignore' })
+    expect(identityEventOutcome('identity.verification_session.requires_input', {})).toEqual({
+      action: 'ignore',
+    })
+  })
+
+  it('ignores every other event', () => {
+    expect(identityEventOutcome('identity.verification_session.created', {})).toEqual({
+      action: 'ignore',
+    })
+    expect(identityEventOutcome('payment_intent.succeeded', null)).toEqual({ action: 'ignore' })
   })
 })
 

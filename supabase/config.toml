@@ -493,3 +493,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/admin-verifications/deno.json"
 entrypoint = "./functions/admin-verifications/index.ts"
+
+[functions.create-identity-session]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-identity-session/deno.json"
+entrypoint = "./functions/create-identity-session/index.ts"
