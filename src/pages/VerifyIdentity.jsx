@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
+import { verificationDocumentPaths } from '../../supabase/functions/_shared/verification.ts'
+
+/** `my_verification` returns a table, so PostgREST hands back an array. */
+function firstRow(data) {
+  if (Array.isArray(data)) return data[0] ?? null
+  return data ?? null
+}
 
 export default function VerifyIdentity() {
   const navigate = useNavigate()
@@ -10,21 +17,21 @@ export default function VerifyIdentity() {
 
   const [statusChecked, setStatusChecked] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState(null)
+  const [rejectionReason, setRejectionReason] = useState('')
   const [idPhoto, setIdPhoto] = useState(null)
   const [selfie, setSelfie] = useState(null)
+  const [consent, setConsent] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
   useEffect(() => {
     async function loadStatus() {
-      const { data } = await supabase
-        .from('users')
-        .select('verification_status')
-        .eq('id', userId)
-        .single()
+      const { data } = await supabase.rpc('my_verification')
+      const row = firstRow(data)
 
-      setVerificationStatus(data?.verification_status || 'unverified')
+      setVerificationStatus(row?.verification_status || 'unverified')
+      setRejectionReason(row?.verification_rejection_reason || '')
       setStatusChecked(true)
     }
 
@@ -40,14 +47,18 @@ export default function VerifyIdentity() {
       return
     }
 
+    if (!consent) {
+      setError('Please confirm you agree to TryKai verifying your identity.')
+      return
+    }
+
     setLoading(true)
 
-    const idPath = `${userId}/id-photo.jpg`
-    const selfiePath = `${userId}/selfie.jpg`
+    const paths = verificationDocumentPaths(userId)
 
     const { error: idUploadError } = await supabase.storage
       .from('verification-docs')
-      .upload(idPath, idPhoto, { upsert: true })
+      .upload(paths.idPhoto, idPhoto, { upsert: true })
 
     if (idUploadError) {
       setLoading(false)
@@ -57,7 +68,7 @@ export default function VerifyIdentity() {
 
     const { error: selfieUploadError } = await supabase.storage
       .from('verification-docs')
-      .upload(selfiePath, selfie, { upsert: true })
+      .upload(paths.selfie, selfie, { upsert: true })
 
     if (selfieUploadError) {
       setLoading(false)
@@ -65,19 +76,16 @@ export default function VerifyIdentity() {
       return
     }
 
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({
-        id_photo_url: idPath,
-        selfie_url: selfiePath,
-        verification_status: 'pending',
-      })
-      .eq('id', userId)
+    const { error: submitError } = await supabase.rpc('submit_verification', {
+      p_id_photo_url: paths.idPhoto,
+      p_selfie_url: paths.selfie,
+      p_consent: true,
+    })
 
     setLoading(false)
 
-    if (updateError) {
-      setError(updateError.message)
+    if (submitError) {
+      setError(submitError.message)
       return
     }
 
@@ -138,6 +146,12 @@ export default function VerifyIdentity() {
           </p>
         )}
 
+        {verificationStatus === 'rejected' && rejectionReason && (
+          <p className="error-message" style={{ marginBottom: '20px' }}>
+            Your last submission was not approved: {rejectionReason}
+          </p>
+        )}
+
         <form onSubmit={handleSubmit} className="form">
           <label className="label">
             NRIC or passport photo
@@ -161,6 +175,19 @@ export default function VerifyIdentity() {
               style={{ padding: '10px' }}
             />
             <span className="hint">A clear photo of your face, taken recently</span>
+          </label>
+
+          <label className="label label--inline">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+            />
+            <span>
+              I agree to TryKai using these documents to verify my identity. They are stored
+              privately, are only seen by the TryKai team for this review, and are deleted
+              within 30 days if my application is not approved.
+            </span>
           </label>
 
           {error && <p className="error-message">{error}</p>}
