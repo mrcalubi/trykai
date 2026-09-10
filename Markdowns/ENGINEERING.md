@@ -10,7 +10,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. The function does not send cancellation emails.
 > 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00005`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
-> 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** The rest of the UI kit in `src/components/ui/` (Button, Input, Card, SelectableCard) is still used only by `/style-guide`: Home still has its hero and still renders `ListingCard`, not `Card`.
+> 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home has no hero and renders the kit's** `Card` **in browse mode.** `ListingCard.jsx` still exists but no page renders it. Button, Input, and SelectableCard are still used only by `/style-guide`.
 > 6. **All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a hex value in a component. See section 2, Styling.
 
 ---
@@ -312,7 +312,7 @@ src/
 │   ├── pricing.js               # All-in card / PayNow prices shown in the UI
 │   └── edgeFunctionError.js     # Read Edge Function error bodies
 ├── pages/
-│   ├── Home.jsx                 # Browse: hero + category/area filters, newest first
+│   ├── Home.jsx                 # Browse: grid of ui/Card, category/area filters, newest first
 │   ├── Login.jsx                # Auth, login + signup (no users insert)
 │   ├── ListingDetail.jsx        # Listing, rail picker, Payment Element
 │   ├── CreateListing.jsx        # Verification gate, listing insert, is_host=true
@@ -327,7 +327,7 @@ src/
 │   ├── SiteNav.jsx              # Live chrome: feeds real auth into TopNav
 │   ├── Footer.jsx               # Policy links only
 │   ├── RequireAuth.jsx
-│   ├── ListingCard.jsx          # All-in card total; category overlay; host · area · price
+│   ├── ListingCard.jsx          # Superseded by ui/Card browse mode; no page renders it
 │   ├── ReviewCard.jsx
 │   ├── StarPicker.jsx
 │   ├── CancellationPolicy.jsx   # Collapsible / info blocks
@@ -336,7 +336,7 @@ src/
 │       ├── HamburgerMenu.jsx    # Slide-in panel, contents adapt to auth state
 │       ├── Button.jsx           # /style-guide only
 │       ├── Input.jsx            # /style-guide only
-│       ├── Card.jsx             # Browse and booking modes; /style-guide only
+│       ├── Card.jsx             # Browse mode is live on Home; booking mode /style-guide only
 │       ├── SelectableCard.jsx   # Category cards; /style-guide only
 │       └── getInitials.js       # Avatar fallback initials
 ├── App.jsx
@@ -378,7 +378,7 @@ supabase/functions/
 | Host verification upload                                   | `src/pages/VerifyIdentity.jsx`                                                                      |
 | Dashboard, both views                                      | `src/pages/Dashboard.jsx`                                                                           |
 | Global nav and hamburger                                   | `src/components/SiteNav.jsx`, `src/components/ui/TopNav.jsx`, `src/components/ui/HamburgerMenu.jsx` |
-| UI kit not yet wired (Button, Input, Card, SelectableCard) | `src/components/ui/`, `src/pages/StyleGuide.jsx`                                                    |
+| UI kit not yet wired (Button, Input, SelectableCard)       | `src/components/ui/`, `src/pages/StyleGuide.jsx`                                                    |
 | Colour tokens and all styling                              | `src/index.css`                                                                                     |
 | Component preview                                          | `/style-guide` route                                                                                |
 | Cancellation arithmetic                                    | `src/lib/cancellationPolicy.js` and `supabase/functions/_shared/booking.ts`                         |
@@ -405,7 +405,7 @@ Use these alongside the code. When you are reading a file and wondering what it 
 
 *Sarah, 23, saw a latte art session shared on Instagram.*
 
-**1. Lands on trykai.sg.** `Home.jsx` still has a hero. It fetches listings where `is_active = true`, ordered `created_at` desc, renders each as a `ListingCard` showing photo, category overlay, title, and `host · area · all-in card price`. No sort UI. Grid is 1 column on phone, 2 from 640px, 3 from 1024px. `full_address` is not fetched. `is_suspended` is not queried; a suspended host's active listings still appear.
+**1. Lands on trykai.sg.** The grid leads the page; there is no hero. `Home.jsx` fetches listings where `is_active = true`, ordered `created_at` desc, and renders each through `ui/Card` in browse mode: square photo, category badge overlaid top-left, title clamped to two lines, then one meta line carrying the all-in card price. No rating is shown because the fetch does not select one. No sort UI. Grid is 2 columns on phone, 3 from 768px, 4 from 1024px. `full_address` is not fetched. `is_suspended` is not queried; a suspended host's active listings still appear.
 
 **2. Filters by category and area.** Filtering is client side on the already fetched array. Category pills are derived from listing data (not a hardcoded six-category list). No additional database call.
 
@@ -465,7 +465,7 @@ Caleb sets `verification_status = 'rejected'`. Webhook should fire `notify-verif
 
 ## 10. Pages (what they actually do)
 
-**Home.jsx** — hero + browse of active listings. Category pills derived from data, area dropdown, combinable, newest first. No auth required. No sort by price or reviews.
+**Home.jsx** — browse of active listings, grid first, no hero. Category pills derived from data, area dropdown, combinable, newest first. No auth required. No sort by price or reviews.
 
 **Login.jsx** — email and password, login and signup. Does not insert into `users`. No password reset. No T&C checkbox.
 
@@ -503,7 +503,8 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 - Host no-show reporting, reschedule, session auto-complete, host→guest reviews: not built.
 - `cancel-booking` does not email either party.
 - Admin verification review is still Table Editor (P0.3).
-- UI kit only partly wired: the nav is live, but Home still has a hero, still renders `ListingCard` rather than the kit's `Card`, the grid is 1/2/3 not 2/3/4, and `ListingCard` meta is still host · area · price with no rating.
+- UI kit only partly wired: the nav and the browse `Card` are live, but Button, Input, and SelectableCard are still `/style-guide` only. `ListingCard.jsx` and its `.listing-card` CSS are now dead code that only its own test renders; deleting them is a separate cleanup.
+- The browse card can never show a rating: the `listings` select does not fetch one and there is no aggregate rating column, so `Card` gets no `rating` prop from Home. The price-only card is correct for a new listing but wrong for a listing with reviews.
 - A host who exits Stripe Connect onboarding without completing it still sees a "Payout setup submitted" success message on the dashboard, because `?connect=return` is treated as success without re-checking `stripe_payouts_enabled`. That host believes they can be paid and cannot. If they take a booking, the guest pays and there is no payout path, discovered after the session.
 
 **Not built, decided**
