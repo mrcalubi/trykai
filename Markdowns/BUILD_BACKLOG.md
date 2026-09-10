@@ -158,7 +158,7 @@ Within 7 days, reviewed manually. Needs a submission form and an admin view.
 Disputes arrive by email today. At launch volume that is survivable.
 
 ### P2.8 — Wire the UI kit and decided browse
-Library lives in `src/components/ui/` and `/style-guide`. Live chrome is still `Navbar.jsx`. DESIGN.md wants: no hero, 2 columns on phone / 3 tablet / 4 desktop, compact price + rating on the card. Home still has a hero; grid is 1 / 2 / 3; ListingCard still shows `host · area · price`.
+**Mostly done, 9 September 2026.** TopNav and HamburgerMenu are the live chrome, and Home is the decided browse: no hero, 2 / 3 / 4 columns, square images, badge on a cream pill, two-line title clamp, one meta line with the all-in price. Left over: the rating on the browse card needs the listings fetch to supply one (no aggregate rating column exists yet), Button and Input are still `/style-guide` only, and `ListingCard.jsx` plus its `.listing-card` CSS are dead code waiting on a deletion pass.
 
 ### P2.9 — Checkout and legal gaps visible in the app
 - `guests_count` hardcoded to 1 in ListingDetail
@@ -183,7 +183,7 @@ All specified in DECISIONS.md. None of it should be touched before launch, regar
 
 Working today, and stable enough. Do not rewrite them before launch unless you are closing a P0/P2 item above.
 
-- Guest browses and filters listings (hero and grid density are P2.8, not a rewrite of fetch)
+- Guest browses and filters listings (the fetch and the filter memos survived the P2.8 grid rebuild untouched; keep it that way)
 - Guest views listing detail and pays (guest-count picker is additive)
 - Signup and login (profile row is the `handle_new_user` trigger)
 - Host verification submission (client UPDATE + guard trigger)
