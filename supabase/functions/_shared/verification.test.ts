@@ -12,6 +12,10 @@ import {
   MAX_REJECTION_REASON_LENGTH,
   normalizeVerificationStatus,
   prepareVerificationReview,
+  purgeCandidatePaths,
+  REJECTED_DOCUMENT_RETENTION_DAYS,
+  retentionCutoffIso,
+  shouldPurgeDocuments,
   SIGNED_URL_TTL_SECONDS,
   verificationDocumentPaths,
   VERIFICATION_STATUSES,
@@ -226,6 +230,73 @@ describe('identityEventOutcome', () => {
       action: 'ignore',
     })
     expect(identityEventOutcome('payment_intent.succeeded', null)).toEqual({ action: 'ignore' })
+  })
+})
+
+describe('document retention', () => {
+  const now = Date.parse('2026-09-30T00:00:00.000Z')
+  const longAgo = '2026-08-01T00:00:00.000Z'
+  const recently = '2026-09-25T00:00:00.000Z'
+
+  function rejected(overrides = {}) {
+    return {
+      id: 'host-9',
+      verification_status: 'rejected',
+      verification_reviewed_at: longAgo,
+      id_photo_url: 'host-9/id-photo.jpg',
+      selfie_url: 'host-9/selfie.jpg',
+      ...overrides,
+    }
+  }
+
+  it('cuts off 30 days back', () => {
+    expect(retentionCutoffIso(now)).toBe('2026-08-31T00:00:00.000Z')
+    expect(REJECTED_DOCUMENT_RETENTION_DAYS).toBe(30)
+  })
+
+  it('purges a rejected host whose documents are past the window', () => {
+    expect(shouldPurgeDocuments(rejected(), now)).toBe(true)
+  })
+
+  it('purges on the cutoff instant, not a millisecond early', () => {
+    expect(
+      shouldPurgeDocuments(rejected({ verification_reviewed_at: '2026-08-31T00:00:00.000Z' }), now),
+    ).toBe(true)
+    expect(
+      shouldPurgeDocuments(rejected({ verification_reviewed_at: '2026-08-31T00:00:00.001Z' }), now),
+    ).toBe(false)
+  })
+
+  it('keeps documents inside the window, so a resubmission still makes sense', () => {
+    expect(shouldPurgeDocuments(rejected({ verification_reviewed_at: recently }), now)).toBe(false)
+  })
+
+  it('never touches a host who is not rejected', () => {
+    for (const status of ['approved', 'pending', 'unverified']) {
+      expect(shouldPurgeDocuments(rejected({ verification_status: status }), now)).toBe(false)
+    }
+  })
+
+  it('skips a rejection with nothing stored, such as a Stripe Identity failure', () => {
+    expect(
+      shouldPurgeDocuments(rejected({ id_photo_url: null, selfie_url: null }), now),
+    ).toBe(false)
+  })
+
+  it('skips a row with a missing or unparseable review date', () => {
+    expect(shouldPurgeDocuments(rejected({ verification_reviewed_at: null }), now)).toBe(false)
+    expect(shouldPurgeDocuments(rejected({ verification_reviewed_at: 'not a date' }), now)).toBe(
+      false,
+    )
+  })
+
+  it('collects the stored paths, dropping blanks and duplicates', () => {
+    expect(purgeCandidatePaths(rejected())).toEqual(['host-9/id-photo.jpg', 'host-9/selfie.jpg'])
+    expect(purgeCandidatePaths(rejected({ selfie_url: null }))).toEqual(['host-9/id-photo.jpg'])
+    expect(purgeCandidatePaths(rejected({ selfie_url: 'host-9/id-photo.jpg' }))).toEqual([
+      'host-9/id-photo.jpg',
+    ])
+    expect(purgeCandidatePaths(rejected({ id_photo_url: '', selfie_url: null }))).toEqual([])
   })
 })
 

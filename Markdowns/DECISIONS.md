@@ -264,7 +264,7 @@ Hosts are independent individuals, not employees. TryKai is a platform, not a se
 DPO is Caleb. Contact is **privacy@trykai.sg**, an alias on his individual mailbox rather than a group, which correctly keeps the role accountable to one named person. Appointing a DPO is mandatory; registering with PDPC is not, but publishing the contact details is, under Section 11(5). Breach penalties reach $1M or 10% of turnover.
 
 ### Data retention
-- **Rejected verification documents:** deleted after 30 days. Long enough for resubmission confusion, short enough to limit exposure. Deletion mechanism not built.
+- **Rejected verification documents:** deleted after 30 days by `purge-verification-docs`, scheduled daily. Long enough for resubmission confusion, short enough to limit exposure. Stripe Identity rejections store no images, so there is nothing to delete.
 - **Approved host verification documents:** retained while the account is active.
 - **Closed accounts:** core records, not ID images, retained 6 months, then purged.
 
@@ -302,7 +302,7 @@ Onboarding required a business plan with three year projections, since there is 
 **Access control:** do not share the login. If Aakash needs spending ability, issue an Aspire card with a set limit instead.
 
 ### Transactional email
-Three flows live via Resend: new booking to host and guest (from `stripe-webhook`), new verification submission to Caleb, verification result to host. **All send from Resend's shared test domain (`TryKai <onboarding@resend.dev>`) and deliver only to Caleb's address.** Non functional for real users until trykai.sg is verified in Resend. Cancellation does not send email. The two notify-verification functions have no shared-secret header.
+Three flows live via Resend: new booking to host and guest (from `stripe-webhook`), new manual verification submission to Caleb (from `notify-verification-pending`, gated by `NOTIFY_FUNCTION_SECRET`), and verification result to host (from `admin-verifications` or `stripe-webhook`, whichever decided). **All send from Resend's shared test domain (`TryKai <onboarding@resend.dev>`) and deliver only to Caleb's address.** Non functional for real users until trykai.sg is verified in Resend. Cancellation does not send email. `notify-verification-result` was removed once those result emails moved.
 
 ### Domain
 trykai.sg via Vodien, two years, ~$75.98. SGNIC identity verification completed.
@@ -433,6 +433,10 @@ Second, PDPA. PDPC's NRIC guidelines say an organisation generally may not colle
 Third, manual review stays, and is not a fallback in name only. Automated checks reject legitimate people, and PDPC's own guidance on declined biometric consent expects an alternative. `consent_declined` and `country_not_supported` route to the manual queue explicitly. Caleb reviews those at `/admin/verifications` rather than in the Table Editor.
 
 Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff and Jumio were the other candidates and were not adopted; Stripe Identity won on already being the payment provider, so there is one vendor, one key, and one webhook rather than two.
+
+**2026-09-11 — Rejected verification documents are deleted after 30 days, and the notify functions are no longer open relays.** Implementation of the retention rule already in Part A. `purge-verification-docs` is secret-gated (`VERIFICATION_PURGE_SECRET` or `CRON_SECRET`) and scheduled daily, not hourly: it only needs to run once the window has passed. Storage objects are removed before the URL columns are cleared, so a failed delete is retried rather than orphaned. A later resubmission is left alone because the job only touches rows that are still `rejected`.
+
+`notify-verification-pending` now requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer) and links to `/admin/verifications` instead of the Table Editor. `notify-verification-result` is deleted; hosts already hear about the decision from `admin-verifications` and `stripe-webhook`. Remaining P0.8 work is verifying trykai.sg in Resend so mail leaves the shared test domain.
 
 ---
 

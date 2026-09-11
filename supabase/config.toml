@@ -445,16 +445,8 @@ entrypoint = "./functions/notify-verification-pending/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/notify-verification-pending/*.html" ]
 
-[functions.notify-verification-result]
-enabled = true
-verify_jwt = false
-import_map = "./functions/notify-verification-result/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/notify-verification-result/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/notify-verification-result/*.html" ]
+# notify-verification-result was removed once admin-verifications and
+# stripe-webhook began emailing results from the action that decided them.
 
 [functions.stripe-webhook]
 enabled = true
@@ -499,3 +491,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/create-identity-session/deno.json"
 entrypoint = "./functions/create-identity-session/index.ts"
+
+[functions.purge-verification-docs]
+enabled = true
+verify_jwt = false
+import_map = "./functions/purge-verification-docs/deno.json"
+entrypoint = "./functions/purge-verification-docs/index.ts"
