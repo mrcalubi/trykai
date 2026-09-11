@@ -95,6 +95,12 @@ A reusable component library now exists in this tree, built in plain CSS matchin
 - Card shows the category badge overlaid on the image top-left, title, a compact meta line with price and, only if a rating exists, the rating after a dot. A brand-new listing shows price only, never an empty star, deliberately unlike ToGatherSG's "0 reviews" look.
 - Only honest scarcity and real discounts as conversion nudges (real "spots left", real PayNow saving). No fabricated urgency, no fake "people viewing now".
 
+**Listing detail decided (built 11 September 2026):**
+- One layout does not fit both. Phone gets one 4/3 photo per screen, swiped with CSS scroll-snap and a row of position dots. From 1024px the gallery becomes a mosaic: 1 large + 2x2 for five photos, 1 large + three for four, 1 large + two stacked for three, two equal for two, and a single photo framed at 3/2 rather than stretched across the page.
+- The gallery is capped in height on desktop (`clamp(320px, 34vw, 440px)`) because the title, host and booking card have to be above the fold. A full-width 4:3 photo pushed all of them off screen.
+- Two columns from 1024px, content left and a sticky booking card right. Page content is capped narrower than the browse grid, because a description running the full width of a 1440px screen is unreadable.
+- **The host block stays high, directly under the area, at every width.** On TryKai the guest is buying time with a person, so who is teaching belongs in the first decision, not below the description. Reviews come last.
+
 **What Home actually does today (9 September 2026):** the browse decisions above are built. No hero, grid 2 / 3 / 4 at 768px and 1024px, square images with a cream fallback, category badge overlaid on a cream pill, title clamped to two lines so cards in a row end level, and one meta line carrying the all-in price. The rating half of the meta line exists in `Card` but never fires on Home, because the listings fetch has no rating to pass; every card is therefore the price-only "new listing" state. Sort is newest only.
 
 ---

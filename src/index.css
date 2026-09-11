@@ -141,6 +141,11 @@ a {
   max-width: 720px;
 }
 
+/* Narrower than the 1200px browse grid: prose past ~650px stops being readable. */
+.page--detail {
+  max-width: 1120px;
+}
+
 .page--form {
   display: flex;
   align-items: center;
@@ -1336,19 +1341,51 @@ a {
 
 /* Detail page */
 .detail-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 8px;
   margin-bottom: 32px;
+}
+
+/* One photo per screen, swiped by scroll-snap rather than by script. */
+.detail-gallery__scroller {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  scrollbar-width: none;
+}
+
+.detail-gallery__scroller::-webkit-scrollbar {
+  display: none;
 }
 
 .detail-gallery__photo {
+  display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  display: block;
+  scroll-snap-align: start;
+}
+
+.detail-gallery__dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.detail-gallery__dot {
+  width: 6px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 50%;
+}
+
+.detail-gallery__dot--active {
+  background: var(--navy);
 }
 
 .detail-gallery__placeholder {
@@ -1359,14 +1396,85 @@ a {
   margin-bottom: 32px;
 }
 
+/* Desktop trades the swipe for a mosaic, capped in height so the title, host and
+   booking card are above the fold instead of pushed off by one tall photo. */
+@media (min-width: 1024px) {
+  .page--detail {
+    --gallery-height: clamp(320px, 34vw, 440px);
+  }
+
+  /* minmax(0, …) everywhere: a plain fr track takes its minimum from the photo's
+     intrinsic aspect ratio, which overflows the capped height and clips cells. */
+  .detail-gallery__scroller {
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(0, 1fr);
+    height: var(--gallery-height);
+    overflow: hidden;
+    scroll-snap-type: none;
+  }
+
+  .detail-gallery__photo {
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    aspect-ratio: auto;
+  }
+
+  /* A lone photo is framed rather than stretched across the whole page. */
+  .detail-gallery__scroller[data-photo-count='1'],
+  .detail-gallery__placeholder {
+    max-width: calc(var(--gallery-height) * 3 / 2);
+    margin-inline: auto;
+  }
+
+  .detail-gallery__placeholder {
+    height: var(--gallery-height);
+    aspect-ratio: auto;
+  }
+
+  .detail-gallery__scroller[data-photo-count='3'],
+  .detail-gallery__scroller[data-photo-count='4'],
+  .detail-gallery__scroller[data-photo-count='5'] {
+    grid-auto-flow: row;
+  }
+
+  .detail-gallery__scroller[data-photo-count='3'] {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
+  .detail-gallery__scroller[data-photo-count='4'] {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+  }
+
+  .detail-gallery__scroller[data-photo-count='5'] {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
+  .detail-gallery__scroller[data-photo-count='3'] .detail-gallery__photo:first-child,
+  .detail-gallery__scroller[data-photo-count='5'] .detail-gallery__photo:first-child {
+    grid-row: span 2;
+  }
+
+  .detail-gallery__scroller[data-photo-count='4'] .detail-gallery__photo:first-child {
+    grid-row: span 3;
+  }
+
+  .detail-gallery__dots {
+    display: none;
+  }
+}
+
 .detail-layout {
   display: grid;
   gap: 40px;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 1024px) {
   .detail-layout {
-    grid-template-columns: 1fr 380px;
+    grid-template-columns: minmax(0, 1fr) 380px;
     align-items: start;
   }
 }
@@ -1469,9 +1577,15 @@ a {
   line-height: 1.8;
 }
 
-.detail-sidebar {
-  position: sticky;
-  top: 96px;
+@media (min-width: 1024px) {
+  .detail-sidebar {
+    position: sticky;
+    top: 96px;
+    /* A card taller than the viewport would otherwise pin its own bottom
+       out of reach once it sticks. */
+    max-height: calc(100svh - 112px);
+    overflow-y: auto;
+  }
 }
 
 .detail-booking-card {
@@ -1491,10 +1605,24 @@ a {
   letter-spacing: -0.02em;
 }
 
+.detail-booking-card__unit {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text);
+}
+
 .detail-booking-card__note {
   font-size: 14px;
   color: var(--text);
   margin: 0 0 20px;
+}
+
+.detail-booking-card__error {
+  margin-bottom: 16px;
+}
+
+.detail-booking-card__hint {
+  margin-top: 12px;
 }
 
 .session-card {

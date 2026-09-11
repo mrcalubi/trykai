@@ -160,6 +160,48 @@ describe('ListingDetail content', () => {
     expect(screen.getByRole('img', { name: 'Learn latte art with me 1' })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Learn latte art with me 2' })).toBeInTheDocument()
   })
+
+  it('tells the CSS how many photos to lay out', async () => {
+    givenListing(makeListing({ photo_urls: ['a.jpg', 'b.jpg', 'c.jpg'] }))
+    renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(document.querySelector('.detail-gallery__scroller')).toHaveAttribute(
+      'data-photo-count',
+      '3'
+    )
+  })
+
+  it('shows one swipe position dot per photo, the first one active', async () => {
+    givenListing(makeListing({ photo_urls: ['a.jpg', 'b.jpg', 'c.jpg'] }))
+    renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    const dots = document.querySelectorAll('.detail-gallery__dot')
+    expect(dots).toHaveLength(3)
+    expect(dots[0].className).toContain('detail-gallery__dot--active')
+    expect(dots[1].className).not.toContain('detail-gallery__dot--active')
+  })
+
+  it('omits the dots when there is nothing to swipe between', async () => {
+    givenListing(makeListing({ photo_urls: ['a.jpg'] }))
+    renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(document.querySelector('.detail-gallery__dots')).not.toBeInTheDocument()
+  })
+
+  it('keeps the host high, above the description and the reviews', async () => {
+    givenListing()
+    givenReviews([makeReview({ id: 'r1', rating: 5 })])
+    renderPage()
+
+    await screen.findByText('Hosted by Mei Ling')
+    const order = [...document.querySelectorAll('.detail-host, .detail-section__title')].map(
+      (node) => (node.className.includes('detail-host') ? 'host' : node.textContent)
+    )
+    expect(order).toEqual(['host', 'About this experience', "What's provided", 'Reviews (1)'])
+  })
 })
 
 describe('ListingDetail sessions', () => {
