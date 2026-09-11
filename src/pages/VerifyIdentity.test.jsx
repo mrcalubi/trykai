@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import VerifyIdentity from './VerifyIdentity'
 import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
@@ -40,6 +40,39 @@ function submitCalls() {
   return supabase.rpc.mock.calls.filter(([fn]) => fn === 'submit_verification')
 }
 
+/**
+ * `my_verification` is polled after a return from Stripe, so a sequence lets a
+ * test hand back a pending row first and a decided one afterwards.
+ */
+function givenVerificationSequence(rows) {
+  let index = 0
+  supabase.rpc.mockImplementation(async (fn) => {
+    if (fn === 'my_verification') {
+      const row = rows[Math.min(index, rows.length - 1)]
+      index += 1
+      return { data: [row], error: null }
+    }
+    return { data: null, error: null }
+  })
+}
+
+function givenIdentitySession(result) {
+  supabase.functions.invoke.mockImplementation(async (name) => {
+    if (name === 'create-identity-session') return result
+    return { data: null, error: null }
+  })
+}
+
+async function openManualForm() {
+  const utils = renderPage()
+  const fallback = await screen.findByRole('button', {
+    name: 'Having trouble? Upload your documents instead',
+  })
+  await utils.user.click(fallback)
+  await screen.findByLabelText(/^NRIC or passport photo/)
+  return utils
+}
+
 // Mounted behind the same guard App.jsx puts it behind, so the page always has
 // a signed-in user. RequireAuth owns the signed-out case and tests it itself.
 function renderPage(options = {}) {
@@ -60,8 +93,7 @@ function imageFile(name) {
 }
 
 async function renderFormWithBothPhotos({ consent = true } = {}) {
-  const utils = renderPage()
-  await screen.findByRole('heading', { name: 'Verify your identity' })
+  const utils = await openManualForm()
   attach(/^NRIC or passport photo/, imageFile('id.png'))
   attach(/^Selfie/, imageFile('selfie.png'))
   if (consent) {
@@ -70,10 +102,23 @@ async function renderFormWithBothPhotos({ consent = true } = {}) {
   return utils
 }
 
+// jsdom refuses real navigation, and the Stripe path is a redirect.
+const assignMock = vi.fn()
+
 beforeEach(() => {
   supabase.__reset()
+  assignMock.mockClear()
+  vi.stubGlobal('location', {
+    assign: assignMock,
+    origin: 'http://localhost:3000',
+    href: 'http://localhost:3000/verify-identity',
+  })
   givenSignedIn()
   givenStatus('unverified')
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('VerifyIdentity access control', () => {
@@ -140,10 +185,126 @@ describe('VerifyIdentity access control', () => {
   })
 })
 
+describe('VerifyIdentity Stripe Identity path', () => {
+  it('leads with the Stripe check and keeps the upload form hidden', async () => {
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Verify with Stripe' })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^NRIC or passport photo/)).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Having trouble? Upload your documents instead' })
+    ).toBeInTheDocument()
+  })
+
+  it('sends the host to the Stripe hosted flow', async () => {
+    givenIdentitySession({ data: { url: 'https://verify.stripe.com/start/abc' }, error: null })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Verify with Stripe' }))
+
+    await waitFor(() =>
+      expect(window.location.assign).toHaveBeenCalledWith('https://verify.stripe.com/start/abc')
+    )
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('create-identity-session', {
+      body: {},
+      headers: { Authorization: 'Bearer test-access-token' },
+    })
+  })
+
+  it('surfaces the real reason the session could not start', async () => {
+    givenIdentitySession({
+      data: null,
+      error: {
+        message: 'Edge Function returned a non-2xx status code',
+        context: { json: async () => ({ error: 'A verification is already under review.' }) },
+      },
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Verify with Stripe' }))
+
+    expect(await screen.findByText('A verification is already under review.')).toBeInTheDocument()
+    expect(window.location.assign).not.toHaveBeenCalled()
+  })
+
+  it('reports a response with no verification link', async () => {
+    givenIdentitySession({ data: {}, error: null })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Verify with Stripe' }))
+
+    expect(
+      await screen.findByText('Could not start the identity check. Please try again.')
+    ).toBeInTheDocument()
+  })
+
+  it('shows the approved view when Stripe had already verified them', async () => {
+    givenIdentitySession({ data: { already_verified: true, url: null }, error: null })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Verify with Stripe' }))
+
+    expect(await screen.findByRole('heading', { name: 'Identity verified' })).toBeInTheDocument()
+  })
+})
+
+describe('VerifyIdentity return from Stripe', () => {
+  it('waits for the webhook rather than showing the form again', async () => {
+    givenStatus('unverified')
+    renderPage({ route: '/verify-identity?identity=return' })
+
+    expect(
+      await screen.findByRole('heading', { name: 'Checking your documents' })
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Verify with Stripe' })).not.toBeInTheDocument()
+  })
+
+  it('switches to approved once the webhook records it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    givenVerificationSequence([
+      { verification_status: 'unverified' },
+      { verification_status: 'approved' },
+    ])
+    renderPage({ route: '/verify-identity?identity=return' })
+
+    await screen.findByRole('heading', { name: 'Checking your documents' })
+    await vi.advanceTimersByTimeAsync(3000)
+
+    expect(await screen.findByRole('heading', { name: 'Identity verified' })).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('shows the failure reason once the webhook records a rejection', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    givenVerificationSequence([
+      { verification_status: 'unverified' },
+      {
+        verification_status: 'rejected',
+        verification_rejection_reason: 'The selfie did not match the photo on the document.',
+      },
+    ])
+    renderPage({ route: '/verify-identity?identity=return' })
+
+    await screen.findByRole('heading', { name: 'Checking your documents' })
+    await vi.advanceTimersByTimeAsync(3000)
+
+    expect(
+      await screen.findByText(/The selfie did not match the photo on the document./)
+    ).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('does not wait when the result is already in', async () => {
+    givenStatus('approved')
+    renderPage({ route: '/verify-identity?identity=return' })
+
+    expect(await screen.findByRole('heading', { name: 'Identity verified' })).toBeInTheDocument()
+  })
+})
+
 describe('VerifyIdentity submission', () => {
   it('requires both documents', async () => {
-    const { user } = renderPage()
-    await screen.findByRole('heading', { name: 'Verify your identity' })
+    const { user } = await openManualForm()
 
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
@@ -154,8 +315,7 @@ describe('VerifyIdentity submission', () => {
   })
 
   it('requires a selfie alongside the ID', async () => {
-    const { user } = renderPage()
-    await screen.findByRole('heading', { name: 'Verify your identity' })
+    const { user } = await openManualForm()
     attach(/^NRIC or passport photo/, imageFile('id.png'))
 
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))

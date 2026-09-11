@@ -319,7 +319,7 @@ src/
 │   ├── ListingDetail.jsx        # Listing, swipe/mosaic gallery, rail picker, Payment Element
 │   ├── CreateListing.jsx        # Verification gate, listing insert, is_host=true
 │   ├── EditListing.jsx          # Host edits listing, including full_address
-│   ├── VerifyIdentity.jsx       # Private uploads + consent, then submit_verification
+│   ├── VerifyIdentity.jsx       # Stripe Identity first; manual upload + consent as fallback
 │   ├── AdminVerifications.jsx   # /admin/verifications review queue, is_admin only
 │   ├── Dashboard.jsx            # Both views, Connect setup, cancel via function
 │   ├── StyleGuide.jsx           # UI kit preview at /style-guide
@@ -361,12 +361,13 @@ supabase/functions/
 │   ├── email.ts                 # Resend helper + booking HTML
 │   └── payouts.ts               # 24h Transfer eligibility
 ├── create-payment-intent/       # Pending booking + PaymentIntent (no emails)
-├── stripe-webhook/              # Stripe-Signature → confirm_paid_booking + emails
+├── stripe-webhook/              # Stripe-Signature → confirm_paid_booking, identity outcomes, emails
 ├── create-connect-account/      # Express account for the signed-in host
 ├── create-account-link/         # Creates account if needed, Account Link to /dashboard?connect=
 ├── cancel-booking/              # Guest or host cancel + Stripe refund + strikes; no emails
 ├── admin-cancel-booking/        # x-admin-secret full refund; cancelled_by='host'; no UI
 ├── admin-verifications/         # JWT + is_admin; signed-URL queue, review + result email
+├── create-identity-session/     # Stripe Identity hosted check; stores only the session id
 ├── notify-verification-pending/ # Emails Caleb; no shared-secret header
 ├── notify-verification-result/  # Emails host on approval/rejection; no shared-secret header
 └── release-payout/              # x-cron-secret Transfer 24h after starts_at
@@ -438,8 +439,12 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 1. **Signs up.** Same as any guest. `is_host = false` initially. Profile row comes from `handle_new_user`.
 2. **Clicks Create Listing.** `CreateListing.jsx` checks `verification_status` on mount. `unverified` or `rejected` redirects to `/verify-identity`. `pending` blocks the form with an under review message. `approved` shows the form.
-3. **Submits verification.** ID photo and live selfie upload to the private `verification-docs` bucket, scoped to a folder named after the user id, which the storage policy enforces. A consent checkbox is required, and `submit_verification` records `verification_consent_at` alongside the paths and `pending`. A database webhook is expected to fire `notify-verification-pending`, emailing `calebong2002@gmail.com`. That function has **no shared-secret header**.
-4. **Caleb reviews** at `/admin/verifications`: both documents side by side, approve, or reject with a reason. `admin-verifications` calls `review_verification` (`00007`, service role only), which writes the decision, the reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record. The function then emails the host. A rejected host also sees the reason on `/verify-identity` when they resubmit.
+3. **Verifies identity.** The default path is **Stripe Identity**: `create-identity-session` opens a hosted document plus live-selfie check and redirects back to `/verify-identity?identity=return`, where the page polls `my_verification()` because the checks are asynchronous. **TryKai never receives the images** — Stripe holds them and reports only an outcome, which is the point. The status is deliberately *not* moved to `pending` when the session is created, because a session starts in `requires_input` and emits no event until the host submits, so anyone who abandons the flow would otherwise be stranded.
+
+   The manual upload is the fallback, behind "Having trouble?". It uploads to the private `verification-docs` bucket, scoped to a folder named after the user id, which the storage policy enforces. A consent checkbox is required, and `submit_verification` records `verification_consent_at` alongside the paths and `pending`. A database webhook is expected to fire `notify-verification-pending`, emailing `calebong2002@gmail.com`. That function has **no shared-secret header**.
+4. **The outcome is recorded.** For Stripe Identity, `stripe-webhook` handles `identity.verification_session.verified` and `.requires_input`. A `requires_input` event is only treated as a failure when it carries a `last_error`, since a fresh session sits in that status. The failure code maps to host-readable copy in `IDENTITY_FAILURE_REASONS`; `consent_declined` and `country_not_supported` point at manual review, because an automated check cannot help there.
+
+   For manual submissions, Caleb reviews at `/admin/verifications`: both documents side by side, approve, or reject with a reason. Both paths call `review_verification` (`00007`, service role only), which writes the decision, the reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record, and `method` records which route decided it. Whichever function made the decision emails the host. A rejected host also sees the reason on `/verify-identity` when they try again.
 5. **Creates the listing.** Title, description, category, price in cents, max guests, public area, private full address, up to 5 photos, what's provided. Inserts into `listings`, sets `is_host = true`, navigates to dashboard. **Does not create the first session in the same form.** No photography guidance. No T&C checkbox.
 6. **Adds a session** from Dashboard “Add Session”. Date, time, duration, spots. `spots_total` and `spots_remaining` both set to the entered number, `status = 'open'`.
 7. **Payout setup.** Dashboard “Set up payouts” → `create-account-link` → Stripe Express onboarding. Book stays disabled for guests until `stripe_payouts_enabled`.
