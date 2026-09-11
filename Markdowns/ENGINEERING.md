@@ -316,7 +316,7 @@ src/
 ├── pages/
 │   ├── Home.jsx                 # Browse: grid of ui/Card, category/area filters, newest first
 │   ├── Login.jsx                # Auth, login + signup (no users insert)
-│   ├── ListingDetail.jsx        # Listing, rail picker, Payment Element
+│   ├── ListingDetail.jsx        # Listing, swipe/mosaic gallery, rail picker, Payment Element
 │   ├── CreateListing.jsx        # Verification gate, listing insert, is_host=true
 │   ├── EditListing.jsx          # Host edits listing, including full_address
 │   ├── VerifyIdentity.jsx       # Stripe Identity first; manual upload + consent as fallback
@@ -417,6 +417,8 @@ Use these alongside the code. When you are reading a file and wondering what it 
 
 **3. Opens the listing.** `ListingDetail.jsx` fetches the listing, its open future sessions, the host profile (including `stripe_payouts_enabled`), and guest→host reviews. Cancellation policy shown collapsed above the Book button. `full_address` still not shown. Book is disabled until the host can receive payouts.
 
+The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, with position dots) and a height-capped mosaic from 1024px, laid out by photo count from `data-photo-count` on the scroller. From 1024px the page is two columns, content left and a sticky booking card right. Content order is the same at every width: category, title, area, host, then description, what's provided, and reviews last.
+
 **4. Not logged in.** Redirected to `Login.jsx`, then back to the listing after auth. Signup calls `auth.signUp` with `full_name` in metadata. The profile row is created by `handle_new_user`.
 
 **5. Phone verification.** OTP required before booking, per progressive disclosure. **Not built.**
@@ -479,7 +481,7 @@ Caleb sets `verification_status = 'rejected'`. Webhook should fire `notify-verif
 
 **Login.jsx** — email and password, login and signup. Does not insert into `users`. No password reset. No T&C checkbox.
 
-**ListingDetail.jsx** — listing, gallery, host name/avatar, open future sessions, collapsible cancellation policy, guest→host reviews, Card vs PayNow checkout. `guests_count` always 1. `full_address` only via RPC after a confirmed booking.
+**ListingDetail.jsx** — listing, gallery (swipe on phone, mosaic from 1024px), host name/avatar high under the area, open future sessions, collapsible cancellation policy, guest→host reviews, Card vs PayNow checkout. Two columns with a sticky booking card from 1024px. `guests_count` always 1. `full_address` only via RPC after a confirmed booking.
 
 **CreateListing.jsx** — auth required. Verification gate. Listing insert then `is_host = true`, then dashboard. CancellationPolicyInfo on the form. First session is a separate dashboard action.
 
