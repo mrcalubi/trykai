@@ -61,7 +61,7 @@ export async function stubSupabase(page, tables = {}, { session = null, function
       const payload = functions[name]
       if (payload === undefined) return json(route, {})
       if (typeof payload === 'function') {
-        let body = {}
+        let body
         try {
           body = request.postDataJSON() ?? {}
         } catch {
