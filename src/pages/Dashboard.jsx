@@ -65,9 +65,11 @@ export default function Dashboard() {
   const [payoutsEnabled, setPayoutsEnabled] = useState(true)
   const [payoutSetupLoading, setPayoutSetupLoading] = useState(false)
   const [payoutSetupError, setPayoutSetupError] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const loadData = useCallback(async () => {
-    const [listingsResult, bookingsResult, reviewsResult, profileResult] = await Promise.all([
+    const [listingsResult, bookingsResult, reviewsResult, profileResult, adminResult] =
+      await Promise.all([
       supabase
         .from('listings')
         .select('id, title, area, category')
@@ -107,6 +109,7 @@ export default function Dashboard() {
         .select('stripe_payouts_enabled, is_host')
         .eq('id', userId)
         .single(),
+      supabase.rpc('my_verification'),
     ])
 
     if (listingsResult.error) {
@@ -149,6 +152,9 @@ export default function Dashboard() {
     if (!profileResult.error) {
       setPayoutsEnabled(Boolean(profileResult.data?.stripe_payouts_enabled))
     }
+
+    const adminRow = Array.isArray(adminResult.data) ? adminResult.data[0] : adminResult.data
+    setIsAdmin(!adminResult.error && Boolean(adminRow?.is_admin))
 
     const listingIds = listingsResult.data?.map((l) => l.id) ?? []
     if (listingIds.length > 0) {
@@ -525,6 +531,23 @@ export default function Dashboard() {
       {deleteError && <p className="error-message" style={{ marginBottom: '20px' }}>{deleteError}</p>}
       {payoutSetupError && (
         <p className="error-message" style={{ marginBottom: '20px' }}>{payoutSetupError}</p>
+      )}
+
+      {isAdmin && (
+        <section className="dashboard-section" aria-label="Verification review">
+          <div className="dashboard-card">
+            <p className="dashboard-card__title">Host verification</p>
+            <p className="dashboard-card__meta">
+              Review pending ID and selfie submissions. Approve, or reject with a reason the host
+              will see.
+            </p>
+            <div className="booking-card__actions">
+              <Link to="/admin/verifications" className="btn btn--primary">
+                Review verifications
+              </Link>
+            </div>
+          </div>
+        </section>
       )}
 
       {listings.length > 0 && !payoutsEnabled && (

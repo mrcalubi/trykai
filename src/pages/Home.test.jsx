@@ -74,6 +74,38 @@ describe('Home listing grid', () => {
     expect(await screen.findByText('Latte art')).toBeInTheDocument()
     expect(screen.getByText(/\$51\/person/)).toBeInTheDocument()
     expect(screen.getByText('Boxing basics')).toBeInTheDocument()
+    expect(listingTitles()).toEqual(['Latte art', 'Boxing basics'])
+  })
+
+  it('makes the whole card a link to the listing, badged with its category', async () => {
+    givenListings([LATTE])
+    renderWithRouter(<Home />)
+
+    const card = await screen.findByRole('link', { name: /Latte art/ })
+    expect(card).toHaveAttribute('href', '/listings/l-1')
+    expect(within(card).getByRole('heading', { level: 2, name: 'Latte art' })).toBeInTheDocument()
+    expect(within(card).getByText('Food')).toBeInTheDocument()
+  })
+
+  it('shows the price alone while a listing has no rating', async () => {
+    givenListings([LATTE])
+    renderWithRouter(<Home />)
+
+    const card = await screen.findByRole('link', { name: /Latte art/ })
+    expect(within(card).getByText('$51/person')).toBeInTheDocument()
+    expect(card.textContent).not.toContain('★')
+    expect(card.textContent).not.toContain('·')
+  })
+
+  it('leads with the grid instead of a hero', async () => {
+    givenListings([LATTE])
+    renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Browse skills' })
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/Singapore's not boring/)).not.toBeInTheDocument()
   })
 
   it('only asks the database for active listings, newest first', async () => {
