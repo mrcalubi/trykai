@@ -75,7 +75,7 @@ The copy-paste PayNow queue assumed manual disbursement. `release-payout` Transf
 ### P0.3 — Admin: verification review — DONE
 **Flow:** host submits ID and selfie → Caleb reviews → approve or reject
 
-`/admin/verifications`, gated by `is_admin`, lists pending submissions oldest first with the ID photo and selfie side by side. Approve, or reject with a reason that is emailed to the host and shown to them on `/verify-identity` when they resubmit. `admin-verifications` authenticates the reviewer's own JWT and re-checks `is_admin` server-side; the images are served through signed URLs minted with the service role, so they are never reachable from a public or authenticated non-admin route. `review_verification` writes every decision alongside a `verification_reviews` audit row.
+`/admin/verifications`, gated by `is_admin`, lists pending submissions oldest first with the ID photo and selfie side by side. Approve, or reject with a reason that is emailed to the host and shown to them on `/verify-identity` when they resubmit. Admins reach it from the hamburger (**Verification review**) and from a card at the top of the dashboard. `admin-verifications` authenticates the reviewer's own JWT and re-checks `is_admin` server-side; the images are served through signed URLs minted with the service role, so they are never reachable from a public or authenticated non-admin route. `review_verification` writes every decision alongside a `verification_reviews` audit row.
 
 Still manual in the Table Editor: granting `is_admin`, which is a one-time action, and `is_founding_host`.
 
