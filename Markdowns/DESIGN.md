@@ -91,7 +91,7 @@ A reusable component library now exists in this tree, built in plain CSS matchin
 - **Category filter row** sits directly below the top nav as a horizontal band, scrollable sideways, and scrolls away with the content rather than staying pinned.
 
 **Browse experience decided (not all built):**
-- The listings grid leads on the home page, no hero banner or persistent search bar for launch. Two columns on phone (matching Airbnb's mobile browse density), three on tablet, four on desktop.
+- The Lane 1 headline from section 5 sits above the listings grid. No photo banner and no persistent search bar for launch. Two columns on phone (matching Airbnb's mobile browse density), three on tablet, four on desktop.
 - Card shows the category badge overlaid on the image top-left, title, a compact meta line with price and, only if a rating exists, the rating after a dot. A brand-new listing shows price only, never an empty star, deliberately unlike ToGatherSG's "0 reviews" look.
 - Only honest scarcity and real discounts as conversion nudges (real "spots left", real PayNow saving). No fabricated urgency, no fake "people viewing now".
 
@@ -101,7 +101,7 @@ A reusable component library now exists in this tree, built in plain CSS matchin
 - Two columns from 1024px, content left and a sticky booking card right. Page content is capped narrower than the browse grid, because a description running the full width of a 1440px screen is unreadable.
 - **The host block stays high, directly under the area, at every width.** On TryKai the guest is buying time with a person, so who is teaching belongs in the first decision, not below the description. Reviews come last.
 
-**What Home actually does today (9 September 2026):** the browse decisions above are built. No hero, grid 2 / 3 / 4 at 768px and 1024px, square images with a cream fallback, category badge overlaid on a cream pill, title clamped to two lines so cards in a row end level, and one meta line carrying the all-in price. The rating half of the meta line exists in `Card` but never fires on Home, because the listings fetch has no rating to pass; every card is therefore the price-only "new listing" state. Sort is newest only.
+**What Home actually does today (12 September 2026):** the browse decisions above are built, including the Lane 1 headline and subhead. Grid 2 / 3 / 4 at 768px and 1024px, square images with a cream fallback, category badge overlaid on a cream pill, title clamped to two lines so cards in a row end level, and one meta line carrying the all-in price. The rating half of the meta line exists in `Card` but never fires on Home, because the listings fetch has no rating to pass; every card is therefore the price-only "new listing" state. Sort is newest only.
 
 ---
 
