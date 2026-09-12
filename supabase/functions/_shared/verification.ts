@@ -213,6 +213,57 @@ export function identityEventOutcome(
   return { action: 'ignore' }
 }
 
+// ===========================================================================
+// Retention
+//
+// DECISIONS.md: rejected documents are deleted after 30 days, long enough for
+// resubmission confusion and short enough to limit exposure. Approved hosts'
+// documents are kept while the account is active.
+// ===========================================================================
+
+export const REJECTED_DOCUMENT_RETENTION_DAYS = 30
+
+export function retentionCutoffIso(now: number = Date.now()): string {
+  return new Date(now - REJECTED_DOCUMENT_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString()
+}
+
+export interface PurgeCandidate {
+  id: string
+  verification_status?: unknown
+  verification_reviewed_at?: string | null
+  id_photo_url?: string | null
+  selfie_url?: string | null
+}
+
+/** A Stripe Identity rejection has no stored documents, so there is nothing to remove. */
+export function purgeCandidatePaths(candidate: PurgeCandidate): string[] {
+  const paths = [candidate?.id_photo_url, candidate?.selfie_url].filter(
+    (path): path is string => typeof path === 'string' && path.length > 0,
+  )
+  return [...new Set(paths)]
+}
+
+/**
+ * Belt and braces against the query: a row is only purged when it is rejected,
+ * was reviewed long enough ago, and actually has something stored. Deleting a
+ * pending or approved host's documents would be unrecoverable.
+ */
+export function shouldPurgeDocuments(
+  candidate: PurgeCandidate,
+  now: number = Date.now(),
+): boolean {
+  if (normalizeVerificationStatus(candidate?.verification_status) !== 'rejected') return false
+  if (purgeCandidatePaths(candidate).length === 0) return false
+
+  const reviewedAt = candidate?.verification_reviewed_at
+  if (!reviewedAt) return false
+
+  const reviewedMs = new Date(reviewedAt).getTime()
+  if (Number.isNaN(reviewedMs)) return false
+
+  return reviewedMs <= new Date(retentionCutoffIso(now)).getTime()
+}
+
 /** Storage paths are derived server-side; never trust a client-supplied path. */
 export function verificationDocumentPaths(userId: string): {
   idPhoto: string

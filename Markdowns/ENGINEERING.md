@@ -351,7 +351,9 @@ supabase/migrations/
 ├── 00002_address_reveal_and_confirm_booking.sql
 ├── 00003_signup_verification_and_suspension.sql
 ├── 00004_create_profile_on_signup.sql
-└── 00005_stripe_connect_payments.sql
+├── 00005_stripe_connect_payments.sql
+├── 00006_block_host_self_booking.sql
+└── 00007_verification_security_foundation.sql
 
 supabase/functions/
 ├── _shared/
@@ -359,7 +361,8 @@ supabase/functions/
 │   ├── http.ts                  # JSON/CORS/secret helpers
 │   ├── connect.ts               # Express account v2 helpers
 │   ├── email.ts                 # Resend helper + booking HTML
-│   └── payouts.ts               # 24h Transfer eligibility
+│   ├── payouts.ts               # 24h Transfer eligibility
+│   └── verification.ts          # Status, Identity params, 30-day retention rules
 ├── create-payment-intent/       # Pending booking + PaymentIntent (no emails)
 ├── stripe-webhook/              # Stripe-Signature → confirm_paid_booking, identity outcomes, emails
 ├── create-connect-account/      # Express account for the signed-in host
@@ -368,8 +371,8 @@ supabase/functions/
 ├── admin-cancel-booking/        # x-admin-secret full refund; cancelled_by='host'; no UI
 ├── admin-verifications/         # JWT + is_admin; signed-URL queue, review + result email
 ├── create-identity-session/     # Stripe Identity hosted check; stores only the session id
-├── notify-verification-pending/ # Emails Caleb; no shared-secret header
-├── notify-verification-result/  # Emails host on approval/rejection; no shared-secret header
+├── notify-verification-pending/ # x-notify-secret; emails Caleb on manual pending
+├── purge-verification-docs/     # Daily cron; deletes rejected docs after 30 days
 └── release-payout/              # x-cron-secret Transfer 24h after starts_at
 ```
 
@@ -382,6 +385,9 @@ supabase/functions/
 | Create listing                                             | `src/pages/CreateListing.jsx`                                                                       |
 | Edit listing                                               | `src/pages/EditListing.jsx`                                                                         |
 | Host verification upload                                   | `src/pages/VerifyIdentity.jsx`                                                                      |
+| Host verification review                                   | `src/pages/AdminVerifications.jsx`                                                                  |
+| Verification and retention rules                           | `supabase/functions/_shared/verification.ts`                                                        |
+| Rejected-document deletion                                 | `supabase/functions/purge-verification-docs/`                                                       |
 | Dashboard, both views                                      | `src/pages/Dashboard.jsx`                                                                           |
 | Global nav and hamburger                                   | `src/components/SiteNav.jsx`, `src/components/ui/TopNav.jsx`, `src/components/ui/HamburgerMenu.jsx` |
 | UI kit not yet wired (Button, Input, SelectableCard)       | `src/components/ui/`, `src/pages/StyleGuide.jsx`                                                    |
@@ -397,7 +403,7 @@ supabase/functions/
 | Connect onboarding                                         | `supabase/functions/create-account-link/`                                                           |
 
 
-**Routes in** `App.jsx`**:** `/`, `/login`, `/listings/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/dashboard` (the last four behind `RequireAuth`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render SiteNav + Footer.
+**Routes in** `App.jsx`**:** `/`, `/login`, `/listings/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/dashboard` (the last four behind `RequireAuth`), `/admin/verifications` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render SiteNav + Footer.
 
 ---
 
@@ -441,7 +447,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 2. **Clicks Create Listing.** `CreateListing.jsx` checks `verification_status` on mount. `unverified` or `rejected` redirects to `/verify-identity`. `pending` blocks the form with an under review message. `approved` shows the form.
 3. **Verifies identity.** The default path is **Stripe Identity**: `create-identity-session` opens a hosted document plus live-selfie check and redirects back to `/verify-identity?identity=return`, where the page polls `my_verification()` because the checks are asynchronous. **TryKai never receives the images** — Stripe holds them and reports only an outcome, which is the point. The status is deliberately *not* moved to `pending` when the session is created, because a session starts in `requires_input` and emits no event until the host submits, so anyone who abandons the flow would otherwise be stranded.
 
-   The manual upload is the fallback, behind "Having trouble?". It uploads to the private `verification-docs` bucket, scoped to a folder named after the user id, which the storage policy enforces. A consent checkbox is required, and `submit_verification` records `verification_consent_at` alongside the paths and `pending`. A database webhook is expected to fire `notify-verification-pending`, emailing `calebong2002@gmail.com`. That function has **no shared-secret header**.
+   The manual upload is the fallback, behind "Having trouble?". It uploads to the private `verification-docs` bucket, scoped to a folder named after the user id, which the storage policy enforces. A consent checkbox is required, and `submit_verification` records `verification_consent_at` alongside the paths and `pending`. A database webhook fires `notify-verification-pending`, which emails `ADMIN_NOTIFY_EMAIL` (default `calebong2002@gmail.com`) with a link to `/admin/verifications`. That function requires `NOTIFY_FUNCTION_SECRET` as `x-notify-secret` or Bearer. Stripe Identity outcomes never pass through `pending`, so they do not send this email.
 4. **The outcome is recorded.** For Stripe Identity, `stripe-webhook` handles `identity.verification_session.verified` and `.requires_input`. A `requires_input` event is only treated as a failure when it carries a `last_error`, since a fresh session sits in that status. The failure code maps to host-readable copy in `IDENTITY_FAILURE_REASONS`; `consent_declined` and `country_not_supported` point at manual review, because an automated check cannot help there.
 
    For manual submissions, Caleb reviews at `/admin/verifications`: both documents side by side, approve, or reject with a reason. Both paths call `review_verification` (`00007`, service role only), which writes the decision, the reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record, and `method` records which route decided it. Whichever function made the decision emails the host. A rejected host also sees the reason on `/verify-identity` when they try again.
@@ -469,7 +475,7 @@ On confirmation: `status = 'cancelled'`, `cancelled_by = 'guest'`, `refund_amoun
 
 ### Scenario 5: Verification rejected
 
-Caleb sets `verification_status = 'rejected'`. Webhook should fire `notify-verification-result` with a resubmit prompt. The form becomes available again. Rejected documents are scheduled for deletion after 30 days, via an Edge Function that is not yet built.
+Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails with a `last_error`. `review_verification` writes `rejected`. The function that made the decision (`admin-verifications` or `stripe-webhook`) emails the host the reason and a resubmit link. The form on `/verify-identity` becomes available again. After 30 days, `purge-verification-docs` deletes whatever is still stored under that rejection and clears the URL columns. Stripe Identity rejections have no stored images, so the job skips them. Approved hosts' documents are kept while the account is active.
 
 ---
 
@@ -487,7 +493,7 @@ Caleb sets `verification_status = 'rejected'`. Webhook should fire `notify-verif
 
 **EditListing.jsx** — auth required, ownership checked, pre fills including `full_address` and existing photos.
 
-**VerifyIdentity.jsx** — two uploads to the private bucket, then client UPDATE to pending. Pending users see an under review message.
+**VerifyIdentity.jsx** — Stripe Identity first. Manual fallback uploads to the private bucket, then `submit_verification` with consent. Pending users see an under review message. A rejection reason from either path is shown on resubmit.
 
 **Dashboard.jsx** — Connect payout setup. Host: listings with Add Session, Edit, soft-delete; upcoming sessions that have active bookings, with Cancel and strike warning. Guest: upcoming and past bookings, Cancel with calculated refund shown, leave review after `starts_at` on pending or confirmed. Polls `?booking=` after Payment Element return.
 
@@ -503,7 +509,7 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 
 **Launch blocking**
 
-- All Edge Function emails still send from Resend's shared test domain. Real users receive nothing until trykai.sg is verified. **Same week:** shared-secret header on `notify-verification-pending` and `notify-verification-result` (release-payout and admin-cancel-booking are already secret-gated; the webhook uses Stripe-Signature).
+- All Edge Function emails still send from Resend's shared test domain. Real users receive nothing until trykai.sg is verified. `notify-verification-pending` is secret-gated (`NOTIFY_FUNCTION_SECRET`). Result emails come from `admin-verifications` and `stripe-webhook`; `notify-verification-result` is gone.
 - Staging must apply `00005` and run this money path in Stripe **test mode** before production. Platform Stripe payouts must be switched to manual. Mark the eleven founding hosts `is_founding_host = true` in Table Editor. One real test booking on production before warm-contact launch.
 - `is_suspended` is never queried in `src/`. Setting the flag in Table Editor does not hide listings or block booking. SAFETY_RESPONSE_PROTOCOL.md still requires a hand check that listings are `is_active = false`.
 - `listings.full_address` is still `GRANT ALL` from `00001`.
@@ -532,7 +538,6 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 - Admin UI for `admin-cancel-booking`
 - Refund amount in a cancellation email
 - Payout clawback where a dispute is confirmed after release
-- Auto deletion of rejected verification documents after 30 days
 
 ---
 

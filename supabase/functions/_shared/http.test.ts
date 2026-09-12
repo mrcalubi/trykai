@@ -71,6 +71,15 @@ describe('asRecord', () => {
   })
 })
 
+describe('corsHeaders', () => {
+  it('allows the secret headers cron and database-webhook callers send', () => {
+    const allowed = corsHeaders['Access-Control-Allow-Headers']
+    expect(allowed).toContain('x-cron-secret')
+    expect(allowed).toContain('x-admin-secret')
+    expect(allowed).toContain('x-notify-secret')
+  })
+})
+
 describe('hasValidSecret', () => {
   it('accepts the named header or a bearer token', () => {
     const secret = 's3cret'

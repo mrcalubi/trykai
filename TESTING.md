@@ -23,7 +23,7 @@ The browser suite needs Chromium once: `npx playwright install chromium`.
 Pure functions, no DOM, no mocks. This is where the money rules live: refund
 tiers, the platform fee, Connect helpers, payout eligibility, and guest-count
 validation. Shared Edge modules under `supabase/functions/_shared/`
-(`booking`, `http`, `connect`, `email`, `payouts`) are covered here. These are
+(`booking`, `http`, `connect`, `email`, `payouts`, `verification`) are covered here. These are
 the tests to reach for first when changing anything that decides an amount.
 
 **Component** — `src/components/*.test.jsx`
