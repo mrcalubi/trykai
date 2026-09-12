@@ -53,7 +53,10 @@ describe('App routes', () => {
     renderAt('/')
 
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Browse skills' })
+      await screen.findByRole('heading', {
+        level: 1,
+        name: "Singapore's not boring. You just haven't found your thing yet.",
+      })
     ).toBeInTheDocument()
   })
 

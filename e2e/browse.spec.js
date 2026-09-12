@@ -3,15 +3,19 @@ import { stubAllExternalCalls } from './support/network'
 import { BOXING, LATTE_ART } from './support/fixtures'
 
 test.describe('browsing listings', () => {
-  test('leads with the grid of every active listing, no hero', async ({ page }) => {
+  test('shows the landing headline above the grid of every active listing', async ({ page }) => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART, BOXING] })
     await page.goto('/')
 
+    await expect(
+      page.getByRole('heading', {
+        level: 1,
+        name: "Singapore's not boring. You just haven't found your thing yet.",
+      })
+    ).toBeVisible()
+    await expect(page.getByText(/Solo, with friends, or on a date/)).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Learn latte art with me' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Boxing basics' })).toBeVisible()
-    await expect(page.getByText(/Singapore's not boring/)).toHaveCount(0)
-    // Screen-reader only, so it is attached rather than visible.
-    await expect(page.getByRole('heading', { level: 1, name: 'Browse skills' })).toBeAttached()
   })
 
   test('shows the category and price on each card, with no rating until it has one', async ({
