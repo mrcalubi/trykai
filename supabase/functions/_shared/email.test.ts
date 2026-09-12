@@ -2,12 +2,62 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   bookingConfirmedGuestHtml,
   bookingConfirmedHostHtml,
+  escapeHtml,
   formatSessionDate,
   sendResendEmail,
+  verificationApprovedHtml,
+  verificationRejectedHtml,
 } from './email.ts'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+describe('verification result emails', () => {
+  it('points an approved host at the listing form', () => {
+    const html = verificationApprovedHtml({ hostName: 'Mei Ling' })
+    expect(html).toContain('Mei Ling')
+    expect(html).toContain('https://trykai.sg/create-listing')
+  })
+
+  it('greets an approved host without a name on file', () => {
+    expect(verificationApprovedHtml({ hostName: null })).toContain("You're verified!")
+  })
+
+  it('tells a rejected host what to fix and where to resubmit', () => {
+    const html = verificationRejectedHtml({
+      hostName: 'Mei Ling',
+      reason: 'The ID photo is too blurry to read',
+    })
+    expect(html).toContain('Mei Ling')
+    expect(html).toContain('The ID photo is too blurry to read')
+    expect(html).toContain('https://trykai.sg/verify-identity')
+  })
+
+  it('greets a rejected host without a name on file', () => {
+    expect(verificationRejectedHtml({ hostName: null, reason: 'blurry' })).toContain('Hi,')
+  })
+
+  it('escapes the reason, which a reviewer typed by hand', () => {
+    const html = verificationRejectedHtml({
+      hostName: 'Mei Ling',
+      reason: '<script>alert("x")</script>',
+    })
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('&lt;script&gt;')
+  })
+})
+
+describe('escapeHtml', () => {
+  it('escapes the five characters that break out of an attribute or element', () => {
+    expect(escapeHtml(`<a href="x" title='y'>&</a>`)).toBe(
+      '&lt;a href=&quot;x&quot; title=&#39;y&#39;&gt;&amp;&lt;/a&gt;',
+    )
+  })
+
+  it('leaves ordinary text alone', () => {
+    expect(escapeHtml('The ID photo is blurry')).toBe('The ID photo is blurry')
+  })
 })
 
 describe('booking confirmation emails', () => {

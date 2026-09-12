@@ -104,6 +104,13 @@ test.describe('signed-out navigation', () => {
     await expect(page).toHaveURL(/\/login$/)
   })
 
+  test('redirects verification review to login', async ({ page }) => {
+    await stubAllExternalCalls(page, {})
+    await page.goto('/admin/verifications')
+
+    await expect(page).toHaveURL(/\/login$/)
+  })
+
   test('returns the visitor to where they were headed after logging in', async ({ page }) => {
     await stubAllExternalCalls(
       page,
@@ -137,3 +144,57 @@ test.describe('signed-out navigation', () => {
     expect(errors).toEqual([])
   })
 })
+
+test.describe('verification review', () => {
+  test('an admin opens the queue from the menu and sees both documents', async ({ page }) => {
+    await stubAllExternalCalls(
+      page,
+      {
+        users: [{ id: SIGNED_IN_USER.id, full_name: 'Caleb', avatar_url: null }],
+        'rpc/my_verification': [{ is_admin: true }],
+      },
+      {
+        session: makeAuthSession(),
+        functions: {
+          'admin-verifications': (body) => {
+            if (body?.action === 'list') {
+              return {
+                pending: [
+                  {
+                    id: 'host-9',
+                    full_name: 'Mei Ling',
+                    email: 'mei@example.com',
+                    submitted_at: '2026-09-01T02:00:00.000Z',
+                    id_photo_url: '/trykai.png',
+                    selfie_url: '/trykai.png',
+                  },
+                ],
+              }
+            }
+            return { ok: true }
+          },
+        },
+      }
+    )
+
+    await page.goto('/login')
+    await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+    await page.getByLabel('Password').fill(SIGNED_IN_USER.password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+    await expect(page).toHaveURL(/\/$/)
+
+    await page.getByRole('button', { name: 'Open menu' }).click()
+    await page
+      .getByRole('navigation', { name: 'Main menu' })
+      .getByRole('link', { name: 'Verification review' })
+      .click()
+
+    await expect(page).toHaveURL(/\/admin\/verifications$/)
+    await expect(page.getByRole('heading', { name: 'Verification review' })).toBeVisible()
+    await expect(page.getByText('Mei Ling')).toBeVisible()
+    await expect(page.getByAltText('ID document')).toBeVisible()
+    await expect(page.getByAltText('Selfie')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Approve' })).toBeVisible()
+  })
+})
+
