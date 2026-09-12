@@ -71,26 +71,15 @@ describe('Card', () => {
     expect(screen.queryByText('—')).not.toBeInTheDocument()
   })
 
-  it('renders the title at whatever level the page needs', () => {
-    render(<Card title="Latte art" titleLevel={2} />)
-
-    expect(screen.getByRole('heading', { name: 'Latte art', level: 2 })).toBeInTheDocument()
-  })
-
-  it('shows the rating to one decimal even when it is a whole number', () => {
-    render(<Card title="Latte art" rating={5} />)
-
-    expect(screen.getByText(/5\.0/)).toBeInTheDocument()
-  })
-
-  it('renders browse mode as a link with a badge and one price and rating line', () => {
-    const { container } = render(
+  it('renders browse mode as a link with badge, compact meta, and price only', () => {
+    render(
       <MemoryRouter>
         <Card
           mode="browse"
           to="/listings/latte"
           badge="Food"
           title="Learn latte art with me"
+          meta="Mei Ling · Tampines"
           rating={4.8}
           price="$20/person"
         />
@@ -101,21 +90,8 @@ describe('Card', () => {
     expect(link).toHaveAttribute('href', '/listings/latte')
     expect(link.className).toContain('ui-card--browse')
     expect(screen.getByText('Food')).toBeInTheDocument()
-    expect(container.querySelectorAll('.ui-card__meta-line')).toHaveLength(1)
-    expect(container.querySelector('.ui-card__meta-line').textContent).toBe(
-      '$20/person · ★ 4.8'
-    )
+    expect(screen.getByText('Mei Ling · Tampines')).toBeInTheDocument()
+    expect(screen.getByText('$20/person')).toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
-  })
-
-  it('drops the dot and the star in browse mode when there is no rating', () => {
-    const { container } = render(
-      <MemoryRouter>
-        <Card mode="browse" to="/listings/boxing" title="Boxing basics" price="$32/person" />
-      </MemoryRouter>
-    )
-
-    expect(container.querySelector('.ui-card__meta-line').textContent).toBe('$32/person')
-    expect(container.querySelector('.ui-card__rating')).not.toBeInTheDocument()
   })
 })

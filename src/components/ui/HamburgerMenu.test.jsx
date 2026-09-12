@@ -34,16 +34,6 @@ describe('HamburgerMenu', () => {
     expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Log out' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Log in or sign up' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Verification review' })).not.toBeInTheDocument()
-  })
-
-  it('offers verification review only to an admin', () => {
-    renderMenu({ open: true, isLoggedIn: true, isAdmin: true })
-
-    expect(screen.getByRole('link', { name: 'Verification review' })).toHaveAttribute(
-      'href',
-      '/admin/verifications'
-    )
   })
 
   it('closes when the dimmed backdrop is pressed', async () => {

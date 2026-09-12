@@ -8,17 +8,14 @@ const LOGGED_OUT_LINKS = [
   { label: 'Dispute policy', to: '/dispute-policy' },
 ]
 
-function loggedInLinks(isAdmin) {
-  return [
-    { label: 'Browse', to: '/' },
-    { label: 'My bookings', to: '/dashboard' },
-    { label: 'Create listing', to: '/create-listing' },
-    ...(isAdmin ? [{ label: 'Verification review', to: '/admin/verifications' }] : []),
-    { label: 'Profile', to: '#' },
-    { label: 'Settings', to: '#' },
-    { label: 'Log out', to: '#', action: 'logout' },
-  ]
-}
+const LOGGED_IN_LINKS = [
+  { label: 'Browse', to: '/' },
+  { label: 'My bookings', to: '/dashboard' },
+  { label: 'Create listing', to: '/create-listing' },
+  { label: 'Profile', to: '#' },
+  { label: 'Settings', to: '#' },
+  { label: 'Log out', to: '#', action: 'logout' },
+]
 
 const STAGGER_MS = 45
 
@@ -27,10 +24,9 @@ export default function HamburgerMenu({
   onClose,
   onLogout,
   isLoggedIn = false,
-  isAdmin = false,
   className = '',
 }) {
-  const links = isLoggedIn ? loggedInLinks(isAdmin) : LOGGED_OUT_LINKS
+  const links = isLoggedIn ? LOGGED_IN_LINKS : LOGGED_OUT_LINKS
 
   function handleLinkClick(event, link) {
     if (link.action === 'logout' && onLogout) {

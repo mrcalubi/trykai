@@ -10,10 +10,7 @@ import {
   bookingConfirmedHostHtml,
   formatSessionDate,
   sendResendEmail,
-  verificationApprovedHtml,
-  verificationRejectedHtml,
 } from '../_shared/email.ts'
-import { identityEventOutcome } from '../_shared/verification.ts'
 import {
   asRecord,
   chargeIdFromPaymentIntent,
@@ -206,73 +203,6 @@ async function syncConnectedAccount(account: { id: string; payouts_enabled?: boo
     .eq('stripe_account_id', account.id)
 }
 
-/**
- * Stripe holds the documents; this only records the outcome. The host is
- * emailed from here for the same reason the review UI emails from its own
- * action: the decision and the reason exist at this point and nowhere else.
- */
-async function reviewIdentitySession(
-  eventType: string,
-  session: {
-    id: string
-    metadata?: Record<string, string>
-    last_error?: { code?: unknown; reason?: unknown } | null
-  },
-) {
-  const outcome = identityEventOutcome(eventType, session)
-  if (outcome.action === 'ignore') return
-
-  const admin = adminClient()
-  const userId = session.metadata?.user_id
-
-  let profileQuery = admin.from('users').select('id, full_name, email')
-  profileQuery = userId
-    ? profileQuery.eq('id', userId)
-    : profileQuery.eq('stripe_identity_session_id', session.id)
-
-  const { data: profile, error } = await profileQuery.maybeSingle()
-  if (error || !profile) {
-    console.error('identity: no host for verification session', session.id, error)
-    return
-  }
-
-  const decision = outcome.action === 'approve' ? 'approved' : 'rejected'
-  const reason = outcome.action === 'reject' ? outcome.reason : null
-
-  const { error: reviewError } = await admin.rpc('review_verification', {
-    p_user_id: profile.id,
-    p_decision: decision,
-    p_reason: reason,
-    p_method: 'stripe_identity',
-    p_reviewer_id: null,
-  })
-
-  if (reviewError) {
-    console.error('identity: review_verification failed', profile.id, reviewError.message)
-    return
-  }
-
-  const apiKey = Deno.env.get('RESEND_API_KEY')
-  if (decision === 'approved') {
-    await sendResendEmail({
-      apiKey,
-      to: profile.email,
-      subject: "You're verified! Start hosting on TryKai",
-      html: verificationApprovedHtml({ hostName: profile.full_name }),
-    })
-  } else {
-    await sendResendEmail({
-      apiKey,
-      to: profile.email,
-      subject: 'Update on your TryKai verification',
-      html: verificationRejectedHtml({
-        hostName: profile.full_name,
-        reason: reason as string,
-      }),
-    })
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return textResponse('ok')
@@ -295,7 +225,7 @@ Deno.serve(async (req) => {
       cryptoProvider,
     )
   } catch (err) {
-    console.error('webhook signature failed', err instanceof Error ? err.message : err)
+    console.error('webhook signature failed', err.message)
     return jsonResponse({ error: 'Invalid signature' }, 400)
   }
 
@@ -307,13 +237,11 @@ Deno.serve(async (req) => {
       await cancelPendingPayment(event.data.object)
     } else if (action === 'sync_account') {
       await syncConnectedAccount(event.data.object)
-    } else if (action === 'review_identity') {
-      await reviewIdentitySession(event.type, event.data.object)
     }
 
     return jsonResponse({ received: true })
   } catch (err) {
     console.error('webhook handler failed', err)
-    return jsonResponse({ error: err instanceof Error ? err.message : 'Unexpected error' }, 500)
+    return jsonResponse({ error: err.message }, 500)
   }
 })

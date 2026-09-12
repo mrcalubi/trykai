@@ -198,30 +198,16 @@ export default function StyleGuide() {
           <article className="style-guide-card-example">
             <p className="style-guide-card__label">Browse card</p>
             <p className="style-guide-card__usage">
-              Category badge, title, then one meta line: price, and the rating only if the
-              listing has one. Whole card clickable.
+              Category badge, host · area, optional rating, price only. Whole card clickable.
             </p>
             <Card
               mode="browse"
               to="/listings/example"
               badge="Food"
               title="Learn latte art with me"
+              meta="Mei Ling · Tampines"
               rating={4.8}
               price="$20/person"
-            />
-          </article>
-          <article className="style-guide-card-example">
-            <p className="style-guide-card__label">Browse card, no reviews yet</p>
-            <p className="style-guide-card__usage">
-              A brand-new listing shows the price alone. No dot, no empty star, no
-              &ldquo;0 reviews&rdquo;.
-            </p>
-            <Card
-              mode="browse"
-              to="/listings/example"
-              badge="Fitness"
-              title="Boxing basics for absolute beginners"
-              price="$32/person"
             />
           </article>
           <article className="style-guide-card-example">

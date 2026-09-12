@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { supabase } from './lib/supabase'
-import { makeAuthSession } from './test/fixtures'
 
 vi.mock('./lib/supabase')
 
@@ -53,7 +52,7 @@ describe('App routes', () => {
     renderAt('/')
 
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Browse skills' })
+      await screen.findByRole('heading', { name: /Singapore's not boring/ })
     ).toBeInTheDocument()
   })
 
@@ -108,23 +107,5 @@ describe('App routes', () => {
     renderAt('/edit-listing/listing-1')
 
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
-  })
-
-  it('sends a signed-out visitor from verification review to login', async () => {
-    renderAt('/admin/verifications')
-
-    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
-  })
-
-  it('refuses a signed-in host who is not an admin', async () => {
-    supabase.auth.getSession.mockResolvedValue({
-      data: { session: makeAuthSession() },
-      error: null,
-    })
-    supabase.rpc.mockResolvedValue({ data: [{ is_admin: false }], error: null })
-    renderAt('/admin/verifications')
-
-    expect(await screen.findByText('This page is for the TryKai team only.')).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Verification review' })).not.toBeInTheDocument()
   })
 })

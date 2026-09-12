@@ -124,12 +124,7 @@ export async function createConnectedAccount(
   return { id }
 }
 
-/**
- * SITE_URL comes from Edge Function secrets, where a bare domain or a stray
- * trailing slash is an easy mistake. Fail with a message that names the fix
- * rather than letting Stripe reject the URL later.
- */
-export function normalizeSiteUrl(raw: string | undefined): string {
+export function siteUrlForAccountLinks(raw: string | undefined): string {
   const value = (raw ?? '').trim() || 'https://trykai.sg'
   let parsed: URL
   try {
@@ -147,9 +142,6 @@ export function normalizeSiteUrl(raw: string | undefined): string {
   return value.replace(/\/$/, '')
 }
 
-/** @deprecated Prefer `normalizeSiteUrl`; kept because Connect call sites read better with it. */
-export const siteUrlForAccountLinks = normalizeSiteUrl
-
 export function accountLinkParams(
   accountId: string,
   siteUrl: string,
@@ -159,7 +151,7 @@ export function accountLinkParams(
   refresh_url: string
   return_url: string
 } {
-  const base = normalizeSiteUrl(siteUrl)
+  const base = siteUrlForAccountLinks(siteUrl)
   return {
     account: accountId,
     type: 'account_onboarding',
