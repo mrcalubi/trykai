@@ -5,7 +5,7 @@ function hasRating(rating) {
 }
 
 function formatRating(rating) {
-  return Number.isInteger(rating) ? String(rating) : rating.toFixed(1)
+  return rating.toFixed(1)
 }
 
 export default function Card({
@@ -14,6 +14,7 @@ export default function Card({
   imageAlt = '',
   badge,
   title,
+  titleLevel = 3,
   meta,
   rating,
   price,
@@ -34,13 +35,29 @@ export default function Card({
     .join(' ')
   const metaLines = Array.isArray(meta) ? meta.filter(Boolean) : meta ? [meta] : []
   const showRating = hasRating(rating)
+  const Title = `h${titleLevel}`
   const Wrapper = isBrowse && to ? Link : 'article'
   const wrapperProps =
     isBrowse && to
       ? { to, className: classes, ...props }
       : { className: classes, ...props }
 
-  const metaBlock =
+  // Browse keeps price and rating on one line, so the price is a bare text node
+  // rather than its own element: the line itself carries the price styling.
+  const browseMetaLine =
+    price || showRating ? (
+      <p className="ui-card__meta-line">
+        {price}
+        {showRating ? (
+          <span className="ui-card__rating">
+            {price ? <span aria-hidden="true"> · </span> : null}
+            <span aria-hidden="true">★</span> {formatRating(rating)}
+          </span>
+        ) : null}
+      </p>
+    ) : null
+
+  const bookingMetaBlock =
     metaLines.length > 0 || showRating ? (
       <div className="ui-card__meta-row">
         {metaLines.length > 0 ? (
@@ -73,12 +90,9 @@ export default function Card({
         </div>
       ) : null}
       <div className="ui-card__body">
-        {title ? <h3 className="ui-card__title">{title}</h3> : null}
-        {metaBlock}
+        {title ? <Title className="ui-card__title">{title}</Title> : null}
+        {isBrowse ? browseMetaLine : bookingMetaBlock}
         {children}
-        {isBrowse && price ? (
-          <p className="ui-card__price">{price}</p>
-        ) : null}
         {!isBrowse && footer ? <div className="ui-card__footer">{footer}</div> : null}
       </div>
     </Wrapper>

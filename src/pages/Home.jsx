@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import ListingCard from '../components/ListingCard'
+import Card from '../components/ui/Card'
+import { formatGuestFacingPrice } from '../lib/pricing'
 
 export default function Home() {
   const [listings, setListings] = useState([])
@@ -65,7 +66,7 @@ export default function Home() {
   }, [listings, activeCategory, areaFilter])
 
   return (
-    <div className="page">
+    <div className="page page--browse">
       <header className="hero">
         <h1 className="hero__title">
           Singapore&apos;s not boring. You just haven&apos;t found your thing yet.
@@ -117,7 +118,16 @@ export default function Home() {
           ) : (
             <div className="listings-grid">
               {filteredListings.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
+                <Card
+                  key={listing.id}
+                  mode="browse"
+                  to={`/listings/${listing.id}`}
+                  image={listing.photo_urls?.[0]}
+                  badge={listing.category}
+                  title={listing.title}
+                  titleLevel={2}
+                  price={`${formatGuestFacingPrice(listing.price_per_person)}/person`}
+                />
               ))}
             </div>
           )}

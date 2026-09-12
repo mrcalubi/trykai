@@ -1,85 +1,52 @@
+import { escapeHtml, sendResendEmail } from '../_shared/email.ts'
+import { asRecord, hasValidSecret, jsonResponse, textResponse } from '../_shared/http.ts'
 
-const corsHeaders = {
-
-  'Access-Control-Allow-Origin': '*',
-
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-
-}
-
+/**
+ * Called by a Supabase database webhook on `public.users`, because a manual
+ * submission goes through the `submit_verification` RPC and so has no Edge
+ * Function in its path. Set the shared secret as a header on that webhook.
+ *
+ * Verification *results* are not sent from here. Whichever function made the
+ * decision emails the host, so it has the rejection reason to hand.
+ */
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return textResponse('ok')
 
-  if (req.method === 'OPTIONS') {
-
-    return new Response('ok', { headers: corsHeaders })
-
+  const secret = Deno.env.get('NOTIFY_FUNCTION_SECRET')
+  if (!hasValidSecret(req, secret, ['x-notify-secret'])) {
+    return textResponse('Unauthorized', 401)
   }
 
   try {
-
     const payload = await req.json()
+    const record = asRecord(payload?.record) as Record<string, unknown> | null
+    const oldRecord = asRecord(payload?.old_record) as Record<string, unknown> | null
 
-    const record = payload.record
+    const becamePending =
+      record?.verification_status === 'pending' && oldRecord?.verification_status !== 'pending'
 
-    const oldRecord = payload.old_record
+    if (!becamePending) return jsonResponse({ ok: true, notified: false })
 
-    // Only notify when verification_status changes TO 'pending'
+    const siteUrl = (Deno.env.get('SITE_URL') ?? 'https://trykai.sg').replace(/\/$/, '')
+    const fullName = typeof record?.full_name === 'string' ? record.full_name : 'A host'
+    const email = typeof record?.email === 'string' ? record.email : 'unknown email'
 
-    if (record?.verification_status === 'pending' && oldRecord?.verification_status !== 'pending') {
-
-      await fetch('https://api.resend.com/emails', {
-
-        method: 'POST',
-
-        headers: {
-
-          'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
-
-          'Content-Type': 'application/json',
-
-        },
-
-        body: JSON.stringify({
-
-          from: 'TryKai <onboarding@resend.dev>',
-
-          to: 'calebong2002@gmail.com',
-
-          subject: 'New host verification pending review',
-
-          html: `
-
-            <h2>New verification submission</h2>
-
-            <p><strong>${record.full_name}</strong> (${record.email}) has submitted ID verification documents.</p>
-
-            <p>Review in <a href="https://supabase.com/dashboard/project/dqqlwofluvhikebtjune/editor">Supabase Table Editor</a>.</p>
-
-          `,
-
-        }),
-
-      })
-
-    }
-
-    return new Response(JSON.stringify({ ok: true }), {
-
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-
+    await sendResendEmail({
+      apiKey: Deno.env.get('RESEND_API_KEY'),
+      to: Deno.env.get('ADMIN_NOTIFY_EMAIL') ?? 'calebong2002@gmail.com',
+      subject: 'New host verification pending review',
+      html: `
+        <h2>New verification submission</h2>
+        <p><strong>${escapeHtml(fullName)}</strong> (${escapeHtml(email)}) uploaded identity
+        documents for manual review.</p>
+        <p><a href="${siteUrl}/admin/verifications">Review it on TryKai</a></p>
+      `,
     })
 
+    return jsonResponse({ ok: true, notified: true })
   } catch (err) {
-
-    return new Response(JSON.stringify({ error: err.message }), {
-
-      status: 500,
-
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-
-    })
-
+    const message = err instanceof Error ? err.message : 'Unexpected error'
+    console.error('notify-verification-pending failed', message)
+    return jsonResponse({ error: message }, 500)
   }
-
 })
-
