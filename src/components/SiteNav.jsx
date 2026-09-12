@@ -15,6 +15,7 @@ export default function SiteNav() {
   const [user, setUser] = useState(null)
   const [fullName, setFullName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     function applySession(session) {
@@ -23,6 +24,7 @@ export default function SiteNav() {
       if (!nextUser) {
         setFullName('')
         setAvatarUrl('')
+        setIsAdmin(false)
       }
     }
 
@@ -51,6 +53,14 @@ export default function SiteNav() {
         setFullName(data?.full_name || '')
         setAvatarUrl(data?.avatar_url || '')
       })
+
+    // `is_admin` has no client SELECT grant, so the menu asks the same
+    // caller-scoped function RequireAdmin uses. The review function checks
+    // again server-side; this only decides whether to show the link.
+    supabase.rpc('my_verification').then(({ data, error }) => {
+      const row = Array.isArray(data) ? data[0] : data
+      setIsAdmin(!error && Boolean(row?.is_admin))
+    })
   }, [user])
 
   async function handleLogout() {
@@ -61,6 +71,7 @@ export default function SiteNav() {
   return (
     <TopNav
       isLoggedIn={Boolean(user)}
+      isAdmin={isAdmin}
       avatarUrl={avatarUrl || undefined}
       name={fullName || user?.email || ''}
       onLogout={handleLogout}

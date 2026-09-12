@@ -33,8 +33,9 @@ function json(route, body, status = 200) {
  * @param page    Playwright page
  * @param tables  map of table name to the rows that table should return
  * @param session session the password grant should hand back, or null to reject it
+ * @param functions map of Edge Function name to a JSON body or a (requestBody) => body
  */
-export async function stubSupabase(page, tables = {}, { session = null } = {}) {
+export async function stubSupabase(page, tables = {}, { session = null, functions = {} } = {}) {
   await page.route(`${SUPABASE_URL}/**`, async (route) => {
     const request = route.request()
 
@@ -53,6 +54,22 @@ export async function stubSupabase(page, tables = {}, { session = null } = {}) {
       return session
         ? json(route, session)
         : json(route, { error: 'invalid_grant', error_description: 'Invalid login credentials' }, 400)
+    }
+
+    if (request.url().includes('/functions/v1/')) {
+      const name = new URL(request.url()).pathname.replace(/^\/functions\/v1\//, '')
+      const payload = functions[name]
+      if (payload === undefined) return json(route, {})
+      if (typeof payload === 'function') {
+        let body = {}
+        try {
+          body = request.postDataJSON() ?? {}
+        } catch {
+          body = {}
+        }
+        return json(route, payload(body))
+      }
+      return json(route, payload)
     }
 
     if (!request.url().includes('/rest/v1/')) {
