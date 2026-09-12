@@ -15,10 +15,7 @@ describe('stripeEventAction', () => {
     expect(stripeEventAction('payment_intent.payment_failed')).toBe('cancel_pending')
     expect(stripeEventAction('payment_intent.canceled')).toBe('cancel_pending')
     expect(stripeEventAction('account.updated')).toBe('sync_account')
-    expect(stripeEventAction('identity.verification_session.verified')).toBe('review_identity')
-    expect(stripeEventAction('identity.verification_session.requires_input')).toBe('review_identity')
     expect(stripeEventAction('charge.refunded')).toBe('ignore')
-    expect(stripeEventAction('identity.verification_session.created')).toBe('ignore')
     expect(stripeEventAction('ping')).toBe('ignore')
   })
 })
@@ -68,15 +65,6 @@ describe('asRecord', () => {
     expect(asRecord([])).toBeNull()
     expect(asRecord(null)).toBeNull()
     expect(asRecord(undefined)).toBeNull()
-  })
-})
-
-describe('corsHeaders', () => {
-  it('allows the secret headers cron and database-webhook callers send', () => {
-    const allowed = corsHeaders['Access-Control-Allow-Headers']
-    expect(allowed).toContain('x-cron-secret')
-    expect(allowed).toContain('x-admin-secret')
-    expect(allowed).toContain('x-notify-secret')
   })
 })
 

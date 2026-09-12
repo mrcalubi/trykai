@@ -20,9 +20,9 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 | **Payments** | **Stripe Connect**, separate charges and transfers, Express accounts. Guest checkout, webhook confirmation, Connect onboarding, refunds, and 24h Transfers are **in this tree**. Remaining is ops: apply `00005` on staging, Stripe Dashboard webhook + secrets, platform payouts **manual**, founding-host flags, one test-mode booking. |
 
 **In the repo now (walked 31 August)**
-- Staging Supabase environment exists; schema is `supabase/migrations/` `00001`–`00007`
+- Staging Supabase environment exists; schema is `supabase/migrations/` `00001`–`00005`
 - Signup profile row is created by `handle_new_user` (`00004`), not by Login.jsx
-- Host verification: `submit_verification` RPC and Stripe Identity; review at `/admin/verifications`. See ENGINEERING.md
+- Host verification is a client UPDATE to `pending`, guarded by `guard_user_self_update`. There is no `submit_verification` RPC
 - Atomic `spots_remaining` decrement via `confirm_paid_booking` (service role only)
 - Guest address reveal via `get_listing_address` (confirmed guest only). `listings.full_address` is still granted SELECT
 - Four tier cancellation refunds via `cancel-booking` (no cancellation emails)
@@ -32,7 +32,7 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 **Blocked or in flight**
 - Stripe ops on staging (migration, webhook, manual platform payouts, test booking). Do not assume `00005` is applied until someone confirms
 - Whether production has the 22 August signup/verification hotfixes. Still needs confirming with Ruiheng
-- P0.8 real Resend domain. Notify-function secrets are in the tree; the shared test sender is not.
+- P0.8 real Resend domain, same week as a secret on the unauthenticated notify-verification functions
 - P0.4: `is_suspended` exists; the app never queries it
 - StyleGuide imports category PNGs that are not in the repo; Navbar requests `/trykai.png`, which is not in `public/`
 

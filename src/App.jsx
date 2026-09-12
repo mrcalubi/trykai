@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import SiteNav from './components/SiteNav'
 import Footer from './components/Footer'
 import RequireAuth from './components/RequireAuth'
-import RequireAdmin from './components/RequireAdmin'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import ListingDetail from './pages/ListingDetail'
@@ -10,7 +9,6 @@ import CreateListing from './pages/CreateListing'
 import EditListing from './pages/EditListing'
 import VerifyIdentity from './pages/VerifyIdentity'
 import Dashboard from './pages/Dashboard'
-import AdminVerifications from './pages/AdminVerifications'
 import RefundPolicy from './pages/RefundPolicy'
 import CancellationPolicy from './pages/CancellationPolicy'
 import DisputePolicy from './pages/DisputePolicy'
@@ -53,16 +51,6 @@ export default function App() {
           element={
             <RequireAuth>
               <Dashboard />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin/verifications"
-          element={
-            <RequireAuth>
-              <RequireAdmin>
-                <AdminVerifications />
-              </RequireAdmin>
             </RequireAuth>
           }
         />

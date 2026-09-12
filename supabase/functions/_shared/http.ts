@@ -1,7 +1,7 @@
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, stripe-signature, x-admin-secret, x-cron-secret, x-notify-secret',
+    'authorization, x-client-info, apikey, content-type, stripe-signature, x-admin-secret, x-cron-secret',
 }
 
 export function jsonResponse(body: unknown, status = 200): Response {
@@ -29,12 +29,7 @@ export function hasValidSecret(
   return false
 }
 
-export type StripeEventAction =
-  | 'confirm'
-  | 'cancel_pending'
-  | 'sync_account'
-  | 'review_identity'
-  | 'ignore'
+export type StripeEventAction = 'confirm' | 'cancel_pending' | 'sync_account' | 'ignore'
 
 export function stripeEventAction(eventType: string): StripeEventAction {
   if (eventType === 'payment_intent.succeeded') return 'confirm'
@@ -42,12 +37,6 @@ export function stripeEventAction(eventType: string): StripeEventAction {
     return 'cancel_pending'
   }
   if (eventType === 'account.updated') return 'sync_account'
-  if (
-    eventType === 'identity.verification_session.verified' ||
-    eventType === 'identity.verification_session.requires_input'
-  ) {
-    return 'review_identity'
-  }
   return 'ignore'
 }
 

@@ -36,7 +36,7 @@ Reviews are the core trust mechanism, not vetting.
 - Trust badges on listings: phone verified, ID verified, review count
 
 ### Host identity verification
-**Stripe Identity is the default path**, decided 10 September 2026: a hosted document plus live-selfie check, USD 1.50 per completed verification, and **TryKai never stores the images**. Manual upload to the private `verification-docs` bucket is the fallback, reviewed by Caleb at **`/admin/verifications`** (not the Table Editor). Consent is explicit and recorded. Status flow: unverified → pending → approved → rejected, now with a CHECK constraint, and **only approved, unsuspended hosts can insert a listing or a session**, enforced in RLS rather than in the page. Every decision writes a `verification_reviews` audit row.
+Manual for MVP. Host uploads NRIC or passport plus a live selfie to a private Supabase bucket. Caleb reviews and approves in the **Supabase Table Editor** (there is no verification dashboard). Status flow: unverified → pending → approved → rejected. Only approved hosts can hold active listings. Automate with Stripe Identity or Veriff once manual review becomes painful, roughly 50+ new hosts a month.
 
 ### Browse
 Live now: category pills (built from listing data, not a fixed six-item list) and an area dropdown, both combinable. Order is newest (`created_at` desc). **Sort by price or most reviewed is not built.**
@@ -264,7 +264,7 @@ Hosts are independent individuals, not employees. TryKai is a platform, not a se
 DPO is Caleb. Contact is **privacy@trykai.sg**, an alias on his individual mailbox rather than a group, which correctly keeps the role accountable to one named person. Appointing a DPO is mandatory; registering with PDPC is not, but publishing the contact details is, under Section 11(5). Breach penalties reach $1M or 10% of turnover.
 
 ### Data retention
-- **Rejected verification documents:** deleted after 30 days by `purge-verification-docs`, scheduled daily. Long enough for resubmission confusion, short enough to limit exposure. Stripe Identity rejections store no images, so there is nothing to delete.
+- **Rejected verification documents:** deleted after 30 days. Long enough for resubmission confusion, short enough to limit exposure. Deletion mechanism not built.
 - **Approved host verification documents:** retained while the account is active.
 - **Closed accounts:** core records, not ID images, retained 6 months, then purged.
 
@@ -302,7 +302,7 @@ Onboarding required a business plan with three year projections, since there is 
 **Access control:** do not share the login. If Aakash needs spending ability, issue an Aspire card with a set limit instead.
 
 ### Transactional email
-Three flows live via Resend: new booking to host and guest (from `stripe-webhook`), new manual verification submission to Caleb (from `notify-verification-pending`, gated by `NOTIFY_FUNCTION_SECRET`), and verification result to host (from `admin-verifications` or `stripe-webhook`, whichever decided). **All send from Resend's shared test domain (`TryKai <onboarding@resend.dev>`) and deliver only to Caleb's address.** Non functional for real users until trykai.sg is verified in Resend. Cancellation does not send email. `notify-verification-result` was removed once those result emails moved.
+Three flows live via Resend: new booking to host and guest (from `stripe-webhook`), new verification submission to Caleb, verification result to host. **All send from Resend's shared test domain (`TryKai <onboarding@resend.dev>`) and deliver only to Caleb's address.** Non functional for real users until trykai.sg is verified in Resend. Cancellation does not send email. The two notify-verification functions have no shared-secret header.
 
 ### Domain
 trykai.sg via Vodien, two years, ~$75.98. SGNIC identity verification completed.
@@ -334,7 +334,7 @@ Full visual identity is in DESIGN.md.
 | Listing video previews | Post MVP, if hosts request it. Max 30 seconds, autoplay muted. |
 | Host Pro subscription | 2,000+ bookings. ~S$29/month for unlimited listings, featured placement, analytics. By then good hosts earn S$300 to S$800 a month, so the price is trivial to them. |
 | SingPass / MyInfo verification | Requires ACRA entity and production track record, plus a GovTech application. Not viable pre incorporation. |
-| ~~Automated ID verification~~ | **Done, 10 September 2026.** Stripe Identity is the default path. See the log entry for why the 50+ hosts a month trigger was brought forward. |
+| Automated ID verification | 50+ new hosts a month. Stripe Identity, Jumio, or Veriff, around $1 to $2 USD per check. |
 | Data monetisation | Store everything now. Skills demand, price points, areas, times will be valuable to corporates, community bodies, agencies, and investors. Store what might be valuable later, not just what is needed today. |
 | Regional expansion | HitPay covers SG, MY, PH. Stripe is better for broader multi country. Revisit provider choice if expanding. |
 | Native mobile app | Only with retention data showing users return regularly and push would meaningfully improve it. Good mobile web is sufficient until then. |
@@ -423,20 +423,6 @@ Defences, in order of actual strength:
 **2026-08-23 — Host fee trigger changed from a platform wide cumulative count to a per host mechanism.** Supersedes the 500 cumulative bookings trigger, which was never going to activate in year one since projected year one volume of 481 bookings never reaches it. Every non founding host's first three bookings are free; their fourth booking onward pays the 10 per cent fee immediately, independent of overall platform pace. Checked against Airbnb's 15.5 per cent host only fee and GrabFood and Foodpanda's 15 to 30 per cent Singapore merchant commissions; 10 per cent sits below both. Off platform leakage risk flagged as most likely where fee pain, mutual benefit to going direct, and an established relationship all overlap, expected mainly in Lane 2.
 
 **2026-08-31 — Stripe Connect payment loop is in the repo.** Implementation status, not a new product decision. Guest checkout, webhook confirmation, Connect Express onboarding, refunds, and 24h Transfers are in this tree as of this date. Remaining work is ops plus BUILD_BACKLOG (real email, notify-function secrets, suspension enforcement, `full_address` grant, missing StyleGuide/logo assets). Supersedes the 16 August "moving to Stripe" wording in Part A as a plan rather than a build.
-
-**2026-09-10 — Host verification moved onto the platform, with Stripe Identity as the default path.** Supersedes "manual for MVP, automate at roughly 50+ new hosts a month" and closes the "Automated ID verification" KIV. Three reasons the trigger was brought forward rather than waiting for the volume.
-
-First, the gate was never real. The listing insert policy checked only `auth.uid() = host_id`, so the approved check lived entirely in `CreateListing.jsx` and could be walked around through PostgREST. That was a correctness problem at any host count.
-
-Second, PDPA. PDPC's NRIC guidelines say an organisation generally may not collect NRIC copies unless it is necessary to verify identity to a high degree of fidelity, with notification, consent, and a justification produced on request. TryKai was holding NRIC images in its own bucket with no consent record and no deletion job. Stripe Identity holds the documents and returns only an outcome, which removes the exposure instead of managing it. Cost is USD 1.50 per completed check, which at eleven founding hosts is immaterial against the risk.
-
-Third, manual review stays, and is not a fallback in name only. Automated checks reject legitimate people, and PDPC's own guidance on declined biometric consent expects an alternative. `consent_declined` and `country_not_supported` route to the manual queue explicitly. Caleb reviews those at `/admin/verifications` rather than in the Table Editor.
-
-Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff and Jumio were the other candidates and were not adopted; Stripe Identity won on already being the payment provider, so there is one vendor, one key, and one webhook rather than two.
-
-**2026-09-11 — Rejected verification documents are deleted after 30 days, and the notify functions are no longer open relays.** Implementation of the retention rule already in Part A. `purge-verification-docs` is secret-gated (`VERIFICATION_PURGE_SECRET` or `CRON_SECRET`) and scheduled daily, not hourly: it only needs to run once the window has passed. Storage objects are removed before the URL columns are cleared, so a failed delete is retried rather than orphaned. A later resubmission is left alone because the job only touches rows that are still `rejected`.
-
-`notify-verification-pending` now requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer) and links to `/admin/verifications` instead of the Table Editor. `notify-verification-result` is deleted; hosts already hear about the decision from `admin-verifications` and `stripe-webhook`. Remaining P0.8 work is verifying trykai.sg in Resend so mail leaves the shared test domain.
 
 ---
 

@@ -57,7 +57,6 @@ export function TopNavAccount({ avatarUrl, name, className = '' }) {
 
 export default function TopNav({
   isLoggedIn = false,
-  isAdmin = false,
   avatarUrl,
   name,
   onMenuClick,
@@ -155,7 +154,6 @@ export default function TopNav({
           onClose={handleMenuClose}
           onLogout={onLogout}
           isLoggedIn={isLoggedIn}
-          isAdmin={isAdmin}
         />
       </div>
       <div

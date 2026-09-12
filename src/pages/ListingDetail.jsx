@@ -109,7 +109,6 @@ export default function ListingDetail() {
   const [paymentError, setPaymentError] = useState('')
   const [revealedAddress, setRevealedAddress] = useState(null)
   const [viewerId, setViewerId] = useState(null)
-  const [activePhoto, setActivePhoto] = useState(0)
 
   useEffect(() => {
     async function fetchListing() {
@@ -210,13 +209,6 @@ export default function ListingDetail() {
 
     fetchListing()
   }, [id])
-
-  // CSS scroll-snap does the swiping; this only keeps the position dots in step.
-  function trackGalleryPosition(e) {
-    const { scrollLeft, clientWidth } = e.currentTarget
-    if (!clientWidth) return
-    setActivePhoto(Math.round(scrollLeft / clientWidth))
-  }
 
   function cancelPayment() {
     setCheckoutSessionId(null)
@@ -333,28 +325,12 @@ export default function ListingDetail() {
   const isOwnListing = viewerIsHost()
 
   return (
-    <div className="page page--detail">
+    <div className="page">
       {photos.length > 0 ? (
         <div className="detail-gallery">
-          <div
-            className="detail-gallery__scroller"
-            data-photo-count={Math.min(photos.length, 5)}
-            onScroll={trackGalleryPosition}
-          >
-            {photos.map((url, i) => (
-              <img key={url} src={url} alt={`${listing.title} ${i + 1}`} className="detail-gallery__photo" />
-            ))}
-          </div>
-          {photos.length > 1 && (
-            <div className="detail-gallery__dots" aria-hidden="true">
-              {photos.map((url, i) => (
-                <span
-                  key={url}
-                  className={`detail-gallery__dot${i === activePhoto ? ' detail-gallery__dot--active' : ''}`}
-                />
-              ))}
-            </div>
-          )}
+          {photos.map((url, i) => (
+            <img key={url} src={url} alt={`${listing.title} ${i + 1}`} className="detail-gallery__photo" />
+          ))}
         </div>
       ) : (
         <div className="detail-gallery__placeholder" />
@@ -383,6 +359,21 @@ export default function ListingDetail() {
           </div>
 
           <section className="detail-section">
+            <h2 className="detail-section__title">
+              Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
+            </h2>
+            {reviews.length === 0 ? (
+              <p className="empty-state">No reviews yet.</p>
+            ) : (
+              <div className="reviews-list">
+                {reviews.map((review) => (
+                  <ReviewCard key={review.id} review={review} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="detail-section">
             <h2 className="detail-section__title">About this experience</h2>
             <p className="detail-description">{listing.description}</p>
           </section>
@@ -397,28 +388,16 @@ export default function ListingDetail() {
               </ul>
             </section>
           )}
-
-          <section className="detail-section">
-            <h2 className="detail-section__title">
-              Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
-            </h2>
-            {reviews.length === 0 ? (
-              <p className="empty-state">No reviews yet.</p>
-            ) : (
-              <div className="reviews-list">
-                {reviews.map((review) => (
-                  <ReviewCard key={review.id} review={review} />
-                ))}
-              </div>
-            )}
-          </section>
         </div>
 
         <aside className="detail-sidebar">
           <div className="detail-booking-card">
             <p className="detail-booking-card__price">
               {formatCents(checkoutPrice)}
-              <span className="detail-booking-card__unit"> / person</span>
+              <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--text)' }}>
+                {' '}
+                / person
+              </span>
             </p>
             <p className="detail-booking-card__note">
               {checkoutRail === 'paynow'
@@ -428,9 +407,7 @@ export default function ListingDetail() {
 
             <CancellationPolicyCollapsible />
 
-            {paymentError && (
-              <p className="error-message detail-booking-card__error">{paymentError}</p>
-            )}
+            {paymentError && <p className="error-message" style={{ marginBottom: '16px' }}>{paymentError}</p>}
 
             {checkoutSessionId && (
               <div className="payment-panel">
@@ -525,13 +502,13 @@ export default function ListingDetail() {
             )}
 
             {isOwnListing && sessions.length > 0 && (
-              <p className="hint detail-booking-card__hint">
+              <p className="hint" style={{ marginTop: '12px' }}>
                 This is your own listing. Hosts cannot book their own sessions.
               </p>
             )}
 
             {!isOwnListing && !canTakePayments && sessions.length > 0 && (
-              <p className="hint detail-booking-card__hint">
+              <p className="hint" style={{ marginTop: '12px' }}>
                 This host is still setting up payouts. Booking will open once that is complete.
               </p>
             )}

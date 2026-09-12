@@ -32,9 +32,9 @@ Cover four things:
 
 **1. Confirm one to one.** Verbal or written commitment from the individual. Group chat enthusiasm is not commitment, and repeatedly has not been.
 
-**2. Account and identity verification.** They sign up, then run the Stripe Identity check from `/verify-identity`: NRIC or passport, plus a live selfie taken on the spot. It usually clears in under a minute with no action from us, so do this while you are still on the call. If it fails, or if they would rather not do a face scan, use the "Having trouble? Upload your documents instead" link and approve them yourself at `/admin/verifications`. Target same day for founding hosts either way.
+**2. Account and identity verification.** They sign up, submit NRIC or passport and a live selfie. Caleb reviews and approves. Target same day for founding hosts.
 
-**3. Stripe Connect onboarding.** *Expect friction.* This is a separate step from the identity check in step 2, and it will feel like repetition to them: Connect is about where the money lands, so Stripe collects bank details and its own identity information for payout compliance. For someone offering a S$20 session it is a second round of paperwork. Warn them it is coming, explain that it is how they get paid, and stay on the call while they do it.
+**3. Stripe Connect onboarding.** *New, and expect friction.* Stripe collects their identity and bank details separately from TryKai's own check. For someone offering a S$20 session this is a second round of paperwork. Warn them it is coming, explain that it is how they get paid, and stay on the call while they do it.
 
 **4. Build the listing together.** Do not let them do this alone the first time. Walk through the guidelines in Part B, particularly pricing and photos.
 

@@ -103,22 +103,6 @@ describe('SiteNav hamburger', () => {
     )
     expect(screen.getByRole('link', { name: 'My bookings' })).toHaveAttribute('href', '/dashboard')
     expect(screen.getByRole('link', { name: 'Log out' })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Verification review' })).not.toBeInTheDocument()
-  })
-
-  it('offers verification review in the menu for an admin', async () => {
-    signedIn()
-    supabase.rpc.mockResolvedValue({ data: [{ is_admin: true }], error: null })
-    const { user } = renderNav()
-
-    await screen.findByLabelText('Account')
-    await user.click(screen.getByRole('button', { name: 'Open menu' }))
-
-    expect(screen.getByRole('link', { name: 'Verification review' })).toHaveAttribute(
-      'href',
-      '/admin/verifications'
-    )
-    expect(supabase.rpc).toHaveBeenCalledWith('my_verification')
   })
 
   it('signs the user out from the menu and sends them home', async () => {

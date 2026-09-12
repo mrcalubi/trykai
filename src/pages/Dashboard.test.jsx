@@ -110,27 +110,6 @@ describe('Dashboard access control', () => {
   })
 })
 
-describe('Dashboard verification review', () => {
-  it('offers the review queue to an admin', async () => {
-    supabase.rpc.mockImplementation(async (name) => {
-      if (name === 'my_verification') return { data: [{ is_admin: true }], error: null }
-      return { data: null, error: null }
-    })
-    await renderDashboard()
-
-    expect(screen.getByRole('link', { name: 'Review verifications' })).toHaveAttribute(
-      'href',
-      '/admin/verifications'
-    )
-  })
-
-  it('keeps the review queue off a host dashboard', async () => {
-    await renderDashboard()
-
-    expect(screen.queryByRole('link', { name: 'Review verifications' })).not.toBeInTheDocument()
-  })
-})
-
 describe('Dashboard empty states', () => {
   it('shows an empty state for each section', async () => {
     await renderDashboard()

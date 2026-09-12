@@ -44,10 +44,10 @@ Live data deliberately kept out of markdown: host roster in a Google Sheet, expe
 
 **What is in the repo (walked 31 August), including work from 22 to 25 August:**
 - Staging Supabase environment exists and is in active use, it is a full copy of the live database.
-- Canonical schema in `supabase/migrations/` (`00001`–`00007`). There is no `schema.sql`.
-- Signup profile rows are created by `handle_new_user` on `auth.users`. Login.jsx does not insert a profile. Host verification is `submit_verification` plus Stripe Identity; Caleb reviews the manual fallback at `/admin/verifications`. See ENGINEERING.md.
-- A user cannot write their own strikes, suspension, stripe, founding-host, or verification-status fields. Verification document columns have no client SELECT. The listing and session insert policies require `approved` and not suspended.
-- Trusted functions: `handle_new_user`, the two guards, `submit_verification` / `my_verification` / `review_verification` (`00007`), `get_listing_address` (confirmed **guest** only), `confirm_paid_booking` / `confirm_booking` (service role only), `apply_host_strike` (service role only).
+- Canonical schema in `supabase/migrations/` (`00001`–`00005`). There is no `schema.sql`.
+- Signup profile rows are created by `handle_new_user` on `auth.users`. Login.jsx does not insert a profile. Host verification is a client UPDATE to pending, blocked from self-approval by `guard_user_self_update`. Suspension fields exist. There is **no** `submit_verification` function.
+- A user cannot write their own strikes, suspension, stripe, or founding-host fields. Verification documents live in a private bucket. `id_photo_url` / `selfie_url` are still granted SELECT to authenticated; the bucket is the real barrier.
+- Trusted functions: `handle_new_user`, the two guards, `get_listing_address` (confirmed **guest** only), `confirm_paid_booking` / `confirm_booking` (service role only), `apply_host_strike` (service role only).
 - Guest address reveal is wired. `listings.full_address` is still `GRANT ALL` from the baseline migration.
 - Four tier cancellation refunds run in `cancel-booking`. That function does not send email.
 - CI gates every merge: Vitest with coverage floors, production build, Playwright at two viewports, Deno type-check of shared Edge modules. Roughly 325 frontend cases, 72 shared Edge cases, 30 Playwright specs each run on desktop and phone. Do not expect to merge with red checks.
@@ -55,7 +55,7 @@ Live data deliberately kept out of markdown: host roster in a Google Sheet, expe
 
 **In flight, needs Ruiheng / ops:**
 - Confirm whether `00005` and the 22 August hotfixes are applied on staging and production. Signup being broken is very likely still true on production until `00004` / the hotfix path is applied there.
-- P0.8: verify trykai.sg in Resend. The notify-function secret is already in the tree.
+- P0.8 Resend domain plus secrets on the notify-verification functions.
 - P0.4: the app ignores `is_suspended`.
 
 **Banking.** Aspire, approved 13 August.
@@ -84,7 +84,7 @@ All logged in DECISIONS.md Part B. The two big pricing decisions that were previ
 - **Insurance quote**, slipped three times now. Non technical, genuinely just requesting one. Real launch blocker.
 - **Founders' agreement unsigned**, and Ruiheng still has not been told about the three way equal profit share.
 - **Safety protocol** drafted but not ratified, and the app does not yet enforce the suspension fields that exist.
-- Remaining P0 admin work: suspension enforcement in the app is the one that is genuinely dangerous to keep doing by hand (the Table Editor flag does nothing until listings are also deactivated). Verification review is on the platform at `/admin/verifications`. The Connect Transfer job replaced the copy-paste payout queue.
+- Remaining P0 admin work: suspension enforcement in the app is the one that is genuinely dangerous to keep doing by hand (the Table Editor flag does nothing until listings are also deactivated). Verification approval survives the Table Editor for now. The Connect Transfer job replaced the copy-paste payout queue.
 - Still deferred in DECISIONS.md: price ceiling for businesses, which axis drives top level navigation, five year transaction retention.
 - Caleb has a standing KIV to re run the four tier cancellation refund check on `main` once the merges settle.
 
@@ -126,7 +126,7 @@ Cheap date band: S$15 to S$25 per person, since under S$60 for two is where the 
 
 1. Stripe ops: apply `00005` on staging, wire the webhook, set platform payouts to manual, run one test-mode booking. The code path is in the repo.
 2. Confirm the 22 August signup/verification hotfixes (and `00004`) are applied to production. Signup may be broken on the live site until then.
-3. P0.8: verify trykai.sg in Resend. Notify-function secrets shipped; mail still leaves the shared test domain until the domain is verified.
+3. P0.8: verify trykai.sg in Resend, and put a shared secret on the notify-verification functions the same week.
 4. P0.4: make the app honour `is_suspended`. Until then, a Table Editor suspend must also set listings `is_active = false` by hand.
 5. Fix missing StyleGuide category PNGs and `/trykai.png` if CI or chrome is broken without them.
 6. Wire the built components into the real pages, Home first. The library is already on this branch.
