@@ -160,7 +160,7 @@ Within 7 days, reviewed manually. Needs a submission form and an admin view.
 Disputes arrive by email today. At launch volume that is survivable.
 
 ### P2.8 — Wire the UI kit and decided browse
-**Mostly done, 9 September 2026.** TopNav and HamburgerMenu are the live chrome, and Home is the decided browse: no hero, 2 / 3 / 4 columns, square images, badge on a cream pill, two-line title clamp, one meta line with the all-in price. Left over: the rating on the browse card needs the listings fetch to supply one (no aggregate rating column exists yet), Button and Input are still `/style-guide` only, and `ListingCard.jsx` plus its `.listing-card` CSS are dead code waiting on a deletion pass.
+**Mostly done, 9 September 2026.** TopNav and HamburgerMenu are the live chrome, and Home is the decided browse: Lane 1 headline, 2 / 3 / 4 columns, square images, badge on a cream pill, two-line title clamp, one meta line with the all-in price. Left over: the rating on the browse card needs the listings fetch to supply one (no aggregate rating column exists yet), Button and Input are still `/style-guide` only, and `ListingCard.jsx` plus its `.listing-card` CSS are dead code waiting on a deletion pass.
 
 ### P2.9 — Checkout and legal gaps visible in the app
 - `guests_count` hardcoded to 1 in ListingDetail

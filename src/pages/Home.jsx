@@ -67,7 +67,14 @@ export default function Home() {
 
   return (
     <div className="page page--browse">
-      <h1 className="visually-hidden">Browse skills</h1>
+      <header className="hero">
+        <h1 className="hero__title">
+          Singapore&apos;s not boring. You just haven&apos;t found your thing yet.
+        </h1>
+        <p className="hero__subtitle">
+          Solo, with friends, or on a date — something better than scrolling for the tenth time.
+        </p>
+      </header>
 
       {loading && <p className="status-message">Loading listings…</p>}
       {error && <p className="status-message error-message">{error}</p>}

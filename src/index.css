@@ -462,6 +462,32 @@ a {
   outline-offset: -2px;
 }
 
+/* Hero — Lane 1 copy from DESIGN.md, same treatment as production. */
+.hero {
+  text-align: center;
+  padding: 48px 0 56px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.hero__title {
+  font-family: var(--display);
+  font-size: clamp(32px, 5vw, 48px);
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1.15;
+  margin: 0 0 16px;
+  color: var(--text-h);
+}
+
+.hero__subtitle {
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--text);
+  max-width: 520px;
+  margin: 0 auto;
+}
+
 /* Filters */
 .filters {
   display: flex;

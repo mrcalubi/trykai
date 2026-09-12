@@ -63,6 +63,12 @@ describe('Home loading and error states', () => {
     renderWithRouter(<Home />)
 
     expect(await screen.findByText('No listings yet. Check back soon.')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: "Singapore's not boring. You just haven't found your thing yet.",
+      })
+    ).toBeInTheDocument()
   })
 })
 
@@ -97,15 +103,20 @@ describe('Home listing grid', () => {
     expect(card.textContent).not.toContain('·')
   })
 
-  it('leads with the grid instead of a hero', async () => {
+  it('shows the landing headline above the grid', async () => {
     givenListings([LATTE])
     renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Browse skills' })
+      screen.getByRole('heading', {
+        level: 1,
+        name: "Singapore's not boring. You just haven't found your thing yet.",
+      })
     ).toBeInTheDocument()
-    expect(screen.queryByText(/Singapore's not boring/)).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/Solo, with friends, or on a date/)
+    ).toBeInTheDocument()
   })
 
   it('only asks the database for active listings, newest first', async () => {
