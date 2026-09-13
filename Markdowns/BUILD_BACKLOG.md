@@ -37,7 +37,7 @@ Every operational promise still depends on Caleb performing a manual action. Som
 
 | Promise | How it happens today |
 |---|---|
-| Hosts verified before listings go live | `/admin/verifications`, gated by `is_admin`. The listing and session insert policies now require `approved` and not suspended (`00007`), so this is enforced by the database rather than by CreateListing.jsx. |
+| Hosts verified before listings go live | `/admin/verifications`, gated by `is_admin`. Listing and session INSERT require `can_create_listing()` (`00008`). Browse still does not filter `is_suspended`. |
 | Hosts paid 24 hours after their session | `release-payout` (cron + secret). Needs scheduling and platform payouts set to manual. |
 | Refunds issued per the cancellation policy | `cancel-booking` from the dashboard. No cancellation emails. |
 | TryKai can cancel a booking | `admin-cancel-booking` with `ADMIN_FUNCTION_SECRET`. No admin UI. Writes `cancelled_by: 'host'`. |
