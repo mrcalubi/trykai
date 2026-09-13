@@ -280,7 +280,7 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 
 **Column grants (after** `00007`**), not a public-profile VIEW.** `00005` revokes ALL on `users` then re-grants specific columns; `00007` narrows that further. `verification_status` is still granted SELECT, because the ID-verified trust badge is meant to be public. `id_photo_url` and `selfie_url` are granted to **neither** anon nor authenticated, so the storage bucket is no longer the only barrier. `is_admin` and the verification metadata columns are granted to no client role at all, which is why `my_verification()` exists instead of a wider SELECT grant. RLS `"Anyone can view host profiles" USING (true)` still exists.
 
-**The listing gate is enforced in the database.** `hosts_create_listings_verified` and `hosts_create_sessions_verified` (`00007`) require `verification_status = 'approved'` and `not is_suspended`. Before `00007` the only check was `auth.uid() = host_id`, so an unverified account could insert a listing straight through PostgREST; the approval check lived only in `CreateListing.jsx`.
+**The listing gate is enforced in the database.** `hosts_create_listings_verified` and `hosts_create_sessions_verified` require `can_create_listing()` (`00008`): approved and not suspended. That function is security definer and reads only `auth.uid()`, because the 00007 policies used to subquery `users.is_suspended` as the caller and 00005 never granted that column, so listing INSERT failed with `permission denied for table users`. Do not SELECT-grant `is_suspended`; the public-profile policy is `USING (true)`. Ownership (`host_id = auth.uid()`, session belongs to the caller's listing) still lives in the policies. Before `00007` the only check was `auth.uid() = host_id`, so an unverified account could insert a listing straight through PostgREST; the approval check lived only in `CreateListing.jsx`.
 
 `full_address`**.** `get_listing_address(listing_id)` returns the address only to a **confirmed guest** for that listing. It does **not** return to the owning host. Hosts read `full_address` via listings SELECT (EditListing). Public pages do not select the column.
 
@@ -290,6 +290,7 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 - `guard_user_self_update()` / `guard_user_self_insert()` — block self-approval and strike/suspension/stripe/founding-host/admin writes.
 - `submit_verification(id_photo_url, selfie_url, consent)` — the only way a client reaches `pending`. Requires consent.
 - `my_verification()` — the caller's own verification state, so a rejection reason and `is_admin` need no table-wide SELECT grant.
+- `can_create_listing()` — whether the caller may insert a listing or a session. Security definer so the policy does not need a SELECT grant on `is_suspended`.
 - `review_verification(user_id, decision, reason, method, reviewer_id)` — writes the decision and an audit row together. **Service role only.**
 - `get_listing_address(listing_id)` — confirmed guest only.
 - `confirm_paid_booking(...)` and `confirm_booking` wrapper — flip pending → confirmed and decrement `spots_remaining` atomically under a row lock. **Service role only.** The Stripe webhook calls `confirm_paid_booking`. If spots are gone, the webhook refunds instead of confirming.
@@ -353,7 +354,8 @@ supabase/migrations/
 ├── 00004_create_profile_on_signup.sql
 ├── 00005_stripe_connect_payments.sql
 ├── 00006_block_host_self_booking.sql
-└── 00007_verification_security_foundation.sql
+├── 00007_verification_security_foundation.sql
+└── 00008_listing_gate_can_create_listing.sql
 
 supabase/functions/
 ├── _shared/
@@ -511,7 +513,7 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 
 - All Edge Function emails still send from Resend's shared test domain. Real users receive nothing until trykai.sg is verified. `notify-verification-pending` is secret-gated (`NOTIFY_FUNCTION_SECRET`). Result emails come from `admin-verifications` and `stripe-webhook`; `notify-verification-result` is gone.
 - Staging must apply `00005` and run this money path in Stripe **test mode** before production. Platform Stripe payouts must be switched to manual. Mark the eleven founding hosts `is_founding_host = true` in Table Editor. One real test booking on production before warm-contact launch.
-- `is_suspended` is never queried in `src/`. Setting the flag in Table Editor does not hide listings or block booking. SAFETY_RESPONSE_PROTOCOL.md still requires a hand check that listings are `is_active = false`.
+- `is_suspended` is never queried in `src/`. Listing and session INSERT are blocked by `can_create_listing()` (`00008`). Browse and Book still ignore the flag. SAFETY_RESPONSE_PROTOCOL.md still requires a hand check that listings are `is_active = false`.
 - `listings.full_address` is still `GRANT ALL` from `00001`.
 - `StyleGuide.jsx` ~~imports category PNGs that are not in the repo; Navbar requests~~ `/trykai.png`~~, which is not in~~ `public/`~~.~~ **Resolved 9 September:** `food`, `fitness`, `arts`, and `music` PNGs are in `src/assets/categories/`, and `public/trykai.png` exists.
 
