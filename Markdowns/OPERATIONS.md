@@ -404,7 +404,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 ## Cancellations
 - [ ] Guest can cancel from dashboard
 - [ ] Four tier refund correctly calculated, 100 / 50 / 25 / 0 at 48hr, 24hr, 6hr, with platform fee forfeited on partial tiers
-- [ ] Refund amount stored and included directly in the cancellation email
+- [x] Refund amount stored and included directly in the cancellation email
 - [ ] Guest can reschedule instead of cancelling, once per booking, 48hr cutoff
 - [ ] Host can cancel from dashboard
 - [ ] Host cancellation increments strikes
