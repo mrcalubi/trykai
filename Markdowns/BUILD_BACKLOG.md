@@ -39,7 +39,7 @@ Every operational promise still depends on Caleb performing a manual action. Som
 |---|---|
 | Hosts verified before listings go live | `/admin/verifications`, gated by `is_admin`. Listing and session INSERT require `can_create_listing()` (`00008`). Browse still does not filter `is_suspended`. |
 | Hosts paid 24 hours after their session | `release-payout` (cron + secret). Needs scheduling and platform payouts set to manual. |
-| Refunds issued per the cancellation policy | `cancel-booking` from the dashboard. No cancellation emails. |
+| Refunds issued per the cancellation policy | `cancel-booking` from the dashboard. Guest is emailed the refund amount (including $0); host is emailed only on a guest cancel. |
 | TryKai can cancel a booking | `admin-cancel-booking` with `ADMIN_FUNCTION_SECRET`. No admin UI. Writes `cancelled_by: 'host'`. |
 | Credible safety reports trigger immediate suspension | Table Editor sets `is_suspended`. **The app does not read that flag.** Listings stay visible unless someone also sets `is_active = false`. |
 | Quality disputes resolved within 2 business days | Email, then nothing |
@@ -53,18 +53,17 @@ Verification approval is now on the platform. Suspension that does not hide list
 Not a calendar. Capacity is 8 hours a week.
 
 1. **Ops (not app code):** apply `00005` on staging, Stripe Dashboard webhook + secrets, platform payouts **manual**, flag eleven `is_founding_host`, one staging test-mode booking.
-2. **P0.8** cancellation emails. Domain and from-address shipped 14 September (`TryKai <no-reply@trykai.sg>`).
-3. **P0.4** app actually filters `is_suspended` (hide listings, block booking, block login or host actions). One-click admin can wait if Table Editor plus this filter is reliable.
-4. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
-5. **Missing assets:** category PNGs imported by StyleGuide (can fail `vite build` because `App.jsx` always imports that page); `/trykai.png` referenced by Navbar and not present in `public/`.
-6. Wire the UI kit (Home first) to the browse decisions in DESIGN.md.
-7. **P2.3** review gating, then the rest of P2 in listed order.
+2. **P0.4** app actually filters `is_suspended` (hide listings, block booking, block login or host actions). One-click admin can wait if Table Editor plus this filter is reliable.
+3. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
+4. **Missing assets:** category PNGs imported by StyleGuide (can fail `vite build` because `App.jsx` always imports that page); `/trykai.png` referenced by Navbar and not present in `public/`.
+5. Wire the UI kit (Home first) to the browse decisions in DESIGN.md.
+6. **P2.3** review gating, then the rest of P2 in listed order.
 
 ---
 
 ## P0: blocks launch
 
-> **Status, 14 September 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, guest address reveal path of P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement, P0.8 cancellation emails (domain and from-address shipped 14 September), `full_address` column grant. P0.3 done 10 September.
+> **Status, 14 September 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, guest address reveal path of P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement, `full_address` column grant. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September.
 
 ### P0.1 — Host payout details — OBSOLETE
 Under Stripe Connect Express, Stripe collects the host's bank details. Do not add `payout_method` / `payout_identifier` columns.
@@ -90,7 +89,7 @@ Still to build:
 - One-click admin button can follow; the filter is the launch-blocking piece
 
 ### P0.5 — Cancellation logic rebuilt to four tiers — DONE
-`calculateGuestRefund` implements 100 / 50 / 25 / 0 at 48, 24, and 6 hours, platform fee forfeited on partial tiers. `cancel-booking` issues the Stripe refund. Spot restore only for confirmed rows. **Emails are not sent** (see P0.8 / P2).
+`calculateGuestRefund` implements 100 / 50 / 25 / 0 at 48, 24, and 6 hours, platform fee forfeited on partial tiers. `cancel-booking` issues the Stripe refund. Spot restore only for confirmed rows. Guests are emailed the refund amount (including $0); the host is emailed only on a guest cancel.
 
 ### P0.6 — Spots decrement, atomically — DONE
 `confirm_paid_booking` decrements `spots_remaining` by `guests_count` under a row lock in the same operation that flips the booking to confirmed. CHECK constraint `spots_remaining >= 0`. Stripe webhook is the caller. Guest-callable `confirm_booking` from `00002` was dropped; the wrapper in `00005` is service_role only.
@@ -100,13 +99,13 @@ Still to build:
 
 **Not done:** `00001` still `GRANT ALL` on `listings` to anon and authenticated. A crafted query on an active listing can read `full_address`. Revoke the column (or all direct SELECT of it) so the RPC is the only guest path.
 
-### P0.8 — Real email delivery — DOMAIN DONE 14 September; cancellation emails OPEN
+### P0.8 — Real email delivery — DONE 14 September
 **Flow:** anything happens → the relevant person is told
 **Today:** from-address is `TryKai <no-reply@trykai.sg>` in `_shared/email.ts`. trykai.sg is verified in Resend.
 
 `notify-verification-pending` requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer). `notify-verification-result` is gone; result emails come from `admin-verifications` and `stripe-webhook`. `release-payout` and `admin-cancel-booking` already require a secret; `stripe-webhook` verifies `Stripe-Signature`.
 
-Also still missing: cancellation emails (policy promises the refund amount in the email). Booking confirmation and verification emails already go out from this address.
+`cancel-booking` emails the guest the refund amount (including $0) and the host only when the guest cancelled. A Resend failure is logged and cannot fail the refund. A missing `RESEND_API_KEY` logs instead of failing silent. `admin-cancel-booking` still does not email.
 
 ### P0.9 — Build assets that CI and chrome depend on — OPEN
 `StyleGuide.jsx` unconditionally imports `src/assets/categories/food.png`, `fitness.png`, and `arts.png`. Those files are not in the repo. `App.jsx` always imports StyleGuide, so `vite build` can fail. Navbar and TopNav request `/trykai.png`; `public/` only has `favicon.svg`. Fix the imports or add the files before treating CI as green.

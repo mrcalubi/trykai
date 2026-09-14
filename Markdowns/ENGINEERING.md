@@ -7,7 +7,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 > **Read before you start, updated 9 September 2026.**
 >
 > 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 24 hours after `starts_at`. Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
-> 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. The function does not send cancellation emails.
+> 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). The host is emailed only when the guest cancelled.
 > 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00005`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
 > 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home shows the Lane 1 headline above the kit's** `Card` **in browse mode.** `ListingCard.jsx` still exists but no page renders it. Button, Input, and SelectableCard are still used only by `/style-guide`.
@@ -38,7 +38,7 @@ Two user types, one account. A user is a guest by default and becomes a host whe
 | Backend, DB, Auth, Storage | Supabase                                                             | Handles backend, auth, storage, and RLS out of the box                                                                                                                                                                                                                                                                                       |
 | Hosting                    | Vercel                                                               | Free tier, auto deploy on push                                                                                                                                                                                                                                                                                                               |
 | Payments                   | **Stripe Connect**, separate charges and transfers, Express accounts | Decided 16 August. Supports PayNow in Singapore at 1.3%, platform is merchant of record, Transfers held until 24h after the session. In code: Payment Element + webhook confirmation, Connect onboarding, refunds, hourly Transfer job. Connect account creation uses Stripe Accounts **v2** (`2026-08-26.preview`) in `_shared/connect.ts`. |
-| Transactional email        | Resend                                                               | From-address is `TryKai <no-reply@trykai.sg>`. trykai.sg is verified in Resend. Cancellation still does not send email.                                                                                                                                                                                           |
+| Transactional email        | Resend                                                               | From-address is `TryKai <no-reply@trykai.sg>`. trykai.sg is verified in Resend. Cancellation emails the guest the refund amount (including $0) and the host only when the guest cancelled.                                                                                                                                                                                           |
 | Business email             | Zoho Mail Lite                                                       | caleb@, aakash@, [ruiheng@trykai.sg](mailto:ruiheng@trykai.sg)                                                                                                                                                                                                                                                                               |
 | AI coding                  | Cursor                                                               | Implementation. Claude handles architecture.                                                                                                                                                                                                                                                                                                 |
 
@@ -362,14 +362,14 @@ supabase/functions/
 │   ├── booking.ts               # Guest charge, host fee, refunds
 │   ├── http.ts                  # JSON/CORS/secret helpers
 │   ├── connect.ts               # Express account v2 helpers
-│   ├── email.ts                 # Resend helper + booking HTML
+│   ├── email.ts                 # Resend helper + booking and cancellation HTML
 │   ├── payouts.ts               # 24h Transfer eligibility
 │   └── verification.ts          # Status, Identity params, 30-day retention rules
 ├── create-payment-intent/       # Pending booking + PaymentIntent (no emails)
 ├── stripe-webhook/              # Stripe-Signature → confirm_paid_booking, identity outcomes, emails
 ├── create-connect-account/      # Express account for the signed-in host
 ├── create-account-link/         # Creates account if needed, Account Link to /dashboard?connect=
-├── cancel-booking/              # Guest or host cancel + Stripe refund + strikes; no emails
+├── cancel-booking/              # Guest or host cancel + Stripe refund + strikes + emails
 ├── admin-cancel-booking/        # x-admin-secret full refund; cancelled_by='host'; no UI
 ├── admin-verifications/         # JWT + is_admin; signed-URL queue, review + result email
 ├── create-identity-session/     # Stripe Identity hosted check; stores only the session id
@@ -465,13 +465,13 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 Warning shown: cancelling results in a strike, three strikes deactivates listings, all guests receive a full refund.
 
-On confirmation the dashboard calls `cancel-booking` with `session_id`. The function issues Stripe refunds for confirmed bookings (or cancels unpaid PaymentIntents), restores spots only for confirmed rows, sets `cancelled_by = 'host'`, and calls `apply_host_strike`. **No emails.**
+On confirmation the dashboard calls `cancel-booking` with `session_id`. The function issues Stripe refunds for confirmed bookings (or cancels unpaid PaymentIntents), restores spots only for confirmed rows, sets `cancelled_by = 'host'`, and calls `apply_host_strike`. Each guest is emailed the refund amount. The host is not emailed; they initiated the cancel.
 
 Host upcoming list is sessions that already have pending or confirmed bookings, not every open session.
 
 ### Scenario 4: Guest cancels
 
-`cancellationPolicy.js` quotes the refund; `cancel-booking` recomputes it and creates the Stripe refund. Pending unpaid cancel voids the PaymentIntent and does not restore spots (none were taken). **No emails**, so the published promise that the refund amount appears in the cancellation email is not kept.
+`cancellationPolicy.js` quotes the refund; `cancel-booking` recomputes it and creates the Stripe refund. Pending unpaid cancel voids the PaymentIntent and does not restore spots (none were taken). The guest is then emailed the refund amount, including $0. The host is emailed only on a guest cancel. A Resend failure is logged and cannot fail the refund that already happened.
 
 On confirmation: `status = 'cancelled'`, `cancelled_by = 'guest'`, `refund_amount` and `stripe_refund_id` stored.
 
@@ -511,7 +511,7 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 
 **Launch blocking**
 
-- ~~All Edge Function emails still send from Resend's shared test domain.~~ **Resolved 14 September:** from-address is `TryKai <no-reply@trykai.sg>`. `notify-verification-pending` is secret-gated (`NOTIFY_FUNCTION_SECRET`). Result emails come from `admin-verifications` and `stripe-webhook`; `notify-verification-result` is gone. Cancellation still does not email either party.
+- ~~All Edge Function emails still send from Resend's shared test domain.~~ **Resolved 14 September:** from-address is `TryKai <no-reply@trykai.sg>`. `notify-verification-pending` is secret-gated (`NOTIFY_FUNCTION_SECRET`). Result emails come from `admin-verifications` and `stripe-webhook`; `notify-verification-result` is gone. Cancellation emails the guest the refund amount (including $0) from `cancel-booking`; a missing `RESEND_API_KEY` is logged rather than silent.
 - Staging must apply `00005` and run this money path in Stripe **test mode** before production. Platform Stripe payouts must be switched to manual. Mark the eleven founding hosts `is_founding_host = true` in Table Editor. One real test booking on production before warm-contact launch.
 - `is_suspended` is never queried in `src/`. Listing and session INSERT are blocked by `can_create_listing()` (`00008`). Browse and Book still ignore the flag. SAFETY_RESPONSE_PROTOCOL.md still requires a hand check that listings are `is_active = false`.
 - `listings.full_address` is still `GRANT ALL` from `00001`.
@@ -521,7 +521,6 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 
 - Review gating still accepts `pending` in the dashboard UI, and RLS does not require confirmed (P2.3).
 - Host no-show reporting, reschedule, session auto-complete, host→guest reviews: not built.
-- `cancel-booking` does not email either party.
 - UI kit only partly wired: the nav and the browse `Card` are live, but Button, Input, and SelectableCard are still `/style-guide` only. `ListingCard.jsx` and its `.listing-card` CSS are now dead code that only its own test renders; deleting them is a separate cleanup.
 - The browse card can never show a rating: the `listings` select does not fetch one and there is no aggregate rating column, so `Card` gets no `rating` prop from Home. The price-only card is correct for a new listing but wrong for a listing with reviews.
 - A host who exits Stripe Connect onboarding without completing it still sees a "Payout setup submitted" success message on the dashboard, because `?connect=return` is treated as success without re-checking `stripe_payouts_enabled`. That host believes they can be paid and cannot. If they take a booking, the guest pays and there is no payout path, discovered after the session.
@@ -538,7 +537,6 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 - Sort by newest / price / most reviewed (DECISIONS.md currently overclaims this as live)
 - Host strike appeals, admin dispute log
 - Admin UI for `admin-cancel-booking`
-- Refund amount in a cancellation email
 - Payout clawback where a dispute is confirmed after release
 
 ---

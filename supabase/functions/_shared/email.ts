@@ -1,26 +1,42 @@
 const RESEND_FROM = 'TryKai <no-reply@trykai.sg>'
 
+export function formatCents(cents: number): string {
+  const dollars = cents / 100
+  return dollars % 1 === 0 ? `$${dollars}` : `$${dollars.toFixed(2)}`
+}
+
 export async function sendResendEmail(options: {
   apiKey: string | undefined
   to: string | null | undefined
   subject: string
   html: string
 }): Promise<void> {
-  if (!options.apiKey || !options.to) return
-
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${options.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: RESEND_FROM,
+  if (!options.apiKey) {
+    console.error('sendResendEmail: RESEND_API_KEY is missing; email not sent', {
       to: options.to,
       subject: options.subject,
-      html: options.html,
-    }),
-  })
+    })
+    return
+  }
+  if (!options.to) return
+
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${options.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: RESEND_FROM,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+      }),
+    })
+  } catch (err) {
+    console.error('sendResendEmail: Resend request failed', err)
+  }
 }
 
 export function bookingConfirmedGuestHtml(options: {
@@ -78,6 +94,81 @@ export function verificationRejectedHtml(options: {
     <p>You can submit new documents whenever you are ready.</p>
     <p><a href="https://trykai.sg/verify-identity">Resubmit verification</a></p>
   `
+}
+
+export function bookingCancelledGuestHtml(options: {
+  listingTitle: string
+  sessionDate: string
+  refundAmountCents: number
+  cancelledBy: 'guest' | 'host'
+}): string {
+  const who =
+    options.cancelledBy === 'host'
+      ? 'The host cancelled your booking'
+      : 'Your booking has been cancelled'
+  return `
+    <h2>${who}</h2>
+    <p>The session was <strong>${escapeHtml(options.listingTitle)}</strong> on ${escapeHtml(options.sessionDate)}.</p>
+    <p><strong>Refund amount:</strong> ${formatCents(options.refundAmountCents)}</p>
+    <p>Any refund goes back to your original payment method. Details are in your <a href="https://trykai.sg/dashboard">TryKai dashboard</a>.</p>
+  `
+}
+
+export function bookingCancelledHostHtml(options: {
+  guestName: string
+  listingTitle: string
+  sessionDate: string
+}): string {
+  return `
+    <h2>A guest cancelled</h2>
+    <p><strong>${escapeHtml(options.guestName)}</strong> cancelled their booking for <strong>${escapeHtml(options.listingTitle)}</strong>.</p>
+    <p><strong>Session:</strong> ${escapeHtml(options.sessionDate)}</p>
+    <p>The spot is available again. See your <a href="https://trykai.sg/dashboard">TryKai dashboard</a>.</p>
+  `
+}
+
+/**
+ * Guest always hears the refund amount, including $0. The host is only told
+ * when the guest cancelled — the host already knows about their own cancel.
+ * Never throws: a Resend failure must not undo a refund that already happened.
+ */
+export async function sendCancellationEmails(options: {
+  apiKey: string | undefined
+  cancelledBy: 'guest' | 'host'
+  refundAmountCents: number
+  listingTitle: string
+  sessionDate: string
+  guestEmail: string | null | undefined
+  hostEmail: string | null | undefined
+  guestName?: string | null
+}): Promise<void> {
+  try {
+    await sendResendEmail({
+      apiKey: options.apiKey,
+      to: options.guestEmail,
+      subject: `Booking cancelled: ${options.listingTitle}`,
+      html: bookingCancelledGuestHtml({
+        listingTitle: options.listingTitle,
+        sessionDate: options.sessionDate,
+        refundAmountCents: options.refundAmountCents,
+        cancelledBy: options.cancelledBy,
+      }),
+    })
+    if (options.cancelledBy === 'guest') {
+      await sendResendEmail({
+        apiKey: options.apiKey,
+        to: options.hostEmail,
+        subject: `A guest cancelled "${options.listingTitle}"`,
+        html: bookingCancelledHostHtml({
+          guestName: options.guestName || 'A guest',
+          listingTitle: options.listingTitle,
+          sessionDate: options.sessionDate,
+        }),
+      })
+    }
+  } catch (err) {
+    console.error('sendCancellationEmails failed', err)
+  }
 }
 
 export function escapeHtml(value: string): string {
