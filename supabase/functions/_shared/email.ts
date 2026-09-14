@@ -1,4 +1,4 @@
-const RESEND_FROM = 'TryKai <onboarding@resend.dev>'
+const RESEND_FROM = 'TryKai <no-reply@trykai.sg>'
 
 export async function sendResendEmail(options: {
   apiKey: string | undefined

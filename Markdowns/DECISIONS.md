@@ -302,7 +302,7 @@ Onboarding required a business plan with three year projections, since there is 
 **Access control:** do not share the login. If Aakash needs spending ability, issue an Aspire card with a set limit instead.
 
 ### Transactional email
-Three flows live via Resend: new booking to host and guest (from `stripe-webhook`), new manual verification submission to Caleb (from `notify-verification-pending`, gated by `NOTIFY_FUNCTION_SECRET`), and verification result to host (from `admin-verifications` or `stripe-webhook`, whichever decided). **All send from Resend's shared test domain (`TryKai <onboarding@resend.dev>`) and deliver only to Caleb's address.** Non functional for real users until trykai.sg is verified in Resend. Cancellation does not send email. `notify-verification-result` was removed once those result emails moved.
+Three flows live via Resend: new booking to host and guest (from `stripe-webhook`), new manual verification submission to Caleb (from `notify-verification-pending`, gated by `NOTIFY_FUNCTION_SECRET`), and verification result to host (from `admin-verifications` or `stripe-webhook`, whichever decided). **All send from `TryKai <no-reply@trykai.sg>`.** trykai.sg is verified in Resend (14 September 2026). Cancellation does not send email. `notify-verification-result` was removed once those result emails moved.
 
 ### Domain
 trykai.sg via Vodien, two years, ~$75.98. SGNIC identity verification completed.
@@ -436,7 +436,7 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-09-11 — Rejected verification documents are deleted after 30 days, and the notify functions are no longer open relays.** Implementation of the retention rule already in Part A. `purge-verification-docs` is secret-gated (`VERIFICATION_PURGE_SECRET` or `CRON_SECRET`) and scheduled daily, not hourly: it only needs to run once the window has passed. Storage objects are removed before the URL columns are cleared, so a failed delete is retried rather than orphaned. A later resubmission is left alone because the job only touches rows that are still `rejected`.
 
-`notify-verification-pending` now requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer) and links to `/admin/verifications` instead of the Table Editor. `notify-verification-result` is deleted; hosts already hear about the decision from `admin-verifications` and `stripe-webhook`. Remaining P0.8 work is verifying trykai.sg in Resend so mail leaves the shared test domain.
+`notify-verification-pending` now requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer) and links to `/admin/verifications` instead of the Table Editor. `notify-verification-result` is deleted; hosts already hear about the decision from `admin-verifications` and `stripe-webhook`. **2026-09-14 — trykai.sg is verified in Resend.** From-address is `TryKai <no-reply@trykai.sg>`. Remaining P0.8 work is cancellation emails.
 
 ---
 

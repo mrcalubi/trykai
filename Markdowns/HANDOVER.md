@@ -55,11 +55,11 @@ Live data deliberately kept out of markdown: host roster in a Google Sheet, expe
 
 **In flight, needs Ruiheng / ops:**
 - Confirm whether `00005` and the 22 August hotfixes are applied on staging and production. Signup being broken is very likely still true on production until `00004` / the hotfix path is applied there.
-- P0.8: verify trykai.sg in Resend. The notify-function secret is already in the tree.
+- P0.8: cancellation emails. Domain and from-address shipped 14 September (`TryKai <no-reply@trykai.sg>`).
 - P0.4: the app ignores `is_suspended`.
 
 **Banking.** Aspire, approved 13 August.
-**Email.** Zoho Mail Lite for team mail, Resend for transactional (still on a shared test domain, from-address `TryKai <onboarding@resend.dev>`, delivers only to Caleb, needs the real domain verified).
+**Email.** Zoho Mail Lite for team mail, Resend for transactional from `TryKai <no-reply@trykai.sg>` (trykai.sg verified 14 September). Cancellation still does not send email.
 
 ---
 
@@ -126,7 +126,7 @@ Cheap date band: S$15 to S$25 per person, since under S$60 for two is where the 
 
 1. Stripe ops: apply `00005` on staging, wire the webhook, set platform payouts to manual, run one test-mode booking. The code path is in the repo.
 2. Confirm the 22 August signup/verification hotfixes (and `00004`) are applied to production. Signup may be broken on the live site until then.
-3. P0.8: verify trykai.sg in Resend. Notify-function secrets shipped; mail still leaves the shared test domain until the domain is verified.
+3. P0.8: cancellation emails. Domain and from-address shipped 14 September (`TryKai <no-reply@trykai.sg>`).
 4. P0.4: make the app honour `is_suspended`. Until then, a Table Editor suspend must also set listings `is_active = false` by hand.
 5. Fix missing StyleGuide category PNGs and `/trykai.png` if CI or chrome is broken without them.
 6. Wire the built components into the real pages, Home first. The library is already on this branch.
