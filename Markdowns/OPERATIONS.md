@@ -226,7 +226,7 @@ A working session across 22 to 25 August closed out a large block of foundation 
 **Goal:** notifications reach real users, and the security gap that opens alongside it closes in the same week.
 
 ### RUIHENG
-- [CRITICAL] Verify trykai.sg in Resend, switch all four Edge Functions off the shared test domain
+- [x] Verify trykai.sg in Resend, switch the from-address to `TryKai <no-reply@trykai.sg>` (14 September; one constant in `_shared/email.ts`, used by every sender)
 - [CRITICAL] Shared secret header check on the unauthenticated function endpoints. **Must land the same week**, not after. Once a real domain is sending, an unauthenticated endpoint becomes an open phishing relay.
 
 ### CALEB

@@ -32,7 +32,7 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 **Blocked or in flight**
 - Stripe ops on staging (migration, webhook, manual platform payouts, test booking). Do not assume `00005` is applied until someone confirms
 - Whether production has the 22 August signup/verification hotfixes. Still needs confirming with Ruiheng
-- P0.8 real Resend domain. Notify-function secrets are in the tree; the shared test sender is not.
+- P0.8 cancellation emails. Domain and from-address shipped 14 September (`TryKai <no-reply@trykai.sg>`); cancellation still does not email either party.
 - P0.4: `is_suspended` exists; the app never queries it
 - StyleGuide imports category PNGs that are not in the repo; Navbar requests `/trykai.png`, which is not in `public/`
 

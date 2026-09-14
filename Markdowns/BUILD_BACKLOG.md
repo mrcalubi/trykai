@@ -53,7 +53,7 @@ Verification approval is now on the platform. Suspension that does not hide list
 Not a calendar. Capacity is 8 hours a week.
 
 1. **Ops (not app code):** apply `00005` on staging, Stripe Dashboard webhook + secrets, platform payouts **manual**, flag eleven `is_founding_host`, one staging test-mode booking.
-2. **P0.8** verify trykai.sg in Resend and switch every sender. The notify-function secret is in the tree; the domain is not.
+2. **P0.8** cancellation emails. Domain and from-address shipped 14 September (`TryKai <no-reply@trykai.sg>`).
 3. **P0.4** app actually filters `is_suspended` (hide listings, block booking, block login or host actions). One-click admin can wait if Table Editor plus this filter is reliable.
 4. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
 5. **Missing assets:** category PNGs imported by StyleGuide (can fail `vite build` because `App.jsx` always imports that page); `/trykai.png` referenced by Navbar and not present in `public/`.
@@ -64,7 +64,7 @@ Not a calendar. Capacity is 8 hours a week.
 
 ## P0: blocks launch
 
-> **Status, 31 August 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, guest address reveal path of P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement, P0.8 (domain; notify secrets shipped 11 September), `full_address` column grant, missing StyleGuide/logo assets. P0.3 done 10 September.
+> **Status, 14 September 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, guest address reveal path of P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement, P0.8 cancellation emails (domain and from-address shipped 14 September), `full_address` column grant. P0.3 done 10 September.
 
 ### P0.1 — Host payout details — OBSOLETE
 Under Stripe Connect Express, Stripe collects the host's bank details. Do not add `payout_method` / `payout_identifier` columns.
@@ -100,15 +100,13 @@ Still to build:
 
 **Not done:** `00001` still `GRANT ALL` on `listings` to anon and authenticated. A crafted query on an active listing can read `full_address`. Revoke the column (or all direct SELECT of it) so the RPC is the only guest path.
 
-### P0.8 — Real email delivery — OPEN (domain); notify secrets DONE
+### P0.8 — Real email delivery — DOMAIN DONE 14 September; cancellation emails OPEN
 **Flow:** anything happens → the relevant person is told
-**Today:** from-address is `TryKai <onboarding@resend.dev>` in `_shared/email.ts`. Delivers only to Caleb.
+**Today:** from-address is `TryKai <no-reply@trykai.sg>` in `_shared/email.ts`. trykai.sg is verified in Resend.
 
 `notify-verification-pending` requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer). `notify-verification-result` is gone; result emails come from `admin-verifications` and `stripe-webhook`. `release-payout` and `admin-cancel-booking` already require a secret; `stripe-webhook` verifies `Stripe-Signature`.
 
-Verify trykai.sg in Resend and switch every sender. That is the remaining launch-blocking piece.
-
-Also still missing: cancellation emails (policy promises the refund amount in the email). Booking confirmation emails already go out from `stripe-webhook` once Resend can deliver.
+Also still missing: cancellation emails (policy promises the refund amount in the email). Booking confirmation and verification emails already go out from this address.
 
 ### P0.9 — Build assets that CI and chrome depend on — OPEN
 `StyleGuide.jsx` unconditionally imports `src/assets/categories/food.png`, `fitness.png`, and `arts.png`. Those files are not in the repo. `App.jsx` always imports StyleGuide, so `vite build` can fail. Navbar and TopNav request `/trykai.png`; `public/` only has `favicon.svg`. Fix the imports or add the files before treating CI as green.
