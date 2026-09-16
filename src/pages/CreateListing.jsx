@@ -379,7 +379,7 @@ export default function CreateListing() {
               />
             </label>
             <span className="hint">
-              Up to {MAX_PHOTOS} images ({photos.length}/{MAX_PHOTOS})
+              Maximum of {MAX_PHOTOS} photos ({photos.length}/{MAX_PHOTOS})
             </span>
 
             {photos.length > 0 && (
