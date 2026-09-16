@@ -25,14 +25,13 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 - Host verification: `submit_verification` RPC and Stripe Identity; review at `/admin/verifications`. See ENGINEERING.md
 - Atomic `spots_remaining` decrement via `confirm_paid_booking` (service role only)
 - Guest address reveal via `get_listing_address` (confirmed guest only). `listings.full_address` is still granted SELECT
-- Four tier cancellation refunds via `cancel-booking` (no cancellation emails)
+- Four tier cancellation refunds via `cancel-booking` (guest emailed the refund amount, including $0)
 - CI: Vitest coverage floors 92% / 90% / 87%, money files 100%, Playwright desktop + phone, Deno type-check of shared Edge modules
 - Component library lives in this tree at `/style-guide`. **Not wired** into real pages; live chrome is still `Navbar.jsx`
 
 **Blocked or in flight**
 - Stripe ops on staging (migration, webhook, manual platform payouts, test booking). Do not assume `00005` is applied until someone confirms
 - Whether production has the 22 August signup/verification hotfixes. Still needs confirming with Ruiheng
-- P0.8 cancellation emails. Domain and from-address shipped 14 September (`TryKai <no-reply@trykai.sg>`); cancellation still does not email either party.
 - P0.4: `is_suspended` exists; the app never queries it
 - StyleGuide imports category PNGs that are not in the repo; Navbar requests `/trykai.png`, which is not in `public/`
 
