@@ -88,6 +88,14 @@ async function cancelOneBooking(
 
   if (bookingError) return { error: bookingError.message }
 
+  console.log('cancel-booking wrote', {
+    booking_id: booking.id,
+    cancelled_by: cancelledBy,
+    refund_amount: stripeRefundId && booking.status === 'pending' ? booking.total_amount : refundAmount,
+    stripe_refund_id: stripeRefundId,
+    spots_restored: restore,
+  })
+
   if (restore > 0) {
     const { data: session, error: sessionError } = await admin
       .from('sessions')
@@ -163,6 +171,11 @@ Deno.serve(async (req) => {
 
     const body = await req.json()
     const admin = adminClient()
+    console.log('cancel-booking invoked', {
+      user_id: user.id,
+      booking_id: body?.booking_id ?? null,
+      session_id: body?.session_id ?? null,
+    })
 
     if (body?.session_id) {
       const { data: session, error } = await admin

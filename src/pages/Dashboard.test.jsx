@@ -19,9 +19,9 @@ function givenSignedIn(userId = USER_ID) {
 }
 
 /**
- * `sessions` and `users` are each queried two different ways by this page — as a
- * list while loading the dashboard, and as a single row while cancelling — so
- * the handlers below branch on whether `.single()` was used.
+ * `sessions` is queried as a list (host upcoming sessions). Guest cancel goes
+ * through cancel-booking, so the `.single()` branch is only the booking-status
+ * poll after checkout.
  */
 function givenData({
   listings = [],
@@ -327,6 +327,33 @@ describe('Dashboard guest cancellation', () => {
     expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
   })
 
+  it('shows Unknown listing / Date TBC when the nested session is missing', async () => {
+    givenData({ bookings: [makeBooking({ sessions: null })] })
+    await renderDashboard()
+
+    expect(screen.getByText('Unknown listing')).toBeInTheDocument()
+    expect(screen.getByText('Date TBC')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
+  })
+
+  it('still offers cancellation when the booked session is full', async () => {
+    givenData({
+      bookings: [
+        makeBooking({
+          sessions: {
+            starts_at: hoursFromNow(72),
+            spots_remaining: 0,
+            listings: { title: 'Latte art', host_id: HOST_ID },
+          },
+        }),
+      ],
+    })
+    await renderDashboard()
+
+    expect(screen.getByText('Latte art')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel booking' })).toBeInTheDocument()
+  })
+
   // A $45 booking carries a $6.75 platform fee, leaving a $38.25 lesson fee. The
   // partial tiers refund a share of the lesson fee only.
   function bookingCancelledAt(hours) {
@@ -389,6 +416,22 @@ describe('Dashboard guest cancellation', () => {
 })
 
 describe('Dashboard host cancellation', () => {
+  it('lists a fully booked upcoming session so the host can still cancel it', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({
+          id: 's-full',
+          bookings: [{ id: 'b-full', status: 'confirmed', guests_count: 4, total_amount: 18000 }],
+        }),
+      ],
+    })
+    await renderDashboard()
+
+    expect(within(sectionFor('Upcoming Hosted Sessions')).getByText('Latte art')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
+  })
+
   it('lists only sessions that have active bookings', async () => {
     givenData({
       listings: [makeMyListing()],
