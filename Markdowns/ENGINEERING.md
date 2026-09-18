@@ -8,7 +8,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 >
 > 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 24 hours after `starts_at`. Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). The host is emailed only when the guest cancelled.
-> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00005`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
+> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00009`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
 > 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home shows the Lane 1 headline above the kit's** `Card` **in browse mode.** `ListingCard.jsx` still exists but no page renders it. Button, Input, and SelectableCard are still used only by `/style-guide`.
 > 6. **All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a hex value in a component. See section 2, Styling.
@@ -136,6 +136,8 @@ created_at timestamp
 
 `completed` is never written. There is no session auto-complete job.
 
+Browse still uses `"Anyone can view open sessions"` (`status = 'open'`). Guests and hosts also read their own sessions in any status via `session_visible_to_me()` (`00009`), so a sold-out (`full`) session still appears on the dashboard. Guests who booked an inactive listing read its title via `listing_booked_by_me()`.
+
 ### bookings
 
 ```sql
@@ -160,7 +162,7 @@ refund_amount integer     -- cents
 created_at timestamp
 ```
 
-After `00005`, anon/authenticated cannot INSERT or UPDATE bookings. Money movement goes through service-role Edge Functions. Authenticated can SELECT (guest own rows + host session bookings).
+After `00005`, anon/authenticated cannot INSERT or UPDATE bookings. `00009` drops the leftover 00001 INSERT/UPDATE policies so a restored GRANT cannot let a guest JWT cancel without `cancel-booking`. Money movement goes through service-role Edge Functions. Authenticated can SELECT (guest own rows + host session bookings). `cancel-booking` writes those rows with the service role, so API logs show `PATCH /rest/v1/bookings` and `PATCH /rest/v1/sessions` even when the function ran; look at Edge Function logs for `cancel-booking invoked`.
 
 ### reviews
 
@@ -191,7 +193,7 @@ created_at timestamptz
 
 Append-only, service role only, no client grant of any kind. Written by `review_verification` in the same transaction as the status change, so a decision cannot be applied without a record. This is both the PDPA justification trail for holding NRIC copies and the review history the safety protocol assumes.
 
-**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`.
+**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`.
 
 ---
 
@@ -355,7 +357,8 @@ supabase/migrations/
 ├── 00005_stripe_connect_payments.sql
 ├── 00006_block_host_self_booking.sql
 ├── 00007_verification_security_foundation.sql
-└── 00008_listing_gate_can_create_listing.sql
+├── 00008_listing_gate_can_create_listing.sql
+└── 00009_booking_session_read_and_cancel_rls.sql
 
 supabase/functions/
 ├── _shared/
