@@ -101,6 +101,20 @@ describe('App routes', () => {
     expect(window.location.pathname).toBe('/login')
   })
 
+  it('sends a signed-out visitor from bookings to login', async () => {
+    renderAt('/bookings')
+
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/login')
+  })
+
+  it('sends a signed-out visitor from hosting to login', async () => {
+    renderAt('/hosting')
+
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/login')
+  })
+
   it('sends a signed-out visitor from verification to login', async () => {
     renderAt('/verify-identity')
 

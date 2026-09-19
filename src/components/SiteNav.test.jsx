@@ -101,7 +101,8 @@ describe('SiteNav hamburger', () => {
       'href',
       '/create-listing'
     )
-    expect(screen.getByRole('link', { name: 'My bookings' })).toHaveAttribute('href', '/dashboard')
+    expect(screen.getByRole('link', { name: 'My bookings' })).toHaveAttribute('href', '/bookings')
+    expect(screen.getByRole('link', { name: 'Hosting' })).toHaveAttribute('href', '/hosting')
     expect(screen.getByRole('link', { name: 'Log out' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Verification review' })).not.toBeInTheDocument()
   })
