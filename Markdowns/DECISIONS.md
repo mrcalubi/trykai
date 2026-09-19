@@ -448,6 +448,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-09-19 — Hamburger is navigation; the avatar is the account menu.** Signed-in hamburger: Browse, My bookings, Hosting (hosts only), Create listing / Become a host (always, top-level so a non-host can start), Verification review (admins only, via `my_verification()`). Settings and Log out live on the avatar. No Profile link until that page exists. Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
 
+**2026-09-19 — Login uses the kit Input.** Email is the floating-label variant; password is the password variant with the eye toggle. Both login and signup modes. Auth, redirect, and form-level error copy are unchanged.
+
 ---
 
 # Analysed but not decided

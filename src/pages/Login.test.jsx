@@ -37,6 +37,14 @@ describe('Login form', () => {
     renderLogin()
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument()
+
+    const email = screen.getByLabelText('Email')
+    const password = screen.getByLabelText('Password')
+    expect(email).toHaveClass('ui-input')
+    expect(email.closest('.ui-field')).toHaveClass('ui-field--floating')
+    expect(password).toHaveClass('ui-input')
+    expect(password).toHaveAttribute('type', 'password')
+    expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
   })
 
   it('switches to sign-up mode and back', async () => {
@@ -45,14 +53,30 @@ describe('Login form', () => {
     await switchToSignup(user)
     expect(screen.getByRole('heading', { name: 'Create account' })).toBeInTheDocument()
     expect(screen.getByLabelText('Full name')).toBeInTheDocument()
+    expect(screen.getByLabelText('Email').closest('.ui-field')).toHaveClass('ui-field--floating')
+    expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Log in' }))
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Email').closest('.ui-field')).toHaveClass('ui-field--floating')
+    expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
   })
 
   it('requires a password of at least six characters', () => {
     renderLogin()
     expect(screen.getByLabelText('Password')).toHaveAttribute('minLength', '6')
+  })
+
+  it('toggles the password field between masked and plain text', async () => {
+    const { user } = renderLogin()
+    const password = screen.getByLabelText('Password')
+
+    await user.click(screen.getByRole('button', { name: 'Show password' }))
+    expect(password).toHaveAttribute('type', 'text')
+    expect(screen.getByRole('button', { name: 'Hide password' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Hide password' }))
+    expect(password).toHaveAttribute('type', 'password')
   })
 
   it('marks the full name field as required on the signup form', async () => {
