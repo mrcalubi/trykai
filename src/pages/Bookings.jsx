@@ -4,10 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import StarPicker from '../components/StarPicker'
-import {
-  formatCents,
-  guestRefundDescription,
-} from '../lib/cancellationPolicy'
+import { guestRefundDescription } from '../lib/cancellationPolicy'
 
 function formatSessionDateTime(iso) {
   const date = new Intl.DateTimeFormat('en-SG', {
