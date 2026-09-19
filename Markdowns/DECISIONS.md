@@ -450,6 +450,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-09-19 — Login uses the kit Input.** Email is the floating-label variant; password is the password variant with the eye toggle. Both login and signup modes. Auth, redirect, and form-level error copy are unchanged.
 
+**2026-09-19 — Host Transfers are scheduled; Stripe logs stay empty until the job runs.** Not a new money-flow decision. `release-payout` existed but nothing invoked it, so Connect Transfers (`tr_`) never appeared. Staging uses pg_cron + Vault (`00010`). The GitHub Action is the extra caller once that workflow is on `main` (GitHub `schedule` only runs there). Platform payouts stay **manual**. Do not Transfer without `source_transaction` after a platform bank payout; that would take a later guest's funds. Ops steps live in OPERATIONS.md.
+
 ---
 
 # Analysed but not decided

@@ -38,7 +38,7 @@ Every operational promise still depends on Caleb performing a manual action. Som
 | Promise | How it happens today |
 |---|---|
 | Hosts verified before listings go live | `/admin/verifications`, gated by `is_admin`. Listing and session INSERT require `can_create_listing()` (`00008`). Browse still does not filter `is_suspended`. |
-| Hosts paid 24 hours after their session | `release-payout` (cron + secret). Needs scheduling and platform payouts set to manual. |
+| Hosts paid 24 hours after their session | `release-payout`, scheduled hourly (`00010` pg_cron + GitHub Action). Vault/GitHub secrets and platform payouts **manual** are still ops. |
 | Refunds issued per the cancellation policy | `cancel-booking` from the dashboard. Guest is emailed the refund amount (including $0); host is emailed only on a guest cancel. |
 | TryKai can cancel a booking | `admin-cancel-booking` with `ADMIN_FUNCTION_SECRET`. No admin UI. Writes `cancelled_by: 'host'`. |
 | Credible safety reports trigger immediate suspension | Table Editor sets `is_suspended`. **The app does not read that flag.** Listings stay visible unless someone also sets `is_active = false`. |
@@ -128,7 +128,7 @@ Stripe Connect (separate charges and transfers, Express) is implemented. Do not 
 ### P1.4 — Admin: issue refund and cancel a booking — SMALLEST PATH DONE
 `admin-cancel-booking` accepts `x-admin-secret` / `ADMIN_FUNCTION_SECRET` and fully refunds. No admin UI.
 
-Connect onboarding (`create-connect-account`, `create-account-link`) and the hourly Transfer job (`release-payout`) shipped with this build.
+Connect onboarding (`create-connect-account`, `create-account-link`) and the hourly Transfer job (`release-payout`) shipped with this build. Scheduling is `00010` (pg_cron) plus `.github/workflows/release-payout.yml` (fires from `main`). Until those run, Stripe logs have no `tr_` Transfers.
 
 ---
 

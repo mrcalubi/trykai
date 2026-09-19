@@ -352,6 +352,69 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 
 ---
 
+# Host Transfers (`release-payout`)
+
+Stripe logs a Transfer (`tr_`) only when `release-payout` creates one. The function was in the repo but nothing called it, which is why Overview showed platform **STRIPE PAYOUT** (`po_` to Aspire) and refunds, but no host Transfers.
+
+Do these once on **trykai-staging** (`hzgybclfvpuxkmytdoos`), then again on production.
+
+1. **Stripe Dashboard → Settings → Payouts → schedule = Manual.** Automatic payouts empty the platform balance. A later Transfer with `source_transaction` then fails, and a Transfer *without* `source_transaction` would take a later guest's funds. Leave historical test charges that already paid out to the bank; do not try to re-pay those from new bookings.
+
+2. **Edge Function secret.** Same value the function already expects:
+   ```bash
+   supabase secrets set PAYOUT_CRON_SECRET='a long random string'
+   ```
+   Redeploy `release-payout` after merging this change so skip-reason logs and charge backfill are live.
+
+3. **Apply migration `00010_schedule_release_payout.sql`.** Then in the SQL editor, set Vault (skip any name that already exists):
+   ```sql
+   select name from vault.decrypted_secrets
+   where name in ('release_payout_url', 'release_payout_anon_key', 'payout_cron_secret');
+
+   select vault.create_secret(
+     'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout',
+     'release_payout_url',
+     'Hourly host Transfer job'
+   );
+   select vault.create_secret(
+     'PASTE_ANON_PUBLIC_KEY',
+     'release_payout_anon_key',
+     'Gateway JWT; the function still checks x-cron-secret'
+   );
+   select vault.create_secret(
+     'PASTE_SAME_VALUE_AS_PAYOUT_CRON_SECRET',
+     'payout_cron_secret',
+     'x-cron-secret for release-payout'
+   );
+   ```
+   Anon public key: Project Settings → API. Production uses that project's URL and keys, not the staging ref above.
+
+4. **Confirm the cron row:**
+   ```sql
+   select jobid, jobname, schedule, command from cron.job
+   where jobname = 'invoke-release-payout-hourly';
+   ```
+
+5. **GitHub secrets** for `.github/workflows/release-payout.yml` (optional on staging because of step 3; required for production once the workflow is on `main`):
+   `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAYOUT_CRON_SECRET`, and the `PRODUCTION_*` equivalents. GitHub **schedule** only runs from `main`. **Actions → Release host payouts → Run workflow** works after that.
+
+6. **Read the function log, not only Stripe.** Each run logs JSON: `scanned`, `due`, `released`, `failed`, `skipped_by_reason`, `skipped`. `hold_not_elapsed` is the 24h wait. `missing_charge_id` means the PaymentIntent had no `latest_charge`. `host_not_connected` / `host_payouts_disabled` means the host has not finished Connect. `failed` with an insufficient-funds error means the platform balance was already paid out to the bank.
+
+A Transfer appears in Stripe **Payments → Transfers** (or Balance → Transfers) only after a run with `released` > 0.
+
+To run once immediately after deploy, without waiting for minute 12:
+
+```bash
+curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout' \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer PASTE_ANON_PUBLIC_KEY" \
+  -H "apikey: PASTE_ANON_PUBLIC_KEY" \
+  -H "x-cron-secret: PASTE_PAYOUT_CRON_SECRET" \
+  -d '{}'
+```
+
+---
+
 # Pre launch checklist
 
 Run through this before soft launch. Mark every item done, not done, or blocked.
@@ -365,7 +428,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Platform fee correctly calculated: 12% of lesson, S$2.50 floor, round up to a whole dollar (see DECISIONS.md). Code exists in `_shared/booking.ts`
 - [ ] PayNow 5% off the advertised all-in total at checkout (not 8% versus 10%)
 - [ ] Failed payment handled gracefully, clear error, no ghost booking
-- [ ] Payout flow tested, Transfer 24 hours after the session (`release-payout`; platform payouts must be manual)
+- [ ] Payout flow tested, Transfer 24 hours after the session (`release-payout` scheduled; platform payouts must be manual). See **Host Transfers** above.
 - [x] Refund, cancellation, and dispute policy pages live
 - [x] Policy page URLs resolve when typed directly, not just via in site navigation
 
