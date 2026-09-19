@@ -117,36 +117,41 @@ export default function PhotoLightbox({ photos, title, startIndex = 0, onClose }
         aria-label="Close"
         onClick={onClose}
       >
-        ×
+        <span className="lightbox__close-icon" aria-hidden="true">
+          ×
+        </span>
+        Close
       </button>
-
-      {hasMany && (
-        <button
-          type="button"
-          className="lightbox__nav lightbox__nav--prev"
-          aria-label="Previous photo"
-          onClick={() => goTo(-1)}
-        >
-          ‹
-        </button>
-      )}
-
-      <img src={photos[index]} alt={`${title} ${index + 1}`} className="lightbox__photo" />
-
-      {hasMany && (
-        <button
-          type="button"
-          className="lightbox__nav lightbox__nav--next"
-          aria-label="Next photo"
-          onClick={() => goTo(1)}
-        >
-          ›
-        </button>
-      )}
 
       <p className="lightbox__position" aria-live="polite">
         {index + 1} / {count}
       </p>
+
+      <div className="lightbox__stage">
+        {hasMany && (
+          <button
+            type="button"
+            className="lightbox__nav lightbox__nav--prev"
+            aria-label="Previous photo"
+            onClick={() => goTo(-1)}
+          >
+            ‹
+          </button>
+        )}
+
+        <img src={photos[index]} alt={`${title} ${index + 1}`} className="lightbox__photo" />
+
+        {hasMany && (
+          <button
+            type="button"
+            className="lightbox__nav lightbox__nav--next"
+            aria-label="Next photo"
+            onClick={() => goTo(1)}
+          >
+            ›
+          </button>
+        )}
+      </div>
     </div>
   )
 }
