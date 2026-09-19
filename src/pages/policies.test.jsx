@@ -23,6 +23,11 @@ describe('Cancellation Policy page', () => {
     expect(screen.getByText(/Less than 6 hours before the session starts, or a no show:/)).toBeInTheDocument()
   })
 
+  it('bases partial refunds on the total amount the guest paid', () => {
+    expect(screen.getByText(/50% of the total amount you paid/)).toBeInTheDocument()
+    expect(screen.getByText(/25% of the total amount you paid/)).toBeInTheDocument()
+  })
+
   it('states that three strikes deactivates a host listing', () => {
     expect(screen.getByText(/After 3 strikes, your\s+listings are automatically deactivated/)).toBeInTheDocument()
   })

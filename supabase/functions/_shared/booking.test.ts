@@ -4,7 +4,6 @@ import {
   CARD_FEE_RATE,
   HOST_FEE_FREE_BOOKINGS,
   HOST_FEE_RATE,
-  LEGACY_PLATFORM_FEE_RATE,
   PAYNOW_DISCOUNT_RATE,
   calculateGuestCharge,
   calculateGuestRefund,
@@ -328,16 +327,16 @@ describe('calculateGuestRefund', () => {
   const now = new Date('2026-06-15T10:00:00.000Z').getTime()
   const hoursFrom = (hours: number) => new Date(now + hours * 60 * 60 * 1000).toISOString()
 
-  it('matches the published four-tier table on a stored platform fee', () => {
+  it('matches the published four-tier table against the amount paid', () => {
     expect(calculateGuestRefund(4500, hoursFrom(72), 675, now)).toBe(4500)
-    expect(calculateGuestRefund(4500, hoursFrom(30), 675, now)).toBe(1913)
-    expect(calculateGuestRefund(4500, hoursFrom(12), 675, now)).toBe(956)
+    expect(calculateGuestRefund(4500, hoursFrom(30), 675, now)).toBe(2250)
+    expect(calculateGuestRefund(4500, hoursFrom(12), 675, now)).toBe(1125)
     expect(calculateGuestRefund(4500, hoursFrom(3), 675, now)).toBe(0)
   })
 
-  it('falls back to the legacy 15% rate when no fee was stored', () => {
-    expect(LEGACY_PLATFORM_FEE_RATE).toBe(0.15)
-    expect(calculateGuestRefund(4500, hoursFrom(30), undefined, now)).toBe(1913)
+  it('ignores the stored platform fee when computing a partial refund', () => {
+    expect(calculateGuestRefund(4500, hoursFrom(30), undefined, now)).toBe(2250)
+    expect(calculateGuestRefund(4500, hoursFrom(30), 0, now)).toBe(2250)
   })
 })
 

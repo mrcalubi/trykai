@@ -14,11 +14,9 @@ import { hoursFromNow } from '../test/fixtures'
 
 const NOW = new Date('2026-06-15T10:00:00.000Z')
 
-// A $45 booking: the guest pays 4500, of which 675 is the platform fee, leaving a
-// lesson fee of 3825.
+// A $45 booking: the guest paid 4500 all-in. Partial refunds are a share of that.
 const TOTAL = 4500
 const FEE = 675
-const LESSON_FEE = TOTAL - FEE
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -78,19 +76,19 @@ describe('guestRefundTier', () => {
 })
 
 describe('calculateGuestRefund', () => {
-  it('refunds everything, platform fee included, at 48 hours or more', () => {
+  it('refunds everything at 48 hours or more', () => {
     expect(calculateGuestRefund(TOTAL, hoursFromNow(72), FEE)).toBe(TOTAL)
     expect(calculateGuestRefund(TOTAL, hoursFromNow(48), FEE)).toBe(TOTAL)
   })
 
-  it('refunds half the lesson fee between 24 and 48 hours', () => {
-    expect(calculateGuestRefund(TOTAL, hoursFromNow(47.9), FEE)).toBe(Math.round(LESSON_FEE * 0.5))
-    expect(calculateGuestRefund(TOTAL, hoursFromNow(24), FEE)).toBe(Math.round(LESSON_FEE * 0.5))
+  it('refunds half of what the guest paid between 24 and 48 hours', () => {
+    expect(calculateGuestRefund(TOTAL, hoursFromNow(47.9), FEE)).toBe(Math.round(TOTAL * 0.5))
+    expect(calculateGuestRefund(TOTAL, hoursFromNow(24), FEE)).toBe(Math.round(TOTAL * 0.5))
   })
 
-  it('refunds a quarter of the lesson fee between 6 and 24 hours', () => {
-    expect(calculateGuestRefund(TOTAL, hoursFromNow(23.9), FEE)).toBe(Math.round(LESSON_FEE * 0.25))
-    expect(calculateGuestRefund(TOTAL, hoursFromNow(6), FEE)).toBe(Math.round(LESSON_FEE * 0.25))
+  it('refunds a quarter of what the guest paid between 6 and 24 hours', () => {
+    expect(calculateGuestRefund(TOTAL, hoursFromNow(23.9), FEE)).toBe(Math.round(TOTAL * 0.25))
+    expect(calculateGuestRefund(TOTAL, hoursFromNow(6), FEE)).toBe(Math.round(TOTAL * 0.25))
   })
 
   it('refunds nothing under 6 hours', () => {
@@ -103,28 +101,14 @@ describe('calculateGuestRefund', () => {
     expect(calculateGuestRefund(TOTAL, hoursFromNow(-48), FEE)).toBe(0)
   })
 
-  it('never refunds the platform fee on a partial refund', () => {
-    for (const hours of [47, 30, 24, 20, 10, 6]) {
-      expect(calculateGuestRefund(TOTAL, hoursFromNow(hours), FEE)).toBeLessThanOrEqual(LESSON_FEE)
-    }
+  it('does not change a partial refund when the stored platform fee changes', () => {
+    expect(calculateGuestRefund(TOTAL, hoursFromNow(30), FEE)).toBe(Math.round(TOTAL * 0.5))
+    expect(calculateGuestRefund(TOTAL, hoursFromNow(30), 0)).toBe(Math.round(TOTAL * 0.5))
+    expect(calculateGuestRefund(TOTAL, hoursFromNow(30), undefined)).toBe(Math.round(TOTAL * 0.5))
   })
 
   it('rounds a part-cent refund to whole cents', () => {
-    // Lesson fee of 4501 halves to 2250.5.
-    expect(calculateGuestRefund(5296, hoursFromNow(30), 795)).toBe(2251)
-  })
-
-  it('falls back to the standard fee rate for a booking with no fee recorded', () => {
-    const derivedFee = Math.round(TOTAL * PLATFORM_FEE_RATE)
-    expect(calculateGuestRefund(TOTAL, hoursFromNow(30), undefined)).toBe(
-      Math.round((TOTAL - derivedFee) * 0.5)
-    )
-  })
-
-  it('treats a null fee the same as a missing one', () => {
-    expect(calculateGuestRefund(TOTAL, hoursFromNow(30), null)).toBe(
-      calculateGuestRefund(TOTAL, hoursFromNow(30), undefined)
-    )
+    expect(calculateGuestRefund(4501, hoursFromNow(30), 0)).toBe(2251)
   })
 
   it('returns zero for a zero-value booking in every tier', () => {
@@ -151,23 +135,21 @@ describe('calculateGuestRefund', () => {
 })
 
 describe('guestRefundDescription', () => {
-  it('describes a full refund and says the platform fee is included', () => {
+  it('describes a full refund of the amount paid', () => {
     expect(guestRefundDescription(TOTAL, hoursFromNow(72), FEE)).toBe(
-      'Full refund of $45, including the platform fee (cancelled 48 or more hours before the session).'
+      'Full refund of $45 (cancelled 48 or more hours before the session).'
     )
   })
 
-  it('describes a half refund of the lesson fee', () => {
+  it('describes a half refund of the amount paid', () => {
     expect(guestRefundDescription(TOTAL, hoursFromNow(30), FEE)).toBe(
-      'Partial refund of $19.13 — 50% of the lesson fee (cancelled 24 to 48 hours before the session). ' +
-        'The platform fee is not refunded.'
+      'Partial refund of $22.50 — 50% of what you paid (cancelled 24 to 48 hours before the session).'
     )
   })
 
-  it('describes a quarter refund of the lesson fee', () => {
+  it('describes a quarter refund of the amount paid', () => {
     expect(guestRefundDescription(TOTAL, hoursFromNow(12), FEE)).toBe(
-      'Partial refund of $9.56 — 25% of the lesson fee (cancelled 6 to 24 hours before the session). ' +
-        'The platform fee is not refunded.'
+      'Partial refund of $11.25 — 25% of what you paid (cancelled 6 to 24 hours before the session).'
     )
   })
 
@@ -227,8 +209,8 @@ describe('CANCELLATION_POLICY_ITEMS', () => {
 
   it.each([
     [0, 72, TOTAL],
-    [1, 30, Math.round(LESSON_FEE * 0.5)],
-    [2, 12, Math.round(LESSON_FEE * 0.25)],
+    [1, 30, Math.round(TOTAL * 0.5)],
+    [2, 12, Math.round(TOTAL * 0.25)],
     [3, 3, 0],
   ])('row %i matches what the code pays %i hours out', (row, hours, expected) => {
     expect(CANCELLATION_POLICY_ITEMS[row].scenario).toMatch(/^Guest cancels/)

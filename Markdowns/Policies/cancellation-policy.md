@@ -1,6 +1,6 @@
 # Cancellation Policy
 
-Last updated: 29 July 2026
+Last updated: 19 September 2026
 
 This policy applies to single session bookings on TryKai. It is shown to guests before checkout and to hosts before a listing goes live, so there are no surprises on either side.
 
@@ -8,9 +8,9 @@ This policy applies to single session bookings on TryKai. It is shown to guests 
 
 Refunds are calculated based on how far in advance you cancel, measured from the moment you cancel to the session's start time, in Singapore time.
 
-- **48 hours or more before the session starts:** full refund, including the platform fee.
-- **Between 24 and 48 hours before the session starts:** 50% of the lesson fee refunded. The platform fee is not refunded in this case.
-- **Between 6 and 24 hours before the session starts:** 25% of the lesson fee refunded. The platform fee is not refunded in this case.
+- **48 hours or more before the session starts:** full refund of the total amount you paid.
+- **Between 24 and 48 hours before the session starts:** 50% of the total amount you paid.
+- **Between 6 and 24 hours before the session starts:** 25% of the total amount you paid.
 - **Less than 6 hours before the session starts, or a no show:** no refund. This applies the same whether you cancel at the last minute or simply do not turn up.
 
 Cancel anytime from your Dashboard. The refund amount is calculated automatically and shown to you before you confirm.

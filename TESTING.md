@@ -161,13 +161,12 @@ Cancellation Policy expressed in code, ordered widest window first:
 
 | Cancelled | Refund |
 | --- | --- |
-| 48h or more before | Everything, platform fee included |
-| 24–48h before | 50% of the lesson fee |
-| 6–24h before | 25% of the lesson fee |
+| 48h or more before | 100% of the amount paid |
+| 24–48h before | 50% of the amount paid |
+| 6–24h before | 25% of the amount paid |
 | Under 6h before, or a no-show | Nothing |
 
-A guest pays `total_amount` and the platform fee is carved out of it rather than
-added on top, so the *lesson fee* is `total_amount - platform_fee`. Changing what a
+Partial refunds are a share of `total_amount` (what the guest paid). Changing what a
 guest is refunded means changing three things together: this table, the prose on
 `src/pages/CancellationPolicy.jsx`, and the tests. `cancellationPolicy.test.js`
 asserts that the tier table, the summary rows rendered in the UI, and the

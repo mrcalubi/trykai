@@ -216,9 +216,9 @@ Published at /cancellation-policy, /refund-policy, /dispute-policy. Finalised 29
 
 | Scenario | Outcome |
 |---|---|
-| Guest cancels 48hrs+ before | Full refund, including platform fee |
-| Guest cancels 24 to 48hrs before | 50% of lesson fee, platform fee forfeited |
-| Guest cancels 6 to 24hrs before | 25% of lesson fee, platform fee forfeited |
+| Guest cancels 48hrs+ before | 100% of the amount the guest paid |
+| Guest cancels 24 to 48hrs before | 50% of the amount the guest paid |
+| Guest cancels 6 to 24hrs before | 25% of the amount the guest paid |
 | Guest cancels under 6hrs, or no show | No refund |
 | Host cancels, any time | Full guest refund including platform fee, 1 strike |
 | Host no show | Full guest refund including platform fee, discretionary compensation, 2 strikes immediately, account reviewed |
@@ -441,6 +441,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-09-11 — Rejected verification documents are deleted after 30 days, and the notify functions are no longer open relays.** Implementation of the retention rule already in Part A. `purge-verification-docs` is secret-gated (`VERIFICATION_PURGE_SECRET` or `CRON_SECRET`) and scheduled daily, not hourly: it only needs to run once the window has passed. Storage objects are removed before the URL columns are cleared, so a failed delete is retried rather than orphaned. A later resubmission is left alone because the job only touches rows that are still `rejected`.
 
 `notify-verification-pending` now requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer) and links to `/admin/verifications` instead of the Table Editor. `notify-verification-result` is deleted; hosts already hear about the decision from `admin-verifications` and `stripe-webhook`. **2026-09-14 — trykai.sg is verified in Resend.** From-address is `TryKai <no-reply@trykai.sg>`. **2026-09-14 — cancellation emails.** `cancel-booking` emails the guest the refund amount (including $0) and the host only when the guest cancelled. A send failure cannot fail the refund.
+
+**2026-09-19 — Guest cancellation refunds are a percentage of the amount paid, not of the host's lesson.** Supersedes the 29 July "50% / 25% of the lesson fee, platform fee forfeited" rule. The four time windows stay: 48h+ is 100% of `total_amount`, 24–48h is 50%, 6–24h is 25%, under 6h is nothing. Host and TryKai cancels are still a full refund of the amount paid.
 
 **2026-09-19 — Dashboard split into `/bookings` and `/hosting`.** One account is still both guest and host; the mixed dashboard page is not. Guest view is `/bookings`. Host view (listings, hosted sessions, Connect payouts) is `/hosting`. `/dashboard` redirects to `/bookings`, except `?connect=` which goes to `/hosting`. Non-hosts hitting `/hosting` go to `/bookings`. Emails and Stripe return URLs still use `/dashboard`.
 

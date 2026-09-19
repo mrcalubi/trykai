@@ -183,10 +183,10 @@ export function prepareBooking(
 export const LEGACY_PLATFORM_FEE_RATE = 0.15
 
 export const GUEST_REFUND_TIER_RULES = [
-  { id: 'full', minHoursBefore: 48, lessonFeeShare: 1, refundsPlatformFee: true },
-  { id: 'half', minHoursBefore: 24, lessonFeeShare: 0.5, refundsPlatformFee: false },
-  { id: 'quarter', minHoursBefore: 6, lessonFeeShare: 0.25, refundsPlatformFee: false },
-  { id: 'none', minHoursBefore: Number.NEGATIVE_INFINITY, lessonFeeShare: 0, refundsPlatformFee: false },
+  { id: 'full', minHoursBefore: 48, totalShare: 1 },
+  { id: 'half', minHoursBefore: 24, totalShare: 0.5 },
+  { id: 'quarter', minHoursBefore: 6, totalShare: 0.25 },
+  { id: 'none', minHoursBefore: Number.NEGATIVE_INFINITY, totalShare: 0 },
 ] as const
 
 export function hoursUntilSession(sessionStartsAt: string | Date, now = Date.now()): number {
@@ -198,26 +198,15 @@ export function guestRefundTierRule(sessionStartsAt: string | Date, now = Date.n
   return GUEST_REFUND_TIER_RULES.find((tier) => hoursUntil >= tier.minHoursBefore)!
 }
 
-function platformFeeOf(
-  totalAmountCents: number,
-  platformFeeCents: number | null | undefined,
-): number {
-  return Number.isFinite(platformFeeCents as number)
-    ? (platformFeeCents as number)
-    : Math.round(totalAmountCents * LEGACY_PLATFORM_FEE_RATE)
-}
-
 export function calculateGuestRefund(
   totalAmountCents: number,
   sessionStartsAt: string | Date,
   platformFeeCents?: number | null,
   now = Date.now(),
 ): number {
+  void platformFeeCents
   const tier = guestRefundTierRule(sessionStartsAt, now)
-  if (tier.refundsPlatformFee) return totalAmountCents
-  if (tier.lessonFeeShare === 0) return 0
-  const lessonFee = totalAmountCents - platformFeeOf(totalAmountCents, platformFeeCents)
-  return Math.round(lessonFee * tier.lessonFeeShare)
+  return Math.round(totalAmountCents * tier.totalShare)
 }
 
 export function confirmRpcErrorKind(message: string | undefined): 'oversell' | 'other' {

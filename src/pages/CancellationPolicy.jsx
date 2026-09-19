@@ -4,7 +4,7 @@ export default function CancellationPolicy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Cancellation Policy</h1>
-      <p className="policy-page__updated">Last updated: 29 July 2026</p>
+      <p className="policy-page__updated">Last updated: 19 September 2026</p>
 
       <p>
         This policy applies to single session bookings on TryKai. It is shown to
@@ -21,17 +21,15 @@ export default function CancellationPolicy() {
       <ul>
         <li>
           <strong>48 hours or more before the session starts:</strong> full
-          refund, including the platform fee.
+          refund of the total amount you paid.
         </li>
         <li>
           <strong>Between 24 and 48 hours before the session starts:</strong>{' '}
-          50% of the lesson fee refunded. The platform fee is not refunded in
-          this case.
+          50% of the total amount you paid.
         </li>
         <li>
           <strong>Between 6 and 24 hours before the session starts:</strong> 25%
-          of the lesson fee refunded. The platform fee is not refunded in this
-          case.
+          of the total amount you paid.
         </li>
         <li>
           <strong>

@@ -451,8 +451,7 @@ describe('Dashboard guest cancellation', () => {
     expect(screen.getByRole('button', { name: 'Cancel booking' })).toBeInTheDocument()
   })
 
-  // A $45 booking carries a $6.75 platform fee, leaving a $38.25 lesson fee. The
-  // partial tiers refund a share of the lesson fee only.
+  // A $45 booking. Partial tiers refund a share of what the guest paid.
   function bookingCancelledAt(hours) {
     return makeBooking({
       total_amount: 4500,
@@ -469,9 +468,9 @@ describe('Dashboard guest cancellation', () => {
   })
 
   it.each([
-    [72, 'Full refund of $45, including the platform fee'],
-    [30, 'Partial refund of $19.13 — 50% of the lesson fee'],
-    [12, 'Partial refund of $9.56 — 25% of the lesson fee'],
+    [72, 'Full refund of $45'],
+    [30, 'Partial refund of $22.50 — 50% of what you paid'],
+    [12, 'Partial refund of $11.25 — 25% of what you paid'],
     [3, 'No refund (cancelled less than 6 hours before the session).'],
   ])('quotes the published refund %i hours before the session', async (hours, quote) => {
     givenData({ bookings: [bookingCancelledAt(hours)] })

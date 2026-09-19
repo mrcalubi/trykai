@@ -89,7 +89,7 @@ Still to build:
 - One-click admin button can follow; the filter is the launch-blocking piece
 
 ### P0.5 — Cancellation logic rebuilt to four tiers — DONE
-`calculateGuestRefund` implements 100 / 50 / 25 / 0 at 48, 24, and 6 hours, platform fee forfeited on partial tiers. `cancel-booking` issues the Stripe refund. Spot restore only for confirmed rows. Guests are emailed the refund amount (including $0); the host is emailed only on a guest cancel.
+`calculateGuestRefund` implements 100 / 50 / 25 / 0 of the amount the guest paid at 48, 24, and 6 hours. `cancel-booking` issues the Stripe refund. Spot restore only for confirmed rows. Guests are emailed the refund amount (including $0); the host is emailed only on a guest cancel.
 
 ### P0.6 — Spots decrement, atomically — DONE
 `confirm_paid_booking` decrements `spots_remaining` by `guests_count` under a row lock in the same operation that flips the booking to confirmed. CHECK constraint `spots_remaining >= 0`. Stripe webhook is the caller. Guest-callable `confirm_booking` from `00002` was dropped; the wrapper in `00005` is service_role only.

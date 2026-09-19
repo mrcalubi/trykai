@@ -216,14 +216,14 @@ These are enforced in code. If you are about to change logic around any of them,
 
 ### Cancellation policy, correct version
 
-*Updated 29 July 2026. Supersedes the old two tier rule. Published at /cancellation-policy.*
+*Updated 19 September 2026. Supersedes the 29 July "percentage of the lesson fee" wording. Published at /cancellation-policy.*
 
 
 | Scenario                              | Outcome                                                                                                                                                           |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Guest cancels 48hrs+ before           | Full refund, including platform fee                                                                                                                               |
-| Guest cancels 24 to 48hrs before      | 50% of lesson fee, platform fee forfeited                                                                                                                         |
-| Guest cancels 6 to 24hrs before       | 25% of lesson fee, platform fee forfeited                                                                                                                         |
+| Guest cancels 48hrs+ before           | 100% of the amount the guest paid                                                                                                                                 |
+| Guest cancels 24 to 48hrs before      | 50% of the amount the guest paid                                                                                                                                  |
+| Guest cancels 6 to 24hrs before       | 25% of the amount the guest paid                                                                                                                                  |
 | Guest cancels under 6hrs, or no shows | No refund                                                                                                                                                         |
 | Host cancels, any time                | Full guest refund including platform fee. Host receives 1 strike.                                                                                                 |
 | Host no show                          | Full guest refund including platform fee, plus discretionary compensation at TryKai's judgement. Host receives 2 strikes immediately and the account is reviewed. |
