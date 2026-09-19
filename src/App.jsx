@@ -10,6 +10,8 @@ import CreateListing from './pages/CreateListing'
 import EditListing from './pages/EditListing'
 import VerifyIdentity from './pages/VerifyIdentity'
 import Dashboard from './pages/Dashboard'
+import Bookings from './pages/Bookings'
+import Hosting from './pages/Hosting'
 import AdminVerifications from './pages/AdminVerifications'
 import RefundPolicy from './pages/RefundPolicy'
 import CancellationPolicy from './pages/CancellationPolicy'
@@ -45,6 +47,22 @@ export default function App() {
           element={
             <RequireAuth>
               <EditListing />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/bookings"
+          element={
+            <RequireAuth>
+              <Bookings />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/hosting"
+          element={
+            <RequireAuth>
+              <Hosting />
             </RequireAuth>
           }
         />

@@ -22,13 +22,15 @@ describe('HamburgerMenu', () => {
     expect(screen.getByRole('link', { name: 'Refund policy' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Dispute policy' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
   })
 
   it('shows logged-in links including Log out', () => {
     renderMenu({ open: true, isLoggedIn: true })
 
     expect(screen.getByRole('link', { name: 'Browse' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'My bookings' })).toHaveAttribute('href', '/dashboard')
+    expect(screen.getByRole('link', { name: 'My bookings' })).toHaveAttribute('href', '/bookings')
+    expect(screen.getByRole('link', { name: 'Hosting' })).toHaveAttribute('href', '/hosting')
     expect(screen.getByRole('link', { name: 'Create listing' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Profile' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument()

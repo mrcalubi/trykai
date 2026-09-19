@@ -19,7 +19,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 
 ## 1. What the platform does
 
-Two user types, one account. A user is a guest by default and becomes a host when they create their first listing. The `is_host` flag on the users table handles the distinction. The dashboard shows both views.
+Two user types, one account. A user is a guest by default and becomes a host when they create their first listing. The `is_host` flag on the users table handles the distinction. Guest bookings live at `/bookings`. Host listings, hosted sessions, and payout setup live at `/hosting`. `/dashboard` redirects to `/bookings` (or `/hosting` when `?connect=` is present) so emails and Stripe return URLs keep working.
 
 - **Hosts** list a skill or experience to teach
 - **Guests** browse and book sessions
@@ -324,7 +324,9 @@ src/
 │   ├── EditListing.jsx          # Host edits listing, including full_address
 │   ├── VerifyIdentity.jsx       # Stripe Identity first; manual upload + consent as fallback
 │   ├── AdminVerifications.jsx   # /admin/verifications review queue, is_admin only
-│   ├── Dashboard.jsx            # Both views, Connect setup, cancel via function
+│   ├── Dashboard.jsx            # Legacy /dashboard → /bookings, or /hosting when ?connect=
+│   ├── Bookings.jsx             # Guest view: My Bookings, cancel, reviews, ?booking= poll
+│   ├── Hosting.jsx              # Host view: listings, hosted sessions, Connect payouts
 │   ├── StyleGuide.jsx           # UI kit preview at /style-guide
 │   ├── RefundPolicy.jsx
 │   ├── CancellationPolicy.jsx
@@ -393,7 +395,9 @@ supabase/functions/
 | Host verification review                                   | `src/pages/AdminVerifications.jsx`                                                                  |
 | Verification and retention rules                           | `supabase/functions/_shared/verification.ts`                                                        |
 | Rejected-document deletion                                 | `supabase/functions/purge-verification-docs/`                                                       |
-| Dashboard, both views                                      | `src/pages/Dashboard.jsx`                                                                           |
+| Guest bookings                                                 | `src/pages/Bookings.jsx` (`/bookings`)                                                              |
+| Host listings, sessions, payouts                               | `src/pages/Hosting.jsx` (`/hosting`)                                                                |
+| Legacy dashboard redirect                                      | `src/pages/Dashboard.jsx` (`/dashboard` → `/bookings`, or `/hosting` when `?connect=`)              |
 | Global nav and hamburger                                   | `src/components/SiteNav.jsx`, `src/components/ui/TopNav.jsx`, `src/components/ui/HamburgerMenu.jsx` |
 | UI kit not yet wired (Button, Input, SelectableCard)       | `src/components/ui/`, `src/pages/StyleGuide.jsx`                                                    |
 | Colour tokens and all styling                              | `src/index.css`                                                                                     |
@@ -408,7 +412,7 @@ supabase/functions/
 | Connect onboarding                                         | `supabase/functions/create-account-link/`                                                           |
 
 
-**Routes in** `App.jsx`**:** `/`, `/login`, `/listings/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/dashboard` (the last four behind `RequireAuth`), `/admin/verifications` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render SiteNav + Footer.
+**Routes in** `App.jsx`**:** `/`, `/login`, `/listings/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/bookings`, `/hosting`, `/dashboard` (the last six behind `RequireAuth`; `/dashboard` redirects to `/bookings`, or `/hosting` when `?connect=` is present), `/admin/verifications` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render SiteNav + Footer.
 
 ---
 
@@ -438,11 +442,11 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 **7. Payment.** Payment Element `confirmPayment` uses `return_url=/dashboard?booking=<id>`. `stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, freezes host fee/payout, emails guest and host via `_shared/email.ts`. Failed/canceled intents mark the pending row cancelled without touching spots. Oversell refunds immediately. `account.updated` syncs `stripe_payouts_enabled`.
 
-**8. Confirmation.** `Dashboard.jsx` polls `/dashboard?booking=` until status is `confirmed`. Then `get_listing_address` returns `full_address` to that guest.
+**8. Confirmation.** `/dashboard?booking=` redirects to `/bookings?booking=`. `Bookings.jsx` polls until status is `confirmed`. Then `get_listing_address` returns `full_address` to that guest.
 
-**9. Session happens.** Payout releases 24 hours after `starts_at`, via `release-payout`. Sessions are not auto-completed. Review prompts appear in the dashboard for `pending` or `confirmed` bookings after `starts_at`.
+**9. Session happens.** Payout releases 24 hours after `starts_at`, via `release-payout`. Sessions are not auto-completed. Review prompts appear on `/bookings` for `pending` or `confirmed` bookings after `starts_at`.
 
-**10. Review.** Dashboard allows a review if the booking is past, status is `pending` or `confirmed`, and this reviewer has not already reviewed. Inserts into `reviews` as `role: 'guest'`. RLS does not require confirmed.
+**10. Review.** `/bookings` allows a review if the booking is past, status is `pending` or `confirmed`, and this reviewer has not already reviewed. Inserts into `reviews` as `role: 'guest'`. RLS does not require confirmed.
 
 ### Scenario 2: Host creates a listing
 
@@ -456,11 +460,11 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 4. **The outcome is recorded.** For Stripe Identity, `stripe-webhook` handles `identity.verification_session.verified` and `.requires_input`. A `requires_input` event is only treated as a failure when it carries a `last_error`, since a fresh session sits in that status. The failure code maps to host-readable copy in `IDENTITY_FAILURE_REASONS`; `consent_declined` and `country_not_supported` point at manual review, because an automated check cannot help there.
 
    For manual submissions, Caleb reviews at `/admin/verifications`: both documents side by side, approve, or reject with a reason. Both paths call `review_verification` (`00007`, service role only), which writes the decision, the reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record, and `method` records which route decided it. Whichever function made the decision emails the host. A rejected host also sees the reason on `/verify-identity` when they try again.
-5. **Creates the listing.** Title, description, category, price in cents, max guests, public area, private full address, up to 5 photos, what's provided. Inserts into `listings`, sets `is_host = true`, navigates to dashboard. **Does not create the first session in the same form.** No photography guidance. No T&C checkbox.
-6. **Adds a session** from Dashboard “Add Session”. Date, time, duration, spots. `spots_total` and `spots_remaining` both set to the entered number, `status = 'open'`.
-7. **Payout setup.** Dashboard “Set up payouts” → `create-account-link` → Stripe Express onboarding. Book stays disabled for guests until `stripe_payouts_enabled`.
+5. **Creates the listing.** Title, description, category, price in cents, max guests, public area, private full address, up to 5 photos, what's provided. Inserts into `listings`, sets `is_host = true`, navigates to `/dashboard` (which redirects to `/bookings`). **Does not create the first session in the same form.** No photography guidance. No T&C checkbox.
+6. **Adds a session** from Hosting “Add Session”. Date, time, duration, spots. `spots_total` and `spots_remaining` both set to the entered number, `status = 'open'`.
+7. **Payout setup.** Hosting “Set up payouts” → `create-account-link` → Stripe Express onboarding. Account Link `return_url`/`refresh_url` still use `/dashboard?connect=`, which redirects to `/hosting`. Book stays disabled for guests until `stripe_payouts_enabled`.
 8. **Receives bookings.** Email from `stripe-webhook` after confirmation, with guest name, session details, guest count.
-9. **Edits.** `EditListing.jsx` checks `host_id = current user`. Soft-delete is `is_active = false` from the dashboard.
+9. **Edits.** `EditListing.jsx` checks `host_id = current user`. Soft-delete is `is_active = false` from `/hosting`.
 
 
 
@@ -468,7 +472,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 Warning shown: cancelling results in a strike, three strikes deactivates listings, all guests receive a full refund.
 
-On confirmation the dashboard calls `cancel-booking` with `session_id`. The function issues Stripe refunds for confirmed bookings (or cancels unpaid PaymentIntents), restores spots only for confirmed rows, sets `cancelled_by = 'host'`, and calls `apply_host_strike`. Each guest is emailed the refund amount. The host is not emailed; they initiated the cancel.
+On confirmation `/hosting` calls `cancel-booking` with `session_id`. The function issues Stripe refunds for confirmed bookings (or cancels unpaid PaymentIntents), restores spots only for confirmed rows, sets `cancelled_by = 'host'`, and calls `apply_host_strike`. Each guest is emailed the refund amount. The host is not emailed; they initiated the cancel.
 
 Host upcoming list is sessions that already have pending or confirmed bookings, not every open session.
 
@@ -494,13 +498,17 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **ListingDetail.jsx** — listing, gallery (swipe on phone, mosaic from 1024px), host name/avatar high under the area, open future sessions, collapsible cancellation policy, guest→host reviews, Card vs PayNow checkout. Two columns with a sticky booking card from 1024px. `guests_count` always 1. `full_address` only via RPC after a confirmed booking.
 
-**CreateListing.jsx** — auth required. Verification gate. Listing insert then `is_host = true`, then dashboard. CancellationPolicyInfo on the form. First session is a separate dashboard action.
+**CreateListing.jsx** — auth required. Verification gate. Listing insert then `is_host = true`, then `/dashboard` (redirects to `/bookings`). CancellationPolicyInfo on the form. First session is a separate `/hosting` action.
 
 **EditListing.jsx** — auth required, ownership checked, pre fills including `full_address` and existing photos.
 
 **VerifyIdentity.jsx** — Stripe Identity first. Manual fallback uploads to the private bucket, then `submit_verification` with consent. Pending users see an under review message. A rejection reason from either path is shown on resubmit.
 
-**Dashboard.jsx** — Connect payout setup. Host: listings with Add Session, Edit, soft-delete; upcoming sessions that have active bookings, with Cancel and strike warning. Guest: upcoming and past bookings, Cancel with calculated refund shown, leave review after `starts_at` on pending or confirmed. Polls `?booking=` after Payment Element return.
+**Dashboard.jsx** — legacy path. Redirects `/dashboard` to `/bookings`, keeping the query string, except `?connect=` which goes to `/hosting`. Emails, Stripe Payment Element `return_url`, and Connect Account Links still use `/dashboard`.
+
+**Bookings.jsx** — auth required. Guest: upcoming and past bookings, Cancel with calculated refund shown, leave review after `starts_at` on pending or confirmed. Polls `?booking=` after Payment Element return.
+
+**Hosting.jsx** — auth required. Host: listings with Add Session, Edit, soft-delete; upcoming sessions that have active bookings, with Cancel and strike warning; Connect payout setup. A signed-in user who is not a host is redirected to `/bookings`.
 
 **StyleGuide.jsx** — private preview of the UI kit at `/style-guide`. Imports `src/assets/categories/{food,fitness,arts,music}.png`, all four of which are now in the repo. Language/Other imports are still commented out; uncommenting either without adding the PNG fails `vite build`, because App always imports this page. It no longer mounts its own TopNav: the live `SiteNav` bar serves the page, and the preview-only "Simulate logged in" toggle is gone.
 

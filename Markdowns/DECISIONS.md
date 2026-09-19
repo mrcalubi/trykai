@@ -16,6 +16,8 @@ Two host types on the same browse page. **Peer hosts**, everyday people monetisi
 ### Unified accounts
 One account type, both host and guest. Guest by default, becomes a host on first listing. `is_host` flag handles the distinction. Hosts get a visible badge.
 
+Guest bookings are at `/bookings`. Host listings, upcoming hosted sessions, and Stripe payout setup are at `/hosting`. `/dashboard` remains as a redirect so emails and Stripe `return_url`s keep working. Payouts stay in the host area, not account settings. A signed-in user who is not a host is redirected from `/hosting` to `/bookings`.
+
 ### Progressive disclosure at signup
 Ask for information when it becomes relevant, not upfront.
 - Browsing: email only
@@ -437,6 +439,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-09-11 — Rejected verification documents are deleted after 30 days, and the notify functions are no longer open relays.** Implementation of the retention rule already in Part A. `purge-verification-docs` is secret-gated (`VERIFICATION_PURGE_SECRET` or `CRON_SECRET`) and scheduled daily, not hourly: it only needs to run once the window has passed. Storage objects are removed before the URL columns are cleared, so a failed delete is retried rather than orphaned. A later resubmission is left alone because the job only touches rows that are still `rejected`.
 
 `notify-verification-pending` now requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer) and links to `/admin/verifications` instead of the Table Editor. `notify-verification-result` is deleted; hosts already hear about the decision from `admin-verifications` and `stripe-webhook`. **2026-09-14 — trykai.sg is verified in Resend.** From-address is `TryKai <no-reply@trykai.sg>`. **2026-09-14 — cancellation emails.** `cancel-booking` emails the guest the refund amount (including $0) and the host only when the guest cancelled. A send failure cannot fail the refund.
+
+**2026-09-19 — Dashboard split into `/bookings` and `/hosting`.** One account is still both guest and host; the mixed dashboard page is not. Guest view is `/bookings`. Host view (listings, hosted sessions, Connect payouts) is `/hosting`. `/dashboard` redirects to `/bookings`, except `?connect=` which goes to `/hosting`. Non-hosts hitting `/hosting` go to `/bookings`. Emails and Stripe return URLs still use `/dashboard`.
 
 ---
 

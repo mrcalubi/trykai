@@ -11,7 +11,8 @@ const LOGGED_OUT_LINKS = [
 function loggedInLinks(isAdmin) {
   return [
     { label: 'Browse', to: '/' },
-    { label: 'My bookings', to: '/dashboard' },
+    { label: 'My bookings', to: '/bookings' },
+    { label: 'Hosting', to: '/hosting' },
     { label: 'Create listing', to: '/create-listing' },
     ...(isAdmin ? [{ label: 'Verification review', to: '/admin/verifications' }] : []),
     { label: 'Profile', to: '#' },

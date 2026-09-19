@@ -97,6 +97,20 @@ test.describe('signed-out navigation', () => {
     await expect(page).toHaveURL(/\/login$/)
   })
 
+  test('redirects bookings to login', async ({ page }) => {
+    await stubAllExternalCalls(page, {})
+    await page.goto('/bookings')
+
+    await expect(page).toHaveURL(/\/login$/)
+  })
+
+  test('redirects hosting to login', async ({ page }) => {
+    await stubAllExternalCalls(page, {})
+    await page.goto('/hosting')
+
+    await expect(page).toHaveURL(/\/login$/)
+  })
+
   test('redirects listing creation to login', async ({ page }) => {
     await stubAllExternalCalls(page, {})
     await page.goto('/create-listing')
