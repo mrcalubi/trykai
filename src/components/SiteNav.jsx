@@ -16,6 +16,7 @@ export default function SiteNav() {
   const [fullName, setFullName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isHost, setIsHost] = useState(false)
 
   useEffect(() => {
     function applySession(session) {
@@ -25,6 +26,7 @@ export default function SiteNav() {
         setFullName('')
         setAvatarUrl('')
         setIsAdmin(false)
+        setIsHost(false)
       }
     }
 
@@ -46,12 +48,13 @@ export default function SiteNav() {
 
     supabase
       .from('users')
-      .select('full_name, avatar_url')
+      .select('full_name, avatar_url, is_host')
       .eq('id', user.id)
       .single()
       .then(({ data }) => {
         setFullName(data?.full_name || '')
         setAvatarUrl(data?.avatar_url || '')
+        setIsHost(Boolean(data?.is_host))
       })
 
     // `is_admin` has no client SELECT grant, so the menu asks the same
@@ -72,6 +75,7 @@ export default function SiteNav() {
     <TopNav
       isLoggedIn={Boolean(user)}
       isAdmin={isAdmin}
+      isHost={isHost}
       avatarUrl={avatarUrl || undefined}
       name={fullName || user?.email || ''}
       onLogout={handleLogout}

@@ -444,7 +444,9 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-09-19 — Dashboard split into `/bookings` and `/hosting`.** One account is still both guest and host; the mixed dashboard page is not. Guest view is `/bookings`. Host view (listings, hosted sessions, Connect payouts) is `/hosting`. `/dashboard` redirects to `/bookings`, except `?connect=` which goes to `/hosting`. Non-hosts hitting `/hosting` go to `/bookings`. Emails and Stripe return URLs still use `/dashboard`.
 
-**2026-09-19 — Settings page at `/settings`.** Signed-in users can edit `full_name` and `avatar_url`. Email is read-only; change it via `hello@trykai.sg`. No in-app delete: deletion must keep transaction records for dispute and tax while removing personal data, and that split is not designed. Nav is not linked yet.
+**2026-09-19 — Settings page at `/settings`.** Signed-in users can edit `full_name` and `avatar_url`. Email is read-only; change it via `hello@trykai.sg`. No in-app delete: deletion must keep transaction records for dispute and tax while removing personal data, and that split is not designed. Linked from the avatar account menu.
+
+**2026-09-19 — Hamburger is navigation; the avatar is the account menu.** Signed-in hamburger: Browse, My bookings, Hosting (hosts only), Create listing / Become a host (always, top-level so a non-host can start), Verification review (admins only, via `my_verification()`). Settings and Log out live on the avatar. No Profile link until that page exists. Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
 
 ---
 

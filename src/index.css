@@ -163,6 +163,7 @@ a {
 /* Top nav */
 .ui-topnav {
   position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -342,6 +343,68 @@ a {
   letter-spacing: 0.02em;
   line-height: 1;
   user-select: none;
+}
+
+.ui-account {
+  position: relative;
+}
+
+.ui-account__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.ui-account__trigger:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.ui-account-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2;
+  min-width: 11.5rem;
+  max-width: min(18rem, calc(100vw - 24px));
+  padding: 6px 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+
+.ui-account-menu__item {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-h);
+  text-align: left;
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.ui-account-menu__item:hover {
+  background: var(--primary-bg);
+}
+
+.ui-account-menu__item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  background: var(--primary-bg);
 }
 
 @media (prefers-reduced-motion: reduce) {
