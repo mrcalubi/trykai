@@ -12,6 +12,7 @@ import VerifyIdentity from './pages/VerifyIdentity'
 import Dashboard from './pages/Dashboard'
 import Bookings from './pages/Bookings'
 import Hosting from './pages/Hosting'
+import Settings from './pages/Settings'
 import AdminVerifications from './pages/AdminVerifications'
 import RefundPolicy from './pages/RefundPolicy'
 import CancellationPolicy from './pages/CancellationPolicy'
@@ -71,6 +72,14 @@ export default function App() {
           element={
             <RequireAuth>
               <Dashboard />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <RequireAuth>
+              <Settings />
             </RequireAuth>
           }
         />
