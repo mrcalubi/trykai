@@ -298,7 +298,7 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 - `confirm_paid_booking(...)` and `confirm_booking` wrapper — flip pending → confirmed and decrement `spots_remaining` atomically under a row lock. **Service role only.** The Stripe webhook calls `confirm_paid_booking`. If spots are gone, the webhook refunds instead of confirming.
 - `apply_host_strike(host_id)` — increments strikes and deactivates listings at 3. **Service role only.**
 
-**Verification review is on the platform** at `/admin/verifications`, gated by `is_admin`. The hamburger and the dashboard show a link to it only after `my_verification()` reports that the signed-in user is an admin. `admin-verifications` authenticates the reviewer's own JWT and then re-checks `is_admin` server-side, because a shared secret cannot be shipped to a browser. Document images are served through signed URLs minted with the service role and valid for `SIGNED_URL_TTL_SECONDS`, so they are never reachable from a public or authenticated non-admin route. The result email, including the rejection reason, is sent from that function rather than a database webhook, the same way booking emails moved into `stripe-webhook`.
+**Verification review is on the platform** at `/admin/verifications`, gated by `is_admin`. The hamburger shows a link to it only after `my_verification()` reports that the signed-in user is an admin. `admin-verifications` authenticates the reviewer's own JWT and then re-checks `is_admin` server-side, because a shared secret cannot be shipped to a browser. Document images are served through signed URLs minted with the service role and valid for `SIGNED_URL_TTL_SECONDS`, so they are never reachable from a public or authenticated non-admin route. The result email, including the rejection reason, is sent from that function rather than a database webhook, the same way booking emails moved into `stripe-webhook`.
 
 The remaining admin actions (set `is_founding_host`, suspend, grant `is_admin`) still run as the service role via the Supabase Table Editor. `admin-cancel-booking` exists and is secret-gated; it writes `cancelled_by: 'host'`.
 
@@ -342,7 +342,7 @@ src/
 │   ├── StarPicker.jsx
 │   ├── CancellationPolicy.jsx   # Collapsible / info blocks
 │   └── ui/
-│       ├── TopNav.jsx           # Global top bar, mounted once via SiteNav
+│       ├── TopNav.jsx           # Global top bar + avatar account menu, via SiteNav
 │       ├── HamburgerMenu.jsx    # Slide-in panel, contents adapt to auth state
 │       ├── Button.jsx           # Live on Settings; also /style-guide
 │       ├── Input.jsx            # Live on Settings; also /style-guide
@@ -512,7 +512,7 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **Hosting.jsx** — auth required. Host: listings with Add Session, Edit, soft-delete; upcoming sessions that have active bookings, with Cancel and strike warning; Connect payout setup. A signed-in user who is not a host is redirected to `/bookings`.
 
-**Settings.jsx** — auth required. Signed-in user edits `full_name` and `avatar_url` (the columns `00005` still grants UPDATE after `00007` revoked verification fields). Email is shown read-only. No in-app account deletion; copy points at `hello@trykai.sg`. Not linked from the nav yet.
+**Settings.jsx** — auth required. Signed-in user edits `full_name` and `avatar_url` (the columns `00005` still grants UPDATE after `00007` revoked verification fields). Email is shown read-only. No in-app account deletion; copy points at `hello@trykai.sg`. Linked from the avatar account menu, not the hamburger.
 
 **StyleGuide.jsx** — private preview of the UI kit at `/style-guide`. Imports `src/assets/categories/{food,fitness,arts,music}.png`, all four of which are now in the repo. Language/Other imports are still commented out; uncommenting either without adding the PNG fails `vite build`, because App always imports this page. It no longer mounts its own TopNav: the live `SiteNav` bar serves the page, and the preview-only "Simulate logged in" toggle is gone.
 

@@ -166,6 +166,59 @@ test.describe('signed-out navigation', () => {
   })
 })
 
+test.describe('signed-in navigation', () => {
+  test('the avatar menu holds Settings and Log out, not Profile', async ({ page }) => {
+    await stubAllExternalCalls(
+      page,
+      { users: [{ id: SIGNED_IN_USER.id, full_name: 'Mei Ling', avatar_url: null, is_host: false }] },
+      { session: makeAuthSession() }
+    )
+
+    await page.goto('/login')
+    await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+    await page.getByLabel('Password').fill(SIGNED_IN_USER.password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+    await expect(page).toHaveURL(/\/$/)
+
+    await page.getByRole('button', { name: 'Account' }).click()
+    const menu = page.getByRole('menu')
+    await expect(menu.getByRole('menuitem', { name: 'Settings' })).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: 'Log out' })).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: 'Profile' })).toHaveCount(0)
+
+    await menu.getByRole('menuitem', { name: 'Settings' }).click()
+    await expect(page).toHaveURL(/\/settings$/)
+  })
+
+  test('the hamburger is navigation only, with Become a host for a guest', async ({ page }) => {
+    await stubAllExternalCalls(
+      page,
+      { users: [{ id: SIGNED_IN_USER.id, full_name: 'Mei Ling', avatar_url: null, is_host: false }] },
+      { session: makeAuthSession() }
+    )
+
+    await page.goto('/login')
+    await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+    await page.getByLabel('Password').fill(SIGNED_IN_USER.password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+    await expect(page).toHaveURL(/\/$/)
+
+    await page.getByRole('button', { name: 'Open menu' }).click()
+    const menu = page.getByRole('navigation', { name: 'Main menu' })
+
+    await expect(menu.getByRole('link', { name: 'Browse' })).toBeVisible()
+    await expect(menu.getByRole('link', { name: 'My bookings' })).toBeVisible()
+    await expect(menu.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
+      'href',
+      '/create-listing'
+    )
+    await expect(menu.getByRole('link', { name: 'Hosting' })).toHaveCount(0)
+    await expect(menu.getByRole('link', { name: 'Settings' })).toHaveCount(0)
+    await expect(menu.getByRole('link', { name: 'Log out' })).toHaveCount(0)
+    await expect(menu.getByRole('link', { name: 'Profile' })).toHaveCount(0)
+  })
+})
+
 test.describe('verification review', () => {
   test('an admin opens the queue from the menu and sees both documents', async ({ page }) => {
     await stubAllExternalCalls(

@@ -8,16 +8,16 @@ const LOGGED_OUT_LINKS = [
   { label: 'Dispute policy', to: '/dispute-policy' },
 ]
 
-function loggedInLinks(isAdmin) {
+function loggedInLinks({ isAdmin, isHost }) {
   return [
     { label: 'Browse', to: '/' },
     { label: 'My bookings', to: '/bookings' },
-    { label: 'Hosting', to: '/hosting' },
-    { label: 'Create listing', to: '/create-listing' },
+    ...(isHost ? [{ label: 'Hosting', to: '/hosting' }] : []),
+    {
+      label: isHost ? 'Create listing' : 'Become a host',
+      to: '/create-listing',
+    },
     ...(isAdmin ? [{ label: 'Verification review', to: '/admin/verifications' }] : []),
-    { label: 'Profile', to: '#' },
-    { label: 'Settings', to: '#' },
-    { label: 'Log out', to: '#', action: 'logout' },
   ]
 }
 
@@ -26,18 +26,14 @@ const STAGGER_MS = 45
 export default function HamburgerMenu({
   open = false,
   onClose,
-  onLogout,
   isLoggedIn = false,
   isAdmin = false,
+  isHost = false,
   className = '',
 }) {
-  const links = isLoggedIn ? loggedInLinks(isAdmin) : LOGGED_OUT_LINKS
+  const links = isLoggedIn ? loggedInLinks({ isAdmin, isHost }) : LOGGED_OUT_LINKS
 
-  function handleLinkClick(event, link) {
-    if (link.action === 'logout' && onLogout) {
-      event.preventDefault()
-      onLogout()
-    }
+  function handleLinkClick() {
     onClose?.()
   }
   const classes = [
@@ -78,7 +74,7 @@ export default function HamburgerMenu({
                   to={link.to}
                   className="ui-hamburger__link"
                   tabIndex={open ? 0 : -1}
-                  onClick={(event) => handleLinkClick(event, link)}
+                  onClick={handleLinkClick}
                 >
                   {link.label}
                 </Link>
