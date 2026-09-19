@@ -191,6 +191,31 @@ describe('ListingDetail content', () => {
     expect(document.querySelector('.detail-gallery__dots')).not.toBeInTheDocument()
   })
 
+  it('opens the clicked gallery photo in the lightbox', async () => {
+    givenListing(makeListing({ photo_urls: ['https://cdn.test/a.jpg', 'https://cdn.test/b.jpg'] }))
+    const { user } = renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    await user.click(screen.getByRole('button', { name: 'View photo 2 of 2' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Learn latte art with me photos' })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(within(dialog).getByRole('img')).toHaveAttribute('src', 'https://cdn.test/b.jpg')
+    expect(within(dialog).getByText('2 / 2')).toBeInTheDocument()
+  })
+
+  it('offers only close when the listing has a single photo', async () => {
+    givenListing(makeListing({ photo_urls: ['https://cdn.test/a.jpg'] }))
+    const { user } = renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    await user.click(screen.getByRole('button', { name: 'View photo 1 of 1' }))
+
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next photo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Previous photo' })).not.toBeInTheDocument()
+  })
+
   it('keeps the host high, above the description and the reviews', async () => {
     givenListing()
     givenReviews([makeReview({ id: 'r1', rating: 5 })])
