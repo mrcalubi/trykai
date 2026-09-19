@@ -1531,20 +1531,14 @@ body.lightbox-open {
 }
 
 .lightbox__stage {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  max-width: 90vw;
-  max-height: 90vh;
+  width: min(90vw, calc(100vw - 96px));
+  height: min(90vh, calc(100vh - 72px));
 }
 
 .lightbox__photo {
   display: block;
-  max-width: 90vw;
-  max-height: 90vh;
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
