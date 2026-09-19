@@ -327,6 +327,7 @@ src/
 │   ├── Dashboard.jsx            # Legacy /dashboard → /bookings, or /hosting when ?connect=
 │   ├── Bookings.jsx             # Guest view: My Bookings, cancel, reviews, ?booking= poll
 │   ├── Hosting.jsx              # Host view: listings, hosted sessions, Connect payouts
+│   ├── Settings.jsx             # Signed-in profile: name, avatar; email read-only
 │   ├── StyleGuide.jsx           # UI kit preview at /style-guide
 │   ├── RefundPolicy.jsx
 │   ├── CancellationPolicy.jsx
@@ -343,8 +344,8 @@ src/
 │   └── ui/
 │       ├── TopNav.jsx           # Global top bar, mounted once via SiteNav
 │       ├── HamburgerMenu.jsx    # Slide-in panel, contents adapt to auth state
-│       ├── Button.jsx           # /style-guide only
-│       ├── Input.jsx            # /style-guide only
+│       ├── Button.jsx           # Live on Settings; also /style-guide
+│       ├── Input.jsx            # Live on Settings; also /style-guide
 │       ├── Card.jsx             # Browse mode is live on Home; booking mode /style-guide only
 │       ├── SelectableCard.jsx   # Category cards; /style-guide only
 │       └── getInitials.js       # Avatar fallback initials
@@ -397,9 +398,10 @@ supabase/functions/
 | Rejected-document deletion                                 | `supabase/functions/purge-verification-docs/`                                                       |
 | Guest bookings                                                 | `src/pages/Bookings.jsx` (`/bookings`)                                                              |
 | Host listings, sessions, payouts                               | `src/pages/Hosting.jsx` (`/hosting`)                                                                |
+| Settings                                                       | `src/pages/Settings.jsx` (`/settings`)                                                              |
 | Legacy dashboard redirect                                      | `src/pages/Dashboard.jsx` (`/dashboard` → `/bookings`, or `/hosting` when `?connect=`)              |
 | Global nav and hamburger                                   | `src/components/SiteNav.jsx`, `src/components/ui/TopNav.jsx`, `src/components/ui/HamburgerMenu.jsx` |
-| UI kit not yet wired (Button, Input, SelectableCard)       | `src/components/ui/`, `src/pages/StyleGuide.jsx`                                                    |
+| UI kit (Button and Input live on Settings; SelectableCard preview only) | `src/components/ui/`, `src/pages/StyleGuide.jsx`                                           |
 | Colour tokens and all styling                              | `src/index.css`                                                                                     |
 | Component preview                                          | `/style-guide` route                                                                                |
 | Cancellation arithmetic                                    | `src/lib/cancellationPolicy.js` and `supabase/functions/_shared/booking.ts`                         |
@@ -412,7 +414,7 @@ supabase/functions/
 | Connect onboarding                                         | `supabase/functions/create-account-link/`                                                           |
 
 
-**Routes in** `App.jsx`**:** `/`, `/login`, `/listings/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/bookings`, `/hosting`, `/dashboard` (the last six behind `RequireAuth`; `/dashboard` redirects to `/bookings`, or `/hosting` when `?connect=` is present), `/admin/verifications` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render SiteNav + Footer.
+**Routes in** `App.jsx`**:** `/`, `/login`, `/listings/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/bookings`, `/hosting`, `/dashboard`, `/settings` (the last seven behind `RequireAuth`; `/dashboard` redirects to `/bookings`, or `/hosting` when `?connect=` is present), `/admin/verifications` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render SiteNav + Footer.
 
 ---
 
@@ -510,6 +512,8 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **Hosting.jsx** — auth required. Host: listings with Add Session, Edit, soft-delete; upcoming sessions that have active bookings, with Cancel and strike warning; Connect payout setup. A signed-in user who is not a host is redirected to `/bookings`.
 
+**Settings.jsx** — auth required. Signed-in user edits `full_name` and `avatar_url` (the columns `00005` still grants UPDATE after `00007` revoked verification fields). Email is shown read-only. No in-app account deletion; copy points at `hello@trykai.sg`. Not linked from the nav yet.
+
 **StyleGuide.jsx** — private preview of the UI kit at `/style-guide`. Imports `src/assets/categories/{food,fitness,arts,music}.png`, all four of which are now in the repo. Language/Other imports are still commented out; uncommenting either without adding the PNG fails `vite build`, because App always imports this page. It no longer mounts its own TopNav: the live `SiteNav` bar serves the page, and the preview-only "Simulate logged in" toggle is gone.
 
 ---
@@ -532,7 +536,7 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 
 - Review gating still accepts `pending` in the dashboard UI, and RLS does not require confirmed (P2.3).
 - Host no-show reporting, reschedule, session auto-complete, host→guest reviews: not built.
-- UI kit only partly wired: the nav and the browse `Card` are live, but Button, Input, and SelectableCard are still `/style-guide` only. `ListingCard.jsx` and its `.listing-card` CSS are now dead code that only its own test renders; deleting them is a separate cleanup.
+- UI kit only partly wired: the nav, the browse `Card`, and Settings (`Button`, `Input`) are live, but SelectableCard is still `/style-guide` only. `ListingCard.jsx` and its `.listing-card` CSS are now dead code that only its own test renders; deleting them is a separate cleanup.
 - The browse card can never show a rating: the `listings` select does not fetch one and there is no aggregate rating column, so `Card` gets no `rating` prop from Home. The price-only card is correct for a new listing but wrong for a listing with reviews.
 - A host who exits Stripe Connect onboarding without completing it still sees a "Payout setup submitted" success message on the dashboard, because `?connect=return` is treated as success without re-checking `stripe_payouts_enabled`. That host believes they can be paid and cannot. If they take a booking, the guest pays and there is no payout path, discovered after the session.
 

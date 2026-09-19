@@ -111,6 +111,13 @@ test.describe('signed-out navigation', () => {
     await expect(page).toHaveURL(/\/login$/)
   })
 
+  test('redirects settings to login', async ({ page }) => {
+    await stubAllExternalCalls(page, {})
+    await page.goto('/settings')
+
+    await expect(page).toHaveURL(/\/login$/)
+  })
+
   test('redirects listing creation to login', async ({ page }) => {
     await stubAllExternalCalls(page, {})
     await page.goto('/create-listing')

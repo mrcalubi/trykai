@@ -115,6 +115,13 @@ describe('App routes', () => {
     expect(window.location.pathname).toBe('/login')
   })
 
+  it('sends a signed-out visitor from settings to login', async () => {
+    renderAt('/settings')
+
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/login')
+  })
+
   it('sends a signed-out visitor from verification to login', async () => {
     renderAt('/verify-identity')
 

@@ -18,6 +18,8 @@ One account type, both host and guest. Guest by default, becomes a host on first
 
 Guest bookings are at `/bookings`. Host listings, upcoming hosted sessions, and Stripe payout setup are at `/hosting`. `/dashboard` remains as a redirect so emails and Stripe `return_url`s keep working. Payouts stay in the host area, not account settings. A signed-in user who is not a host is redirected from `/hosting` to `/bookings`.
 
+Profile name and photo are edited at `/settings`. Email is shown there but not changed in-app. Account deletion is contact-support only until the retain-transactions / remove-personal-data split is designed.
+
 ### Progressive disclosure at signup
 Ask for information when it becomes relevant, not upfront.
 - Browsing: email only
@@ -441,6 +443,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 `notify-verification-pending` now requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer) and links to `/admin/verifications` instead of the Table Editor. `notify-verification-result` is deleted; hosts already hear about the decision from `admin-verifications` and `stripe-webhook`. **2026-09-14 — trykai.sg is verified in Resend.** From-address is `TryKai <no-reply@trykai.sg>`. **2026-09-14 — cancellation emails.** `cancel-booking` emails the guest the refund amount (including $0) and the host only when the guest cancelled. A send failure cannot fail the refund.
 
 **2026-09-19 — Dashboard split into `/bookings` and `/hosting`.** One account is still both guest and host; the mixed dashboard page is not. Guest view is `/bookings`. Host view (listings, hosted sessions, Connect payouts) is `/hosting`. `/dashboard` redirects to `/bookings`, except `?connect=` which goes to `/hosting`. Non-hosts hitting `/hosting` go to `/bookings`. Emails and Stripe return URLs still use `/dashboard`.
+
+**2026-09-19 — Settings page at `/settings`.** Signed-in users can edit `full_name` and `avatar_url`. Email is read-only; change it via `hello@trykai.sg`. No in-app delete: deletion must keep transaction records for dispute and tax while removing personal data, and that split is not designed. Nav is not linked yet.
 
 ---
 
