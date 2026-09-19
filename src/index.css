@@ -1389,11 +1389,31 @@ a {
 }
 
 .detail-gallery__photo {
+  position: relative;
   display: block;
   width: 100%;
+  padding: 0;
+  border: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
   aspect-ratio: 4 / 3;
-  object-fit: cover;
+  overflow: hidden;
   scroll-snap-align: start;
+}
+
+.detail-gallery__photo img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.detail-gallery__photo:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: -2px;
 }
 
 .detail-gallery__dots {
@@ -1490,6 +1510,96 @@ a {
 
   .detail-gallery__dots {
     display: none;
+  }
+}
+
+body.lightbox-open {
+  overflow: hidden;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 12px 64px;
+  background: var(--scrim);
+}
+
+.lightbox__photo {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.lightbox__close,
+.lightbox__nav {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--cream);
+  background: var(--navy);
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.lightbox__close:focus-visible,
+.lightbox__nav:focus-visible {
+  outline: 2px solid var(--cream);
+  outline-offset: 2px;
+}
+
+.lightbox__close {
+  top: 12px;
+  right: 12px;
+}
+
+.lightbox__nav--prev {
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.lightbox__nav--next {
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.lightbox__position {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  color: var(--cream);
+  font-family: var(--mono);
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  .lightbox {
+    padding: 72px 80px 80px;
+  }
+
+  .lightbox__nav--prev {
+    left: 16px;
+  }
+
+  .lightbox__nav--next {
+    right: 16px;
   }
 }
 

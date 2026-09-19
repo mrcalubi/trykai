@@ -167,6 +167,28 @@ test.describe('listing detail gallery', () => {
     await expect(page.getByRole('heading', { level: 1 })).toBeInViewport()
     await expect(page.locator('.detail-booking-card__price')).toBeInViewport()
   })
+
+  test('opens a clicked photo full size and steps through the set', async ({ page }) => {
+    await stubAllExternalCalls(page, {
+      listings: [withPhotos(3)],
+      sessions: [OPEN_SESSION],
+      reviews: [],
+    })
+    await page.goto('/listings/listing-latte')
+
+    await page.getByRole('button', { name: 'View photo 1 of 3' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Learn latte art with me photos' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toHaveAttribute('aria-modal', 'true')
+    await expect(dialog.getByText('1 / 3')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Next photo' }).click()
+    await expect(dialog.getByText('2 / 3')).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+  })
 })
 
 test.describe('booking requires an account', () => {
