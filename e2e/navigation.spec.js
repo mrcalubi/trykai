@@ -58,6 +58,9 @@ test.describe('signed-out navigation', () => {
     await page.getByRole('link', { name: 'Log in', exact: true }).click()
 
     await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
+    await expect(page.getByLabel('Email')).toBeVisible()
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Show password' })).toBeVisible()
   })
 
   // The published terms have to be reachable from the nav while signed out, not
@@ -88,6 +91,9 @@ test.describe('signed-out navigation', () => {
 
     await expect(page.getByRole('heading', { name: 'Create account' })).toBeVisible()
     await expect(page.getByLabel('Full name')).toBeVisible()
+    await expect(page.getByLabel('Email')).toBeVisible()
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Show password' })).toBeVisible()
   })
 
   test('redirects the dashboard to login', async ({ page }) => {
@@ -142,7 +148,7 @@ test.describe('signed-out navigation', () => {
     await expect(page).toHaveURL(/\/login$/)
 
     await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
-    await page.getByLabel('Password').fill(SIGNED_IN_USER.password)
+    await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
     await page.getByRole('button', { name: 'Log in' }).click()
 
     // The whole point of stashing the destination: the visitor lands back on the
@@ -176,7 +182,7 @@ test.describe('signed-in navigation', () => {
 
     await page.goto('/login')
     await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
-    await page.getByLabel('Password').fill(SIGNED_IN_USER.password)
+    await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
     await page.getByRole('button', { name: 'Log in' }).click()
     await expect(page).toHaveURL(/\/$/)
 
@@ -199,7 +205,7 @@ test.describe('signed-in navigation', () => {
 
     await page.goto('/login')
     await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
-    await page.getByLabel('Password').fill(SIGNED_IN_USER.password)
+    await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
     await page.getByRole('button', { name: 'Log in' }).click()
     await expect(page).toHaveURL(/\/$/)
 
@@ -253,7 +259,7 @@ test.describe('verification review', () => {
 
     await page.goto('/login')
     await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
-    await page.getByLabel('Password').fill(SIGNED_IN_USER.password)
+    await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
     await page.getByRole('button', { name: 'Log in' }).click()
     await expect(page).toHaveURL(/\/$/)
 
