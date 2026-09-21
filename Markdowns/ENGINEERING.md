@@ -503,7 +503,7 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **Home.jsx** — Lane 1 headline, then browse of active listings. Category pills derived from data, area dropdown, combinable, newest first. No auth required. No sort by price or reviews.
 
-**Login.jsx** — email and password via the kit `Input` (floating email, password with eye toggle), login and signup. Does not insert into `users`. No password reset. No T&C checkbox. Full name on signup is still the page's original field.
+**Login.jsx** — kit `Input` for full name, email, and password, all with floating labels. Password also uses the eye toggle. Login and signup. Does not insert into `users`. No password reset. No T&C checkbox.
 
 **ListingDetail.jsx** — listing, gallery (swipe on phone, mosaic from 1024px), host name/avatar high under the area, open future sessions, collapsible cancellation policy, guest→host reviews, Card vs PayNow checkout. Two columns with a sticky booking card from 1024px. `guests_count` always 1. `full_address` only via RPC after a confirmed booking.
 
