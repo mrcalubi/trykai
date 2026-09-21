@@ -38,7 +38,7 @@ Live data deliberately kept out of markdown: host roster in a Google Sheet, expe
 
 ## State of play, 31 August
 
-**Payments.** Stripe Connect, separate charges and transfers, Express accounts, decided 16 August. The money loop is **in this tree**: all-in card prices, Card vs PayNow PaymentIntents, signed `stripe-webhook` → `confirm_paid_booking`, Connect Express onboarding, `cancel-booking` refunds, and `release-payout` Transfers 24h after `starts_at`. Do not adapt the HitPay stash. Ops still required: apply `00005` on staging, Stripe Dashboard webhook + secrets, platform payouts set to **manual**, founding hosts flagged `is_founding_host`, staging test-mode booking.
+**Payments.** Stripe Connect, separate charges and transfers, Express accounts, decided 16 August. The money loop is **in this tree**: all-in card prices, Card vs PayNow PaymentIntents, signed `stripe-webhook` → `confirm_paid_booking`, Connect Express onboarding, `cancel-booking` refunds, and `release-payout` Transfers 24h after `starts_at`. Do not adapt the HitPay stash. Ops still required: apply remaining migrations on staging, Stripe Dashboard webhook + secrets, platform payouts set to **manual**, Vault/GitHub secrets for `release-payout` (OPERATIONS.md), founding hosts flagged `is_founding_host`, staging test-mode booking.
 
 **The requirement that constrains all payment design:** the host's share is held until 24 hours after the session takes place, not after the guest pays. Guests book weeks ahead. Every published refund guarantee depends on that hold. Stripe Connect preserves it.
 

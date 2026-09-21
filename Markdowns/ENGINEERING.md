@@ -8,7 +8,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 >
 > 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 24 hours after `starts_at`. Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). The host is emailed only when the guest cancelled.
-> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00009`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
+> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00010`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
 > 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home shows the Lane 1 headline above the kit's** `Card` **in browse mode.** `ListingCard.jsx` still exists but no page renders it. Button is live on Settings. Input is live on Settings and Login. SelectableCard is still used only by `/style-guide`.
 > 6. **All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a hex value in a component. See section 2, Styling.
@@ -193,7 +193,7 @@ created_at timestamptz
 
 Append-only, service role only, no client grant of any kind. Written by `review_verification` in the same transaction as the status change, so a decision cannot be applied without a record. This is both the PDPA justification trail for holding NRIC copies and the review history the safety protocol assumes.
 
-**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`.
+**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`.
 
 ---
 
@@ -258,11 +258,16 @@ Do not hardcode a flat percentage. Worked checks: $10 → $13, $20 → $23, $25 
 
 **Provider decided 16 August 2026: Stripe Connect, separate charges and transfers, Express accounts.** This is implemented in code.
 
-The host's share is released **24 hours after** `starts_at`, not 24 hours after the guest pays. `release-payout` creates a Transfer with `transfer_group = booking_id` and `source_transaction = stripe_charge_id`. It is secret-gated (`PAYOUT_CRON_SECRET` or `CRON_SECRET`); schedule it hourly.
+The host's share is released **24 hours after** `starts_at`, not 24 hours after the guest pays. `release-payout` creates a Transfer with `transfer_group = booking_id` and `source_transaction = stripe_charge_id`. Stripe only records that Transfer when the function runs. Two hourly callers:
+
+- **Staging (and any hosted project):** pg_cron job `invoke-release-payout-hourly` from `00010`, at minute 12 UTC. It POSTs using Vault secrets `release_payout_url`, `release_payout_anon_key`, and `payout_cron_secret`.
+- **Production extra:** GitHub Action `.github/workflows/release-payout.yml` (schedule plus **Run workflow**). GitHub only fires `schedule` from the default branch (`main`).
+
+Both send `x-cron-secret` (`PAYOUT_CRON_SECRET` or `CRON_SECRET`). Stripe idempotency key is the booking id, so overlap is safe. Each run logs JSON `{ scanned, due, released, failed, skipped_by_reason, skipped }`. `skipped` lists rows that are not merely waiting out the 24h hold. A missing `stripe_charge_id` is loaded from the PaymentIntent (`latest_charge`) and stored before eligibility is decided. Do not omit `source_transaction`; after a platform bank payout that would Transfer someone else's funds.
 
 It does **not** check for open disputes. The only money hold besides the 24h timer is `stripe_refund_id IS NULL`.
 
-**Ops:** set platform Stripe payouts to **manual** (or keep a reserve covering outstanding host liability). Automatic platform payouts to Aspire would leave nothing to Transfer.
+**Ops (click-by-click in OPERATIONS.md):** Vault secrets, GitHub secrets, deploy `release-payout`, set platform Stripe payouts to **manual** (or keep a reserve covering outstanding host liability). Automatic platform payouts to Aspire would leave nothing to Transfer.
 
 Under Express accounts, Stripe collects the host's bank details at onboarding. Hosts must finish Connect onboarding (`stripe_payouts_enabled`) before guests can Book. Creating a listing stays allowed. The dashboard calls `create-account-link`, which creates the Express account if the host does not have one yet.
 
@@ -297,6 +302,7 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 - `get_listing_address(listing_id)` — confirmed guest only.
 - `confirm_paid_booking(...)` and `confirm_booking` wrapper — flip pending → confirmed and decrement `spots_remaining` atomically under a row lock. **Service role only.** The Stripe webhook calls `confirm_paid_booking`. If spots are gone, the webhook refunds instead of confirming.
 - `apply_host_strike(host_id)` — increments strikes and deactivates listings at 3. **Service role only.**
+- `invoke_release_payout()` — pg_cron POST to `release-payout`. Reads Vault; revoked from anon and authenticated.
 
 **Verification review is on the platform** at `/admin/verifications`, gated by `is_admin`. The hamburger shows a link to it only after `my_verification()` reports that the signed-in user is an admin. `admin-verifications` authenticates the reviewer's own JWT and then re-checks `is_admin` server-side, because a shared secret cannot be shipped to a browser. Document images are served through signed URLs minted with the service role and valid for `SIGNED_URL_TTL_SECONDS`, so they are never reachable from a public or authenticated non-admin route. The result email, including the rejection reason, is sent from that function rather than a database webhook, the same way booking emails moved into `stripe-webhook`.
 
@@ -361,7 +367,8 @@ supabase/migrations/
 ├── 00006_block_host_self_booking.sql
 ├── 00007_verification_security_foundation.sql
 ├── 00008_listing_gate_can_create_listing.sql
-└── 00009_booking_session_read_and_cancel_rls.sql
+├── 00009_booking_session_read_and_cancel_rls.sql
+└── 00010_schedule_release_payout.sql
 
 supabase/functions/
 ├── _shared/
@@ -369,7 +376,7 @@ supabase/functions/
 │   ├── http.ts                  # JSON/CORS/secret helpers
 │   ├── connect.ts               # Express account v2 helpers
 │   ├── email.ts                 # Resend helper + booking and cancellation HTML
-│   ├── payouts.ts               # 24h Transfer eligibility
+│   ├── payouts.ts               # 24h Transfer eligibility, skip reasons, charge backfill
 │   └── verification.ts          # Status, Identity params, 30-day retention rules
 ├── create-payment-intent/       # Pending booking + PaymentIntent (no emails)
 ├── stripe-webhook/              # Stripe-Signature → confirm_paid_booking, identity outcomes, emails
@@ -381,7 +388,7 @@ supabase/functions/
 ├── create-identity-session/     # Stripe Identity hosted check; stores only the session id
 ├── notify-verification-pending/ # x-notify-secret; emails Caleb on manual pending
 ├── purge-verification-docs/     # Daily cron; deletes rejected docs after 30 days
-└── release-payout/              # x-cron-secret Transfer 24h after starts_at
+└── release-payout/              # x-cron-secret Transfer 24h after starts_at; pg_cron + GH Action
 ```
 
 
@@ -446,7 +453,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 **8. Confirmation.** `/dashboard?booking=` redirects to `/bookings?booking=`. `Bookings.jsx` polls until status is `confirmed`. Then `get_listing_address` returns `full_address` to that guest.
 
-**9. Session happens.** Payout releases 24 hours after `starts_at`, via `release-payout`. Sessions are not auto-completed. Review prompts appear on `/bookings` for `pending` or `confirmed` bookings after `starts_at`.
+**9. Session happens.** Payout releases 24 hours after `starts_at`, via `release-payout` (pg_cron `00010` and the GitHub Action). Sessions are not auto-completed. Review prompts appear on `/bookings` for `pending` or `confirmed` bookings after `starts_at`.
 
 **10. Review.** `/bookings` allows a review if the booking is past, status is `pending` or `confirmed`, and this reviewer has not already reviewed. Inserts into `reviews` as `role: 'guest'`. RLS does not require confirmed.
 
