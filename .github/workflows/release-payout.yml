@@ -1,0 +1,48 @@
+name: Release host payouts
+
+# Stripe only records a Transfer when release-payout runs. GitHub scheduled
+# workflows fire only from the default branch (main), so staging also uses
+# pg_cron (migration 00010). Stripe idempotency key = booking id, so both
+# callers in the same hour are safe.
+on:
+  schedule:
+    - cron: '12 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Invoke release-payout (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: staging
+            url_secret: STAGING_SUPABASE_URL
+            anon_secret: STAGING_SUPABASE_ANON_KEY
+            cron_secret: STAGING_PAYOUT_CRON_SECRET
+          - name: production
+            url_secret: PRODUCTION_SUPABASE_URL
+            anon_secret: PRODUCTION_SUPABASE_ANON_KEY
+            cron_secret: PRODUCTION_PAYOUT_CRON_SECRET
+    steps:
+      - name: POST /functions/v1/release-payout
+        env:
+          SUPABASE_URL: ${{ secrets[matrix.url_secret] }}
+          SUPABASE_ANON_KEY: ${{ secrets[matrix.anon_secret] }}
+          PAYOUT_CRON_SECRET: ${{ secrets[matrix.cron_secret] }}
+          TARGET: ${{ matrix.name }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$PAYOUT_CRON_SECRET" ]; then
+            echo "Skipping ${TARGET}: GitHub secrets ${{ matrix.url_secret }}, ${{ matrix.anon_secret }}, ${{ matrix.cron_secret }} are not all set."
+            exit 0
+          fi
+          curl -fsS -X POST "${SUPABASE_URL%/}/functions/v1/release-payout" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "x-cron-secret: ${PAYOUT_CRON_SECRET}" \
+            -d '{}'
