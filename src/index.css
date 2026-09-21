@@ -976,6 +976,8 @@ a {
 }
 
 .ui-input {
+  display: block;
+  width: 100%;
   min-height: 44px;
   padding: 12px 14px;
   font-family: var(--sans);
@@ -1006,26 +1008,27 @@ a {
   padding-right: 44px;
 }
 
+.ui-field__control,
 .ui-field__input-wrap {
   position: relative;
+  display: block;
   width: 100%;
 }
 
 .ui-field__toggle {
   position: absolute;
-  top: 50%;
+  top: 0;
   right: 0;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 44px;
-  height: 44px;
   padding: 0;
   color: var(--navy-muted);
   background: none;
   border: none;
   border-radius: var(--radius-sm);
-  transform: translateY(-50%);
   cursor: pointer;
 }
 
@@ -1039,7 +1042,6 @@ a {
 }
 
 .ui-field--floating .ui-field__control {
-  position: relative;
   padding-top: 22px;
 }
 
@@ -1069,7 +1071,13 @@ a {
     color 0.18s ease;
 }
 
-.ui-field--floating.ui-field--floated .ui-field__label {
+/* Autofill often paints a value without a React onChange, so do not rely on
+   `.ui-field--floated` alone. :placeholder-shown is false once text is there;
+   :-webkit-autofill covers Chrome when the placeholder flag stays stuck. */
+.ui-field--floating.ui-field--floated .ui-field__label,
+.ui-field--floating:focus-within .ui-field__label,
+.ui-field--floating:has(.ui-input:not(:placeholder-shown)) .ui-field__label,
+.ui-field--floating:has(.ui-input:-webkit-autofill) .ui-field__label {
   top: 0;
   left: 0;
   font-size: 14px;
@@ -2578,6 +2586,10 @@ body.lightbox-open {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
+}
+
+.style-guide-card .ui-field {
+  align-self: stretch;
 }
 
 .style-guide-card__label {

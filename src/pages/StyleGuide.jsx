@@ -134,7 +134,10 @@ export default function StyleGuide() {
           </article>
           <article className="style-guide-card">
             <p className="style-guide-card__label">Floating label</p>
-            <p className="style-guide-card__usage">Sits inside until focus or a value, then floats above</p>
+            <p className="style-guide-card__usage">
+              Sits inside until focus, a value, or autofill, then floats above. Combines with any
+              input type, including password.
+            </p>
             <Input
               id="style-guide-full-name-floating"
               label="Full name"
@@ -145,12 +148,27 @@ export default function StyleGuide() {
           </article>
           <article className="style-guide-card">
             <p className="style-guide-card__label">Password</p>
-            <p className="style-guide-card__usage">Used for login and signup. Eye toggles masked and plain text</p>
+            <p className="style-guide-card__usage">
+              Used for login and signup. Eye sits inside the field and toggles masked and plain text
+            </p>
             <Input
               id="style-guide-password"
               label="Password"
               type="password"
               placeholder="••••••••"
+              autoComplete="current-password"
+            />
+          </article>
+          <article className="style-guide-card">
+            <p className="style-guide-card__label">Floating password</p>
+            <p className="style-guide-card__usage">
+              Floating label and the eye toggle together, the same pairing Login uses
+            </p>
+            <Input
+              id="style-guide-password-floating"
+              label="Password"
+              type="password"
+              floatingLabel
               autoComplete="current-password"
             />
           </article>

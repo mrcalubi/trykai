@@ -43,6 +43,7 @@ describe('Login form', () => {
     expect(email).toHaveClass('ui-input')
     expect(email.closest('.ui-field')).toHaveClass('ui-field--floating')
     expect(password).toHaveClass('ui-input')
+    expect(password.closest('.ui-field')).toHaveClass('ui-field--floating')
     expect(password).toHaveAttribute('type', 'password')
     expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
   })
@@ -52,8 +53,9 @@ describe('Login form', () => {
 
     await switchToSignup(user)
     expect(screen.getByRole('heading', { name: 'Create account' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Full name')).toBeInTheDocument()
+    expect(screen.getByLabelText('Full name').closest('.ui-field')).toHaveClass('ui-field--floating')
     expect(screen.getByLabelText('Email').closest('.ui-field')).toHaveClass('ui-field--floating')
+    expect(screen.getByLabelText('Password').closest('.ui-field')).toHaveClass('ui-field--floating')
     expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Log in' }))

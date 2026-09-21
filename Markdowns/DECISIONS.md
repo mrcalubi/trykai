@@ -450,6 +450,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-09-19 — Login uses the kit Input.** Email is the floating-label variant; password is the password variant with the eye toggle. Both login and signup modes. Auth, redirect, and form-level error copy are unchanged.
 
+**2026-09-21 — Kit Input fills its wrapper; floating combines with password.** `.ui-input` is `width: 100%` in every variant so the password eye sits inside the field. `floatingLabel` is a label behaviour, not a separate variant, and Login uses it on full name, email, and password. Autofill floats the label via `:placeholder-shown` / `:-webkit-autofill`, not React value state.
+
 ---
 
 # Analysed but not decided

@@ -103,18 +103,17 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="form">
           {isSignup && (
-            <label className="label">
-              Full name
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Your name"
-                autoComplete="name"
-                required
-                className="input"
-              />
-            </label>
+            <Input
+              id="login-full-name"
+              label="Full name"
+              type="text"
+              floatingLabel
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Your name"
+              autoComplete="name"
+              required
+            />
           )}
 
           <Input
@@ -133,6 +132,7 @@ export default function Login() {
             id="login-password"
             label="Password"
             type="password"
+            floatingLabel
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
