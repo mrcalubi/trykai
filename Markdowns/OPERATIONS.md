@@ -483,7 +483,9 @@ Production uses that project's URL and keys, not the staging ref above.
 
 ## 4. Run it once now (do not wait until minute 12)
 
-In Terminal, replace the two placeholders with the **anon public key** and the **same cron secret**:
+Replace the two placeholders with the **anon public key** and the **same cron secret**.
+
+On macOS / Linux / Git Bash, backslash continues the line:
 
 ```bash
 curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout' \
@@ -492,6 +494,16 @@ curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release
   -H "apikey: PASTE_ANON_PUBLIC_KEY" \
   -H "x-cron-secret: PASTE_PAYOUT_CRON_SECRET" \
   -d '{}'
+```
+
+On **Windows PowerShell**, `curl` is `Invoke-WebRequest`, which does not accept `-H`. Use `curl.exe` (one line is safest) or the native cmdlet:
+
+```powershell
+curl.exe -fsS -X POST "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout" -H "Content-Type: application/json" -H "Authorization: Bearer PASTE_ANON_PUBLIC_KEY" -H "apikey: PASTE_ANON_PUBLIC_KEY" -H "x-cron-secret: PASTE_PAYOUT_CRON_SECRET" -d "{}"
+```
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout" -ContentType "application/json" -Headers @{ Authorization = "Bearer PASTE_ANON_PUBLIC_KEY"; apikey = "PASTE_ANON_PUBLIC_KEY"; "x-cron-secret" = "PASTE_PAYOUT_CRON_SECRET" } -Body "{}"
 ```
 
 **What you should see**
