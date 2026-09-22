@@ -388,53 +388,102 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 
 Stripe logs a Transfer (`tr_`) only when `release-payout` creates one. The function was in the repo but nothing called it, which is why Overview showed platform **STRIPE PAYOUT** (`po_` to Aspire) and refunds, but no host Transfers.
 
-Do these once on **trykai-staging** (`hzgybclfvpuxkmytdoos`), then again on production.
+Merging the GitHub PR does **not** do any of this. You still have to click in Stripe and in the **trykai-staging** Supabase project. Do the same later on production, with production URLs and keys.
 
-1. **Stripe Dashboard → Settings → Payouts → schedule = Manual.** Automatic payouts empty the platform balance. A later Transfer with `source_transaction` then fails, and a Transfer *without* `source_transaction` would take a later guest's funds. Leave historical test charges that already paid out to the bank; do not try to re-pay those from new bookings.
+**Project:** trykai-staging, ref `hzgybclfvpuxkmytdoos`  
+**Dashboard:** https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos
 
-2. **Edge Function secret.** Same value the function already expects:
-   ```bash
-   supabase secrets set PAYOUT_CRON_SECRET='a long random string'
-   ```
-   Redeploy `release-payout` after merging this change so skip-reason logs and charge backfill are live.
+Write one password-manager note called `PAYOUT_CRON_SECRET (staging)` and reuse that exact string in steps 2, 3, and 4. Generate it with `openssl rand -hex 32` in Terminal, or any 32+ character random string. Do not commit it.
 
-3. **Apply migration `00010_schedule_release_payout.sql`.** Then in the SQL editor, set Vault (skip any name that already exists):
-   ```sql
-   select name from vault.decrypted_secrets
-   where name in ('release_payout_url', 'release_payout_anon_key', 'payout_cron_secret');
+## 1. Stripe: stop automatic payouts to the bank
 
-   select vault.create_secret(
-     'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout',
-     'release_payout_url',
-     'Hourly host Transfer job'
-   );
-   select vault.create_secret(
-     'PASTE_ANON_PUBLIC_KEY',
-     'release_payout_anon_key',
-     'Gateway JWT; the function still checks x-cron-secret'
-   );
-   select vault.create_secret(
-     'PASTE_SAME_VALUE_AS_PAYOUT_CRON_SECRET',
-     'payout_cron_secret',
-     'x-cron-secret for release-payout'
-   );
-   ```
-   Anon public key: Project Settings → API. Production uses that project's URL and keys, not the staging ref above.
+This is the **platform** Stripe account (TryKai), not a host's Connect account. Automatic payouts empty the platform balance. Host Transfers then fail, and retrying without pinning to the original charge would take a later guest's funds.
 
-4. **Confirm the cron row:**
-   ```sql
-   select jobid, jobname, schedule, command from cron.job
-   where jobname = 'invoke-release-payout-hourly';
-   ```
+1. Open https://dashboard.stripe.com (the TryKai account).
+2. Turn **Test mode** on if you are working on staging sandbox charges (toggle in the top right). Live mode is a separate setting; you will repeat this on live before real money.
+3. Go to **Settings** (gear) → **Payouts**, or open https://dashboard.stripe.com/settings/payouts (add `/test` after `.com` when Test mode is on: https://dashboard.stripe.com/test/settings/payouts). Some accounts label this **Bank accounts and scheduling**.
+4. Set the payout schedule to **Manual**. Save.
+5. Confirm: you should no longer see daily/weekly automatic **STRIPE PAYOUT** (`po_`) emptying the balance. You pay TryKai's own bank later, by hand, from **Balances → Pay out**, only after host Transfers have run.
 
-5. **GitHub secrets** for `.github/workflows/release-payout.yml` (optional on staging because of step 3; required for production once the workflow is on `main`):
-   `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAYOUT_CRON_SECRET`, and the `PRODUCTION_*` equivalents. GitHub **schedule** only runs from `main`. **Actions → Release host payouts → Run workflow** works after that.
+Leave historical test charges that already paid out to the bank. Those cannot be Transferred from the original `source_transaction`. New bookings after this switch can.
 
-6. **Read the function log, not only Stripe.** Each run logs JSON: `scanned`, `due`, `released`, `failed`, `skipped_by_reason`, `skipped`. `hold_not_elapsed` is the 24h wait. `missing_charge_id` means the PaymentIntent had no `latest_charge`. `host_not_connected` / `host_payouts_disabled` means the host has not finished Connect. `failed` with an insufficient-funds error means the platform balance was already paid out to the bank.
+## 2. Deploy `release-payout` and set `PAYOUT_CRON_SECRET`
 
-A Transfer appears in Stripe **Payments → Transfers** (or Balance → Transfers) only after a run with `released` > 0.
+The function checks header `x-cron-secret` against the Edge Function secret `PAYOUT_CRON_SECRET` (or fallback `CRON_SECRET`). Setting the secret is instant; the **new** skip-reason logs and charge backfill only exist after you deploy the merged function.
 
-To run once immediately after deploy, without waiting for minute 12:
+**Secret (Dashboard, no CLI):**
+
+1. Open https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/functions/secrets
+2. If the left nav says **Edge Functions**, click **Secrets**.
+3. Add key `PAYOUT_CRON_SECRET` and paste the string from your password note. Save.
+4. You do not need to redeploy just for the secret. You **do** need to deploy for the new code.
+
+**Deploy the function (CLI; this function imports `_shared`, so do not paste it into the Dashboard editor):**
+
+```bash
+supabase login
+supabase link --project-ref hzgybclfvpuxkmytdoos
+supabase functions deploy release-payout --project-ref hzgybclfvpuxkmytdoos
+```
+
+Confirm at https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/functions that `release-payout` shows a fresh deploy time.
+
+Optional CLI equivalent for the secret: `supabase secrets set PAYOUT_CRON_SECRET='paste-the-same-string' --project-ref hzgybclfvpuxkmytdoos`
+
+## 3. Apply migration `00010` and the three Vault secrets
+
+`00010` creates `invoke_release_payout()` and the hourly pg_cron job. Vault holds the URL, anon key, and cron secret because those differ per project and must not live in git. The database cron **cannot** read Edge Function secrets; that is why Vault is a second copy.
+
+**Apply the migration**
+
+1. Open the file https://github.com/mrcalubi/trykai/blob/staging/supabase/migrations/00010_schedule_release_payout.sql and copy the whole file.
+2. Open the SQL editor: https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/sql/new
+3. Paste, click **Run**. Success is enough. Notices about `pg_cron not available` mean the Database → Extensions page needs `pg_cron` and `pg_net` enabled; enable both, then run the file again.
+
+**Confirm the cron row** (new query in the same SQL editor):
+
+```sql
+select jobid, jobname, schedule, command from cron.job
+where jobname = 'invoke-release-payout-hourly';
+```
+
+You want one row, schedule `12 * * * *` (minute 12 every hour, UTC).
+
+**Copy the anon public key**
+
+1. Open https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/settings/api
+2. Copy the **anon** / **public** key (sometimes labelled publishable). Not the `service_role` key.
+
+**Create the Vault secrets** (skip any name that already exists):
+
+```sql
+select name from vault.decrypted_secrets
+where name in ('release_payout_url', 'release_payout_anon_key', 'payout_cron_secret');
+
+select vault.create_secret(
+  'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout',
+  'release_payout_url',
+  'Hourly host Transfer job'
+);
+select vault.create_secret(
+  'PASTE_ANON_PUBLIC_KEY',
+  'release_payout_anon_key',
+  'Gateway JWT; the function still checks x-cron-secret'
+);
+select vault.create_secret(
+  'PASTE_SAME_VALUE_AS_PAYOUT_CRON_SECRET',
+  'payout_cron_secret',
+  'x-cron-secret for release-payout'
+);
+```
+
+`payout_cron_secret` in Vault must match `PAYOUT_CRON_SECRET` on the function. If a name already exists and the value is wrong, update it with `vault.update_secret(id, 'new value')` using the `id` from `vault.decrypted_secrets`. You can also add named secrets under **Integrations → Vault** in the Dashboard.
+
+Production uses that project's URL and keys, not the staging ref above.
+
+## 4. Run it once now (do not wait until minute 12)
+
+In Terminal, replace the two placeholders with the **anon public key** and the **same cron secret**:
 
 ```bash
 curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout' \
@@ -444,6 +493,23 @@ curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release
   -H "x-cron-secret: PASTE_PAYOUT_CRON_SECRET" \
   -d '{}'
 ```
+
+**What you should see**
+
+- `401 Unauthorized`: the `x-cron-secret` does not match `PAYOUT_CRON_SECRET`, or you used the wrong project.
+- JSON with `scanned`, `due`, `released`, `failed`, `skipped_by_reason`, `skipped`: the function ran. That is success even if `released` is `0`.
+- `released` greater than 0: look in Stripe Test mode under **Payments → Transfers** (or **Balance → Transfers**) for `tr_` rows.
+
+Also open **Edge Functions → release-payout → Logs** and look for a line starting `release-payout`.
+
+| Log field | Meaning |
+|---|---|
+| `hold_not_elapsed` | Session started less than 24 hours ago. Expected. |
+| `missing_charge_id` | Stripe PaymentIntent has no `latest_charge` yet. |
+| `host_not_connected` / `host_payouts_disabled` | Host has not finished Connect onboarding. |
+| `failed` + insufficient funds | Platform balance already paid out to the bank. Manual payouts (step 1) must be on before new bookings. |
+
+GitHub secrets `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAYOUT_CRON_SECRET` (and `PRODUCTION_*`) are optional on staging because of the database cron. They are needed for production once `.github/workflows/release-payout.yml` is on `main`. GitHub **schedule** only runs from `main`. **Actions → Release host payouts → Run workflow** works after that.
 
 ---
 
