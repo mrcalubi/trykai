@@ -464,3 +464,5 @@ Live questions with work already done. Each needs a call.
 **Which axis drives top level navigation.** Casual versus professional is orthogonal to one-off versus progression. The documents currently assume Lane 1 and Lane 2 drive the top level. A business tab would quietly introduce a second axis and a two by two. Needs a deliberate decision before either is built.
 
 **Five year transaction retention.** Standard expectation for anything payments adjacent. TryKai does not currently meet it and Aspire was told so honestly. Not decided.
+
+**Gamified, shareable dashboard.** Parked until there is usage data to build it on. Not decided.

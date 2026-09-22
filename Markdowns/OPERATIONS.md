@@ -27,6 +27,38 @@ Each week has three sections, one per founder, tagged **[CRITICAL]**, **[HIGH]**
 
 ---
 
+## Progress snapshot, 21 September 2026
+
+Week 8 of the original plan (15–21 September) is ending. The week-by-week sections below stay as the historical plan. Read this snapshot first.
+
+**In the tree now (not true of the 31 August snapshot):**
+- Schema is `00001`–`00010`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` hourly via pg_cron.
+- `Navbar.jsx` is deleted. `SiteNav` mounts `TopNav` once in `App.jsx`. Hamburger is navigation only. Avatar is Settings and Log out.
+- Browse uses the kit `Card` and shows the card all-in price. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only.
+- Guest bookings at `/bookings`, host tools and payout setup at `/hosting`, profile at `/settings`. `/dashboard` redirects.
+- trykai.sg is verified in Resend. From-address is `TryKai <no-reply@trykai.sg>`. `notify-verification-pending` is secret-gated. `notify-verification-result` is gone. Staging booking confirmation emails confirmed arriving.
+- `cancel-booking` emails the guest the refund amount (including $0) and the host only on a guest cancel. `/bookings` and `/hosting` invoke that function.
+- StyleGuide category PNGs and `public/trykai.png` are in the repo.
+- Edge Functions: `create-payment-intent`, `stripe-webhook`, `create-connect-account`, `create-account-link`, `cancel-booking`, `admin-cancel-booking`, `admin-verifications`, `create-identity-session`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`.
+
+**Still ops, not app code:**
+- Confirm `00005`, `00008`, `00009`, and `00010` on each environment. Confirm production has `RESEND_API_KEY` and current function deploys. This repo cannot see production.
+- Apply `00010` and set Vault secrets so `release-payout` actually runs. The GitHub Action only fires from `main`. Platform payouts must stay **manual**. See **Host Transfers** below.
+- Stripe Dashboard webhook + secrets, `is_founding_host` flags, one test-mode booking.
+- Confirm the two test cancellations were refunded on Stripe. API PATCH 204s are the expected service-role writes from `cancel-booking`, not proof of a client bypass.
+
+**Open in the app:**
+- Bug 4: Hosting treats `?connect=return` as "Payout setup submitted" without re-checking `stripe_payouts_enabled`.
+- P0.4: browse and Book ignore `is_suspended`. INSERT is already gated by `00008`.
+- P0.7: `listings.full_address` grant still too wide.
+- Forgot password is not built.
+
+**Carried non-engineering:** insurance quote, unsigned founders' agreement, Ruiheng not told about the profit share, safety protocol drafted but not ratified, production `00003` hotfix confirmation.
+
+The 31 August and 25 August snapshots below are kept for history. They still describe Navbar, unverified Resend, and migrations stopping at `00007` / `00005`. That is no longer the tree.
+
+---
+
 ## Progress snapshot, 31 August 2026
 
 Week 5 of the original plan (25–31 August) is ending. The week-by-week sections below stay as the historical plan. Read this snapshot first.
@@ -227,7 +259,7 @@ A working session across 22 to 25 August closed out a large block of foundation 
 
 ### RUIHENG
 - [x] Verify trykai.sg in Resend, switch the from-address to `TryKai <no-reply@trykai.sg>` (14 September; one constant in `_shared/email.ts`, used by every sender)
-- [CRITICAL] Shared secret header check on the unauthenticated function endpoints. **Must land the same week**, not after. Once a real domain is sending, an unauthenticated endpoint becomes an open phishing relay.
+- [x] Shared secret header check on the unauthenticated function endpoints (11 September). `notify-verification-pending` requires `NOTIFY_FUNCTION_SECRET`. `notify-verification-result` is deleted. `release-payout`, `admin-cancel-booking`, and `purge-verification-docs` are secret-gated. `stripe-webhook` verifies `Stripe-Signature`.
 
 ### CALEB
 - [STANDARD] Continue host verification and listing quality reviews
@@ -235,7 +267,7 @@ A working session across 22 to 25 August closed out a large block of foundation 
 ### AAKASH
 - [HIGH] Continue content calendar and outreach
 
-**Risk:** these two items are deliberately paired. Do not ship the Resend change without the header check.
+**Risk:** these two items were deliberately paired. Both landed: from-address 14 September, secret headers 11 September.
 
 ---
 
@@ -423,8 +455,8 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [x] Payment provider and account model resolved (Stripe Connect, separate charges and transfers, Express, 16 August)
 - [ ] End to end flow working on staging test-mode: guest pays → booking confirmed → host notified
 - [ ] Booking status updates correctly, pending to confirmed (code path exists; needs a live Stripe test)
-- [ ] Booking confirmation email to guest (code path exists; Resend still on test domain)
-- [ ] Booking notification email to host (same)
+- [x] Booking confirmation email to guest (staging, 14–21 September; production `RESEND_API_KEY` unconfirmed)
+- [x] Booking notification email to host (same)
 - [ ] Platform fee correctly calculated: 12% of lesson, S$2.50 floor, round up to a whole dollar (see DECISIONS.md). Code exists in `_shared/booking.ts`
 - [ ] PayNow 5% off the advertised all-in total at checkout (not 8% versus 10%)
 - [ ] Failed payment handled gracefully, clear error, no ghost booking
@@ -465,11 +497,11 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Approved host can create listings
 
 ## Cancellations
-- [ ] Guest can cancel from dashboard
+- [ ] Guest can cancel from `/bookings` (invokes `cancel-booking`)
 - [ ] Four tier refund correctly calculated, 100 / 50 / 25 / 0 at 48hr, 24hr, 6hr, with platform fee forfeited on partial tiers
 - [x] Refund amount stored and included directly in the cancellation email
 - [ ] Guest can reschedule instead of cancelling, once per booking, 48hr cutoff
-- [ ] Host can cancel from dashboard
+- [ ] Host can cancel from `/hosting`
 - [ ] Host cancellation increments strikes
 - [ ] Guest can report a host no show, distinct from host initiated cancel, triggering 2 strikes and account review
 - [ ] Host can appeal a strike within 7 days
@@ -488,20 +520,20 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Review prompt appears after the session date passes
 
 ## Dashboard
-- [ ] Host view: listings, upcoming sessions, Add Session, Edit
+- [ ] Host view at `/hosting`: listings, upcoming sessions, Add Session, Edit, payout setup
 - [ ] Host view: Cancel with strike warning
-- [ ] Guest view: upcoming and past bookings
-- [ ] Guest view: Cancel with refund amount shown
+- [ ] Guest view at `/bookings`: upcoming and past bookings
+- [ ] Guest view: Cancel with refund amount shown (calls `cancel-booking`, does not PATCH bookings from the browser)
 - [ ] Guest view: Leave review after the session
-- [ ] Both views accessible from one account
+- [ ] Both views reachable from one account (hamburger: My bookings; Hosting if `is_host`)
 
 ## Auth and accounts
 - [ ] Signup, login, logout working
 - [ ] User row created on signup
-- [ ] Password reset working
+- [ ] Password reset working (not built; Login has no reset link)
 - [ ] Phone OTP required before booking
 - [ ] `is_host` set true on first listing
-- [ ] Avatar or initial in navbar when logged in
+- [ ] Avatar or initial in navbar when logged in (`SiteNav` / `TopNav`; `Navbar.jsx` is deleted)
 
 ## Legal, required before any real money moves
 - [ ] Terms of Service live at /terms
@@ -518,9 +550,9 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Founders' agreement signed by all three
 
 ## Email
-- [ ] All Edge Functions off the Resend test domain, sending from trykai.sg
-- [ ] Booking confirmation to guest
-- [ ] Booking notification to host
+- [x] All Edge Functions off the Resend test domain in code, sending from trykai.sg (staging confirmed; production `RESEND_API_KEY` unconfirmed)
+- [x] Booking confirmation to guest (staging)
+- [x] Booking notification to host (staging)
 - [ ] Verification submission to Caleb
 - [ ] Verification approved to host
 - [ ] Verification rejected to host
@@ -531,9 +563,9 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 ## UI and design
 - [ ] Navy #16264B and cream #F4F1EA consistent throughout
 - [ ] Bricolage Grotesque for display, Manrope for body, monospace for prices and tags
-- [ ] Logo and favicon implemented
+- [x] Logo and favicon implemented (`public/trykai.png`, `favicon.svg` / png sizes, apple-touch-icon)
 - [ ] Mobile responsive on iOS Safari and Android Chrome
-- [ ] No broken images or missing assets
+- [x] No broken images or missing assets for StyleGuide categories or `/trykai.png` (language/other PNG imports stay commented out)
 - [ ] Loading states on all async actions
 - [ ] Error states handled, no blank screens or raw errors
 - [ ] Empty states handled
@@ -545,14 +577,14 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Verification documents in a private bucket
 - [ ] Prices stored as integers in cents
 - [ ] No sensitive data in client side code or console logs
-- [ ] Database schema in version control
+- [x] Database schema in version control (`supabase/migrations/` `00001`–`00010`)
 
 ## Infrastructure
 - [x] trykai.sg pointing at Vercel
 - [x] SSL active
 - [ ] 404 page exists
 - [ ] Basic meta tags on key pages
-- [ ] Favicon showing
+- [x] Favicon showing
 
 ## Host onboarding experience
 - [ ] Photography guidance shown during listing creation
