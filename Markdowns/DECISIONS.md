@@ -16,6 +16,10 @@ Two host types on the same browse page. **Peer hosts**, everyday people monetisi
 ### Unified accounts
 One account type, both host and guest. Guest by default, becomes a host on first listing. `is_host` flag handles the distinction. Hosts get a visible badge.
 
+Guest bookings are at `/bookings`. Host listings, upcoming hosted sessions, and Stripe payout setup are at `/hosting`. `/dashboard` remains as a redirect so emails and Stripe `return_url`s keep working. Payouts stay in the host area, not account settings. A signed-in user who is not a host is redirected from `/hosting` to `/bookings`.
+
+Profile name and photo are edited at `/settings`. Email is shown there but not changed in-app. Account deletion is contact-support only until the retain-transactions / remove-personal-data split is designed.
+
 ### Progressive disclosure at signup
 Ask for information when it becomes relevant, not upfront.
 - Browsing: email only
@@ -302,7 +306,7 @@ Onboarding required a business plan with three year projections, since there is 
 **Access control:** do not share the login. If Aakash needs spending ability, issue an Aspire card with a set limit instead.
 
 ### Transactional email
-Three flows live via Resend: new booking to host and guest (from `stripe-webhook`), new manual verification submission to Caleb (from `notify-verification-pending`, gated by `NOTIFY_FUNCTION_SECRET`), and verification result to host (from `admin-verifications` or `stripe-webhook`, whichever decided). **All send from Resend's shared test domain (`TryKai <onboarding@resend.dev>`) and deliver only to Caleb's address.** Non functional for real users until trykai.sg is verified in Resend. Cancellation does not send email. `notify-verification-result` was removed once those result emails moved.
+Three flows live via Resend: new booking to host and guest (from `stripe-webhook`), new manual verification submission to Caleb (from `notify-verification-pending`, gated by `NOTIFY_FUNCTION_SECRET`), verification result to host (from `admin-verifications` or `stripe-webhook`, whichever decided), and cancellation (from `cancel-booking`: guest always, with the refund amount including $0; host only when `cancelled_by = 'guest'`). **All send from `TryKai <no-reply@trykai.sg>`.** trykai.sg is verified in Resend (14 September 2026). A missing `RESEND_API_KEY` is logged. `notify-verification-result` was removed once those result emails moved.
 
 ### Domain
 trykai.sg via Vodien, two years, ~$75.98. SGNIC identity verification completed.
@@ -436,7 +440,18 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-09-11 — Rejected verification documents are deleted after 30 days, and the notify functions are no longer open relays.** Implementation of the retention rule already in Part A. `purge-verification-docs` is secret-gated (`VERIFICATION_PURGE_SECRET` or `CRON_SECRET`) and scheduled daily, not hourly: it only needs to run once the window has passed. Storage objects are removed before the URL columns are cleared, so a failed delete is retried rather than orphaned. A later resubmission is left alone because the job only touches rows that are still `rejected`.
 
-`notify-verification-pending` now requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer) and links to `/admin/verifications` instead of the Table Editor. `notify-verification-result` is deleted; hosts already hear about the decision from `admin-verifications` and `stripe-webhook`. Remaining P0.8 work is verifying trykai.sg in Resend so mail leaves the shared test domain.
+`notify-verification-pending` now requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer) and links to `/admin/verifications` instead of the Table Editor. `notify-verification-result` is deleted; hosts already hear about the decision from `admin-verifications` and `stripe-webhook`. **2026-09-14 — trykai.sg is verified in Resend.** From-address is `TryKai <no-reply@trykai.sg>`. **2026-09-14 — cancellation emails.** `cancel-booking` emails the guest the refund amount (including $0) and the host only when the guest cancelled. A send failure cannot fail the refund.
+
+**2026-09-19 — Dashboard split into `/bookings` and `/hosting`.** One account is still both guest and host; the mixed dashboard page is not. Guest view is `/bookings`. Host view (listings, hosted sessions, Connect payouts) is `/hosting`. `/dashboard` redirects to `/bookings`, except `?connect=` which goes to `/hosting`. Non-hosts hitting `/hosting` go to `/bookings`. Emails and Stripe return URLs still use `/dashboard`.
+
+**2026-09-19 — Settings page at `/settings`.** Signed-in users can edit `full_name` and `avatar_url`. Email is read-only; change it via `hello@trykai.sg`. No in-app delete: deletion must keep transaction records for dispute and tax while removing personal data, and that split is not designed. Linked from the avatar account menu.
+
+**2026-09-19 — Hamburger is navigation; the avatar is the account menu.** Signed-in hamburger: Browse, My bookings, Hosting (hosts only), Create listing / Become a host (always, top-level so a non-host can start), Verification review (admins only, via `my_verification()`). Settings and Log out live on the avatar. No Profile link until that page exists. Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
+
+**2026-09-19 — Login uses the kit Input.** Email is the floating-label variant; password is the password variant with the eye toggle. Both login and signup modes. Auth, redirect, and form-level error copy are unchanged.
+
+**2026-09-21 — Kit Input fills its wrapper; floating combines with password.** `.ui-input` is `width: 100%` in every variant so the password eye sits inside the field. `floatingLabel` is a label behaviour, not a separate variant, and Login uses it on full name, email, and password. Autofill floats the label via `:placeholder-shown` / `:-webkit-autofill`, not React value state.
+**2026-09-19 — Host Transfers are scheduled; Stripe logs stay empty until the job runs.** Not a new money-flow decision. `release-payout` existed but nothing invoked it, so Connect Transfers (`tr_`) never appeared. Staging uses pg_cron + Vault (`00010`). The GitHub Action is the extra caller once that workflow is on `main` (GitHub `schedule` only runs there). Platform payouts stay **manual**. Do not Transfer without `source_transaction` after a platform bank payout; that would take a later guest's funds. Ops steps live in OPERATIONS.md.
 
 ---
 
@@ -449,3 +464,5 @@ Live questions with work already done. Each needs a call.
 **Which axis drives top level navigation.** Casual versus professional is orthogonal to one-off versus progression. The documents currently assume Lane 1 and Lane 2 drive the top level. A business tab would quietly introduce a second axis and a two by two. Needs a deliberate decision before either is built.
 
 **Five year transaction retention.** Standard expectation for anything payments adjacent. TryKai does not currently meet it and Aspire was told so honestly. Not decided.
+
+**Gamified, shareable dashboard.** Parked until there is usage data to build it on. Not decided.

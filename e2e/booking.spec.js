@@ -167,6 +167,102 @@ test.describe('listing detail gallery', () => {
     await expect(page.getByRole('heading', { level: 1 })).toBeInViewport()
     await expect(page.locator('.detail-booking-card__price')).toBeInViewport()
   })
+
+  test('opens a clicked photo full size and steps through the set', async ({ page }) => {
+    await stubAllExternalCalls(page, {
+      listings: [withPhotos(3)],
+      sessions: [OPEN_SESSION],
+      reviews: [],
+    })
+    await page.goto('/listings/listing-latte')
+
+    await page.getByRole('button', { name: 'View photo 1 of 3' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Learn latte art with me photos' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toHaveAttribute('aria-modal', 'true')
+    await expect(dialog.getByText('1 / 3')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Next photo' }).click()
+    await expect(dialog.getByText('2 / 3')).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+  })
+
+  test('keeps the lightbox frame and arrows still across mixed aspect ratios', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'desktop overlay geometry')
+
+    const frames = [
+      { hue: 20, w: 1600, h: 900 },
+      { hue: 200, w: 900, h: 1600 },
+      { hue: 320, w: 1000, h: 1000 },
+      { hue: 90, w: 2100, h: 700 },
+      { hue: 45, w: 700, h: 2100 },
+    ]
+    const listing = {
+      ...LATTE_ART,
+      photo_urls: frames.map(({ hue, w, h }) => {
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="hsl(${hue} 50% 60%)"/></svg>`
+        return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+      }),
+    }
+
+    await stubAllExternalCalls(page, {
+      listings: [listing],
+      sessions: [OPEN_SESSION],
+      reviews: [],
+    })
+    await page.goto('/listings/listing-latte')
+    await page.getByRole('button', { name: 'View photo 1 of 5' }).click()
+
+    const dialog = page.getByRole('dialog')
+    const stage = page.locator('.lightbox__stage')
+    const photo = page.locator('.lightbox__photo')
+    const prev = page.getByRole('button', { name: 'Previous photo' })
+    const next = page.getByRole('button', { name: 'Next photo' })
+
+    await expect(dialog).toBeVisible()
+    await expect(photo).toHaveCSS('object-fit', 'contain')
+
+    const firstStage = await stage.boundingBox()
+    const firstPrev = await prev.boundingBox()
+    const firstNext = await next.boundingBox()
+    const naturals = []
+
+    for (let i = 0; i < frames.length; i += 1) {
+      if (i > 0) {
+        await next.click()
+        await expect(dialog.getByText(`${i + 1} / 5`)).toBeVisible()
+      }
+
+      const [naturalWidth, naturalHeight] = await photo.evaluate((img) => [
+        img.naturalWidth,
+        img.naturalHeight,
+      ])
+      naturals.push(`${naturalWidth}x${naturalHeight}`)
+
+      const stageBox = await stage.boundingBox()
+      const prevBox = await prev.boundingBox()
+      const nextBox = await next.boundingBox()
+      const photoBox = await photo.boundingBox()
+
+      expect(Math.round(stageBox.width)).toBe(Math.round(firstStage.width))
+      expect(Math.round(stageBox.height)).toBe(Math.round(firstStage.height))
+      expect(Math.round(stageBox.x)).toBe(Math.round(firstStage.x))
+      expect(Math.round(stageBox.y)).toBe(Math.round(firstStage.y))
+      expect(Math.round(prevBox.x)).toBe(Math.round(firstPrev.x))
+      expect(Math.round(prevBox.y)).toBe(Math.round(firstPrev.y))
+      expect(Math.round(nextBox.x)).toBe(Math.round(firstNext.x))
+      expect(Math.round(nextBox.y)).toBe(Math.round(firstNext.y))
+      expect(Math.round(photoBox.width)).toBe(Math.round(firstStage.width))
+      expect(Math.round(photoBox.height)).toBe(Math.round(firstStage.height))
+    }
+
+    expect(new Set(naturals).size).toBe(frames.length)
+  })
 })
 
 test.describe('booking requires an account', () => {

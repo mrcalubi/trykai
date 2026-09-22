@@ -4,6 +4,7 @@ import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from '../lib/supabase'
 import ReviewCard from '../components/ReviewCard'
+import PhotoLightbox from '../components/PhotoLightbox'
 import { CancellationPolicyCollapsible } from '../components/CancellationPolicy'
 import { formatCents } from '../lib/cancellationPolicy'
 import {
@@ -110,6 +111,7 @@ export default function ListingDetail() {
   const [revealedAddress, setRevealedAddress] = useState(null)
   const [viewerId, setViewerId] = useState(null)
   const [activePhoto, setActivePhoto] = useState(0)
+  const [lightboxIndex, setLightboxIndex] = useState(null)
 
   useEffect(() => {
     async function fetchListing() {
@@ -342,7 +344,15 @@ export default function ListingDetail() {
             onScroll={trackGalleryPosition}
           >
             {photos.map((url, i) => (
-              <img key={url} src={url} alt={`${listing.title} ${i + 1}`} className="detail-gallery__photo" />
+              <button
+                key={url}
+                type="button"
+                className="detail-gallery__photo"
+                aria-label={`View photo ${i + 1} of ${photos.length}`}
+                onClick={() => setLightboxIndex(i)}
+              >
+                <img src={url} alt={`${listing.title} ${i + 1}`} />
+              </button>
             ))}
           </div>
           {photos.length > 1 && (
@@ -358,6 +368,15 @@ export default function ListingDetail() {
         </div>
       ) : (
         <div className="detail-gallery__placeholder" />
+      )}
+
+      {lightboxIndex !== null && (
+        <PhotoLightbox
+          photos={photos}
+          title={listing.title}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
       )}
 
       <div className="detail-layout">

@@ -1,5 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import Bookings from './Bookings'
+import Hosting from './Hosting'
 import Dashboard from './Dashboard'
 import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
@@ -19,9 +21,9 @@ function givenSignedIn(userId = USER_ID) {
 }
 
 /**
- * `sessions` and `users` are each queried two different ways by this page — as a
- * list while loading the dashboard, and as a single row while cancelling — so
- * the handlers below branch on whether `.single()` was used.
+ * `sessions` is queried as a list (host upcoming sessions). Guest cancel goes
+ * through cancel-booking, so the `.single()` branch is only the booking-status
+ * poll after checkout.
  */
 function givenData({
   listings = [],
@@ -30,6 +32,7 @@ function givenData({
   hostSessions = [],
   spotsRemaining = 2,
   hostStrikes = 0,
+  isHost,
 } = {}) {
   supabase.__on('listings', 'select', { data: listings, error: null })
   supabase.__on('bookings', 'select', (call) =>
@@ -42,7 +45,11 @@ function givenData({
       : { data: hostSessions, error: null }
   )
   supabase.__on('users', 'select', {
-    data: { stripe_payouts_enabled: true, is_host: listings.length > 0, host_strikes: hostStrikes },
+    data: {
+      stripe_payouts_enabled: true,
+      is_host: isHost ?? listings.length > 0,
+      host_strikes: hostStrikes,
+    },
     error: null,
   })
 }
@@ -64,15 +71,35 @@ function makeMyListing(overrides = {}) {
 
 // Mounted behind the same guard App.jsx puts it behind, so the page always has
 // a signed-in user. RequireAuth owns the signed-out case and tests it itself.
-async function renderDashboard(options = {}) {
+async function renderBookings(options = {}) {
   const utils = renderWithRouter(
     <RequireAuth>
-      <Dashboard />
+      <Bookings />
     </RequireAuth>,
-    { route: '/dashboard', path: '/dashboard', ...options }
+    { route: '/bookings', path: '/bookings', ...options }
   )
   await screen.findByRole('heading', { name: 'Dashboard', level: 1 })
   return utils
+}
+
+async function renderHosting(options = {}) {
+  const utils = renderWithRouter(
+    <RequireAuth>
+      <Hosting />
+    </RequireAuth>,
+    { route: '/hosting', path: '/hosting', ...options }
+  )
+  await screen.findByRole('heading', { name: 'Dashboard', level: 1 })
+  return utils
+}
+
+function renderDashboardRedirect(options = {}) {
+  return renderWithRouter(
+    <RequireAuth>
+      <Dashboard />
+    </RequireAuth>,
+    { route: '/dashboard', path: '*', outlivesNavigation: true, ...options }
+  )
 }
 
 function sectionFor(title) {
@@ -85,16 +112,58 @@ beforeEach(() => {
   givenData()
 })
 
-describe('Dashboard access control', () => {
-  it('scopes every query to the signed-in user', async () => {
-    givenSignedIn('user-42')
-    await renderDashboard()
+describe('Dashboard redirect', () => {
+  it('sends /dashboard to /bookings so existing links keep working', async () => {
+    givenSignedIn()
+    givenData()
+    const { currentPath } = renderDashboardRedirect()
 
-    expect(supabase.__lastCall('listings', 'select').filters).toContainEqual({
-      method: 'eq',
-      column: 'host_id',
-      value: 'user-42',
+    await waitFor(() => expect(currentPath()).toBe('/bookings'))
+  })
+
+  it('keeps a booking query string when redirecting from /dashboard', async () => {
+    givenSignedIn()
+    givenData()
+    const { currentPath, currentSearch } = renderDashboardRedirect({
+      route: '/dashboard?booking=booking-1',
     })
+
+    await waitFor(() => expect(currentPath()).toBe('/bookings'))
+    expect(currentSearch()).toBe('?booking=booking-1')
+  })
+
+  it('sends Connect return URLs to hosting', async () => {
+    givenSignedIn()
+    givenData({ listings: [makeMyListing()] })
+    const { currentPath, currentSearch } = renderDashboardRedirect({
+      route: '/dashboard?connect=return',
+    })
+
+    await waitFor(() => expect(currentPath()).toBe('/hosting'))
+    expect(currentSearch()).toBe('?connect=return')
+  })
+})
+
+describe('Hosting access for guests', () => {
+  it('sends a signed-in user who is not a host to /bookings', async () => {
+    givenData({ isHost: false })
+    const { currentPath } = renderWithRouter(
+      <RequireAuth>
+        <Hosting />
+      </RequireAuth>,
+      { route: '/hosting', path: '*', outlivesNavigation: true }
+    )
+
+    await waitFor(() => expect(currentPath()).toBe('/bookings'))
+    expect(screen.queryByRole('heading', { name: 'My Listings' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Dashboard access control', () => {
+  it('scopes booking queries to the signed-in guest', async () => {
+    givenSignedIn('user-42')
+    await renderBookings()
+
     expect(supabase.__lastCall('bookings', 'select').filters).toContainEqual({
       method: 'eq',
       column: 'guest_id',
@@ -102,9 +171,29 @@ describe('Dashboard access control', () => {
     })
   })
 
-  it('reports a load failure', async () => {
+  it('scopes listing queries to the signed-in host', async () => {
+    givenSignedIn('user-42')
+    givenData({ isHost: true })
+    await renderHosting()
+
+    expect(supabase.__lastCall('listings', 'select').filters).toContainEqual({
+      method: 'eq',
+      column: 'host_id',
+      value: 'user-42',
+    })
+  })
+
+  it('reports a load failure on hosting', async () => {
+    givenData({ isHost: true })
     supabase.__on('listings', 'select', { data: null, error: { message: 'permission denied' } })
-    await renderDashboard()
+    await renderHosting()
+
+    expect(screen.getByText('permission denied')).toBeInTheDocument()
+  })
+
+  it('reports a load failure on bookings', async () => {
+    supabase.__on('bookings', 'select', { data: null, error: { message: 'permission denied' } })
+    await renderBookings()
 
     expect(screen.getByText('permission denied')).toBeInTheDocument()
   })
@@ -116,7 +205,8 @@ describe('Dashboard verification review', () => {
       if (name === 'my_verification') return { data: [{ is_admin: true }], error: null }
       return { data: null, error: null }
     })
-    await renderDashboard()
+    givenData({ isHost: true })
+    await renderHosting()
 
     expect(screen.getByRole('link', { name: 'Review verifications' })).toHaveAttribute(
       'href',
@@ -125,18 +215,25 @@ describe('Dashboard verification review', () => {
   })
 
   it('keeps the review queue off a host dashboard', async () => {
-    await renderDashboard()
+    givenData({ isHost: true })
+    await renderHosting()
 
     expect(screen.queryByRole('link', { name: 'Review verifications' })).not.toBeInTheDocument()
   })
 })
 
 describe('Dashboard empty states', () => {
-  it('shows an empty state for each section', async () => {
-    await renderDashboard()
+  it('shows an empty bookings state', async () => {
+    await renderBookings()
+
+    expect(screen.getByText('No bookings yet.')).toBeInTheDocument()
+  })
+
+  it('shows empty host sections', async () => {
+    givenData({ isHost: true })
+    await renderHosting()
 
     expect(screen.getByText('No upcoming sessions with active bookings.')).toBeInTheDocument()
-    expect(screen.getByText('No bookings yet.')).toBeInTheDocument()
     expect(within(sectionFor('My Listings')).getByRole('link', { name: 'Create one' })).toHaveAttribute(
       'href',
       '/create-listing'
@@ -147,7 +244,7 @@ describe('Dashboard empty states', () => {
 describe('Dashboard listings', () => {
   it('lists the host listings with an edit link', async () => {
     givenData({ listings: [makeMyListing({ id: 'listing-9', title: 'Boxing' })] })
-    await renderDashboard()
+    await renderHosting()
 
     expect(screen.getByText('Boxing')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute(
@@ -158,7 +255,7 @@ describe('Dashboard listings', () => {
 
   it('deactivates a listing rather than deleting the row', async () => {
     givenData({ listings: [makeMyListing()] })
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
 
     await user.click(screen.getByRole('button', { name: 'Delete listing' }))
     await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
@@ -172,7 +269,7 @@ describe('Dashboard listings', () => {
 
   it('removes the listing from the page once deleted', async () => {
     givenData({ listings: [makeMyListing()] })
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
 
     await user.click(screen.getByRole('button', { name: 'Delete listing' }))
     await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
@@ -182,7 +279,7 @@ describe('Dashboard listings', () => {
 
   it('keeps the listing when the host backs out', async () => {
     givenData({ listings: [makeMyListing()] })
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
 
     await user.click(screen.getByRole('button', { name: 'Delete listing' }))
     await user.click(screen.getByRole('button', { name: 'Keep listing' }))
@@ -194,7 +291,7 @@ describe('Dashboard listings', () => {
   it('reports a failed deletion', async () => {
     givenData({ listings: [makeMyListing()] })
     supabase.__on('listings', 'update', { error: { message: 'not your listing' } })
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
 
     await user.click(screen.getByRole('button', { name: 'Delete listing' }))
     await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
@@ -221,7 +318,7 @@ describe('Dashboard add session', () => {
   }
 
   it('stores the start time as UTC converted from Singapore time', async () => {
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
     await openSessionForm(user)
     fillSession({ date: '2026-09-01', time: '10:30' })
 
@@ -239,7 +336,7 @@ describe('Dashboard add session', () => {
   })
 
   it('opens a new session with every spot available', async () => {
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
     await openSessionForm(user)
     fillSession({ spots: '6' })
 
@@ -254,7 +351,7 @@ describe('Dashboard add session', () => {
   })
 
   it('rejects a session with no date or time', async () => {
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
     await openSessionForm(user)
     fireEvent.submit(document.querySelector('.dashboard-card__form'))
 
@@ -263,7 +360,7 @@ describe('Dashboard add session', () => {
   })
 
   it('rejects a zero-minute session', async () => {
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
     await openSessionForm(user)
     fillSession({ duration: '0' })
     fireEvent.submit(document.querySelector('.dashboard-card__form'))
@@ -272,7 +369,7 @@ describe('Dashboard add session', () => {
   })
 
   it('rejects a session with no spots', async () => {
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
     await openSessionForm(user)
     fillSession({ spots: '0' })
     fireEvent.submit(document.querySelector('.dashboard-card__form'))
@@ -281,7 +378,7 @@ describe('Dashboard add session', () => {
   })
 
   it('closes the form after a successful save', async () => {
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
     await openSessionForm(user)
     fillSession()
 
@@ -292,7 +389,7 @@ describe('Dashboard add session', () => {
 
   it('keeps the form open and shows the error when the save fails', async () => {
     supabase.__on('sessions', 'insert', { error: { message: 'overlapping session' } })
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
     await openSessionForm(user)
     fillSession()
 
@@ -306,7 +403,7 @@ describe('Dashboard add session', () => {
 describe('Dashboard guest cancellation', () => {
   it('offers cancellation for an upcoming confirmed booking', async () => {
     givenData({ bookings: [makeBooking()] })
-    await renderDashboard()
+    await renderBookings()
 
     expect(screen.getByRole('button', { name: 'Cancel booking' })).toBeInTheDocument()
   })
@@ -315,16 +412,43 @@ describe('Dashboard guest cancellation', () => {
     givenData({
       bookings: [makeBooking({ sessions: { starts_at: hoursFromNow(-2), listings: {} } })],
     })
-    await renderDashboard()
+    await renderBookings()
 
     expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
   })
 
   it('does not offer cancellation for an already cancelled booking', async () => {
     givenData({ bookings: [makeBooking({ status: 'cancelled' })] })
-    await renderDashboard()
+    await renderBookings()
 
     expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
+  })
+
+  it('shows Unknown listing / Date TBC when the nested session is missing', async () => {
+    givenData({ bookings: [makeBooking({ sessions: null })] })
+    await renderBookings()
+
+    expect(screen.getByText('Unknown listing')).toBeInTheDocument()
+    expect(screen.getByText('Date TBC')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
+  })
+
+  it('still offers cancellation when the booked session is full', async () => {
+    givenData({
+      bookings: [
+        makeBooking({
+          sessions: {
+            starts_at: hoursFromNow(72),
+            spots_remaining: 0,
+            listings: { title: 'Latte art', host_id: HOST_ID },
+          },
+        }),
+      ],
+    })
+    await renderBookings()
+
+    expect(screen.getByText('Latte art')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel booking' })).toBeInTheDocument()
   })
 
   // A $45 booking carries a $6.75 platform fee, leaving a $38.25 lesson fee. The
@@ -339,7 +463,7 @@ describe('Dashboard guest cancellation', () => {
 
   it('reads the platform fee it needs to work out a partial refund', async () => {
     givenData({ bookings: [makeBooking()] })
-    await renderDashboard()
+    await renderBookings()
 
     expect(supabase.__lastCall('bookings', 'select').chain[0].args[0]).toContain('platform_fee')
   })
@@ -351,7 +475,7 @@ describe('Dashboard guest cancellation', () => {
     [3, 'No refund (cancelled less than 6 hours before the session).'],
   ])('quotes the published refund %i hours before the session', async (hours, quote) => {
     givenData({ bookings: [bookingCancelledAt(hours)] })
-    const { user } = await renderDashboard()
+    const { user } = await renderBookings()
 
     await user.click(screen.getByRole('button', { name: 'Cancel booking' }))
 
@@ -361,7 +485,7 @@ describe('Dashboard guest cancellation', () => {
   it('asks the cancel-booking function to refund the guest', async () => {
     givenData({ bookings: [makeBooking()] })
     supabase.functions.invoke.mockResolvedValue({ data: { ok: true, refund_amount: 4500 }, error: null })
-    const { user } = await renderDashboard()
+    const { user } = await renderBookings()
 
     await user.click(screen.getByRole('button', { name: 'Cancel booking' }))
     await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
@@ -379,7 +503,7 @@ describe('Dashboard guest cancellation', () => {
       data: null,
       error: { message: 'already cancelled' },
     })
-    const { user } = await renderDashboard()
+    const { user } = await renderBookings()
 
     await user.click(screen.getByRole('button', { name: 'Cancel booking' }))
     await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
@@ -389,6 +513,22 @@ describe('Dashboard guest cancellation', () => {
 })
 
 describe('Dashboard host cancellation', () => {
+  it('lists a fully booked upcoming session so the host can still cancel it', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({
+          id: 's-full',
+          bookings: [{ id: 'b-full', status: 'confirmed', guests_count: 4, total_amount: 18000 }],
+        }),
+      ],
+    })
+    await renderHosting()
+
+    expect(within(sectionFor('Upcoming Hosted Sessions')).getByText('Latte art')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
+  })
+
   it('lists only sessions that have active bookings', async () => {
     givenData({
       listings: [makeMyListing()],
@@ -400,14 +540,14 @@ describe('Dashboard host cancellation', () => {
         }),
       ],
     })
-    await renderDashboard()
+    await renderHosting()
 
     expect(within(sectionFor('Upcoming Hosted Sessions')).getAllByText('Latte art')).toHaveLength(1)
   })
 
   it('warns about the strike before cancelling', async () => {
     givenData({ listings: [makeMyListing()], hostSessions: [makeHostSession()] })
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
 
     await user.click(screen.getByRole('button', { name: 'Cancel session' }))
 
@@ -418,7 +558,7 @@ describe('Dashboard host cancellation', () => {
   it('asks the cancel-booking function to cancel the whole session', async () => {
     givenData({ listings: [makeMyListing()], hostSessions: [makeHostSession()] })
     supabase.functions.invoke.mockResolvedValue({ data: { cancelled: 1 }, error: null })
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
 
     await user.click(screen.getByRole('button', { name: 'Cancel session' }))
     await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
@@ -436,7 +576,7 @@ describe('Dashboard host cancellation', () => {
       data: { error: 'refund failed' },
       error: null,
     })
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
 
     await user.click(screen.getByRole('button', { name: 'Cancel session' }))
     await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
@@ -452,7 +592,7 @@ describe('Dashboard payout setup', () => {
       data: { stripe_payouts_enabled: false, is_host: true },
       error: null,
     })
-    await renderDashboard()
+    await renderHosting()
 
     expect(screen.getByRole('heading', { name: 'Set up payouts' })).toBeInTheDocument()
   })
@@ -467,7 +607,7 @@ describe('Dashboard payout setup', () => {
       data: { stripe_payouts_enabled: true, url: null },
       error: null,
     })
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
 
     await user.click(screen.getByRole('button', { name: 'Set up payouts' }))
 
@@ -496,7 +636,7 @@ describe('Dashboard payout setup', () => {
         },
       },
     })
-    const { user } = await renderDashboard()
+    const { user } = await renderHosting()
 
     await user.click(screen.getByRole('button', { name: 'Set up payouts' }))
 
@@ -511,9 +651,9 @@ describe('Dashboard payout setup', () => {
     givenData({ listings: [makeMyListing()] })
     renderWithRouter(
       <RequireAuth>
-        <Dashboard />
+        <Hosting />
       </RequireAuth>,
-      { route: '/dashboard?connect=return', path: '/dashboard' }
+      { route: '/hosting?connect=return', path: '/hosting' }
     )
 
     expect(
@@ -525,9 +665,9 @@ describe('Dashboard payout setup', () => {
     givenData({ listings: [makeMyListing()] })
     renderWithRouter(
       <RequireAuth>
-        <Dashboard />
+        <Hosting />
       </RequireAuth>,
-      { route: '/dashboard?connect=refresh', path: '/dashboard' }
+      { route: '/hosting?connect=refresh', path: '/hosting' }
     )
 
     expect(
@@ -548,21 +688,21 @@ describe('Dashboard reviews', () => {
 
   it('invites a review after the session has happened', async () => {
     givenData({ bookings: [pastBooking()] })
-    await renderDashboard()
+    await renderBookings()
 
     expect(screen.getByRole('button', { name: 'Leave a review' })).toBeInTheDocument()
   })
 
   it('does not invite a review before the session', async () => {
     givenData({ bookings: [makeBooking()] })
-    await renderDashboard()
+    await renderBookings()
 
     expect(screen.queryByRole('button', { name: 'Leave a review' })).not.toBeInTheDocument()
   })
 
   it('does not invite a second review for the same booking', async () => {
     givenData({ bookings: [pastBooking()], reviews: [{ booking_id: 'booking-past' }] })
-    await renderDashboard()
+    await renderBookings()
 
     expect(screen.queryByRole('button', { name: 'Leave a review' })).not.toBeInTheDocument()
     expect(screen.getByText('Review submitted')).toBeInTheDocument()
@@ -570,14 +710,14 @@ describe('Dashboard reviews', () => {
 
   it('does not invite a review on a cancelled booking', async () => {
     givenData({ bookings: [makeBooking({ ...pastBooking(), status: 'cancelled' })] })
-    await renderDashboard()
+    await renderBookings()
 
     expect(screen.queryByRole('button', { name: 'Leave a review' })).not.toBeInTheDocument()
   })
 
   it('requires a star rating', async () => {
     givenData({ bookings: [pastBooking()] })
-    const { user } = await renderDashboard()
+    const { user } = await renderBookings()
 
     await user.click(screen.getByRole('button', { name: 'Leave a review' }))
     await user.click(screen.getByRole('button', { name: 'Submit review' }))
@@ -588,7 +728,7 @@ describe('Dashboard reviews', () => {
 
   it('saves the review against the host', async () => {
     givenData({ bookings: [pastBooking()] })
-    const { user } = await renderDashboard()
+    const { user } = await renderBookings()
 
     await user.click(screen.getByRole('button', { name: 'Leave a review' }))
     await user.click(screen.getByRole('button', { name: '4 stars' }))
@@ -608,7 +748,7 @@ describe('Dashboard reviews', () => {
 
   it('stores a null comment for a rating-only review', async () => {
     givenData({ bookings: [pastBooking()] })
-    const { user } = await renderDashboard()
+    const { user } = await renderBookings()
 
     await user.click(screen.getByRole('button', { name: 'Leave a review' }))
     await user.click(screen.getByRole('button', { name: '5 stars' }))
@@ -620,7 +760,7 @@ describe('Dashboard reviews', () => {
 
   it('marks the booking as reviewed once saved', async () => {
     givenData({ bookings: [pastBooking()] })
-    const { user } = await renderDashboard()
+    const { user } = await renderBookings()
 
     await user.click(screen.getByRole('button', { name: 'Leave a review' }))
     await user.click(screen.getByRole('button', { name: '5 stars' }))
@@ -639,7 +779,7 @@ describe('Dashboard reviews', () => {
         }),
       ],
     })
-    const { user } = await renderDashboard()
+    const { user } = await renderBookings()
 
     await user.click(screen.getByRole('button', { name: 'Leave a review' }))
     await user.click(screen.getByRole('button', { name: '5 stars' }))
@@ -652,7 +792,7 @@ describe('Dashboard reviews', () => {
   it('reports a rejected review', async () => {
     givenData({ bookings: [pastBooking()] })
     supabase.__on('reviews', 'insert', { error: { message: 'duplicate review' } })
-    const { user } = await renderDashboard()
+    const { user } = await renderBookings()
 
     await user.click(screen.getByRole('button', { name: 'Leave a review' }))
     await user.click(screen.getByRole('button', { name: '5 stars' }))
@@ -666,9 +806,9 @@ describe('Dashboard post-payment status', () => {
   function renderReturningFromPayment() {
     return renderWithRouter(
       <RequireAuth>
-        <Dashboard />
+        <Bookings />
       </RequireAuth>,
-      { route: '/dashboard?booking=booking-1', path: '/dashboard' }
+      { route: '/bookings?booking=booking-1', path: '/bookings' }
     )
   }
 

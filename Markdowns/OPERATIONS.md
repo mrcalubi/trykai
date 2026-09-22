@@ -27,6 +27,38 @@ Each week has three sections, one per founder, tagged **[CRITICAL]**, **[HIGH]**
 
 ---
 
+## Progress snapshot, 21 September 2026
+
+Week 8 of the original plan (15–21 September) is ending. The week-by-week sections below stay as the historical plan. Read this snapshot first.
+
+**In the tree now (not true of the 31 August snapshot):**
+- Schema is `00001`–`00010`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` hourly via pg_cron.
+- `Navbar.jsx` is deleted. `SiteNav` mounts `TopNav` once in `App.jsx`. Hamburger is navigation only. Avatar is Settings and Log out.
+- Browse uses the kit `Card` and shows the card all-in price. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only.
+- Guest bookings at `/bookings`, host tools and payout setup at `/hosting`, profile at `/settings`. `/dashboard` redirects.
+- trykai.sg is verified in Resend. From-address is `TryKai <no-reply@trykai.sg>`. `notify-verification-pending` is secret-gated. `notify-verification-result` is gone. Staging booking confirmation emails confirmed arriving.
+- `cancel-booking` emails the guest the refund amount (including $0) and the host only on a guest cancel. `/bookings` and `/hosting` invoke that function.
+- StyleGuide category PNGs and `public/trykai.png` are in the repo.
+- Edge Functions: `create-payment-intent`, `stripe-webhook`, `create-connect-account`, `create-account-link`, `cancel-booking`, `admin-cancel-booking`, `admin-verifications`, `create-identity-session`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`.
+
+**Still ops, not app code:**
+- Confirm `00005`, `00008`, `00009`, and `00010` on each environment. Confirm production has `RESEND_API_KEY` and current function deploys. This repo cannot see production.
+- Apply `00010` and set Vault secrets so `release-payout` actually runs. The GitHub Action only fires from `main`. Platform payouts must stay **manual**. See **Host Transfers** below.
+- Stripe Dashboard webhook + secrets, `is_founding_host` flags, one test-mode booking.
+- Confirm the two test cancellations were refunded on Stripe. API PATCH 204s are the expected service-role writes from `cancel-booking`, not proof of a client bypass.
+
+**Open in the app:**
+- Bug 4: Hosting treats `?connect=return` as "Payout setup submitted" without re-checking `stripe_payouts_enabled`.
+- P0.4: browse and Book ignore `is_suspended`. INSERT is already gated by `00008`.
+- P0.7: `listings.full_address` grant still too wide.
+- Forgot password is not built.
+
+**Carried non-engineering:** insurance quote, unsigned founders' agreement, Ruiheng not told about the profit share, safety protocol drafted but not ratified, production `00003` hotfix confirmation.
+
+The 31 August and 25 August snapshots below are kept for history. They still describe Navbar, unverified Resend, and migrations stopping at `00007` / `00005`. That is no longer the tree.
+
+---
+
 ## Progress snapshot, 31 August 2026
 
 Week 5 of the original plan (25–31 August) is ending. The week-by-week sections below stay as the historical plan. Read this snapshot first.
@@ -226,8 +258,8 @@ A working session across 22 to 25 August closed out a large block of foundation 
 **Goal:** notifications reach real users, and the security gap that opens alongside it closes in the same week.
 
 ### RUIHENG
-- [CRITICAL] Verify trykai.sg in Resend, switch all four Edge Functions off the shared test domain
-- [CRITICAL] Shared secret header check on the unauthenticated function endpoints. **Must land the same week**, not after. Once a real domain is sending, an unauthenticated endpoint becomes an open phishing relay.
+- [x] Verify trykai.sg in Resend, switch the from-address to `TryKai <no-reply@trykai.sg>` (14 September; one constant in `_shared/email.ts`, used by every sender)
+- [x] Shared secret header check on the unauthenticated function endpoints (11 September). `notify-verification-pending` requires `NOTIFY_FUNCTION_SECRET`. `notify-verification-result` is deleted. `release-payout`, `admin-cancel-booking`, and `purge-verification-docs` are secret-gated. `stripe-webhook` verifies `Stripe-Signature`.
 
 ### CALEB
 - [STANDARD] Continue host verification and listing quality reviews
@@ -235,7 +267,7 @@ A working session across 22 to 25 August closed out a large block of foundation 
 ### AAKASH
 - [HIGH] Continue content calendar and outreach
 
-**Risk:** these two items are deliberately paired. Do not ship the Resend change without the header check.
+**Risk:** these two items were deliberately paired. Both landed: from-address 14 September, secret headers 11 September.
 
 ---
 
@@ -352,6 +384,135 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 
 ---
 
+# Host Transfers (`release-payout`)
+
+Stripe logs a Transfer (`tr_`) only when `release-payout` creates one. The function was in the repo but nothing called it, which is why Overview showed platform **STRIPE PAYOUT** (`po_` to Aspire) and refunds, but no host Transfers.
+
+Merging the GitHub PR does **not** do any of this. You still have to click in Stripe and in the **trykai-staging** Supabase project. Do the same later on production, with production URLs and keys.
+
+**Project:** trykai-staging, ref `hzgybclfvpuxkmytdoos`  
+**Dashboard:** https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos
+
+Write one password-manager note called `PAYOUT_CRON_SECRET (staging)` and reuse that exact string in steps 2, 3, and 4. Generate it with `openssl rand -hex 32` in Terminal, or any 32+ character random string. Do not commit it.
+
+## 1. Stripe: stop automatic payouts to the bank
+
+This is the **platform** Stripe account (TryKai), not a host's Connect account. Automatic payouts empty the platform balance. Host Transfers then fail, and retrying without pinning to the original charge would take a later guest's funds.
+
+1. Open https://dashboard.stripe.com (the TryKai account).
+2. Turn **Test mode** on if you are working on staging sandbox charges (toggle in the top right). Live mode is a separate setting; you will repeat this on live before real money.
+3. Go to **Settings** (gear) → **Payouts**, or open https://dashboard.stripe.com/settings/payouts (add `/test` after `.com` when Test mode is on: https://dashboard.stripe.com/test/settings/payouts). Some accounts label this **Bank accounts and scheduling**.
+4. Set the payout schedule to **Manual**. Save.
+5. Confirm: you should no longer see daily/weekly automatic **STRIPE PAYOUT** (`po_`) emptying the balance. You pay TryKai's own bank later, by hand, from **Balances → Pay out**, only after host Transfers have run.
+
+Leave historical test charges that already paid out to the bank. Those cannot be Transferred from the original `source_transaction`. New bookings after this switch can.
+
+## 2. Deploy `release-payout` and set `PAYOUT_CRON_SECRET`
+
+The function checks header `x-cron-secret` against the Edge Function secret `PAYOUT_CRON_SECRET` (or fallback `CRON_SECRET`). Setting the secret is instant; the **new** skip-reason logs and charge backfill only exist after you deploy the merged function.
+
+**Secret (Dashboard, no CLI):**
+
+1. Open https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/functions/secrets
+2. If the left nav says **Edge Functions**, click **Secrets**.
+3. Add key `PAYOUT_CRON_SECRET` and paste the string from your password note. Save.
+4. You do not need to redeploy just for the secret. You **do** need to deploy for the new code.
+
+**Deploy the function (CLI; this function imports `_shared`, so do not paste it into the Dashboard editor):**
+
+```bash
+supabase login
+supabase link --project-ref hzgybclfvpuxkmytdoos
+supabase functions deploy release-payout --project-ref hzgybclfvpuxkmytdoos
+```
+
+Confirm at https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/functions that `release-payout` shows a fresh deploy time.
+
+Optional CLI equivalent for the secret: `supabase secrets set PAYOUT_CRON_SECRET='paste-the-same-string' --project-ref hzgybclfvpuxkmytdoos`
+
+## 3. Apply migration `00010` and the three Vault secrets
+
+`00010` creates `invoke_release_payout()` and the hourly pg_cron job. Vault holds the URL, anon key, and cron secret because those differ per project and must not live in git. The database cron **cannot** read Edge Function secrets; that is why Vault is a second copy.
+
+**Apply the migration**
+
+1. Open the file https://github.com/mrcalubi/trykai/blob/staging/supabase/migrations/00010_schedule_release_payout.sql and copy the whole file.
+2. Open the SQL editor: https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/sql/new
+3. Paste, click **Run**. Success is enough. Notices about `pg_cron not available` mean the Database → Extensions page needs `pg_cron` and `pg_net` enabled; enable both, then run the file again.
+
+**Confirm the cron row** (new query in the same SQL editor):
+
+```sql
+select jobid, jobname, schedule, command from cron.job
+where jobname = 'invoke-release-payout-hourly';
+```
+
+You want one row, schedule `12 * * * *` (minute 12 every hour, UTC).
+
+**Copy the anon public key**
+
+1. Open https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/settings/api
+2. Copy the **anon** / **public** key (sometimes labelled publishable). Not the `service_role` key.
+
+**Create the Vault secrets** (skip any name that already exists):
+
+```sql
+select name from vault.decrypted_secrets
+where name in ('release_payout_url', 'release_payout_anon_key', 'payout_cron_secret');
+
+select vault.create_secret(
+  'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout',
+  'release_payout_url',
+  'Hourly host Transfer job'
+);
+select vault.create_secret(
+  'PASTE_ANON_PUBLIC_KEY',
+  'release_payout_anon_key',
+  'Gateway JWT; the function still checks x-cron-secret'
+);
+select vault.create_secret(
+  'PASTE_SAME_VALUE_AS_PAYOUT_CRON_SECRET',
+  'payout_cron_secret',
+  'x-cron-secret for release-payout'
+);
+```
+
+`payout_cron_secret` in Vault must match `PAYOUT_CRON_SECRET` on the function. If a name already exists and the value is wrong, update it with `vault.update_secret(id, 'new value')` using the `id` from `vault.decrypted_secrets`. You can also add named secrets under **Integrations → Vault** in the Dashboard.
+
+Production uses that project's URL and keys, not the staging ref above.
+
+## 4. Run it once now (do not wait until minute 12)
+
+In Terminal, replace the two placeholders with the **anon public key** and the **same cron secret**:
+
+```bash
+curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout' \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer PASTE_ANON_PUBLIC_KEY" \
+  -H "apikey: PASTE_ANON_PUBLIC_KEY" \
+  -H "x-cron-secret: PASTE_PAYOUT_CRON_SECRET" \
+  -d '{}'
+```
+
+**What you should see**
+
+- `401 Unauthorized`: the `x-cron-secret` does not match `PAYOUT_CRON_SECRET`, or you used the wrong project.
+- JSON with `scanned`, `due`, `released`, `failed`, `skipped_by_reason`, `skipped`: the function ran. That is success even if `released` is `0`.
+- `released` greater than 0: look in Stripe Test mode under **Payments → Transfers** (or **Balance → Transfers**) for `tr_` rows.
+
+Also open **Edge Functions → release-payout → Logs** and look for a line starting `release-payout`.
+
+| Log field | Meaning |
+|---|---|
+| `hold_not_elapsed` | Session started less than 24 hours ago. Expected. |
+| `missing_charge_id` | Stripe PaymentIntent has no `latest_charge` yet. |
+| `host_not_connected` / `host_payouts_disabled` | Host has not finished Connect onboarding. |
+| `failed` + insufficient funds | Platform balance already paid out to the bank. Manual payouts (step 1) must be on before new bookings. |
+
+GitHub secrets `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAYOUT_CRON_SECRET` (and `PRODUCTION_*`) are optional on staging because of the database cron. They are needed for production once `.github/workflows/release-payout.yml` is on `main`. GitHub **schedule** only runs from `main`. **Actions → Release host payouts → Run workflow** works after that.
+
+---
+
 # Pre launch checklist
 
 Run through this before soft launch. Mark every item done, not done, or blocked.
@@ -360,12 +521,12 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [x] Payment provider and account model resolved (Stripe Connect, separate charges and transfers, Express, 16 August)
 - [ ] End to end flow working on staging test-mode: guest pays → booking confirmed → host notified
 - [ ] Booking status updates correctly, pending to confirmed (code path exists; needs a live Stripe test)
-- [ ] Booking confirmation email to guest (code path exists; Resend still on test domain)
-- [ ] Booking notification email to host (same)
+- [x] Booking confirmation email to guest (staging, 14–21 September; production `RESEND_API_KEY` unconfirmed)
+- [x] Booking notification email to host (same)
 - [ ] Platform fee correctly calculated: 12% of lesson, S$2.50 floor, round up to a whole dollar (see DECISIONS.md). Code exists in `_shared/booking.ts`
 - [ ] PayNow 5% off the advertised all-in total at checkout (not 8% versus 10%)
 - [ ] Failed payment handled gracefully, clear error, no ghost booking
-- [ ] Payout flow tested, Transfer 24 hours after the session (`release-payout`; platform payouts must be manual)
+- [ ] Payout flow tested, Transfer 24 hours after the session (`release-payout` scheduled; platform payouts must be manual). See **Host Transfers** above.
 - [x] Refund, cancellation, and dispute policy pages live
 - [x] Policy page URLs resolve when typed directly, not just via in site navigation
 
@@ -402,11 +563,11 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Approved host can create listings
 
 ## Cancellations
-- [ ] Guest can cancel from dashboard
+- [ ] Guest can cancel from `/bookings` (invokes `cancel-booking`)
 - [ ] Four tier refund correctly calculated, 100 / 50 / 25 / 0 at 48hr, 24hr, 6hr, with platform fee forfeited on partial tiers
-- [ ] Refund amount stored and included directly in the cancellation email
+- [x] Refund amount stored and included directly in the cancellation email
 - [ ] Guest can reschedule instead of cancelling, once per booking, 48hr cutoff
-- [ ] Host can cancel from dashboard
+- [ ] Host can cancel from `/hosting`
 - [ ] Host cancellation increments strikes
 - [ ] Guest can report a host no show, distinct from host initiated cancel, triggering 2 strikes and account review
 - [ ] Host can appeal a strike within 7 days
@@ -425,20 +586,20 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Review prompt appears after the session date passes
 
 ## Dashboard
-- [ ] Host view: listings, upcoming sessions, Add Session, Edit
+- [ ] Host view at `/hosting`: listings, upcoming sessions, Add Session, Edit, payout setup
 - [ ] Host view: Cancel with strike warning
-- [ ] Guest view: upcoming and past bookings
-- [ ] Guest view: Cancel with refund amount shown
+- [ ] Guest view at `/bookings`: upcoming and past bookings
+- [ ] Guest view: Cancel with refund amount shown (calls `cancel-booking`, does not PATCH bookings from the browser)
 - [ ] Guest view: Leave review after the session
-- [ ] Both views accessible from one account
+- [ ] Both views reachable from one account (hamburger: My bookings; Hosting if `is_host`)
 
 ## Auth and accounts
 - [ ] Signup, login, logout working
 - [ ] User row created on signup
-- [ ] Password reset working
+- [ ] Password reset working (not built; Login has no reset link)
 - [ ] Phone OTP required before booking
 - [ ] `is_host` set true on first listing
-- [ ] Avatar or initial in navbar when logged in
+- [ ] Avatar or initial in navbar when logged in (`SiteNav` / `TopNav`; `Navbar.jsx` is deleted)
 
 ## Legal, required before any real money moves
 - [ ] Terms of Service live at /terms
@@ -455,9 +616,9 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Founders' agreement signed by all three
 
 ## Email
-- [ ] All Edge Functions off the Resend test domain, sending from trykai.sg
-- [ ] Booking confirmation to guest
-- [ ] Booking notification to host
+- [x] All Edge Functions off the Resend test domain in code, sending from trykai.sg (staging confirmed; production `RESEND_API_KEY` unconfirmed)
+- [x] Booking confirmation to guest (staging)
+- [x] Booking notification to host (staging)
 - [ ] Verification submission to Caleb
 - [ ] Verification approved to host
 - [ ] Verification rejected to host
@@ -468,9 +629,9 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 ## UI and design
 - [ ] Navy #16264B and cream #F4F1EA consistent throughout
 - [ ] Bricolage Grotesque for display, Manrope for body, monospace for prices and tags
-- [ ] Logo and favicon implemented
+- [x] Logo and favicon implemented (`public/trykai.png`, `favicon.svg` / png sizes, apple-touch-icon)
 - [ ] Mobile responsive on iOS Safari and Android Chrome
-- [ ] No broken images or missing assets
+- [x] No broken images or missing assets for StyleGuide categories or `/trykai.png` (language/other PNG imports stay commented out)
 - [ ] Loading states on all async actions
 - [ ] Error states handled, no blank screens or raw errors
 - [ ] Empty states handled
@@ -482,14 +643,14 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Verification documents in a private bucket
 - [ ] Prices stored as integers in cents
 - [ ] No sensitive data in client side code or console logs
-- [ ] Database schema in version control
+- [x] Database schema in version control (`supabase/migrations/` `00001`–`00010`)
 
 ## Infrastructure
 - [x] trykai.sg pointing at Vercel
 - [x] SSL active
 - [ ] 404 page exists
 - [ ] Basic meta tags on key pages
-- [ ] Favicon showing
+- [x] Favicon showing
 
 ## Host onboarding experience
 - [ ] Photography guidance shown during listing creation

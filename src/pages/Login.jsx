@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import Input from '../components/ui/Input'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -102,46 +103,43 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="form">
           {isSignup && (
-            <label className="label">
-              Full name
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Your name"
-                autoComplete="name"
-                required
-                className="input"
-              />
-            </label>
+            <Input
+              id="login-full-name"
+              label="Full name"
+              type="text"
+              floatingLabel
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Your name"
+              autoComplete="name"
+              required
+            />
           )}
 
-          <label className="label">
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-              autoComplete="email"
-              className="input"
-            />
-          </label>
+          <Input
+            id="login-email"
+            label="Email"
+            type="email"
+            floatingLabel
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+            autoComplete="email"
+          />
 
-          <label className="label">
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              minLength={6}
-              autoComplete={isSignup ? 'new-password' : 'current-password'}
-              className="input"
-            />
-          </label>
+          <Input
+            id="login-password"
+            label="Password"
+            type="password"
+            floatingLabel
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            required
+            minLength={6}
+            autoComplete={isSignup ? 'new-password' : 'current-password'}
+          />
 
           {error && <p className="error-message">{error}</p>}
           {message && <p className="success-message">{message}</p>}

@@ -101,4 +101,45 @@ describe('Input', () => {
     await user.tab()
     expect(container.querySelector('.ui-field')).toHaveClass('ui-field--floated')
   })
+
+  it('keeps the password input filling its wrapper with the eye inside the field', () => {
+    const { container } = render(<Input id="password" label="Password" type="password" />)
+    const field = screen.getByLabelText('Password')
+    const wrap = container.querySelector('.ui-field__input-wrap')
+    const toggle = screen.getByRole('button', { name: 'Show password' })
+
+    expect(field).toHaveClass('ui-input--with-toggle')
+    expect(wrap).toContainElement(field)
+    expect(wrap).toContainElement(toggle)
+  })
+
+  it('lets a floating label combine with a password field', () => {
+    const { container } = render(
+      <Input id="password-floating" label="Password" type="password" floatingLabel />
+    )
+
+    expect(container.querySelector('.ui-field')).toHaveClass('ui-field--floating')
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
+    expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
+    expect(container.querySelector('.ui-field__control')).toContainElement(
+      container.querySelector('.ui-field__input-wrap')
+    )
+  })
+
+  it('treats a browser-painted value as filled even when React state is still empty', () => {
+    const { container } = render(
+      <Input id="email-autofill" label="Email" type="email" floatingLabel />
+    )
+    const field = screen.getByLabelText('Email')
+    const wrap = container.querySelector('.ui-field')
+
+    expect(field.matches(':placeholder-shown')).toBe(true)
+    expect(wrap).not.toHaveClass('ui-field--floated')
+
+    // Autofill writes the DOM value without an onChange. React still sees "".
+    field.value = 'kai@example.com'
+
+    expect(field.matches(':placeholder-shown')).toBe(false)
+    expect(wrap).not.toHaveClass('ui-field--floated')
+  })
 })

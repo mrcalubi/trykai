@@ -319,13 +319,18 @@ describe('CreateListing photos', () => {
     fireEvent.change(screen.getByLabelText('Photos'), { target: { files } })
   }
 
+  it('tells the host the photo maximum before they pick any', async () => {
+    renderPage()
+    expect(await screen.findByText('Maximum of 5 photos (0/5)')).toBeInTheDocument()
+  })
+
   it('previews each selected image', async () => {
     renderPage()
     await screen.findByLabelText('Photos')
 
     selectFiles([imageFile('a.png'), imageFile('b.png')])
 
-    expect(await screen.findByText('Up to 5 images (2/5)')).toBeInTheDocument()
+    expect(await screen.findByText('Maximum of 5 photos (2/5)')).toBeInTheDocument()
   })
 
   it('ignores files that are not images', async () => {
@@ -334,7 +339,7 @@ describe('CreateListing photos', () => {
 
     selectFiles([new File(['x'], 'notes.txt', { type: 'text/plain' }), imageFile()])
 
-    expect(await screen.findByText('Up to 5 images (1/5)')).toBeInTheDocument()
+    expect(await screen.findByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
   })
 
   it('caps the gallery at five photos', async () => {
@@ -343,7 +348,7 @@ describe('CreateListing photos', () => {
 
     selectFiles(Array.from({ length: 8 }, (_, i) => imageFile(`p${i}.png`)))
 
-    expect(await screen.findByText('Up to 5 images (5/5)')).toBeInTheDocument()
+    expect(await screen.findByText('Maximum of 5 photos (5/5)')).toBeInTheDocument()
     expect(screen.getByLabelText('Photos')).toBeDisabled()
   })
 
@@ -351,11 +356,11 @@ describe('CreateListing photos', () => {
     const { user } = renderPage()
     await screen.findByLabelText('Photos')
     selectFiles([imageFile('a.png'), imageFile('b.png')])
-    await screen.findByText('Up to 5 images (2/5)')
+    await screen.findByText('Maximum of 5 photos (2/5)')
 
     await user.click(screen.getAllByRole('button', { name: 'Remove photo' })[0])
 
-    expect(await screen.findByText('Up to 5 images (1/5)')).toBeInTheDocument()
+    expect(await screen.findByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
   })
 
   it('uploads the photos and saves their public URLs on the listing', async () => {
@@ -363,7 +368,7 @@ describe('CreateListing photos', () => {
     await screen.findByLabelText('Title')
     await fillValidForm(user)
     selectFiles([imageFile('a.png')])
-    await screen.findByText('Up to 5 images (1/5)')
+    await screen.findByText('Maximum of 5 photos (1/5)')
 
     await user.click(screen.getByRole('button', { name: 'Create listing' }))
 
@@ -379,7 +384,7 @@ describe('CreateListing photos', () => {
     await screen.findByLabelText('Title')
     await fillValidForm(user)
     selectFiles([imageFile('a.png')])
-    await screen.findByText('Up to 5 images (1/5)')
+    await screen.findByText('Maximum of 5 photos (1/5)')
     supabase
       .__bucket('listing-photos')
       .upload.mockResolvedValue({ data: null, error: { message: 'storage full' } })
