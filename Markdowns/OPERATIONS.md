@@ -519,7 +519,7 @@ Also open **Edge Functions → release-payout → Logs** and look for a line sta
 | `hold_not_elapsed` | Session started less than 24 hours ago. Expected. |
 | `missing_charge_id` | Stripe PaymentIntent has no `latest_charge` yet. |
 | `host_not_connected` / `host_payouts_disabled` | Host has not finished Connect onboarding. |
-| `failed` + insufficient funds | Platform balance already paid out to the bank. Manual payouts (step 1) must be on before new bookings. |
+| `failed` + insufficient available funds | Platform available balance is too low (automatic payouts already sent it to the bank). Two Transfers can succeed and the rest fail in the same run. In **test mode**, Stripe's own message is the fix: create a charge with card `4000000000000077` (any future expiry and CVC) so funds land in the available balance, then run the same command again. Bookings already in `released` are not paid twice. |
 
 GitHub secrets `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAYOUT_CRON_SECRET` (and `PRODUCTION_*`) are optional on staging because of the database cron. They are needed for production once `.github/workflows/release-payout.yml` is on `main`. GitHub **schedule** only runs from `main`. **Actions → Release host payouts → Run workflow** works after that.
 
