@@ -506,6 +506,16 @@ curl.exe -fsS -X POST "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/rel
 Invoke-RestMethod -Method Post -Uri "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout" -ContentType "application/json" -Headers @{ Authorization = "Bearer PASTE_ANON_PUBLIC_KEY"; apikey = "PASTE_ANON_PUBLIC_KEY"; "x-cron-secret" = "PASTE_PAYOUT_CRON_SECRET" } -Body "{}"
 ```
 
+If the cron secret itself contains `"` or `'`, do not put it inside the header quotes. Paste it between `@'` and `'@` (the closing `'@` must be at the start of its own line):
+
+```powershell
+$secret = @'
+PASTE_PAYOUT_CRON_SECRET
+'@
+$key = "PASTE_ANON_PUBLIC_KEY"
+Invoke-RestMethod -Method Post -Uri "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout" -ContentType "application/json" -Headers @{ Authorization = "Bearer $key"; apikey = $key; "x-cron-secret" = $secret } -Body "{}"
+```
+
 **What you should see**
 
 - `401 Unauthorized`: the `x-cron-secret` does not match `PAYOUT_CRON_SECRET`, or you used the wrong project.
