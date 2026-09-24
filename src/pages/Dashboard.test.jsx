@@ -873,14 +873,23 @@ describe('Dashboard reviews', () => {
 
   it('reports a rejected review', async () => {
     givenData({ bookings: [pastBooking()] })
-    supabase.__on('reviews', 'insert', { error: { message: 'duplicate review' } })
+    supabase.__on('reviews', 'insert', {
+      error: {
+        message:
+          'duplicate key value violates unique constraint "reviews_booking_id_role_key"',
+      },
+    })
     const { user } = await renderBookings()
 
     await user.click(screen.getByRole('button', { name: 'Leave a review' }))
     await user.click(screen.getByRole('button', { name: '5 stars' }))
     await user.click(screen.getByRole('button', { name: 'Submit review' }))
 
-    expect(await screen.findByText('duplicate review')).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'duplicate key value violates unique constraint "reviews_booking_id_role_key"'
+      )
+    ).toBeInTheDocument()
   })
 })
 

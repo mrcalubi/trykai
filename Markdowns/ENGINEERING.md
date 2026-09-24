@@ -177,7 +177,7 @@ role text                -- 'host' | 'guest'
 created_at timestamp
 ```
 
-Insert policy is guest-only: reviewer is the guest on that booking, `role = 'guest'`. It does **not** require `bookings.status = 'confirmed'`. Host→guest reviews have no insert path.
+Insert policy (`00011`) is guest-only: reviewer is the guest on that booking, `role = 'guest'`, booking is `confirmed`, `now()` is after `starts_at + duration_mins`, and `reviewee_id` is the listing host. Unique on `(booking_id, role)`. Host→guest reviews have no insert path.
 
 ### verification_reviews
 
@@ -193,7 +193,7 @@ created_at timestamptz
 
 Append-only, service role only, no client grant of any kind. Written by `review_verification` in the same transaction as the status change, so a decision cannot be applied without a record. This is both the PDPA justification trail for holding NRIC copies and the review history the safety protocol assumes.
 
-**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`. Listing-page reviews go through `reviews_for_listing` (`00011`) so a public page does not embed private bookings.
+**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`. Listing-page reviews and guest INSERT gating are `00011_reviews_for_listing.sql` (`reviews_for_listing`, `guest_can_leave_review`, one review per booking per role).
 
 ---
 
@@ -205,7 +205,7 @@ These are enforced in code. If you are about to change logic around any of them,
 
 1. **Prices are always integers in cents.** $20 = 2000. Never floats. Never dollars in the database.
 2. `full_address` **must not appear in a public query.** Guest reveal is `get_listing_address` after a confirmed booking. Do not add `full_address` to Home or ListingDetail selects. The column grant on `listings` is still too wide; do not widen it further.
-3. **Reviews are gated.** The product rule is: a user may only review if they hold a `confirmed` booking for that session, one review per booking per direction. The Bookings UI requires `confirmed` and a session that has ended (`starts_at` + `duration_mins`; if duration is missing, `starts_at` + 2 hours). RLS only checks that a guest booking exists.
+3. **Reviews are gated.** A guest may only review a `confirmed` booking after the session ends (`starts_at` + `duration_mins`), one review per booking per role, and only of that listing's host. The Bookings UI matches this (if duration is missing it uses `starts_at` + 2 hours). RLS is `guest_can_leave_review` in `00011`.
 4. `spots_remaining` **must never go below zero.** Decrement on confirmation (`confirm_paid_booking`), increment on cancellation of confirmed rows only.
 5. **Only approved hosts can hold active listings.** `verification_status = 'approved'` is the CreateListing gate. There is no server-side block that prevents an unverified user from inserting a listing if they bypass the form.
 6. **The platform fee is not a flat percentage.** Guest totals live in `supabase/functions/_shared/booking.ts`. See section 5.
@@ -301,6 +301,7 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 - `review_verification(user_id, decision, reason, method, reviewer_id)` — writes the decision and an audit row together. **Service role only.**
 - `get_listing_address(listing_id)` — confirmed guest only.
 - `reviews_for_listing(listing_id)` — public guest reviews whose booking belongs to a session of that listing. Security definer so the listing page does not embed `bookings` (guest/host SELECT only). Returns review fields and the reviewer's `full_name` only.
+- `guest_can_leave_review(booking_id, reviewer_id, reviewee_id)` — INSERT gate for guest reviews. Security definer. Requires confirmed booking, session ended, reviewer is the guest, reviewee is the listing host.
 - `confirm_paid_booking(...)` and `confirm_booking` wrapper — flip pending → confirmed and decrement `spots_remaining` atomically under a row lock. **Service role only.** The Stripe webhook calls `confirm_paid_booking`. If spots are gone, the webhook refunds instead of confirming.
 - `apply_host_strike(host_id)` — increments strikes and deactivates listings at 3. **Service role only.**
 - `invoke_release_payout()` — pg_cron POST to `release-payout`. Reads Vault; revoked from anon and authenticated.
@@ -322,6 +323,7 @@ src/
 │   ├── authedUser.js            # RequireAuth context: useAuthedUserId
 │   ├── cancellationPolicy.js    # Four-tier guest refund copy + arithmetic
 │   ├── pricing.js               # All-in card / PayNow prices shown in the UI
+│   ├── reviewGate.js            # Guest review eligibility (confirmed + session ended)
 │   └── edgeFunctionError.js     # Read Edge Function error bodies
 ├── pages/
 │   ├── Home.jsx                 # Browse: grid of ui/Card, category/area filters, newest first
@@ -419,6 +421,7 @@ supabase/functions/
 | Colour tokens and all styling                              | `src/index.css`                                                                                     |
 | Component preview                                          | `/style-guide` route                                                                                |
 | Cancellation arithmetic                                    | `src/lib/cancellationPolicy.js` and `supabase/functions/_shared/booking.ts`                         |
+| Guest review eligibility                                   | `src/lib/reviewGate.js` and `guest_can_leave_review` (`00011`)                                      |
 | Guest-facing prices                                        | `src/lib/pricing.js`                                                                                |
 | Routes                                                     | `src/App.jsx`                                                                                       |
 | Payment and booking creation                               | `supabase/functions/create-payment-intent/`                                                         |
@@ -462,7 +465,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 **9. Session happens.** Payout releases 24 hours after `starts_at`, via `release-payout` (pg_cron `00010` and the GitHub Action). Sessions are not auto-completed. Review prompts appear on `/bookings` for `confirmed` bookings after the session ends.
 
-**10. Review.** `/bookings` allows a review if the session has ended, status is `confirmed`, and this reviewer has not already reviewed. Session end is `starts_at` + `duration_mins` (or `starts_at` + 2 hours if duration is missing). Inserts into `reviews` as `role: 'guest'`. RLS does not require confirmed.
+**10. Review.** `/bookings` allows a review if the session has ended, status is `confirmed`, and this reviewer has not already reviewed. Session end is `starts_at` + `duration_mins` (or `starts_at` + 2 hours if duration is missing). Inserts into `reviews` as `role: 'guest'`. RLS (`00011`) requires the same confirmed-and-ended rule and that `reviewee_id` is the listing host. Unique on `(booking_id, role)`.
 
 ### Scenario 2: Host creates a listing
 
@@ -552,8 +555,7 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 
 **Serious**
 
-- Review gating in the Bookings UI now requires a confirmed booking after the session ends. RLS still does not require confirmed (P2.3).
-- Host no-show reporting, reschedule, session auto-complete, host→guest reviews: not built.
+- Host no-show reporting, reschedule, session auto-complete, host→guest reviews: not built. Guest→host insert and uniqueness are in `00011` (P2.3 done).
 - UI kit only partly wired: the nav, the browse `Card`, Settings (`Button`, `Input`), and Login (`Input`) are live, but SelectableCard is still `/style-guide` only. `ListingCard.jsx` and its `.listing-card` CSS are now dead code that only its own test renders; deleting them is a separate cleanup.
 - The browse card can never show a rating: the `listings` select does not fetch one and there is no aggregate rating column, so `Card` gets no `rating` prop from Home. The price-only card is correct for a new listing but wrong for a listing with reviews.
 - A host who exits Stripe Connect onboarding without completing it still sees a "Payout setup submitted" success message on the dashboard, because `?connect=return` is treated as success without re-checking `stripe_payouts_enabled`. That host believes they can be paid and cannot. If they take a booking, the guest pays and there is no payout path, discovered after the session.
@@ -579,7 +581,7 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 
 - Never expose `full_address` in a public query
 - Never store prices as floats
-- Never allow a review without a confirmed booking (the UI requires confirmed; RLS still does not)
+- Never allow a review without a confirmed booking after the session ends (UI and RLS both require this)
 - Never assume a flat platform fee
 - Never confirm a booking from the browser. The webhook is the source of truth.
 - Do not over engineer the MVP. Keep it simple and shippable.

@@ -6,27 +6,7 @@ import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import StarPicker from '../components/StarPicker'
 import Button from '../components/ui/Button'
 import { guestRefundDescription } from '../lib/cancellationPolicy'
-
-const FALLBACK_SESSION_MINS = 120
-
-function sessionEndAt(session) {
-  const startsAt = session?.starts_at
-  if (!startsAt) return null
-  const startMs = new Date(startsAt).getTime()
-  if (Number.isNaN(startMs)) return null
-
-  if (session.ends_at) {
-    const endMs = new Date(session.ends_at).getTime()
-    if (!Number.isNaN(endMs)) return new Date(endMs)
-  }
-
-  const durationMins = Number(session.duration_mins)
-  if (Number.isFinite(durationMins) && durationMins > 0) {
-    return new Date(startMs + durationMins * 60 * 1000)
-  }
-
-  return new Date(startMs + FALLBACK_SESSION_MINS * 60 * 1000)
-}
+import { canLeaveGuestReview } from '../lib/reviewGate'
 
 function formatSessionDateTime(iso) {
   const date = new Intl.DateTimeFormat('en-SG', {
@@ -207,12 +187,6 @@ export default function Bookings() {
     return startsAt && new Date(startsAt) > new Date()
   }
 
-  function isPastBooking(booking) {
-    const endsAt = sessionEndAt(booking.sessions)
-    if (!endsAt) return false
-    return endsAt < new Date()
-  }
-
   function canCancelBooking(booking) {
     return (
       isUpcoming(booking.sessions?.starts_at) &&
@@ -221,11 +195,9 @@ export default function Bookings() {
   }
 
   function canLeaveReview(booking) {
-    return (
-      isPastBooking(booking) &&
-      booking.status === 'confirmed' &&
-      !reviewedBookingIds.has(booking.id)
-    )
+    return canLeaveGuestReview(booking, {
+      alreadyReviewed: reviewedBookingIds.has(booking.id),
+    })
   }
 
   function openReviewForm(bookingId) {
@@ -246,6 +218,11 @@ export default function Bookings() {
 
     if (reviewRating < 1 || reviewRating > 5) {
       setReviewError('Please select a star rating.')
+      return
+    }
+
+    if (!canLeaveReview(booking)) {
+      setReviewError('You can only review a confirmed booking after the session ends.')
       return
     }
 
