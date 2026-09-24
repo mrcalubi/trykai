@@ -5,6 +5,8 @@ import RequireAuth from './components/RequireAuth'
 import RequireAdmin from './components/RequireAdmin'
 import Home from './pages/Home'
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import ListingDetail from './pages/ListingDetail'
 import CreateListing from './pages/CreateListing'
 import EditListing from './pages/EditListing'
@@ -26,6 +28,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/listings/:id" element={<ListingDetail />} />
         <Route
           path="/create-listing"

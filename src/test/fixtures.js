@@ -76,6 +76,7 @@ export function makeBooking(overrides = {}) {
     status: 'confirmed',
     sessions: {
       starts_at: hoursFromNow(72),
+      duration_mins: 90,
       spots_remaining: 3,
       listings: { title: 'Learn latte art with me', host_id: 'host-1' },
     },

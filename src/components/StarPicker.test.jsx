@@ -42,6 +42,31 @@ describe('StarPicker', () => {
     expect(active).toHaveLength(0)
   })
 
+  it('fills every star up to the hovered star', async () => {
+    const user = userEvent.setup()
+    render(<StarPicker value={1} onChange={vi.fn()} />)
+
+    await user.hover(screen.getByRole('button', { name: '4 stars' }))
+
+    const active = screen
+      .getAllByRole('button')
+      .filter((button) => button.className.includes('star-picker__btn--active'))
+    expect(active).toHaveLength(4)
+  })
+
+  it('returns to the selected rating when hover ends', async () => {
+    const user = userEvent.setup()
+    render(<StarPicker value={2} onChange={vi.fn()} />)
+
+    await user.hover(screen.getByRole('button', { name: '5 stars' }))
+    await user.unhover(screen.getByRole('button', { name: '5 stars' }))
+
+    const active = screen
+      .getAllByRole('button')
+      .filter((button) => button.className.includes('star-picker__btn--active'))
+    expect(active).toHaveLength(2)
+  })
+
   it('uses buttons that do not submit the surrounding form', () => {
     render(<StarPicker value={0} onChange={vi.fn()} />)
     for (const button of screen.getAllByRole('button')) {

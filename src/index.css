@@ -12,6 +12,7 @@
   --success-bg: #EAF2ED;    /* success banner background */
   --error: #C7382C;         /* error text and icons */
   --error-bg: #F8EAE8;      /* error banner background */
+  --star: #ffb400;          /* filled rating stars */
   --scrim: rgba(22, 38, 75, 0.4);  /* dimmed backdrop behind overlays */
   --lightbox-backdrop: rgba(0, 0, 0, 0.92); /* photo viewer; page behind should disappear */
   --lightbox-chrome: #F4F1EA;               /* light controls on the dark overlay */
@@ -750,6 +751,12 @@ a {
   margin: 0 0 32px;
   color: var(--text);
   font-size: 15px;
+}
+
+.form-card__forgot {
+  margin: -8px 0 0;
+  font-size: 14px;
+  text-align: right;
 }
 
 .form {
@@ -1730,6 +1737,18 @@ body.lightbox-open {
   color: var(--navy-muted);
 }
 
+/* User-written copy on listing detail, listing cards, and booking cards */
+.detail-title,
+.detail-description,
+.detail-area,
+.detail-list li,
+.review-card__comment,
+.ui-card__title,
+.dashboard-card__title,
+.dashboard-card__meta {
+  overflow-wrap: anywhere;
+}
+
 .detail-title {
   font-family: var(--display);
   font-size: clamp(28px, 4vw, 36px);
@@ -2235,7 +2254,7 @@ body.lightbox-open {
 }
 
 .star-display__filled {
-  color: #ffb400;
+  color: var(--star);
 }
 
 .star-display__empty {
@@ -2258,10 +2277,12 @@ body.lightbox-open {
   transition: color 0.1s ease, transform 0.1s ease;
 }
 
-.star-picker__btn:hover,
-.star-picker__btn--active {
-  color: #ffb400;
+.star-picker__btn:hover {
   transform: scale(1.1);
+}
+
+.star-picker__btn--active {
+  color: var(--star);
 }
 
 .booking-card__actions {
@@ -2269,7 +2290,16 @@ body.lightbox-open {
   align-items: center;
   gap: 12px;
   margin-top: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+}
+
+.booking-card__actions .badge {
+  margin-top: 0;
+}
+
+.booking-card__actions .hint {
+  margin: 0;
+  line-height: 1;
 }
 
 /* Verification: Stripe first, manual upload as the fallback */

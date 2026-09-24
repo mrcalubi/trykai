@@ -32,7 +32,7 @@ Each week has three sections, one per founder, tagged **[CRITICAL]**, **[HIGH]**
 Week 8 of the original plan (15–21 September) is ending. The week-by-week sections below stay as the historical plan. Read this snapshot first.
 
 **In the tree now (not true of the 31 August snapshot):**
-- Schema is `00001`–`00010`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` hourly via pg_cron.
+- Schema is `00001`–`00011`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` hourly via pg_cron. `00011` is `reviews_for_listing` plus guest review INSERT (confirmed, session ended, one per booking per role). Not yet applied on staging.
 - `Navbar.jsx` is deleted. `SiteNav` mounts `TopNav` once in `App.jsx`. Hamburger is navigation only. Avatar is Settings and Log out.
 - Browse uses the kit `Card` and shows the card all-in price. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only.
 - Guest bookings at `/bookings`, host tools and payout setup at `/hosting`, profile at `/settings`. `/dashboard` redirects.
@@ -42,7 +42,7 @@ Week 8 of the original plan (15–21 September) is ending. The week-by-week sect
 - Edge Functions: `create-payment-intent`, `stripe-webhook`, `create-connect-account`, `create-account-link`, `cancel-booking`, `admin-cancel-booking`, `admin-verifications`, `create-identity-session`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`.
 
 **Still ops, not app code:**
-- Confirm `00005`, `00008`, `00009`, and `00010` on each environment. Confirm production has `RESEND_API_KEY` and current function deploys. This repo cannot see production.
+- Confirm `00005`, `00008`, `00009`, `00010`, and `00011` on each environment. Confirm production has `RESEND_API_KEY` and current function deploys. This repo cannot see production.
 - Apply `00010` and set Vault secrets so `release-payout` actually runs. The GitHub Action only fires from `main`. Platform payouts must stay **manual**. See **Host Transfers** below.
 - Stripe Dashboard webhook + secrets, `is_founding_host` flags, one test-mode booking.
 - Confirm the two test cancellations were refunded on Stripe. API PATCH 204s are the expected service-role writes from `cancel-booking`, not proof of a client bypass.
@@ -483,7 +483,9 @@ Production uses that project's URL and keys, not the staging ref above.
 
 ## 4. Run it once now (do not wait until minute 12)
 
-In Terminal, replace the two placeholders with the **anon public key** and the **same cron secret**:
+Replace the two placeholders with the **anon public key** and the **same cron secret**.
+
+On macOS / Linux / Git Bash, backslash continues the line:
 
 ```bash
 curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout' \
@@ -492,6 +494,26 @@ curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release
   -H "apikey: PASTE_ANON_PUBLIC_KEY" \
   -H "x-cron-secret: PASTE_PAYOUT_CRON_SECRET" \
   -d '{}'
+```
+
+On **Windows PowerShell**, `curl` is `Invoke-WebRequest`, which does not accept `-H`. Use `curl.exe` (one line is safest) or the native cmdlet:
+
+```powershell
+curl.exe -fsS -X POST "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout" -H "Content-Type: application/json" -H "Authorization: Bearer PASTE_ANON_PUBLIC_KEY" -H "apikey: PASTE_ANON_PUBLIC_KEY" -H "x-cron-secret: PASTE_PAYOUT_CRON_SECRET" -d "{}"
+```
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout" -ContentType "application/json" -Headers @{ Authorization = "Bearer PASTE_ANON_PUBLIC_KEY"; apikey = "PASTE_ANON_PUBLIC_KEY"; "x-cron-secret" = "PASTE_PAYOUT_CRON_SECRET" } -Body "{}"
+```
+
+If the cron secret itself contains `"` or `'`, do not put it inside the header quotes. Paste it between `@'` and `'@` (the closing `'@` must be at the start of its own line):
+
+```powershell
+$secret = @'
+PASTE_PAYOUT_CRON_SECRET
+'@
+$key = "PASTE_ANON_PUBLIC_KEY"
+Invoke-RestMethod -Method Post -Uri "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout" -ContentType "application/json" -Headers @{ Authorization = "Bearer $key"; apikey = $key; "x-cron-secret" = $secret } -Body "{}"
 ```
 
 **What you should see**
@@ -507,7 +529,7 @@ Also open **Edge Functions → release-payout → Logs** and look for a line sta
 | `hold_not_elapsed` | Session started less than 24 hours ago. Expected. |
 | `missing_charge_id` | Stripe PaymentIntent has no `latest_charge` yet. |
 | `host_not_connected` / `host_payouts_disabled` | Host has not finished Connect onboarding. |
-| `failed` + insufficient funds | Platform balance already paid out to the bank. Manual payouts (step 1) must be on before new bookings. |
+| `failed` + insufficient available funds | Platform available balance is too low (automatic payouts already sent it to the bank). Two Transfers can succeed and the rest fail in the same run. In **test mode**, Stripe's own message is the fix: create a charge with card `4000000000000077` (any future expiry and CVC) so funds land in the available balance, then run the same command again. Bookings already in `released` are not paid twice. |
 
 GitHub secrets `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAYOUT_CRON_SECRET` (and `PRODUCTION_*`) are optional on staging because of the database cron. They are needed for production once `.github/workflows/release-payout.yml` is on `main`. GitHub **schedule** only runs from `main`. **Actions → Release host payouts → Run workflow** works after that.
 
@@ -643,7 +665,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Verification documents in a private bucket
 - [ ] Prices stored as integers in cents
 - [ ] No sensitive data in client side code or console logs
-- [x] Database schema in version control (`supabase/migrations/` `00001`–`00010`)
+- [x] Database schema in version control (`supabase/migrations/` `00001`–`00011`)
 
 ## Infrastructure
 - [x] trykai.sg pointing at Vercel

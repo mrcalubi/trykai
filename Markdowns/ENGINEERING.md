@@ -8,7 +8,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 >
 > 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 24 hours after `starts_at`. Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). The host is emailed only when the guest cancelled.
-> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00010`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
+> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00011`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
 > 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home shows the Lane 1 headline above the kit's** `Card` **in browse mode.** `ListingCard.jsx` still exists but no page renders it. Button is live on Settings. Input is live on Settings and Login. SelectableCard is still used only by `/style-guide`.
 > 6. **All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a hex value in a component. See section 2, Styling.
@@ -177,7 +177,7 @@ role text                -- 'host' | 'guest'
 created_at timestamp
 ```
 
-Insert policy is guest-only: reviewer is the guest on that booking, `role = 'guest'`. It does **not** require `bookings.status = 'confirmed'`. Host→guest reviews have no insert path.
+Insert policy (`00011`) is guest-only: reviewer is the guest on that booking, `role = 'guest'`, booking is `confirmed`, `now()` is after `starts_at + duration_mins`, and `reviewee_id` is the listing host. Unique on `(booking_id, role)`. Host→guest reviews have no insert path.
 
 ### verification_reviews
 
@@ -193,7 +193,7 @@ created_at timestamptz
 
 Append-only, service role only, no client grant of any kind. Written by `review_verification` in the same transaction as the status change, so a decision cannot be applied without a record. This is both the PDPA justification trail for holding NRIC copies and the review history the safety protocol assumes.
 
-**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`.
+**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`. Listing-page reviews and guest INSERT gating are `00011_reviews_for_listing.sql` (`reviews_for_listing`, `guest_can_leave_review`, one review per booking per role).
 
 ---
 
@@ -205,7 +205,7 @@ These are enforced in code. If you are about to change logic around any of them,
 
 1. **Prices are always integers in cents.** $20 = 2000. Never floats. Never dollars in the database.
 2. `full_address` **must not appear in a public query.** Guest reveal is `get_listing_address` after a confirmed booking. Do not add `full_address` to Home or ListingDetail selects. The column grant on `listings` is still too wide; do not widen it further.
-3. **Reviews are gated.** The product rule is: a user may only review if they hold a `confirmed` booking for that session, one review per booking per direction. The dashboard UI still allows `pending`. RLS only checks that a guest booking exists.
+3. **Reviews are gated.** A guest may only review a `confirmed` booking after the session ends (`starts_at` + `duration_mins`), one review per booking per role, and only of that listing's host. The Bookings UI matches this (if duration is missing it uses `starts_at` + 2 hours). RLS is `guest_can_leave_review` in `00011`.
 4. `spots_remaining` **must never go below zero.** Decrement on confirmation (`confirm_paid_booking`), increment on cancellation of confirmed rows only.
 5. **Only approved hosts can hold active listings.** `verification_status = 'approved'` is the CreateListing gate. There is no server-side block that prevents an unverified user from inserting a listing if they bypass the form.
 6. **The platform fee is not a flat percentage.** Guest totals live in `supabase/functions/_shared/booking.ts`. See section 5.
@@ -300,6 +300,8 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 - `can_create_listing()` — whether the caller may insert a listing or a session. Security definer so the policy does not need a SELECT grant on `is_suspended`.
 - `review_verification(user_id, decision, reason, method, reviewer_id)` — writes the decision and an audit row together. **Service role only.**
 - `get_listing_address(listing_id)` — confirmed guest only.
+- `reviews_for_listing(listing_id)` — public guest reviews whose booking belongs to a session of that listing. Security definer so the listing page does not embed `bookings` (guest/host SELECT only). Returns review fields and the reviewer's `full_name` only.
+- `guest_can_leave_review(booking_id, reviewer_id, reviewee_id)` — INSERT gate for guest reviews. Security definer. Requires confirmed booking, session ended, reviewer is the guest, reviewee is the listing host.
 - `confirm_paid_booking(...)` and `confirm_booking` wrapper — flip pending → confirmed and decrement `spots_remaining` atomically under a row lock. **Service role only.** The Stripe webhook calls `confirm_paid_booking`. If spots are gone, the webhook refunds instead of confirming.
 - `apply_host_strike(host_id)` — increments strikes and deactivates listings at 3. **Service role only.**
 - `invoke_release_payout()` — pg_cron POST to `release-payout`. Reads Vault; revoked from anon and authenticated.
@@ -321,10 +323,13 @@ src/
 │   ├── authedUser.js            # RequireAuth context: useAuthedUserId
 │   ├── cancellationPolicy.js    # Four-tier guest refund copy + arithmetic
 │   ├── pricing.js               # All-in card / PayNow prices shown in the UI
+│   ├── reviewGate.js            # Guest review eligibility (confirmed + session ended)
 │   └── edgeFunctionError.js     # Read Edge Function error bodies
 ├── pages/
 │   ├── Home.jsx                 # Browse: grid of ui/Card, category/area filters, newest first
 │   ├── Login.jsx                # Auth, login + signup (no users insert)
+│   ├── ForgotPassword.jsx       # Public: request a reset email
+│   ├── ResetPassword.jsx        # Public: set a new password from a recovery link
 │   ├── ListingDetail.jsx        # Listing, swipe/mosaic gallery, rail picker, Payment Element
 │   ├── CreateListing.jsx        # Verification gate, listing insert, is_host=true
 │   ├── EditListing.jsx          # Host edits listing, including full_address
@@ -368,7 +373,8 @@ supabase/migrations/
 ├── 00007_verification_security_foundation.sql
 ├── 00008_listing_gate_can_create_listing.sql
 ├── 00009_booking_session_read_and_cancel_rls.sql
-└── 00010_schedule_release_payout.sql
+├── 00010_schedule_release_payout.sql
+└── 00011_reviews_for_listing.sql
 
 supabase/functions/
 ├── _shared/
@@ -396,7 +402,10 @@ supabase/functions/
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Browse page and filters                                    | `src/pages/Home.jsx`                                                                                |
 | Listing detail and booking                                 | `src/pages/ListingDetail.jsx`                                                                       |
+| Listing-page reviews                                       | `reviews_for_listing` (`00011`); do not embed `bookings` from the client                            |
 | Login and signup                                           | `src/pages/Login.jsx`                                                                               |
+| Forgot password request                                    | `src/pages/ForgotPassword.jsx` (`/forgot-password`)                                                 |
+| Reset password from email                                  | `src/pages/ResetPassword.jsx` (`/reset-password`)                                                   |
 | Create listing                                             | `src/pages/CreateListing.jsx`                                                                       |
 | Edit listing                                               | `src/pages/EditListing.jsx`                                                                         |
 | Host verification upload                                   | `src/pages/VerifyIdentity.jsx`                                                                      |
@@ -412,6 +421,7 @@ supabase/functions/
 | Colour tokens and all styling                              | `src/index.css`                                                                                     |
 | Component preview                                          | `/style-guide` route                                                                                |
 | Cancellation arithmetic                                    | `src/lib/cancellationPolicy.js` and `supabase/functions/_shared/booking.ts`                         |
+| Guest review eligibility                                   | `src/lib/reviewGate.js` and `guest_can_leave_review` (`00011`)                                      |
 | Guest-facing prices                                        | `src/lib/pricing.js`                                                                                |
 | Routes                                                     | `src/App.jsx`                                                                                       |
 | Payment and booking creation                               | `supabase/functions/create-payment-intent/`                                                         |
@@ -421,7 +431,7 @@ supabase/functions/
 | Connect onboarding                                         | `supabase/functions/create-account-link/`                                                           |
 
 
-**Routes in** `App.jsx`**:** `/`, `/login`, `/listings/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/bookings`, `/hosting`, `/dashboard`, `/settings` (the last seven behind `RequireAuth`; `/dashboard` redirects to `/bookings`, or `/hosting` when `?connect=` is present), `/admin/verifications` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render SiteNav + Footer.
+**Routes in** `App.jsx`**:** `/`, `/login`, `/forgot-password`, `/reset-password`, `/listings/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/bookings`, `/hosting`, `/dashboard`, `/settings` (the last seven behind `RequireAuth`; `/dashboard` redirects to `/bookings`, or `/hosting` when `?connect=` is present), `/admin/verifications` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render SiteNav + Footer.
 
 ---
 
@@ -439,7 +449,7 @@ Use these alongside the code. When you are reading a file and wondering what it 
 
 **2. Filters by category and area.** Filtering is client side on the already fetched array. Category pills are derived from listing data (not a hardcoded six-category list). No additional database call.
 
-**3. Opens the listing.** `ListingDetail.jsx` fetches the listing, its open future sessions, the host profile (including `stripe_payouts_enabled`), and guest→host reviews. Cancellation policy shown collapsed above the Book button. `full_address` still not shown. Book is disabled until the host can receive payouts.
+**3. Opens the listing.** `ListingDetail.jsx` fetches the listing, its open future sessions, the host profile (including `stripe_payouts_enabled`), guest reviews for this listing via `reviews_for_listing`, and the host's public reviews by `reviewee_id` for the "Hosted by" average. That RPC is what scopes the reviews list to the listing; the host line is the average and count across all their listings, hidden when they have none. Cancellation policy shown collapsed above the Book button. `full_address` still not shown. Book is disabled until the host can receive payouts.
 
 The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, with position dots) and a height-capped mosaic from 1024px, laid out by photo count from `data-photo-count` on the scroller. From 1024px the page is two columns, content left and a sticky booking card right. Content order is the same at every width: category, title, area, host, then description, what's provided, and reviews last.
 
@@ -453,9 +463,9 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 **8. Confirmation.** `/dashboard?booking=` redirects to `/bookings?booking=`. `Bookings.jsx` polls until status is `confirmed`. Then `get_listing_address` returns `full_address` to that guest.
 
-**9. Session happens.** Payout releases 24 hours after `starts_at`, via `release-payout` (pg_cron `00010` and the GitHub Action). Sessions are not auto-completed. Review prompts appear on `/bookings` for `pending` or `confirmed` bookings after `starts_at`.
+**9. Session happens.** Payout releases 24 hours after `starts_at`, via `release-payout` (pg_cron `00010` and the GitHub Action). Sessions are not auto-completed. Review prompts appear on `/bookings` for `confirmed` bookings after the session ends.
 
-**10. Review.** `/bookings` allows a review if the booking is past, status is `pending` or `confirmed`, and this reviewer has not already reviewed. Inserts into `reviews` as `role: 'guest'`. RLS does not require confirmed.
+**10. Review.** `/bookings` allows a review if the session has ended, status is `confirmed`, and this reviewer has not already reviewed. Session end is `starts_at` + `duration_mins` (or `starts_at` + 2 hours if duration is missing). Inserts into `reviews` as `role: 'guest'`. RLS (`00011`) requires the same confirmed-and-ended rule and that `reviewee_id` is the listing host. Unique on `(booking_id, role)`.
 
 ### Scenario 2: Host creates a listing
 
@@ -503,9 +513,13 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **Home.jsx** — Lane 1 headline, then browse of active listings. Category pills derived from data, area dropdown, combinable, newest first. No auth required. No sort by price or reviews.
 
-**Login.jsx** — kit `Input` for full name, email, and password, all with floating labels. Password also uses the eye toggle. Login and signup. Does not insert into `users`. No password reset. No T&C checkbox.
+**Login.jsx** — kit `Input` for full name, email, and password, all with floating labels. Password also uses the eye toggle. Login and signup. Does not insert into `users`. Login mode links to `/forgot-password`. No T&C checkbox.
 
-**ListingDetail.jsx** — listing, gallery (swipe on phone, mosaic from 1024px), host name/avatar high under the area, open future sessions, collapsible cancellation policy, guest→host reviews, Card vs PayNow checkout. Two columns with a sticky booking card from 1024px. `guests_count` always 1. `full_address` only via RPC after a confirmed booking.
+**ForgotPassword.jsx** — public. Requests `resetPasswordForEmail` with `redirectTo` `/reset-password`. Always confirms; only rate limits and network failures surface as errors.
+
+**ResetPassword.jsx** — public. Shows the new-password form only for a genuine recovery (`type=recovery` in the landing URL or `PASSWORD_RECOVERY`). Expired or missing recovery shows a link back to `/forgot-password`. `updateUser({ password })` then goes to `/bookings`.
+
+**ListingDetail.jsx** — listing, gallery (swipe on phone, mosaic from 1024px), host name/avatar high under the area, host rating as average and count across all their listings (hidden when none), open future sessions, collapsible cancellation policy, guest reviews for this listing via `reviews_for_listing` (not a bookings embed), Card vs PayNow checkout. Two columns with a sticky booking card from 1024px. `guests_count` always 1. `full_address` only via RPC after a confirmed booking.
 
 **CreateListing.jsx** — auth required. Verification gate. Listing insert then `is_host = true`, then `/dashboard` (redirects to `/bookings`). CancellationPolicyInfo on the form. First session is a separate `/hosting` action.
 
@@ -515,7 +529,7 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **Dashboard.jsx** — legacy path. Redirects `/dashboard` to `/bookings`, keeping the query string, except `?connect=` which goes to `/hosting`. Emails, Stripe Payment Element `return_url`, and Connect Account Links still use `/dashboard`.
 
-**Bookings.jsx** — auth required. Guest: upcoming and past bookings, Cancel with calculated refund shown, leave review after `starts_at` on pending or confirmed. Polls `?booking=` after Payment Element return.
+**Bookings.jsx** — auth required. Guest: upcoming and past bookings, Cancel with calculated refund shown, leave review after the session ends on confirmed only. Polls `?booking=` after Payment Element return.
 
 **Hosting.jsx** — auth required. Host: listings with Add Session, Edit, soft-delete; upcoming sessions that have active bookings, with Cancel and strike warning; Connect payout setup. A signed-in user who is not a host is redirected to `/bookings`.
 
@@ -541,8 +555,7 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 
 **Serious**
 
-- Review gating still accepts `pending` in the dashboard UI, and RLS does not require confirmed (P2.3).
-- Host no-show reporting, reschedule, session auto-complete, host→guest reviews: not built.
+- Host no-show reporting, reschedule, session auto-complete, host→guest reviews: not built. Guest→host insert and uniqueness are in `00011` (P2.3 done).
 - UI kit only partly wired: the nav, the browse `Card`, Settings (`Button`, `Input`), and Login (`Input`) are live, but SelectableCard is still `/style-guide` only. `ListingCard.jsx` and its `.listing-card` CSS are now dead code that only its own test renders; deleting them is a separate cleanup.
 - The browse card can never show a rating: the `listings` select does not fetch one and there is no aggregate rating column, so `Card` gets no `rating` prop from Home. The price-only card is correct for a new listing but wrong for a listing with reviews.
 - A host who exits Stripe Connect onboarding without completing it still sees a "Payout setup submitted" success message on the dashboard, because `?connect=return` is treated as success without re-checking `stripe_payouts_enabled`. That host believes they can be paid and cannot. If they take a booking, the guest pays and there is no payout path, discovered after the session.
@@ -550,7 +563,6 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 **Not built, decided**
 
 - Phone OTP before booking
-- Password reset
 - Terms of Service and Privacy Policy routes
 - T&C checkboxes at signup, create listing, and checkout
 - Guest count picker (`guests_count` hardcoded to 1)
@@ -569,7 +581,7 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 
 - Never expose `full_address` in a public query
 - Never store prices as floats
-- Never allow a review without a confirmed booking (the UI currently does; do not make it worse)
+- Never allow a review without a confirmed booking after the session ends (UI and RLS both require this)
 - Never assume a flat platform fee
 - Never confirm a booking from the browser. The webhook is the source of truth.
 - Do not over engineer the MVP. Keep it simple and shippable.

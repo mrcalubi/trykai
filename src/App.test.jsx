@@ -66,6 +66,20 @@ describe('App routes', () => {
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
   })
 
+  it('serves forgot-password without requiring a session', async () => {
+    renderAt('/forgot-password')
+
+    expect(await screen.findByRole('heading', { name: 'Forgot password' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/forgot-password')
+  })
+
+  it('serves reset-password without requiring a session', async () => {
+    renderAt('/reset-password')
+
+    expect(await screen.findByRole('heading', { name: 'Reset password' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/reset-password')
+  })
+
   it.each([
     ['/refund-policy', 'Refund Policy'],
     ['/cancellation-policy', 'Cancellation Policy'],

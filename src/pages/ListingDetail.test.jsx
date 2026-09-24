@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ListingDetail from './ListingDetail'
@@ -34,6 +36,20 @@ function givenSessions(sessions) {
 }
 
 function givenReviews(reviews) {
+  supabase.rpc.mockImplementation(async (name, args) => {
+    if (name === 'reviews_for_listing') {
+      const listingId = args?.p_listing_id
+      const rows = (reviews ?? []).filter((review) => {
+        const reviewListingId = review.bookings?.sessions?.listing_id
+        return reviewListingId == null || reviewListingId === listingId
+      })
+      return { data: rows, error: null }
+    }
+    return { data: null, error: null }
+  })
+}
+
+function givenHostReviews(reviews) {
   supabase.__on('reviews', 'select', { data: reviews, error: null })
 }
 
@@ -118,19 +134,95 @@ describe('ListingDetail content', () => {
   it('averages the host reviews to one decimal place', async () => {
     givenListing()
     givenReviews([makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })])
+    givenHostReviews([makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })])
     renderPage()
 
-    expect(await screen.findByText('★ 4.5 average rating')).toBeInTheDocument()
+    expect(await screen.findByText('4.5 · 2 reviews')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Reviews (2)' })).toBeInTheDocument()
   })
 
-  it('says there are no reviews yet when the host has none', async () => {
+  it('rates the host from every listing, not only this one', async () => {
     givenListing()
-    givenReviews([])
+    givenReviews([makeReview({ id: 'r1', rating: 5 })])
+    givenHostReviews([
+      makeReview({ id: 'r1', rating: 5 }),
+      makeReview({ id: 'r-other', rating: 1 }),
+    ])
     renderPage()
 
-    expect(await screen.findByText('No reviews yet')).toBeInTheDocument()
+    expect(await screen.findByText('3.0 · 2 reviews')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Reviews (1)' })).toBeInTheDocument()
+  })
+
+  it('loads the host average by reviewee_id and listing reviews through the RPC', async () => {
+    givenListing()
+    givenReviews([makeReview()])
+    givenHostReviews([makeReview()])
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
+    expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_listing', { p_listing_id: 'listing-1' })
+    expect(supabase.__lastCall('reviews', 'select').filters).toEqual(
+      expect.arrayContaining([
+        { method: 'eq', column: 'reviewee_id', value: 'host-1' },
+        { method: 'eq', column: 'role', value: 'guest' },
+      ])
+    )
+    expect(supabase.__lastCall('reviews', 'select').filters).not.toContainEqual({
+      method: 'eq',
+      column: 'bookings.sessions.listing_id',
+      value: 'listing-1',
+    })
+  })
+
+  it('still shows listing reviews to a signed-out visitor', async () => {
+    givenListing()
+    givenReviews([makeReview({ comment: 'Great latte class' })])
+    renderPage()
+
+    expect(await screen.findByText('Great latte class')).toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_listing', { p_listing_id: 'listing-1' })
+  })
+
+  it('hides reviews whose booking belongs to another listing', async () => {
+    givenListing()
+    givenReviews([
+      makeReview({
+        id: 'r1',
+        rating: 5,
+        bookings: { sessions: { listing_id: 'listing-1' } },
+      }),
+      makeReview({
+        id: 'r2',
+        rating: 1,
+        comment: 'Wrong listing',
+        bookings: { sessions: { listing_id: 'listing-other' } },
+      }),
+    ])
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Reviews (1)' })).toBeInTheDocument()
+    expect(screen.queryByText('Wrong listing')).not.toBeInTheDocument()
+  })
+
+  it('wraps user-written listing and booking copy with one overflow-wrap rule', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    expect([...css.matchAll(/overflow-wrap:\s*anywhere/g)]).toHaveLength(1)
+    expect(css).toMatch(
+      /\.detail-title,\s*\n\.detail-description,\s*\n\.detail-area,\s*\n\.detail-list li,\s*\n\.review-card__comment,\s*\n\.ui-card__title,\s*\n\.dashboard-card__title,\s*\n\.dashboard-card__meta/
+    )
+  })
+
+  it('hides the host rating when the host has no reviews', async () => {
+    givenListing()
+    givenReviews([])
+    givenHostReviews([])
+    renderPage()
+
+    await screen.findByText('Hosted by Mei Ling')
+    expect(document.querySelector('.detail-host__rating')).not.toBeInTheDocument()
     expect(screen.getByText('No reviews yet.')).toBeInTheDocument()
+    expect(screen.queryByText(/· \d+ reviews?/)).not.toBeInTheDocument()
   })
 
   it('lists what the host provides', async () => {

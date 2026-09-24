@@ -52,18 +52,18 @@ Verification approval is now on the platform. Suspension that does not hide list
 
 Not a calendar. Capacity is 8 hours a week.
 
-1. **Ops (not app code):** confirm `00005`, `00008`, `00009`, and `00010` on each environment; Vault/GitHub secrets for `release-payout`; Stripe Dashboard webhook + secrets; `RESEND_API_KEY` and current Edge Function deploys on production; platform payouts **manual**; flag eleven `is_founding_host`; one staging test-mode booking; confirm the two test cancellations were refunded on Stripe.
+1. **Ops (not app code):** confirm `00005`, `00008`, `00009`, `00010`, and `00011` on each environment; Vault/GitHub secrets for `release-payout`; Stripe Dashboard webhook + secrets; `RESEND_API_KEY` and current Edge Function deploys on production; platform payouts **manual**; flag eleven `is_founding_host`; one staging test-mode booking; confirm the two test cancellations were refunded on Stripe.
 2. **Bug 4:** Hosting treats `?connect=return` as "Payout setup submitted" without re-checking `stripe_payouts_enabled`. Money path.
 3. **P0.4** app actually filters `is_suspended` on browse and Book. Listing/session INSERT is already gated by `can_create_listing()` (`00008`). One-click admin can wait if Table Editor plus this filter is reliable.
 4. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
 5. Browse card rating: the listings fetch does not supply one and there is no aggregate rating column. The card already shows the all-in card price.
-6. **P2.3** review gating, then the rest of P2 in listed order.
+6. **P2.3** review gating is done (`00011`). Then the rest of P2 in listed order.
 
 ---
 
 ## P0: blocks launch
 
-> **Status, 21 September 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, guest address reveal path of P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement on browse/Book, `full_address` column grant. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September. P0.9 assets resolved 9 September. `00008` listing gate, `00009` session/booking read, and `00010` `release-payout` schedule are in the tree.
+> **Status, 21 September 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, guest address reveal path of P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement on browse/Book, `full_address` column grant. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September. P0.9 assets resolved 9 September. `00008` listing gate, `00009` session/booking read, `00010` `release-payout` schedule, and `00011` review gate are in the tree.
 
 ### P0.1 — Host payout details — OBSOLETE
 Under Stripe Connect Express, Stripe collects the host's bank details. Do not add `payout_method` / `payout_identifier` columns.
@@ -114,7 +114,7 @@ Still to build:
 
 ## P1: the payment build — DONE IN CODE, 27–31 August 2026
 
-Stripe Connect (separate charges and transfers, Express) is implemented. Do not adapt `hitpay-wip-2026-08`. Remaining work is ops: confirm `00005` / `00008` / `00009` / `00010`, Vault/GitHub secrets for `release-payout`, Stripe Dashboard webhook + secrets, `RESEND_API_KEY` and function deploys on production, platform payouts manual, founding-host flags, staging test-mode booking.
+Stripe Connect (separate charges and transfers, Express) is implemented. Do not adapt `hitpay-wip-2026-08`. Remaining work is ops: confirm `00005` / `00008` / `00009` / `00010` / `00011`, Vault/GitHub secrets for `release-payout`, Stripe Dashboard webhook + secrets, `RESEND_API_KEY` and function deploys on production, platform payouts manual, founding-host flags, staging test-mode booking.
 
 ### P1.1 — Payment confirmation webhook — DONE
 `supabase/functions/stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, emails both parties, refunds on oversell, cancels pending on failed/canceled intents, syncs `stripe_payouts_enabled` from `account.updated`.
@@ -142,7 +142,7 @@ Connect onboarding (`create-connect-account`, `create-account-link`) and the hou
 Once per booking, same 48 hour cutoff. Published as available. Recovers bookings that would otherwise be cancelled outright.
 
 ### P2.3 — Review gating tightened
-`/bookings` `canLeaveReview` still allows `pending` or `confirmed` after `starts_at`. RLS insert only checks that the reviewer is the guest on some booking for that id, not that it is confirmed. Should require `confirmed` and a session that has actually happened.
+**Done.** `/bookings` and RLS (`00011` `guest_can_leave_review`) both require a `confirmed` booking after `starts_at + duration_mins`, with `reviewee_id` the listing host. Unique on `(booking_id, role)`. Host→guest reviews are still P2.4.
 
 ### P2.4 — Host to guest reviews
 Two way reviews are promised. Insert policy is guest-only. No host UI.
@@ -163,7 +163,7 @@ Disputes arrive by email today. At launch volume that is survivable.
 - `guests_count` hardcoded to 1 in ListingDetail
 - No catch-all 404
 - No T&C checkboxes at signup, create listing, or checkout
-- No password reset (Login has no reset link)
+- Password reset: done (`/forgot-password` and `/reset-password`)
 - No photography guidance on CreateListing (the 5 photo limit copy is not that)
 - No sort UI (DECISIONS.md listed newest / price / most reviewed as live; only newest exists)
 - Phone OTP before booking: not built
