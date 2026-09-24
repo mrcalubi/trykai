@@ -20,7 +20,8 @@ test.describe('listing detail', () => {
 
     await expect(page.getByText('Hosted by Mei Ling')).toBeVisible()
     await expect(page.getByText('$51').first()).toBeVisible()
-    await expect(page.getByText('No reviews yet', { exact: true })).toBeVisible()
+    await expect(page.getByText('No reviews yet.')).toBeVisible()
+    await expect(page.locator('.detail-host__rating')).toHaveCount(0)
     await expect(page.getByText('Pull your first rosetta in ninety minutes.')).toBeVisible()
     await expect(page.getByRole('listitem').filter({ hasText: 'Materials' })).toBeVisible()
   })
@@ -74,6 +75,7 @@ test.describe('listing detail', () => {
     await stubAllExternalCalls(page, {
       listings: [LATTE_ART],
       sessions: [OPEN_SESSION],
+      reviews: [{ id: 'r-this', rating: 5 }],
       'rpc/reviews_for_listing': [
         {
           id: 'r-this',
@@ -87,7 +89,7 @@ test.describe('listing detail', () => {
     await page.goto('/listings/listing-latte')
 
     await expect(page.getByText('Great latte class')).toBeVisible()
-    await expect(page.getByText('★ 5.0 average rating')).toBeVisible()
+    await expect(page.getByText('5.0 · 1 review')).toBeVisible()
   })
 
   test('shows a helpful message for a listing that does not exist', async ({ page }) => {

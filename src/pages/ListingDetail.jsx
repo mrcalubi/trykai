@@ -34,10 +34,11 @@ function formatSessionTime(iso) {
   }).format(new Date(iso))
 }
 
-function averageRating(reviews) {
+function formatHostRating(reviews) {
   if (!reviews?.length) return null
-  const sum = reviews.reduce((acc, r) => acc + r.rating, 0)
-  return (sum / reviews.length).toFixed(1)
+  const average = (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
+  const count = reviews.length
+  return `${average} · ${count} ${count === 1 ? 'review' : 'reviews'}`
 }
 
 function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel }) {
@@ -98,6 +99,7 @@ export default function ListingDetail() {
   const [listing, setListing] = useState(null)
   const [sessions, setSessions] = useState([])
   const [reviews, setReviews] = useState([])
+  const [hostReviews, setHostReviews] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -149,7 +151,7 @@ export default function ListingDetail() {
 
       setListing(listingData)
 
-      const [sessionsResult, reviewsResult, authResult] = await Promise.all([
+      const [sessionsResult, reviewsResult, hostReviewsResult, authResult] = await Promise.all([
         supabase
           .from('sessions')
           .select('id, starts_at, duration_mins, spots_remaining')
@@ -158,6 +160,11 @@ export default function ListingDetail() {
           .gt('starts_at', new Date().toISOString())
           .order('starts_at', { ascending: true }),
         supabase.rpc('reviews_for_listing', { p_listing_id: id }),
+        supabase
+          .from('reviews')
+          .select('rating')
+          .eq('reviewee_id', listingData.host_id)
+          .eq('role', 'guest'),
         supabase.auth.getSession(),
       ])
 
@@ -169,6 +176,10 @@ export default function ListingDetail() {
 
       if (!reviewsResult.error) {
         setReviews(reviewsResult.data ?? [])
+      }
+
+      if (!hostReviewsResult.error) {
+        setHostReviews(hostReviewsResult.data ?? [])
       }
 
       const userId = authResult.data?.session?.user?.id
@@ -310,7 +321,7 @@ export default function ListingDetail() {
 
   const host = listing.users
   const photos = listing.photo_urls?.length ? listing.photo_urls : []
-  const avgRating = averageRating(reviews)
+  const hostRating = formatHostRating(hostReviews)
   const cardPrice = guestFacingPriceCents(listing.price_per_person)
   const paynowPrice = paynowPriceCents(listing.price_per_person)
   const checkoutPrice = checkoutRail
@@ -380,9 +391,7 @@ export default function ListingDetail() {
             )}
             <div>
               <p className="detail-host__name">Hosted by {host?.full_name || 'Anonymous'}</p>
-              <p className="detail-host__rating">
-                {avgRating ? `★ ${avgRating} average rating` : 'No reviews yet'}
-              </p>
+              {hostRating ? <p className="detail-host__rating">{hostRating}</p> : null}
             </div>
           </div>
 
