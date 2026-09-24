@@ -89,11 +89,6 @@ export default function ResetPassword() {
       }
     })
 
-    if (passwordRecoveryWasSeen?.()) {
-      setMode('recovery')
-      return () => subscription.unsubscribe()
-    }
-
     supabase.auth.getSession().then(() => {
       window.setTimeout(() => {
         setMode((current) => {
