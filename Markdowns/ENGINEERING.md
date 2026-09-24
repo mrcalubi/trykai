@@ -449,7 +449,7 @@ Use these alongside the code. When you are reading a file and wondering what it 
 
 **2. Filters by category and area.** Filtering is client side on the already fetched array. Category pills are derived from listing data (not a hardcoded six-category list). No additional database call.
 
-**3. Opens the listing.** `ListingDetail.jsx` fetches the listing, its open future sessions, the host profile (including `stripe_payouts_enabled`), and guest reviews for this listing via `reviews_for_listing`. That RPC is what scopes reviews to the listing; a client embed through `bookings` would hide them from anyone who cannot read the booking. Cancellation policy shown collapsed above the Book button. `full_address` still not shown. Book is disabled until the host can receive payouts.
+**3. Opens the listing.** `ListingDetail.jsx` fetches the listing, its open future sessions, the host profile (including `stripe_payouts_enabled`), guest reviews for this listing via `reviews_for_listing`, and the host's public reviews by `reviewee_id` for the "Hosted by" average. That RPC is what scopes the reviews list to the listing; the host line is the average and count across all their listings, hidden when they have none. Cancellation policy shown collapsed above the Book button. `full_address` still not shown. Book is disabled until the host can receive payouts.
 
 The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, with position dots) and a height-capped mosaic from 1024px, laid out by photo count from `data-photo-count` on the scroller. From 1024px the page is two columns, content left and a sticky booking card right. Content order is the same at every width: category, title, area, host, then description, what's provided, and reviews last.
 
@@ -519,7 +519,7 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **ResetPassword.jsx** — public. Shows the new-password form only for a genuine recovery (`type=recovery` in the landing URL or `PASSWORD_RECOVERY`). Expired or missing recovery shows a link back to `/forgot-password`. `updateUser({ password })` then goes to `/bookings`.
 
-**ListingDetail.jsx** — listing, gallery (swipe on phone, mosaic from 1024px), host name/avatar high under the area, open future sessions, collapsible cancellation policy, guest reviews for this listing via `reviews_for_listing` (not a bookings embed), Card vs PayNow checkout. Two columns with a sticky booking card from 1024px. `guests_count` always 1. `full_address` only via RPC after a confirmed booking.
+**ListingDetail.jsx** — listing, gallery (swipe on phone, mosaic from 1024px), host name/avatar high under the area, host rating as average and count across all their listings (hidden when none), open future sessions, collapsible cancellation policy, guest reviews for this listing via `reviews_for_listing` (not a bookings embed), Card vs PayNow checkout. Two columns with a sticky booking card from 1024px. `guests_count` always 1. `full_address` only via RPC after a confirmed booking.
 
 **CreateListing.jsx** — auth required. Verification gate. Listing insert then `is_host = true`, then `/dashboard` (redirects to `/bookings`). CancellationPolicyInfo on the form. First session is a separate `/hosting` action.
 

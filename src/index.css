@@ -1737,6 +1737,18 @@ body.lightbox-open {
   color: var(--navy-muted);
 }
 
+/* User-written copy on listing detail, listing cards, and booking cards */
+.detail-title,
+.detail-description,
+.detail-area,
+.detail-list li,
+.review-card__comment,
+.ui-card__title,
+.dashboard-card__title,
+.dashboard-card__meta {
+  overflow-wrap: anywhere;
+}
+
 .detail-title {
   font-family: var(--display);
   font-size: clamp(28px, 4vw, 36px);
