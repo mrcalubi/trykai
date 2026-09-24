@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Input from '../components/ui/Input'
 
@@ -140,6 +140,14 @@ export default function Login() {
             minLength={6}
             autoComplete={isSignup ? 'new-password' : 'current-password'}
           />
+
+          {!isSignup && (
+            <p className="form-card__forgot">
+              <Link to="/forgot-password" className="link-btn">
+                Forgot password?
+              </Link>
+            </p>
+          )}
 
           {error && <p className="error-message">{error}</p>}
           {message && <p className="success-message">{message}</p>}

@@ -46,6 +46,10 @@ describe('Login form', () => {
     expect(password.closest('.ui-field')).toHaveClass('ui-field--floating')
     expect(password).toHaveAttribute('type', 'password')
     expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute(
+      'href',
+      '/forgot-password'
+    )
   })
 
   it('switches to sign-up mode and back', async () => {
@@ -57,9 +61,14 @@ describe('Login form', () => {
     expect(screen.getByLabelText('Email').closest('.ui-field')).toHaveClass('ui-field--floating')
     expect(screen.getByLabelText('Password').closest('.ui-field')).toHaveClass('ui-field--floating')
     expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Forgot password?' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Log in' }))
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute(
+      'href',
+      '/forgot-password'
+    )
     expect(screen.getByLabelText('Email').closest('.ui-field')).toHaveClass('ui-field--floating')
     expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
   })
