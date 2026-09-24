@@ -325,6 +325,8 @@ src/
 ├── pages/
 │   ├── Home.jsx                 # Browse: grid of ui/Card, category/area filters, newest first
 │   ├── Login.jsx                # Auth, login + signup (no users insert)
+│   ├── ForgotPassword.jsx       # Public: request a reset email
+│   ├── ResetPassword.jsx        # Public: set a new password from a recovery link
 │   ├── ListingDetail.jsx        # Listing, swipe/mosaic gallery, rail picker, Payment Element
 │   ├── CreateListing.jsx        # Verification gate, listing insert, is_host=true
 │   ├── EditListing.jsx          # Host edits listing, including full_address
@@ -397,6 +399,8 @@ supabase/functions/
 | Browse page and filters                                    | `src/pages/Home.jsx`                                                                                |
 | Listing detail and booking                                 | `src/pages/ListingDetail.jsx`                                                                       |
 | Login and signup                                           | `src/pages/Login.jsx`                                                                               |
+| Forgot password request                                    | `src/pages/ForgotPassword.jsx` (`/forgot-password`)                                                 |
+| Reset password from email                                  | `src/pages/ResetPassword.jsx` (`/reset-password`)                                                   |
 | Create listing                                             | `src/pages/CreateListing.jsx`                                                                       |
 | Edit listing                                               | `src/pages/EditListing.jsx`                                                                         |
 | Host verification upload                                   | `src/pages/VerifyIdentity.jsx`                                                                      |
@@ -421,7 +425,7 @@ supabase/functions/
 | Connect onboarding                                         | `supabase/functions/create-account-link/`                                                           |
 
 
-**Routes in** `App.jsx`**:** `/`, `/login`, `/listings/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/bookings`, `/hosting`, `/dashboard`, `/settings` (the last seven behind `RequireAuth`; `/dashboard` redirects to `/bookings`, or `/hosting` when `?connect=` is present), `/admin/verifications` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render SiteNav + Footer.
+**Routes in** `App.jsx`**:** `/`, `/login`, `/forgot-password`, `/reset-password`, `/listings/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/bookings`, `/hosting`, `/dashboard`, `/settings` (the last seven behind `RequireAuth`; `/dashboard` redirects to `/bookings`, or `/hosting` when `?connect=` is present), `/admin/verifications` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render SiteNav + Footer.
 
 ---
 
@@ -503,7 +507,11 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **Home.jsx** — Lane 1 headline, then browse of active listings. Category pills derived from data, area dropdown, combinable, newest first. No auth required. No sort by price or reviews.
 
-**Login.jsx** — kit `Input` for full name, email, and password, all with floating labels. Password also uses the eye toggle. Login and signup. Does not insert into `users`. No password reset. No T&C checkbox.
+**Login.jsx** — kit `Input` for full name, email, and password, all with floating labels. Password also uses the eye toggle. Login and signup. Does not insert into `users`. Login mode links to `/forgot-password`. No T&C checkbox.
+
+**ForgotPassword.jsx** — public. Requests `resetPasswordForEmail` with `redirectTo` `/reset-password`. Always confirms; only rate limits and network failures surface as errors.
+
+**ResetPassword.jsx** — public. Shows the new-password form only for a genuine recovery (`type=recovery` in the landing URL or `PASSWORD_RECOVERY`). Expired or missing recovery shows a link back to `/forgot-password`. `updateUser({ password })` then goes to `/bookings`.
 
 **ListingDetail.jsx** — listing, gallery (swipe on phone, mosaic from 1024px), host name/avatar high under the area, open future sessions, collapsible cancellation policy, guest→host reviews, Card vs PayNow checkout. Two columns with a sticky booking card from 1024px. `guests_count` always 1. `full_address` only via RPC after a confirmed booking.
 
@@ -550,7 +558,6 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 **Not built, decided**
 
 - Phone OTP before booking
-- Password reset
 - Terms of Service and Privacy Policy routes
 - T&C checkboxes at signup, create listing, and checkout
 - Guest count picker (`guests_count` hardcoded to 1)
