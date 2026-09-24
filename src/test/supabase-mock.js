@@ -53,6 +53,13 @@ export function createSupabaseMock() {
   const queues = new Map()
   const calls = []
   const buckets = new Map()
+  const authListeners = new Set()
+  const authCallbackFromUrl = {
+    type: null,
+    error: null,
+    error_code: null,
+    error_description: null,
+  }
 
   function keyOf(table, operation) {
     return `${table}.${operation}`
@@ -161,10 +168,20 @@ export function createSupabaseMock() {
     signInWithPassword: async () => ({ data: { user: null, session: null }, error: null }),
     signUp: async () => ({ data: { user: null, session: null }, error: null }),
     resetPasswordForEmail: async () => ({ data: {}, error: null }),
+    updateUser: async () => ({ data: { user: null }, error: null }),
     signOut: async () => ({ error: null }),
-    onAuthStateChange: () => ({
-      data: { subscription: { unsubscribe: vi.fn() } },
-    }),
+    onAuthStateChange: (callback) => {
+      if (typeof callback === 'function') authListeners.add(callback)
+      return {
+        data: {
+          subscription: {
+            unsubscribe: vi.fn(() => {
+              authListeners.delete(callback)
+            }),
+          },
+        },
+      }
+    },
   }
 
   const auth = {}
@@ -215,12 +232,27 @@ export function createSupabaseMock() {
     },
 
     __bucket: bucket,
+    authCallbackFromUrl,
+    __passwordRecoverySeen: false,
+
+    __emitAuth(event, session) {
+      if (event === 'PASSWORD_RECOVERY') supabase.__passwordRecoverySeen = true
+      for (const callback of authListeners) {
+        callback(event, session)
+      }
+    },
 
     __reset() {
       handlers.clear()
       queues.clear()
       calls.length = 0
       buckets.clear()
+      authListeners.clear()
+      supabase.__passwordRecoverySeen = false
+      authCallbackFromUrl.type = null
+      authCallbackFromUrl.error = null
+      authCallbackFromUrl.error_code = null
+      authCallbackFromUrl.error_description = null
       supabase.from.mockClear()
       supabase.storage.from.mockClear()
       functions.invoke.mockReset()

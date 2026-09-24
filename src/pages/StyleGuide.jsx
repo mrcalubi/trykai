@@ -175,7 +175,7 @@ export default function StyleGuide() {
           <article className="style-guide-card">
             <p className="style-guide-card__label">Forgot password</p>
             <p className="style-guide-card__usage">
-              Visual placeholder only — password reset is not built yet
+              Forgot-password link next to a password field
             </p>
             <div className="style-guide-password-preview">
               <div className="style-guide-field__label-row">

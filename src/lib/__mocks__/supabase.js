@@ -4,3 +4,7 @@ import { createSupabaseMock } from '../../test/supabase-mock'
 // mocks the module shares this instance, so call `supabase.__reset()` in a
 // beforeEach to avoid leaking handlers between tests.
 export const supabase = createSupabaseMock()
+export const authCallbackFromUrl = supabase.authCallbackFromUrl
+export function passwordRecoveryWasSeen() {
+  return Boolean(supabase.__passwordRecoverySeen)
+}
