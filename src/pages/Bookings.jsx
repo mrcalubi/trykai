@@ -4,7 +4,29 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import StarPicker from '../components/StarPicker'
+import Button from '../components/ui/Button'
 import { guestRefundDescription } from '../lib/cancellationPolicy'
+
+const FALLBACK_SESSION_MINS = 120
+
+function sessionEndAt(session) {
+  const startsAt = session?.starts_at
+  if (!startsAt) return null
+  const startMs = new Date(startsAt).getTime()
+  if (Number.isNaN(startMs)) return null
+
+  if (session.ends_at) {
+    const endMs = new Date(session.ends_at).getTime()
+    if (!Number.isNaN(endMs)) return new Date(endMs)
+  }
+
+  const durationMins = Number(session.duration_mins)
+  if (Number.isFinite(durationMins) && durationMins > 0) {
+    return new Date(startMs + durationMins * 60 * 1000)
+  }
+
+  return new Date(startMs + FALLBACK_SESSION_MINS * 60 * 1000)
+}
 
 function formatSessionDateTime(iso) {
   const date = new Intl.DateTimeFormat('en-SG', {
@@ -59,6 +81,7 @@ export default function Bookings() {
           platform_fee,
           sessions (
             starts_at,
+            duration_mins,
             spots_remaining,
             listings (
               id,
@@ -185,9 +208,9 @@ export default function Bookings() {
   }
 
   function isPastBooking(booking) {
-    const startsAt = booking.sessions?.starts_at
-    if (!startsAt) return false
-    return new Date(startsAt) < new Date()
+    const endsAt = sessionEndAt(booking.sessions)
+    if (!endsAt) return false
+    return endsAt < new Date()
   }
 
   function canCancelBooking(booking) {
@@ -200,7 +223,7 @@ export default function Bookings() {
   function canLeaveReview(booking) {
     return (
       isPastBooking(booking) &&
-      (booking.status === 'pending' || booking.status === 'confirmed') &&
+      booking.status === 'confirmed' &&
       !reviewedBookingIds.has(booking.id)
     )
   }
@@ -330,14 +353,13 @@ export default function Bookings() {
                     {booking.status}
                   </span>
                   {canLeaveReview(booking) && activeReviewBookingId !== booking.id && (
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
                       onClick={() => openReviewForm(booking.id)}
-                      className="btn btn--secondary"
-                      style={{ padding: '6px 14px', fontSize: '13px' }}
                     >
                       Leave a review
-                    </button>
+                    </Button>
                   )}
                   {canCancelBooking(booking) && confirmCancelBookingId !== booking.id && (
                     <button

@@ -34,7 +34,17 @@ function givenSessions(sessions) {
 }
 
 function givenReviews(reviews) {
-  supabase.__on('reviews', 'select', { data: reviews, error: null })
+  supabase.rpc.mockImplementation(async (name, args) => {
+    if (name === 'reviews_for_listing') {
+      const listingId = args?.p_listing_id
+      const rows = (reviews ?? []).filter((review) => {
+        const reviewListingId = review.bookings?.sessions?.listing_id
+        return reviewListingId == null || reviewListingId === listingId
+      })
+      return { data: rows, error: null }
+    }
+    return { data: null, error: null }
+  })
 }
 
 function givenSignedIn(session = makeAuthSession()) {
@@ -122,6 +132,47 @@ describe('ListingDetail content', () => {
 
     expect(await screen.findByText('★ 4.5 average rating')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Reviews (2)' })).toBeInTheDocument()
+  })
+
+  it('loads listing reviews through reviews_for_listing, not a bookings embed', async () => {
+    givenListing()
+    givenReviews([makeReview()])
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
+    expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_listing', { p_listing_id: 'listing-1' })
+    expect(supabase.__calls('reviews', 'select')).toHaveLength(0)
+  })
+
+  it('still shows listing reviews to a signed-out visitor', async () => {
+    givenListing()
+    givenReviews([makeReview({ comment: 'Great latte class' })])
+    renderPage()
+
+    expect(await screen.findByText('Great latte class')).toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_listing', { p_listing_id: 'listing-1' })
+  })
+
+  it('hides reviews whose booking belongs to another listing', async () => {
+    givenListing()
+    givenReviews([
+      makeReview({
+        id: 'r1',
+        rating: 5,
+        bookings: { sessions: { listing_id: 'listing-1' } },
+      }),
+      makeReview({
+        id: 'r2',
+        rating: 1,
+        comment: 'Wrong listing',
+        bookings: { sessions: { listing_id: 'listing-other' } },
+      }),
+    ])
+    renderPage()
+
+    expect(await screen.findByText('★ 5.0 average rating')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Reviews (1)' })).toBeInTheDocument()
+    expect(screen.queryByText('Wrong listing')).not.toBeInTheDocument()
   })
 
   it('says there are no reviews yet when the host has none', async () => {
