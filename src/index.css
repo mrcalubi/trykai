@@ -752,6 +752,12 @@ a {
   font-size: 15px;
 }
 
+.form-card__forgot {
+  margin: -8px 0 0;
+  font-size: 14px;
+  text-align: right;
+}
+
 .form {
   display: flex;
   flex-direction: column;
