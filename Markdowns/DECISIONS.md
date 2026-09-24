@@ -34,7 +34,7 @@ Public listings show general area only, e.g. "Tampines". Full address is reveale
 
 ### Trust layer
 Reviews are the core trust mechanism, not vetting.
-- Reviews only after a confirmed booking, both directions. **Not how the app behaves today:** dashboard allows `pending`, RLS insert is guest-only and does not require confirmed. See BUILD_BACKLOG P2.3 / P2.4.
+- Reviews only after a confirmed booking, once the session has ended. Guest→host insert is enforced in RLS (`00011`: reviewer is the guest, booking `confirmed`, `now()` after `starts_at + duration_mins`, reviewee is the listing host, one review per booking per role). Host→guest reviews still have no insert path. See BUILD_BACKLOG P2.4.
 - Profile photo required to host, non negotiable
 - Phone OTP on signup
 - Trust badges on listings: phone verified, ID verified, review count
@@ -452,6 +452,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-09-21 — Kit Input fills its wrapper; floating combines with password.** `.ui-input` is `width: 100%` in every variant so the password eye sits inside the field. `floatingLabel` is a label behaviour, not a separate variant, and Login uses it on full name, email, and password. Autofill floats the label via `:placeholder-shown` / `:-webkit-autofill`, not React value state.
 **2026-09-19 — Host Transfers are scheduled; Stripe logs stay empty until the job runs.** Not a new money-flow decision. `release-payout` existed but nothing invoked it, so Connect Transfers (`tr_`) never appeared. Staging uses pg_cron + Vault (`00010`). The GitHub Action is the extra caller once that workflow is on `main` (GitHub `schedule` only runs there). Platform payouts stay **manual**. Do not Transfer without `source_transaction` after a platform bank payout; that would take a later guest's funds. Ops steps live in OPERATIONS.md.
+
+**2026-09-24 — Guest review INSERT is gated in the database.** Supersedes the Part A note that the dashboard and RLS still allowed `pending`. `00011` requires a confirmed booking, a session that has ended (`starts_at + duration_mins`), `reviewee_id` the listing host, and one review per booking per role. Host→guest reviews remain unbuilt.
 
 ---
 

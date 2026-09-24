@@ -157,22 +157,7 @@ export default function ListingDetail() {
           .eq('status', 'open')
           .gt('starts_at', new Date().toISOString())
           .order('starts_at', { ascending: true }),
-        supabase
-          .from('reviews')
-          .select(
-            `
-            id,
-            rating,
-            comment,
-            created_at,
-            users!reviewer_id (
-              full_name
-            )
-          `
-          )
-          .eq('reviewee_id', listingData.host_id)
-          .eq('role', 'guest')
-          .order('created_at', { ascending: false }),
+        supabase.rpc('reviews_for_listing', { p_listing_id: id }),
         supabase.auth.getSession(),
       ])
 

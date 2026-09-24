@@ -682,6 +682,7 @@ describe('Dashboard reviews', () => {
       id: 'booking-past',
       sessions: {
         starts_at: hoursFromNow(-5),
+        duration_mins: 90,
         listings: { title: 'Latte art', host_id: HOST_ID },
       },
     })
@@ -693,11 +694,88 @@ describe('Dashboard reviews', () => {
     expect(screen.getByRole('button', { name: 'Leave a review' })).toBeInTheDocument()
   })
 
+  it('does not invite a review before the session ends', async () => {
+    givenData({
+      bookings: [
+        makeBooking({
+          sessions: {
+            starts_at: hoursFromNow(-1),
+            duration_mins: 120,
+            listings: { title: 'Latte art', host_id: HOST_ID },
+          },
+        }),
+      ],
+    })
+    await renderBookings()
+
+    expect(screen.queryByRole('button', { name: 'Leave a review' })).not.toBeInTheDocument()
+  })
+
   it('does not invite a review before the session', async () => {
     givenData({ bookings: [makeBooking()] })
     await renderBookings()
 
     expect(screen.queryByRole('button', { name: 'Leave a review' })).not.toBeInTheDocument()
+  })
+
+  it('uses starts_at plus two hours when the session has no duration', async () => {
+    givenData({
+      bookings: [
+        makeBooking({
+          id: 'booking-past',
+          sessions: {
+            starts_at: hoursFromNow(-1),
+            listings: { title: 'Latte art', host_id: HOST_ID },
+          },
+        }),
+      ],
+    })
+    await renderBookings()
+
+    expect(screen.queryByRole('button', { name: 'Leave a review' })).not.toBeInTheDocument()
+  })
+
+  it('invites a review two hours after start when duration is missing', async () => {
+    givenData({
+      bookings: [
+        makeBooking({
+          id: 'booking-past',
+          sessions: {
+            starts_at: hoursFromNow(-3),
+            listings: { title: 'Latte art', host_id: HOST_ID },
+          },
+        }),
+      ],
+    })
+    await renderBookings()
+
+    expect(screen.getByRole('button', { name: 'Leave a review' })).toBeInTheDocument()
+  })
+
+  it('does not invite a review on a pending booking', async () => {
+    givenData({ bookings: [makeBooking({ ...pastBooking(), status: 'pending' })] })
+    await renderBookings()
+
+    expect(screen.queryByRole('button', { name: 'Leave a review' })).not.toBeInTheDocument()
+  })
+
+  it('centres the status badge and review action on one line', async () => {
+    givenData({ bookings: [pastBooking()] })
+    await renderBookings()
+
+    const reviewButton = screen.getByRole('button', { name: 'Leave a review' })
+    expect(reviewButton).toHaveClass('ui-button', 'ui-button--secondary')
+    expect(reviewButton.parentElement).toHaveClass('booking-card__actions')
+    expect(reviewButton.parentElement.querySelector('.badge')).toHaveTextContent('confirmed')
+  })
+
+  it('centres Review submitted with the status badge', async () => {
+    givenData({ bookings: [pastBooking()], reviews: [{ booking_id: 'booking-past' }] })
+    await renderBookings()
+
+    const submitted = screen.getByText('Review submitted')
+    expect(submitted.parentElement).toHaveClass('booking-card__actions')
+    expect(submitted.parentElement.querySelector('.badge')).toHaveTextContent('confirmed')
   })
 
   it('does not invite a second review for the same booking', async () => {
@@ -775,7 +853,11 @@ describe('Dashboard reviews', () => {
       bookings: [
         makeBooking({
           id: 'booking-past',
-          sessions: { starts_at: hoursFromNow(-5), listings: { title: 'Latte art' } },
+          sessions: {
+            starts_at: hoursFromNow(-5),
+            duration_mins: 90,
+            listings: { title: 'Latte art' },
+          },
         }),
       ],
     })
@@ -791,14 +873,23 @@ describe('Dashboard reviews', () => {
 
   it('reports a rejected review', async () => {
     givenData({ bookings: [pastBooking()] })
-    supabase.__on('reviews', 'insert', { error: { message: 'duplicate review' } })
+    supabase.__on('reviews', 'insert', {
+      error: {
+        message:
+          'duplicate key value violates unique constraint "reviews_booking_id_role_key"',
+      },
+    })
     const { user } = await renderBookings()
 
     await user.click(screen.getByRole('button', { name: 'Leave a review' }))
     await user.click(screen.getByRole('button', { name: '5 stars' }))
     await user.click(screen.getByRole('button', { name: 'Submit review' }))
 
-    expect(await screen.findByText('duplicate review')).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'duplicate key value violates unique constraint "reviews_booking_id_role_key"'
+      )
+    ).toBeInTheDocument()
   })
 })
 

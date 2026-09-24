@@ -32,7 +32,7 @@ Each week has three sections, one per founder, tagged **[CRITICAL]**, **[HIGH]**
 Week 8 of the original plan (15–21 September) is ending. The week-by-week sections below stay as the historical plan. Read this snapshot first.
 
 **In the tree now (not true of the 31 August snapshot):**
-- Schema is `00001`–`00010`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` hourly via pg_cron.
+- Schema is `00001`–`00011`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` hourly via pg_cron. `00011` is `reviews_for_listing` plus guest review INSERT (confirmed, session ended, one per booking per role). Not yet applied on staging.
 - `Navbar.jsx` is deleted. `SiteNav` mounts `TopNav` once in `App.jsx`. Hamburger is navigation only. Avatar is Settings and Log out.
 - Browse uses the kit `Card` and shows the card all-in price. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only.
 - Guest bookings at `/bookings`, host tools and payout setup at `/hosting`, profile at `/settings`. `/dashboard` redirects.
@@ -42,7 +42,7 @@ Week 8 of the original plan (15–21 September) is ending. The week-by-week sect
 - Edge Functions: `create-payment-intent`, `stripe-webhook`, `create-connect-account`, `create-account-link`, `cancel-booking`, `admin-cancel-booking`, `admin-verifications`, `create-identity-session`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`.
 
 **Still ops, not app code:**
-- Confirm `00005`, `00008`, `00009`, and `00010` on each environment. Confirm production has `RESEND_API_KEY` and current function deploys. This repo cannot see production.
+- Confirm `00005`, `00008`, `00009`, `00010`, and `00011` on each environment. Confirm production has `RESEND_API_KEY` and current function deploys. This repo cannot see production.
 - Apply `00010` and set Vault secrets so `release-payout` actually runs. The GitHub Action only fires from `main`. Platform payouts must stay **manual**. See **Host Transfers** below.
 - Stripe Dashboard webhook + secrets, `is_founding_host` flags, one test-mode booking.
 - Confirm the two test cancellations were refunded on Stripe. API PATCH 204s are the expected service-role writes from `cancel-booking`, not proof of a client bypass.
@@ -665,7 +665,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Verification documents in a private bucket
 - [ ] Prices stored as integers in cents
 - [ ] No sensitive data in client side code or console logs
-- [x] Database schema in version control (`supabase/migrations/` `00001`–`00010`)
+- [x] Database schema in version control (`supabase/migrations/` `00001`–`00011`)
 
 ## Infrastructure
 - [x] trykai.sg pointing at Vercel

@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test'
 import { stubAllExternalCalls } from './support/network'
-import { LATTE_ART, OPEN_SESSION, SOLD_OUT_SESSION } from './support/fixtures'
+import {
+  hoursFromNow,
+  LATTE_ART,
+  OPEN_SESSION,
+  SIGNED_IN_USER,
+  SOLD_OUT_SESSION,
+  makeAuthSession,
+} from './support/fixtures'
 
 test.describe('listing detail', () => {
   test('shows the host, price, description and what is provided', async ({ page }) => {
@@ -61,6 +68,26 @@ test.describe('listing detail', () => {
     await expect(
       page.getByText('Guest cancels under 6 hours before session, or does not show up:')
     ).toBeVisible()
+  })
+
+  test('a signed-out visitor still sees reviews for this listing', async ({ page }) => {
+    await stubAllExternalCalls(page, {
+      listings: [LATTE_ART],
+      sessions: [OPEN_SESSION],
+      'rpc/reviews_for_listing': [
+        {
+          id: 'r-this',
+          rating: 5,
+          comment: 'Great latte class',
+          created_at: '2026-03-14T02:00:00.000Z',
+          users: { full_name: 'Guest One' },
+        },
+      ],
+    })
+    await page.goto('/listings/listing-latte')
+
+    await expect(page.getByText('Great latte class')).toBeVisible()
+    await expect(page.getByText('★ 5.0 average rating')).toBeVisible()
   })
 
   test('shows a helpful message for a listing that does not exist', async ({ page }) => {
@@ -296,5 +323,76 @@ test.describe('booking requires an account', () => {
     await expect(page).toHaveURL(/\/login$/)
 
     expect(functionCalls).toEqual([])
+  })
+})
+
+test.describe('booking reviews', () => {
+  async function signInAndOpenBookings(page, { bookings, reviews = [] }) {
+    await stubAllExternalCalls(
+      page,
+      {
+        users: [
+          { id: SIGNED_IN_USER.id, full_name: 'Kai Guest', avatar_url: null, is_host: false },
+        ],
+        bookings,
+        reviews,
+      },
+      { session: makeAuthSession() }
+    )
+
+    await page.goto('/login')
+    await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+    await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+    await expect(page).toHaveURL(/\/$/)
+
+    await page.goto('/bookings')
+    await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible()
+  }
+
+  const endedBooking = {
+    id: 'booking-past',
+    status: 'confirmed',
+    session_id: 'session-past',
+    guests_count: 1,
+    total_amount: 4500,
+    platform_fee: 675,
+    sessions: {
+      starts_at: hoursFromNow(-5),
+      duration_mins: 90,
+      listings: {
+        id: 'listing-latte',
+        title: 'Learn latte art with me',
+        host_id: 'host-1',
+      },
+    },
+  }
+
+  test('keeps the status badge and Leave a review on one centred line', async ({ page }) => {
+    await signInAndOpenBookings(page, { bookings: [endedBooking] })
+
+    const actions = page.locator('.booking-card__actions')
+    const badge = actions.locator('.badge')
+    const reviewButton = actions.getByRole('button', { name: 'Leave a review' })
+
+    await expect(reviewButton).toHaveClass(/ui-button--secondary/)
+    await expect(badge).toHaveText('confirmed')
+
+    const badgeBox = await badge.boundingBox()
+    const buttonBox = await reviewButton.boundingBox()
+    expect(badgeBox).toBeTruthy()
+    expect(buttonBox).toBeTruthy()
+    const badgeMid = badgeBox.y + badgeBox.height / 2
+    const buttonMid = buttonBox.y + buttonBox.height / 2
+    expect(Math.abs(badgeMid - buttonMid)).toBeLessThan(4)
+  })
+
+  test('fills every star up to the one under the pointer', async ({ page }) => {
+    await signInAndOpenBookings(page, { bookings: [endedBooking] })
+
+    await page.getByRole('button', { name: 'Leave a review' }).click()
+    await page.getByRole('button', { name: '4 stars' }).hover()
+
+    await expect(page.locator('.star-picker__btn--active')).toHaveCount(4)
   })
 })
