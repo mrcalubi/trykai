@@ -483,7 +483,9 @@ Production uses that project's URL and keys, not the staging ref above.
 
 ## 4. Run it once now (do not wait until minute 12)
 
-In Terminal, replace the two placeholders with the **anon public key** and the **same cron secret**:
+Replace the two placeholders with the **anon public key** and the **same cron secret**.
+
+On macOS / Linux / Git Bash, backslash continues the line:
 
 ```bash
 curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout' \
@@ -492,6 +494,26 @@ curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release
   -H "apikey: PASTE_ANON_PUBLIC_KEY" \
   -H "x-cron-secret: PASTE_PAYOUT_CRON_SECRET" \
   -d '{}'
+```
+
+On **Windows PowerShell**, `curl` is `Invoke-WebRequest`, which does not accept `-H`. Use `curl.exe` (one line is safest) or the native cmdlet:
+
+```powershell
+curl.exe -fsS -X POST "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout" -H "Content-Type: application/json" -H "Authorization: Bearer PASTE_ANON_PUBLIC_KEY" -H "apikey: PASTE_ANON_PUBLIC_KEY" -H "x-cron-secret: PASTE_PAYOUT_CRON_SECRET" -d "{}"
+```
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout" -ContentType "application/json" -Headers @{ Authorization = "Bearer PASTE_ANON_PUBLIC_KEY"; apikey = "PASTE_ANON_PUBLIC_KEY"; "x-cron-secret" = "PASTE_PAYOUT_CRON_SECRET" } -Body "{}"
+```
+
+If the cron secret itself contains `"` or `'`, do not put it inside the header quotes. Paste it between `@'` and `'@` (the closing `'@` must be at the start of its own line):
+
+```powershell
+$secret = @'
+PASTE_PAYOUT_CRON_SECRET
+'@
+$key = "PASTE_ANON_PUBLIC_KEY"
+Invoke-RestMethod -Method Post -Uri "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/release-payout" -ContentType "application/json" -Headers @{ Authorization = "Bearer $key"; apikey = $key; "x-cron-secret" = $secret } -Body "{}"
 ```
 
 **What you should see**
@@ -507,7 +529,7 @@ Also open **Edge Functions → release-payout → Logs** and look for a line sta
 | `hold_not_elapsed` | Session started less than 24 hours ago. Expected. |
 | `missing_charge_id` | Stripe PaymentIntent has no `latest_charge` yet. |
 | `host_not_connected` / `host_payouts_disabled` | Host has not finished Connect onboarding. |
-| `failed` + insufficient funds | Platform balance already paid out to the bank. Manual payouts (step 1) must be on before new bookings. |
+| `failed` + insufficient available funds | Platform available balance is too low (automatic payouts already sent it to the bank). Two Transfers can succeed and the rest fail in the same run. In **test mode**, Stripe's own message is the fix: create a charge with card `4000000000000077` (any future expiry and CVC) so funds land in the available balance, then run the same command again. Bookings already in `released` are not paid twice. |
 
 GitHub secrets `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAYOUT_CRON_SECRET` (and `PRODUCTION_*`) are optional on staging because of the database cron. They are needed for production once `.github/workflows/release-payout.yml` is on `main`. GitHub **schedule** only runs from `main`. **Actions → Release host payouts → Run workflow** works after that.
 
