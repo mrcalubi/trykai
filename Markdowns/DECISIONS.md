@@ -16,9 +16,9 @@ Two host types on the same browse page. **Peer hosts**, everyday people monetisi
 ### Unified accounts
 One account type, both host and guest. Guest by default, becomes a host on first listing. `is_host` flag handles the distinction. Hosts get a visible badge.
 
-Guest bookings are at `/bookings`. Host listings, upcoming hosted sessions, and Stripe payout setup are at `/hosting`. `/dashboard` remains as a redirect so emails and Stripe `return_url`s keep working. Payouts stay in the host area, not account settings. A signed-in user who is not a host is redirected from `/hosting` to `/bookings`. Anyone's public profile is `/u/:id` (first name, listings, reviews received). Own bookings and hosting tabs on that page are not built.
+Guest bookings are at `/bookings`. Host listings, upcoming hosted sessions, and Stripe payout setup are at `/hosting`. `/dashboard` remains as a redirect so emails and Stripe `return_url`s keep working. Payouts stay in the host area, not account settings. A signed-in user who is not a host is redirected from `/hosting` to `/bookings`. Anyone's public profile is `/u/:id` (display name, listings, reviews received). Own bookings and hosting tabs on that page are not built.
 
-Profile name and photo are edited at `/settings`. Email is shown there but not changed in-app. Account deletion is contact-support only until the retain-transactions / remove-personal-data split is designed.
+Profile name, display name, and photo are edited at `/settings`. Email is shown there but not changed in-app. Account deletion is contact-support only until the retain-transactions / remove-personal-data split is designed.
 
 ### Host price band
 S$10 to S$40 is **guidance** for hosts, not a hard rule. CreateListing does not enforce it. The band is where zero-fixed-cost supply sits and where the guest fee was tuned; it is not a CHECK constraint.
@@ -68,7 +68,7 @@ An optional layer hosts enable on Lane 1 listings only. Host specifies what is d
 ### Identity and social layer
 *Decided direction, to build post MVP, except the thin public profile below.*
 
-**Public profile, part 1 (29 September 2026).** `/u/:id` is public. Avatar, first name, ID-verified badge if approved, host rating and count (hidden when none), active listings, reviews received as a host. Reviews they wrote as a guest are not shown. Own bookings and hosting tabs on that page are part 2 and are not built. First names only on public surfaces (this page, Hosted by, review cards). Review RPCs return the reviewer's first name; `users.full_name` is still SELECT-able through the API.
+**Public profile, part 1 (29 September 2026).** `/u/:id` is public. Avatar, display name, ID-verified badge if approved, host rating and count (hidden when none), active listings, reviews received as a host. Reviews they wrote as a guest are not shown. Own bookings and hosting tabs on that page are part 2 and are not built. Public surfaces (this page, Hosted by, review cards) show `display_name`, falling back to the first word of `full_name`. Review RPCs return the reviewer's `display_name` in jsonb `users.full_name`. `full_name` is still SELECT-able through the API.
 
 The rest of the guest profile as a public artefact that accumulates remains post MVP. Every completed session adds to a visible log. Lane 2 progress shown explicitly with a progress indicator toward a stated goal.
 
@@ -466,6 +466,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-09-29 — Public profile at `/u/:id`, first names only on public surfaces.** Part 1: anyone can view avatar, first name, ID-verified if approved, host rating, active listings, and reviews received as a host (`reviews_for_host`). Reviews they wrote as a guest are not shown. Hosted by on listing detail links here. Part 2 (own bookings and hosting tabs on your own profile) is not built. Review RPCs return the reviewer's first name in jsonb `users.full_name`. Host names on listing and profile pages still use `firstName`; `full_name` remains granted SELECT.
 
 **2026-09-29 — S$10 to S$40 is guidance, not a rule.** Hosts are pointed at that band because it is where peer supply can price and where the guest fee was tuned. It is not enforced in CreateListing or as a CHECK. Supersedes wording that treated the band as a hard identity constraint.
+
+**2026-09-29 — Users choose a display name.** Public surfaces (profile, Hosted by, review cards) show `users.display_name` instead of splitting `full_name`. Signup asks "What should we call you?" and Settings edits it next to full name. Trimmed, 1 to 40 characters (`00014`). Existing rows are backfilled from the first word of `full_name`. `handle_new_user` reads it from signup metadata and falls back to that first word. Review RPCs return it in jsonb `users.full_name` so ReviewCard's shape is unchanged. `full_name` remains granted SELECT; it can be revoked for anon once nothing public reads it.
 
 ---
 

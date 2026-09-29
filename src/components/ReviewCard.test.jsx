@@ -8,11 +8,10 @@ function renderReview(overrides) {
 }
 
 describe('ReviewCard', () => {
-  it('shows the reviewer first name and their initial', () => {
-    renderReview({ users: { full_name: 'Mei Ling' } })
-    expect(screen.getByText('Mei')).toBeInTheDocument()
-    expect(screen.getByText('M')).toBeInTheDocument()
-    expect(screen.queryByText('Mei Ling')).not.toBeInTheDocument()
+  it('shows the reviewer display name from the RPC jsonb and their initial', () => {
+    renderReview({ users: { full_name: 'Latte Queen' } })
+    expect(screen.getByText('Latte Queen')).toBeInTheDocument()
+    expect(screen.getByText('L')).toBeInTheDocument()
   })
 
   it('renders the listing title when the review is on a host profile', () => {

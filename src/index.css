@@ -982,6 +982,13 @@ a {
   color: var(--text-h);
 }
 
+.ui-field__hint {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+}
+
 .ui-input {
   display: block;
   width: 100%;

@@ -18,7 +18,7 @@ test.describe('listing detail', () => {
     })
     await page.goto('/listings/listing-latte')
 
-    await expect(page.getByText('Hosted by Mei Ling')).toBeVisible()
+    await expect(page.getByText('Hosted by Mei')).toBeVisible()
     await expect(page.getByText('$51').first()).toBeVisible()
     await expect(page.getByText('No reviews yet.')).toBeVisible()
     await expect(page.locator('.detail-host__rating')).toHaveCount(0)

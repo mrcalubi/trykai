@@ -61,7 +61,7 @@ Not a calendar. Capacity is 8 hours a week.
 7. JWT "issued at future" on browse: retry once, friendly error, never show raw error text.
 8. Host cancel warning: replace per-guest refund amounts with "Cancelling refunds all N guests in full and adds a strike".
 9. Review reminder email, about 3h after session ends.
-10. First names: review RPCs return the given name; host names on listing/profile pages and the `full_name` column grant are still the leak. Needs a database-level fix.
+10. `full_name` SELECT for anon can be revoked once nothing public reads it (`display_name` is the public name; pages still fall back to `full_name`).
 11. Reword S$10 to S$40 as guidance, not a rule (decided; remaining copy in HOST_ONBOARDING / BUSINESS / HANDOVER).
 
 ---
@@ -183,7 +183,7 @@ Replace the per-guest refund amounts in the Hosting confirm dialog with: "Cancel
 About 3 hours after the session ends, email the guest if they have not left a review.
 
 ### P2.13 — First names are UI-only
-Review RPCs (`reviews_for_listing`, `reviews_for_host`) return the reviewer's first name in jsonb `users.full_name`. Host names on listing and profile pages still use `firstName(full_name)`. The `full_name` column is still granted SELECT to anon and authenticated (`00005`). A crafted query can still read the whole name. Needs a database-level fix (column, view, or RPC).
+Public surfaces show `display_name` (`00014`). Review RPCs return it in jsonb `users.full_name`. Pages still SELECT `full_name` and fall back to `firstName(full_name)` when `display_name` is empty. The `full_name` column is still granted SELECT to anon and authenticated (`00005`). A crafted query can still read the whole name. Revoke that SELECT for anon once nothing public reads the column.
 
 ### P2.14 — S$10 to S$40 is guidance, not a rule
 Decided 29 September 2026. Remaining: HOST_ONBOARDING, BUSINESS, and HANDOVER still describe it as a hard band. CreateListing already only checks `priceCents > 0`.

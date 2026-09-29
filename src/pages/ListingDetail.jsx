@@ -14,7 +14,7 @@ import {
   paynowPriceCents,
 } from '../lib/pricing'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
-import { firstName } from '../lib/firstName'
+import { publicName } from '../lib/publicName'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -134,6 +134,7 @@ export default function ListingDetail() {
           whats_provided,
           host_id,
           users!host_id (
+            display_name,
             full_name,
             avatar_url,
             stripe_payouts_enabled
@@ -387,7 +388,7 @@ export default function ListingDetail() {
               <img src={host.avatar_url} alt="" className="detail-host__avatar" />
             ) : (
               <div className="detail-host__avatar-placeholder">
-                {firstName(host?.full_name)?.[0]?.toUpperCase() || '?'}
+                {publicName(host)?.[0]?.toUpperCase() || '?'}
               </div>
             )}
             <div>
@@ -395,10 +396,10 @@ export default function ListingDetail() {
                 Hosted by{' '}
                 {listing.host_id ? (
                   <Link to={`/u/${listing.host_id}`} className="detail-host__link">
-                    {firstName(host?.full_name) || 'Anonymous'}
+                    {publicName(host) || 'Anonymous'}
                   </Link>
                 ) : (
-                  firstName(host?.full_name) || 'Anonymous'
+                  publicName(host) || 'Anonymous'
                 )}
               </p>
               {hostRating ? <p className="detail-host__rating">{hostRating}</p> : null}

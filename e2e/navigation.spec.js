@@ -91,6 +91,8 @@ test.describe('signed-out navigation', () => {
 
     await expect(page.getByRole('heading', { name: 'Create account' })).toBeVisible()
     await expect(page.getByLabel('Full name')).toBeVisible()
+    await expect(page.getByLabel('What should we call you?')).toBeVisible()
+    await expect(page.getByText('Shown on your profile and reviews.')).toBeVisible()
     await expect(page.getByLabel('Email')).toBeVisible()
     await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Show password' })).toBeVisible()

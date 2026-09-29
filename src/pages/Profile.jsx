@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { firstName } from '../lib/firstName'
+import { publicName } from '../lib/publicName'
 import ReviewCard from '../components/ReviewCard'
 import Card from '../components/ui/Card'
 import { formatGuestFacingPrice } from '../lib/pricing'
@@ -31,7 +31,7 @@ export default function Profile() {
 
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('id, full_name, avatar_url, verification_status')
+        .select('id, display_name, full_name, avatar_url, verification_status')
         .eq('id', id)
         .single()
 
@@ -82,7 +82,7 @@ export default function Profile() {
     )
   }
 
-  const givenName = firstName(profile.full_name) || 'Anonymous'
+  const givenName = publicName(profile) || 'Anonymous'
   const hostRating = formatHostRating(reviews)
   const verified = profile.verification_status === 'approved'
 

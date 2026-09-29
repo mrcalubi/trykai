@@ -117,7 +117,22 @@ describe('ListingDetail content', () => {
     expect(screen.queryByText('$45')).not.toBeInTheDocument()
   })
 
-  it('names the host by first name and links to their profile', async () => {
+  it('names the host by display name and links to their profile', async () => {
+    givenListing(
+      makeListing({
+        users: { display_name: 'Latte Queen', full_name: 'Mei Ling Tan', avatar_url: null },
+      })
+    )
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: 'Latte Queen' })).toHaveAttribute(
+      'href',
+      '/u/host-1'
+    )
+    expect(screen.queryByText('Mei Ling Tan')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the first name when display_name is missing', async () => {
     givenListing(makeListing({ users: { full_name: 'Mei Ling', avatar_url: null } }))
     renderPage()
 

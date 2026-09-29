@@ -11,6 +11,7 @@ const HOST_ID = 'host-1'
 
 function givenProfile(profile = {
   id: HOST_ID,
+  display_name: 'Mei',
   full_name: 'Mei Ling Tan',
   avatar_url: null,
   verification_status: 'approved',
@@ -59,12 +60,39 @@ describe('Profile loading and failure', () => {
 })
 
 describe('Profile public content', () => {
-  it('shows the first name only, even when signed out', async () => {
+  it('shows the display name, even when signed out', async () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Mei', level: 1 })).toBeInTheDocument()
     expect(screen.queryByText('Mei Ling Tan')).not.toBeInTheDocument()
     expect(supabase.auth.getSession).not.toHaveBeenCalled()
+  })
+
+  it('does not split a multi-word display name', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Latte Queen',
+      full_name: 'Mei Ling Tan',
+      avatar_url: null,
+      verification_status: 'approved',
+    })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Latte Queen', level: 1 })).toBeInTheDocument()
+    expect(screen.queryByText('Mei')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the first name when display_name is empty', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: '',
+      full_name: 'Mei Ling Tan',
+      avatar_url: null,
+      verification_status: 'approved',
+    })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Mei', level: 1 })).toBeInTheDocument()
   })
 
   it('shows the ID verified badge only when the host is approved', async () => {
@@ -75,6 +103,7 @@ describe('Profile public content', () => {
   it('hides the ID verified badge when the host is not approved', async () => {
     givenProfile({
       id: HOST_ID,
+      display_name: 'Mei',
       full_name: 'Mei Ling',
       avatar_url: null,
       verification_status: 'pending',
@@ -166,7 +195,7 @@ describe('Profile public content', () => {
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
 
     expect(supabase.__lastCall('users', 'select').chain[0].args[0]).toBe(
-      'id, full_name, avatar_url, verification_status'
+      'id, display_name, full_name, avatar_url, verification_status'
     )
   })
 })

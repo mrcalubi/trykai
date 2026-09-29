@@ -44,6 +44,7 @@ export function makeListing(overrides = {}) {
     host_id: 'host-1',
     is_active: true,
     users: {
+      display_name: 'Mei',
       full_name: 'Mei Ling',
       avatar_url: null,
       stripe_payouts_enabled: true,

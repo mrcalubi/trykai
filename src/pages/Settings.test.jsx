@@ -19,11 +19,12 @@ function givenSignedIn(userId = USER_ID) {
 
 function givenProfile({
   full_name: fullName = 'Mei Ling',
+  display_name: displayName = 'Mei',
   email = 'mei@example.com',
   avatar_url: avatarUrl = null,
 } = {}) {
   supabase.__on('users', 'select', {
-    data: { full_name: fullName, email, avatar_url: avatarUrl },
+    data: { full_name: fullName, display_name: displayName, email, avatar_url: avatarUrl },
     error: null,
   })
 }
@@ -59,9 +60,11 @@ describe('Settings access', () => {
       value: USER_ID,
     })
     expect(supabase.__lastCall('users', 'select').chain[0].args[0]).toBe(
-      'full_name, email, avatar_url'
+      'full_name, display_name, email, avatar_url'
     )
     expect(screen.getByLabelText('Full name')).toHaveValue('Mei Ling')
+    expect(screen.getByLabelText('Display name')).toHaveValue('Mei')
+    expect(screen.getByText('Shown on your profile and reviews.')).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toHaveValue('mei@example.com')
   })
 
@@ -112,16 +115,28 @@ describe('Settings profile form', () => {
     expect(supabase.__calls('users', 'update')).toHaveLength(0)
   })
 
-  it('saves only the writable name column', async () => {
+  it('requires a display name before saving', async () => {
+    const { user } = await renderSettings()
+
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Please enter a display name.')).toBeInTheDocument()
+    expect(supabase.__calls('users', 'update')).toHaveLength(0)
+  })
+
+  it('saves the writable name columns', async () => {
     const { user } = await renderSettings()
 
     await user.clear(screen.getByLabelText('Full name'))
     await user.type(screen.getByLabelText('Full name'), '  Mei Ling Tan  ')
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.type(screen.getByLabelText('Display name'), '  Latte Queen  ')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
     await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
     const call = supabase.__lastCall('users', 'update')
-    expect(call.payload).toEqual({ full_name: 'Mei Ling Tan' })
+    expect(call.payload).toEqual({ full_name: 'Mei Ling Tan', display_name: 'Latte Queen' })
     expect(call.filters).toContainEqual({ method: 'eq', column: 'id', value: USER_ID })
     expect(await screen.findByText('Your profile has been saved.')).toBeInTheDocument()
   })
@@ -140,6 +155,7 @@ describe('Settings profile form', () => {
     expect(uploadedPath).toMatch(new RegExp(`^${USER_ID}/avatar-.+\\.png$`))
     expect(supabase.__lastCall('users', 'update').payload).toEqual({
       full_name: 'Mei Ling',
+      display_name: 'Mei',
       avatar_url: `https://cdn.test/listing-photos/${uploadedPath}`,
     })
   })
@@ -151,7 +167,10 @@ describe('Settings profile form', () => {
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
     await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
-    expect(supabase.__lastCall('users', 'update').payload).toEqual({ full_name: 'Mei Ling' })
+    expect(supabase.__lastCall('users', 'update').payload).toEqual({
+      full_name: 'Mei Ling',
+      display_name: 'Mei',
+    })
     expect(supabase.__bucket('listing-photos').upload).not.toHaveBeenCalled()
   })
 

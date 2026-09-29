@@ -1,4 +1,4 @@
-import { firstName } from '../lib/firstName'
+import { publicName } from '../lib/publicName'
 
 function formatReviewDate(iso) {
   return new Intl.DateTimeFormat('en-SG', {
@@ -22,7 +22,7 @@ function StarDisplay({ rating }) {
 }
 
 export default function ReviewCard({ review }) {
-  const name = firstName(review.users?.full_name) || 'Guest'
+  const name = publicName({ display_name: review.users?.full_name }) || 'Guest'
   const initial = name[0]?.toUpperCase() || '?'
 
   return (
