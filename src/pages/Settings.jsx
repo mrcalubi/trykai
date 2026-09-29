@@ -9,11 +9,13 @@ export default function Settings() {
   const userId = useAuthedUserId()
 
   const [fullName, setFullName] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('')
   const [nameError, setNameError] = useState('')
+  const [displayNameError, setDisplayNameError] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(true)
@@ -22,7 +24,7 @@ export default function Settings() {
   const loadProfile = useCallback(async () => {
     const { data, error: loadError } = await supabase
       .from('users')
-      .select('full_name, email, avatar_url')
+      .select('full_name, display_name, email, avatar_url')
       .eq('id', userId)
       .single()
 
@@ -33,6 +35,7 @@ export default function Settings() {
     }
 
     setFullName(data?.full_name || '')
+    setDisplayName(data?.display_name || '')
     setEmail(data?.email || '')
     setAvatarUrl(data?.avatar_url || '')
     setLoading(false)
@@ -87,10 +90,20 @@ export default function Settings() {
     setError('')
     setSuccess('')
     setNameError('')
+    setDisplayNameError('')
 
     const name = fullName.trim()
+    const handle = displayName.trim()
     if (!name) {
       setNameError('Please enter your full name.')
+      return
+    }
+    if (!handle) {
+      setDisplayNameError('Please enter a display name.')
+      return
+    }
+    if (handle.length > 40) {
+      setDisplayNameError('Display name must be 40 characters or fewer.')
       return
     }
 
@@ -107,7 +120,7 @@ export default function Settings() {
       }
     }
 
-    const payload = { full_name: name }
+    const payload = { full_name: name, display_name: handle }
     if (avatarFile) payload.avatar_url = nextAvatarUrl
 
     const { error: updateError } = await supabase
@@ -123,6 +136,7 @@ export default function Settings() {
     }
 
     setFullName(name)
+    setDisplayName(handle)
     setAvatarUrl(nextAvatarUrl)
     setAvatarFile(null)
     setAvatarPreviewUrl((previous) => {
@@ -175,6 +189,18 @@ export default function Settings() {
             onChange={(event) => setFullName(event.target.value)}
             autoComplete="name"
             error={nameError}
+          />
+
+          <Input
+            id="settings-display-name"
+            label="Display name"
+            type="text"
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            autoComplete="nickname"
+            maxLength={40}
+            hint="Shown on your profile and reviews."
+            error={displayNameError}
           />
 
           <Input

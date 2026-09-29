@@ -117,18 +117,34 @@ describe('ListingDetail content', () => {
     expect(screen.queryByText('$45')).not.toBeInTheDocument()
   })
 
-  it('names the host', async () => {
+  it('names the host by display name and links to their profile', async () => {
+    givenListing(
+      makeListing({
+        users: { display_name: 'Latte Queen', full_name: 'Mei Ling Tan', avatar_url: null },
+      })
+    )
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: 'Latte Queen' })).toHaveAttribute(
+      'href',
+      '/u/host-1'
+    )
+    expect(screen.queryByText('Mei Ling Tan')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the first name when display_name is missing', async () => {
     givenListing(makeListing({ users: { full_name: 'Mei Ling', avatar_url: null } }))
     renderPage()
 
-    expect(await screen.findByText('Hosted by Mei Ling')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Mei' })).toHaveAttribute('href', '/u/host-1')
+    expect(screen.queryByText('Mei Ling')).not.toBeInTheDocument()
   })
 
   it('falls back to Anonymous when the host profile is missing', async () => {
     givenListing(makeListing({ users: null }))
     renderPage()
 
-    expect(await screen.findByText('Hosted by Anonymous')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Anonymous' })).toHaveAttribute('href', '/u/host-1')
   })
 
   it('averages the host reviews to one decimal place', async () => {
@@ -177,10 +193,11 @@ describe('ListingDetail content', () => {
 
   it('still shows listing reviews to a signed-out visitor', async () => {
     givenListing()
-    givenReviews([makeReview({ comment: 'Great latte class' })])
+    givenReviews([makeReview({ comment: 'Great latte class', users: { full_name: 'Arun' } })])
     renderPage()
 
     expect(await screen.findByText('Great latte class')).toBeInTheDocument()
+    expect(screen.getByText('Arun')).toBeInTheDocument()
     expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_listing', { p_listing_id: 'listing-1' })
   })
 
@@ -219,7 +236,7 @@ describe('ListingDetail content', () => {
     givenHostReviews([])
     renderPage()
 
-    await screen.findByText('Hosted by Mei Ling')
+    await screen.findByRole('link', { name: 'Mei' })
     expect(document.querySelector('.detail-host__rating')).not.toBeInTheDocument()
     expect(screen.getByText('No reviews yet.')).toBeInTheDocument()
     expect(screen.queryByText(/· \d+ reviews?/)).not.toBeInTheDocument()
@@ -313,7 +330,7 @@ describe('ListingDetail content', () => {
     givenReviews([makeReview({ id: 'r1', rating: 5 })])
     renderPage()
 
-    await screen.findByText('Hosted by Mei Ling')
+    await screen.findByRole('link', { name: 'Mei' })
     const order = [...document.querySelectorAll('.detail-host, .detail-section__title')].map(
       (node) => (node.className.includes('detail-host') ? 'host' : node.textContent)
     )

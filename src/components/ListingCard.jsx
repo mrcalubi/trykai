@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
 import { formatGuestFacingPrice } from '../lib/pricing'
+import { publicName } from '../lib/publicName'
 
 function getHostName(listing) {
   const host = listing.host ?? listing.users
   if (!host) return null
-  if (Array.isArray(host)) return host[0]?.full_name ?? null
-  return host.full_name ?? null
+  const record = Array.isArray(host) ? host[0] : host
+  return publicName(record) || null
 }
 
 export default function ListingCard({ listing }) {

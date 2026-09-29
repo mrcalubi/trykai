@@ -8,6 +8,7 @@ import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import ListingDetail from './pages/ListingDetail'
+import Profile from './pages/Profile'
 import CreateListing from './pages/CreateListing'
 import EditListing from './pages/EditListing'
 import VerifyIdentity from './pages/VerifyIdentity'
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/listings/:id" element={<ListingDetail />} />
+        <Route path="/u/:id" element={<Profile />} />
         <Route
           path="/create-listing"
           element={

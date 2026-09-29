@@ -130,6 +130,9 @@ describe('Home listing grid', () => {
       method: 'order',
       args: ['created_at', { ascending: false }],
     })
+    const select = call.chain.find((step) => step.method === 'select')?.args[0]
+    expect(select).not.toMatch(/full_name/)
+    expect(select).not.toMatch(/host:users/)
   })
 })
 

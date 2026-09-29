@@ -73,7 +73,7 @@ Rule that keeps the docs honest: one fact, one home. When two docs disagree, say
 - Forgot password: not built. Supabase's default reset email address is acceptable. Login has no reset link.
 - Prices far outside S$10 to S$40 are accepted ($7,580, $137,027 seen). CreateListing only checks `priceCents > 0`. The listings CHECK is `price_per_person >= 0`. No 1000–4000 band.
 - Browse card rating cannot render: nothing fetches it, no aggregate column. The price on the card is already the all-in card total.
-- `ListingCard` is dead code. Home still joins host `full_name` that the browse `Card` never receives.
+- `ListingCard` is dead code.
 - Category cut to four (Food, Fitness, Arts, Music): undecided. Touches docs, CreateListing, data, possibly a CHECK constraint. CreateListing still offers Language and Other. StyleGuide language/other PNG imports stay commented out.
 - Rating star colour: undecided.
 - Account deletion: needs an anonymisation design (retain transactions for dispute and tax, strip personal data). Ruiheng's. Manual via contact us until then.
