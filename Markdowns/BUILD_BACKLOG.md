@@ -52,7 +52,7 @@ Verification approval is now on the platform. Suspension that does not hide list
 
 Not a calendar. Capacity is 8 hours a week.
 
-1. **Ops (not app code):** confirm `00005`, `00008`, `00009`, `00010`, and `00011` on each environment; Vault/GitHub secrets for `release-payout`; Stripe Dashboard webhook + secrets; `RESEND_API_KEY` and current Edge Function deploys on production; platform payouts **manual**; flag eleven `is_founding_host`; one staging test-mode booking; confirm the two test cancellations were refunded on Stripe.
+1. **Ops (not app code):** confirm `00005`, `00008`, `00009`, `00010`, `00011`, and `00012` on each environment; Vault/GitHub secrets for `release-payout`; Stripe Dashboard webhook + secrets; `RESEND_API_KEY` and current Edge Function deploys on production; platform payouts **manual**; flag eleven `is_founding_host`; one staging test-mode booking; confirm the two test cancellations were refunded on Stripe.
 2. **Bug 4:** Hosting treats `?connect=return` as "Payout setup submitted" without re-checking `stripe_payouts_enabled`. Money path.
 3. **P0.4** app actually filters `is_suspended` on browse and Book. Listing/session INSERT is already gated by `can_create_listing()` (`00008`). One-click admin can wait if Table Editor plus this filter is reliable.
 4. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
@@ -63,7 +63,7 @@ Not a calendar. Capacity is 8 hours a week.
 
 ## P0: blocks launch
 
-> **Status, 21 September 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, guest address reveal path of P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement on browse/Book, `full_address` column grant. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September. P0.9 assets resolved 9 September. `00008` listing gate, `00009` session/booking read, `00010` `release-payout` schedule, and `00011` review gate are in the tree.
+> **Status, 21 September 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, guest address reveal path of P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement on browse/Book, `full_address` column grant. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September. P0.9 assets resolved 9 September. `00008` listing gate, `00009` session/booking read, `00010` `release-payout` schedule, `00011` review gate, and `00012` empty-session delete are in the tree.
 
 ### P0.1 — Host payout details — OBSOLETE
 Under Stripe Connect Express, Stripe collects the host's bank details. Do not add `payout_method` / `payout_identifier` columns.
@@ -114,10 +114,10 @@ Still to build:
 
 ## P1: the payment build — DONE IN CODE, 27–31 August 2026
 
-Stripe Connect (separate charges and transfers, Express) is implemented. Do not adapt `hitpay-wip-2026-08`. Remaining work is ops: confirm `00005` / `00008` / `00009` / `00010` / `00011`, Vault/GitHub secrets for `release-payout`, Stripe Dashboard webhook + secrets, `RESEND_API_KEY` and function deploys on production, platform payouts manual, founding-host flags, staging test-mode booking.
+Stripe Connect (separate charges and transfers, Express) is implemented. Do not adapt `hitpay-wip-2026-08`. Remaining work is ops: confirm `00005` / `00008` / `00009` / `00010` / `00011` / `00012`, Vault/GitHub secrets for `release-payout`, Stripe Dashboard webhook + secrets, `RESEND_API_KEY` and function deploys on production, platform payouts manual, founding-host flags, staging test-mode booking.
 
 ### P1.1 — Payment confirmation webhook — DONE
-`supabase/functions/stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, emails both parties, refunds on oversell, cancels pending on failed/canceled intents, syncs `stripe_payouts_enabled` from `account.updated`.
+`supabase/functions/stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, emails both parties, refunds on oversell (including a cancelled / not-`open` session), cancels pending on failed/canceled intents, syncs `stripe_payouts_enabled` from `account.updated`.
 
 ### P1.2 — Fee calculation — DONE
 `calculateGuestCharge` in `_shared/booking.ts`: 12% + S$2.50 floor, round up to a whole dollar, PayNow 5% off that total. Browse and listing show the card all-in price. Host fee 10% from the fourth confirmed booking; founding hosts never.

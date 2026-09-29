@@ -8,7 +8,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 >
 > 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 24 hours after `starts_at`. Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). The host is emailed only when the guest cancelled.
-> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00011`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
+> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00012`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
 > 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home shows the Lane 1 headline above the kit's** `Card` **in browse mode.** `ListingCard.jsx` still exists but no page renders it. Button is live on Settings. Input is live on Settings and Login. SelectableCard is still used only by `/style-guide`.
 > 6. **All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a hex value in a component. See section 2, Styling.
@@ -129,14 +129,14 @@ starts_at timestamp
 duration_mins integer
 spots_total integer
 spots_remaining integer
-status text              -- documented as 'open' | 'full' | 'completed'
+status text              -- documented as 'open' | 'full' | 'completed' | 'cancelled'
 payout_released_at timestamp  -- unused for Connect payouts; booking.payout_released_at is the field that matters
 created_at timestamp
 ```
 
-`completed` is never written. There is no session auto-complete job.
+`completed` is never written. There is no session auto-complete job. `cancelled` is a soft-delete: `delete_empty_session` (`00012`) sets it when the listing owner removes an upcoming session that has no pending or confirmed bookings. Rows are never hard-deleted. There is no CHECK on status.
 
-Browse still uses `"Anyone can view open sessions"` (`status = 'open'`). Guests and hosts also read their own sessions in any status via `session_visible_to_me()` (`00009`), so a sold-out (`full`) session still appears on the dashboard. Guests who booked an inactive listing read its title via `listing_booked_by_me()`.
+Browse still uses `"Anyone can view open sessions"` (`status = 'open'`), so a cancelled session disappears from the listing page. Guests and hosts also read their own sessions in any status via `session_visible_to_me()` (`00009`), so a sold-out (`full`) session still appears on the dashboard; Hosting excludes `cancelled` in its query. Guests who booked an inactive listing read its title via `listing_booked_by_me()`. Clients have SELECT + INSERT on sessions, no UPDATE (`00009`); changing status to `cancelled` is the RPC, not a client PATCH.
 
 ### bookings
 
@@ -193,7 +193,7 @@ created_at timestamptz
 
 Append-only, service role only, no client grant of any kind. Written by `review_verification` in the same transaction as the status change, so a decision cannot be applied without a record. This is both the PDPA justification trail for holding NRIC copies and the review history the safety protocol assumes.
 
-**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`. Listing-page reviews and guest INSERT gating are `00011_reviews_for_listing.sql` (`reviews_for_listing`, `guest_can_leave_review`, one review per booking per role).
+**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`. Listing-page reviews and guest INSERT gating are `00011_reviews_for_listing.sql` (`reviews_for_listing`, `guest_can_leave_review`, one review per booking per role). Empty-session soft-delete is `00012_delete_empty_session.sql` (`delete_empty_session`). `00012` also redefines `confirm_paid_booking` so a session that is not `open` (including `cancelled`) cannot confirm; the webhook refunds that the same way it refunds an oversell.
 
 ---
 
@@ -302,7 +302,8 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 - `get_listing_address(listing_id)` — confirmed guest only.
 - `reviews_for_listing(listing_id)` — public guest reviews whose booking belongs to a session of that listing. Security definer so the listing page does not embed `bookings` (guest/host SELECT only). Returns review fields and the reviewer's `full_name` only.
 - `guest_can_leave_review(booking_id, reviewer_id, reviewee_id)` — INSERT gate for guest reviews. Security definer. Requires confirmed booking, session ended, reviewer is the guest, reviewee is the listing host.
-- `confirm_paid_booking(...)` and `confirm_booking` wrapper — flip pending → confirmed and decrement `spots_remaining` atomically under a row lock. **Service role only.** The Stripe webhook calls `confirm_paid_booking`. If spots are gone, the webhook refunds instead of confirming.
+- `delete_empty_session(session_id)` — listing owner only. Soft-deletes an upcoming session (`status = 'cancelled'`) when no booking on it is pending or confirmed. Never hard-deletes. Revoked from anon.
+- `confirm_paid_booking(...)` and `confirm_booking` wrapper — flip pending → confirmed and decrement `spots_remaining` atomically under a row lock. **Service role only.** Requires `sessions.status = 'open'` (`00012`). The Stripe webhook calls `confirm_paid_booking`. If spots are gone or the session is not open (including cancelled), the webhook refunds instead of confirming.
 - `apply_host_strike(host_id)` — increments strikes and deactivates listings at 3. **Service role only.**
 - `invoke_release_payout()` — pg_cron POST to `release-payout`. Reads Vault; revoked from anon and authenticated.
 
@@ -374,7 +375,8 @@ supabase/migrations/
 ├── 00008_listing_gate_can_create_listing.sql
 ├── 00009_booking_session_read_and_cancel_rls.sql
 ├── 00010_schedule_release_payout.sql
-└── 00011_reviews_for_listing.sql
+├── 00011_reviews_for_listing.sql
+└── 00012_delete_empty_session.sql
 
 supabase/functions/
 ├── _shared/
@@ -403,6 +405,7 @@ supabase/functions/
 | Browse page and filters                                    | `src/pages/Home.jsx`                                                                                |
 | Listing detail and booking                                 | `src/pages/ListingDetail.jsx`                                                                       |
 | Listing-page reviews                                       | `reviews_for_listing` (`00011`); do not embed `bookings` from the client                            |
+| Delete an empty hosted session                             | `delete_empty_session` (`00012`); Hosting Delete, not Cancel                                        |
 | Login and signup                                           | `src/pages/Login.jsx`                                                                               |
 | Forgot password request                                    | `src/pages/ForgotPassword.jsx` (`/forgot-password`)                                                 |
 | Reset password from email                                  | `src/pages/ResetPassword.jsx` (`/reset-password`)                                                   |
@@ -459,7 +462,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 **6. Checkout.** `guests_count` is hardcoded to 1. Guest picks Card or PayNow (5% off, shown only here) *before* `create-payment-intent`. The function creates a pending booking, then a PaymentIntent locked to that rail. No host email is sent here.
 
-**7. Payment.** Payment Element `confirmPayment` uses `return_url=/dashboard?booking=<id>`. `stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, freezes host fee/payout, emails guest and host via `_shared/email.ts`. Failed/canceled intents mark the pending row cancelled without touching spots. Oversell refunds immediately. `account.updated` syncs `stripe_payouts_enabled`.
+**7. Payment.** Payment Element `confirmPayment` uses `return_url=/dashboard?booking=<id>`. `stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, freezes host fee/payout, emails guest and host via `_shared/email.ts`. Failed/canceled intents mark the pending row cancelled without touching spots. Oversell refunds immediately, including when confirm finds the session cancelled or otherwise not `open`. `account.updated` syncs `stripe_payouts_enabled`.
 
 **8. Confirmation.** `/dashboard?booking=` redirects to `/bookings?booking=`. `Bookings.jsx` polls until status is `confirmed`. Then `get_listing_address` returns `full_address` to that guest.
 
@@ -480,7 +483,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
    For manual submissions, Caleb reviews at `/admin/verifications`: both documents side by side, approve, or reject with a reason. Both paths call `review_verification` (`00007`, service role only), which writes the decision, the reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record, and `method` records which route decided it. Whichever function made the decision emails the host. A rejected host also sees the reason on `/verify-identity` when they try again.
 5. **Creates the listing.** Title, description, category, price in cents, max guests, public area, private full address, up to 5 photos, what's provided. Inserts into `listings`, sets `is_host = true`, navigates to `/dashboard` (which redirects to `/bookings`). **Does not create the first session in the same form.** No photography guidance. No T&C checkbox.
-6. **Adds a session** from Hosting “Add Session”. Date, time, duration, spots. `spots_total` and `spots_remaining` both set to the entered number, `status = 'open'`.
+6. **Adds a session** from Hosting “Add Session”. Date, time, duration, spots. `spots_total` and `spots_remaining` both set to the entered number, `status = 'open'`. The new row appears under Upcoming Hosted Sessions even with zero bookings. An empty upcoming session can be removed with Delete, which calls `delete_empty_session` and sets `status = 'cancelled'` (no strike, no refund). A session with pending or confirmed bookings has Cancel instead, not Delete.
 7. **Payout setup.** Hosting “Set up payouts” → `create-account-link` → Stripe Express onboarding. Account Link `return_url`/`refresh_url` still use `/dashboard?connect=`, which redirects to `/hosting`. Book stays disabled for guests until `stripe_payouts_enabled`.
 8. **Receives bookings.** Email from `stripe-webhook` after confirmation, with guest name, session details, guest count.
 9. **Edits.** `EditListing.jsx` checks `host_id = current user`. Soft-delete is `is_active = false` from `/hosting`.
@@ -493,7 +496,9 @@ Warning shown: cancelling results in a strike, three strikes deactivates listing
 
 On confirmation `/hosting` calls `cancel-booking` with `session_id`. The function issues Stripe refunds for confirmed bookings (or cancels unpaid PaymentIntents), restores spots only for confirmed rows, sets `cancelled_by = 'host'`, and calls `apply_host_strike`. Each guest is emailed the refund amount. The host is not emailed; they initiated the cancel.
 
-Host upcoming list is sessions that already have pending or confirmed bookings, not every open session.
+Host upcoming list is every future session on the host's listings that is not `cancelled`, including rows with zero bookings.
+
+An empty upcoming session (no pending or confirmed bookings) is Delete, not Cancel: confirm, then `delete_empty_session`. That is a soft-delete (`status = 'cancelled'`), no refunds, no strike. The listing page already only selects `status = 'open'`, so the row disappears there too.
 
 ### Scenario 4: Guest cancels
 
@@ -531,7 +536,7 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **Bookings.jsx** — auth required. Guest: upcoming and past bookings, Cancel with calculated refund shown, leave review after the session ends on confirmed only. Polls `?booking=` after Payment Element return.
 
-**Hosting.jsx** — auth required. Host: listings with Add Session, Edit, soft-delete; upcoming sessions that have active bookings, with Cancel and strike warning; Connect payout setup. A signed-in user who is not a host is redirected to `/bookings`.
+**Hosting.jsx** — auth required. Host: listings with Add Session, Edit, soft-delete; all upcoming non-cancelled sessions (Delete when empty, Cancel with strike warning when there are pending or confirmed bookings); Connect payout setup. A signed-in user who is not a host is redirected to `/bookings`.
 
 **Settings.jsx** — auth required. Signed-in user edits `full_name` and `avatar_url` (the columns `00005` still grants UPDATE after `00007` revoked verification fields). Email is shown read-only. No in-app account deletion; copy points at `hello@trykai.sg`. Linked from the avatar account menu, not the hamburger.
 
