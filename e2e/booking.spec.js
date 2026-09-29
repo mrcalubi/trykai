@@ -82,7 +82,7 @@ test.describe('listing detail', () => {
           rating: 5,
           comment: 'Great latte class',
           created_at: '2026-03-14T02:00:00.000Z',
-          users: { full_name: 'Guest One' },
+          users: { full_name: 'Guest' },
         },
       ],
     })

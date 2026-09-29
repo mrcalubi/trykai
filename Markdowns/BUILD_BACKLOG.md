@@ -58,6 +58,11 @@ Not a calendar. Capacity is 8 hours a week.
 4. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
 5. Browse card rating: the listings fetch does not supply one and there is no aggregate rating column. The card already shows the all-in card price.
 6. **P2.3** review gating is done (`00011`). Then the rest of P2 in listed order.
+7. JWT "issued at future" on browse: retry once, friendly error, never show raw error text.
+8. Host cancel warning: replace per-guest refund amounts with "Cancelling refunds all N guests in full and adds a strike".
+9. Review reminder email, about 3h after session ends.
+10. First names: review RPCs return the given name; host names on listing/profile pages and the `full_name` column grant are still the leak. Needs a database-level fix.
+11. Reword S$10 to S$40 as guidance, not a rule (decided; remaining copy in HOST_ONBOARDING / BUSINESS / HANDOVER).
 
 ---
 
@@ -157,7 +162,7 @@ Within 7 days, reviewed manually. Needs a submission form and an admin view.
 Disputes arrive by email today. At launch volume that is survivable.
 
 ### P2.8 — Wire the UI kit and decided browse
-**Mostly done, 9–21 September 2026.** TopNav and HamburgerMenu are the live chrome (`Navbar.jsx` is deleted), and Home is the decided browse: Lane 1 headline, 2 / 3 / 4 columns, square images, badge on a cream pill, two-line title clamp, one meta line with the all-in card price. Settings uses Button and Input. Login uses Input (floating + password). Left over: the rating on the browse card needs the listings fetch to supply one (no aggregate rating column exists yet), SelectableCard is still `/style-guide` only, and `ListingCard.jsx` plus its `.listing-card` CSS are dead code waiting on a deletion pass. Home still joins host `full_name` that the browse `Card` never receives.
+**Mostly done, 9–21 September 2026.** TopNav and HamburgerMenu are the live chrome (`Navbar.jsx` is deleted), and Home is the decided browse: Lane 1 headline, 2 / 3 / 4 columns, square images, badge on a cream pill, two-line title clamp, one meta line with the all-in card price. Settings uses Button and Input. Login uses Input (floating + password). Left over: the rating on the browse card needs the listings fetch to supply one (no aggregate rating column exists yet), SelectableCard is still `/style-guide` only, and `ListingCard.jsx` plus its `.listing-card` CSS are dead code waiting on a deletion pass.
 
 ### P2.9 — Checkout and legal gaps visible in the app
 - `guests_count` hardcoded to 1 in ListingDetail
@@ -167,6 +172,21 @@ Disputes arrive by email today. At launch volume that is survivable.
 - No photography guidance on CreateListing (the 5 photo limit copy is not that)
 - No sort UI (DECISIONS.md listed newest / price / most reviewed as live; only newest exists)
 - Phone OTP before booking: not built
+
+### P2.10 — JWT "issued at future" on browse
+Clock skew on the guest JWT can fail the listings fetch. Retry the request once, then show a friendly error. Never surface the raw error text.
+
+### P2.11 — Host cancel warning copy
+Replace the per-guest refund amounts in the Hosting confirm dialog with: "Cancelling refunds all N guests in full and adds a strike".
+
+### P2.12 — Review reminder email
+About 3 hours after the session ends, email the guest if they have not left a review.
+
+### P2.13 — First names are UI-only
+Review RPCs (`reviews_for_listing`, `reviews_for_host`) return the reviewer's first name in jsonb `users.full_name`. Host names on listing and profile pages still use `firstName(full_name)`. The `full_name` column is still granted SELECT to anon and authenticated (`00005`). A crafted query can still read the whole name. Needs a database-level fix (column, view, or RPC).
+
+### P2.14 — S$10 to S$40 is guidance, not a rule
+Decided 29 September 2026. Remaining: HOST_ONBOARDING, BUSINESS, and HANDOVER still describe it as a hard band. CreateListing already only checks `priceCents > 0`.
 
 ---
 

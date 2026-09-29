@@ -21,10 +21,7 @@ export default function Home() {
           area,
           price_per_person,
           category,
-          photo_urls,
-          host:users!host_id (
-            full_name
-          )
+          photo_urls
         `
         )
         .eq('is_active', true)

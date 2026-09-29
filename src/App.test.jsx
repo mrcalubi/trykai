@@ -91,6 +91,22 @@ describe('App routes', () => {
     expect(await screen.findByRole('heading', { name: heading, level: 1 })).toBeInTheDocument()
   })
 
+  it('serves a public profile without requiring a session', async () => {
+    supabase.__on('users', 'select', {
+      data: {
+        id: 'host-1',
+        full_name: 'Mei Ling',
+        avatar_url: null,
+        verification_status: 'approved',
+      },
+      error: null,
+    })
+    renderAt('/u/host-1')
+
+    expect(await screen.findByRole('heading', { name: 'Mei', level: 1 })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/u/host-1')
+  })
+
   it('serves a listing detail page for a listing id', async () => {
     supabase.__on('listings', 'select', {
       data: { id: 'listing-1', title: 'Latte art', host_id: 'host-1', photo_urls: [] },

@@ -90,7 +90,7 @@ export function makeReview(overrides = {}) {
     rating: 5,
     comment: 'Wonderful host.',
     created_at: '2026-03-14T02:00:00.000Z',
-    users: { full_name: 'Guest One' },
+    users: { full_name: 'Guest' },
     ...overrides,
   }
 }

@@ -16,9 +16,12 @@ Two host types on the same browse page. **Peer hosts**, everyday people monetisi
 ### Unified accounts
 One account type, both host and guest. Guest by default, becomes a host on first listing. `is_host` flag handles the distinction. Hosts get a visible badge.
 
-Guest bookings are at `/bookings`. Host listings, upcoming hosted sessions, and Stripe payout setup are at `/hosting`. `/dashboard` remains as a redirect so emails and Stripe `return_url`s keep working. Payouts stay in the host area, not account settings. A signed-in user who is not a host is redirected from `/hosting` to `/bookings`.
+Guest bookings are at `/bookings`. Host listings, upcoming hosted sessions, and Stripe payout setup are at `/hosting`. `/dashboard` remains as a redirect so emails and Stripe `return_url`s keep working. Payouts stay in the host area, not account settings. A signed-in user who is not a host is redirected from `/hosting` to `/bookings`. Anyone's public profile is `/u/:id` (first name, listings, reviews received). Own bookings and hosting tabs on that page are not built.
 
 Profile name and photo are edited at `/settings`. Email is shown there but not changed in-app. Account deletion is contact-support only until the retain-transactions / remove-personal-data split is designed.
+
+### Host price band
+S$10 to S$40 is **guidance** for hosts, not a hard rule. CreateListing does not enforce it. The band is where zero-fixed-cost supply sits and where the guest fee was tuned; it is not a CHECK constraint.
 
 ### Progressive disclosure at signup
 Ask for information when it becomes relevant, not upfront.
@@ -63,9 +66,11 @@ An optional layer hosts enable on Lane 1 listings only. Host specifies what is d
 **Why:** it taps a trigger that refuels itself. Dates, anniversaries, "we need to do something different". Not a one time purchase. It is a natural upsell at near zero extra cost to the host, and it permanently differentiates TryKai from any tuition platform.
 
 ### Identity and social layer
-*Decided direction, to build post MVP.*
+*Decided direction, to build post MVP, except the thin public profile below.*
 
-The guest profile is a public artefact that accumulates, not just an account page. Every completed session adds to a visible log. Lane 2 progress shown explicitly with a progress indicator toward a stated goal.
+**Public profile, part 1 (29 September 2026).** `/u/:id` is public. Avatar, first name, ID-verified badge if approved, host rating and count (hidden when none), active listings, reviews received as a host. Reviews they wrote as a guest are not shown. Own bookings and hosting tabs on that page are part 2 and are not built. First names only on public surfaces (this page, Hosted by, review cards). Review RPCs return the reviewer's first name; `users.full_name` is still SELECT-able through the API.
+
+The rest of the guest profile as a public artefact that accumulates remains post MVP. Every completed session adds to a visible log. Lane 2 progress shown explicitly with a progress indicator toward a stated goal.
 
 **Trophies**, named and specific rather than generic: First Timer, Explorer (5 categories), Night Owl, Date Night Pro, Regulars Club (same host 3+ times), Polyglot in Progress, Still Going (4 week streak). Visible to anyone viewing the profile.
 
@@ -447,7 +452,7 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-09-19 — Settings page at `/settings`.** Signed-in users can edit `full_name` and `avatar_url`. Email is read-only; change it via `hello@trykai.sg`. No in-app delete: deletion must keep transaction records for dispute and tax while removing personal data, and that split is not designed. Linked from the avatar account menu.
 
-**2026-09-19 — Hamburger is navigation; the avatar is the account menu.** Signed-in hamburger: Browse, My bookings, Hosting (hosts only), Create listing / Become a host (always, top-level so a non-host can start), Verification review (admins only, via `my_verification()`). Settings and Log out live on the avatar. No Profile link until that page exists. Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
+**2026-09-19 — Hamburger is navigation; the avatar is the account menu.** Signed-in hamburger: Browse, My bookings, Hosting (hosts only), Create listing / Become a host (always, top-level so a non-host can start), Verification review (admins only, via `my_verification()`). Settings and Log out live on the avatar. Public profiles live at `/u/:id`; the hamburger still has no Profile link (own bookings/hosting tabs on that page are part 2). Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
 
 **2026-09-19 — Login uses the kit Input.** Email is the floating-label variant; password is the password variant with the eye toggle. Both login and signup modes. Auth, redirect, and form-level error copy are unchanged.
 
@@ -457,6 +462,10 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-09-24 — Guest review INSERT is gated in the database.** Supersedes the Part A note that the dashboard and RLS still allowed `pending`. `00011` requires a confirmed booking, a session that has ended (`starts_at + duration_mins`), `reviewee_id` the listing host, and one review per booking per role. Host→guest reviews remain unbuilt.
 
 **2026-09-29 — Hosts can delete an empty upcoming session on their own listing.** Not a host cancel: no bookings means no refunds and no strike. `delete_empty_session` (`00012`) is security definer, listing-owner only, and refuses the write if any booking on the row is pending or confirmed. Success sets `sessions.status = 'cancelled'`; the row is never hard-deleted. Clients have no UPDATE grant on sessions, so this is the only host path. Hosting lists every upcoming non-cancelled session (not only those with bookings). Empty rows get Delete; booked rows keep Cancel. The listing page already selects `status = 'open'`, so cancelled sessions disappear there without a page change.
+
+**2026-09-29 — Public profile at `/u/:id`, first names only on public surfaces.** Part 1: anyone can view avatar, first name, ID-verified if approved, host rating, active listings, and reviews received as a host (`reviews_for_host`). Reviews they wrote as a guest are not shown. Hosted by on listing detail links here. Part 2 (own bookings and hosting tabs on your own profile) is not built. Review RPCs return the reviewer's first name in jsonb `users.full_name`. Host names on listing and profile pages still use `firstName`; `full_name` remains granted SELECT.
+
+**2026-09-29 — S$10 to S$40 is guidance, not a rule.** Hosts are pointed at that band because it is where peer supply can price and where the guest fee was tuned. It is not enforced in CreateListing or as a CHECK. Supersedes wording that treated the band as a hard identity constraint.
 
 ---
 

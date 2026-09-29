@@ -1809,6 +1809,45 @@ body.lightbox-open {
   color: var(--text);
 }
 
+.detail-host__link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.detail-host__link:hover {
+  color: var(--primary);
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.profile-header__name {
+  margin: 0;
+  font-family: var(--heading);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-h);
+}
+
+.profile-verified {
+  display: inline-block;
+  margin: 8px 0 0;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  background: var(--success-bg);
+  color: var(--success);
+}
+
 .detail-section {
   margin-top: 28px;
 }
@@ -2225,6 +2264,12 @@ body.lightbox-open {
   font-weight: 600;
   font-size: 15px;
   color: var(--text-h);
+}
+
+.review-card__listing {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text);
 }
 
 .review-card__meta {
