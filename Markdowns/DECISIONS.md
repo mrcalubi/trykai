@@ -221,6 +221,7 @@ Published at /cancellation-policy, /refund-policy, /dispute-policy. Finalised 29
 | Guest cancels 6 to 24hrs before | 25% of lesson fee, platform fee forfeited |
 | Guest cancels under 6hrs, or no show | No refund |
 | Host cancels, any time | Full guest refund including platform fee, 1 strike |
+| Host deletes an empty session | No guests; `delete_empty_session` sets `sessions.status = 'cancelled'`. No refund, no strike. Not a host cancel. |
 | Host no show | Full guest refund including platform fee, discretionary compensation, 2 strikes immediately, account reviewed |
 | 3 strikes | Listings auto deactivated |
 
@@ -454,6 +455,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-09-19 — Host Transfers are scheduled; Stripe logs stay empty until the job runs.** Not a new money-flow decision. `release-payout` existed but nothing invoked it, so Connect Transfers (`tr_`) never appeared. Staging uses pg_cron + Vault (`00010`). The GitHub Action is the extra caller once that workflow is on `main` (GitHub `schedule` only runs there). Platform payouts stay **manual**. Do not Transfer without `source_transaction` after a platform bank payout; that would take a later guest's funds. Ops steps live in OPERATIONS.md.
 
 **2026-09-24 — Guest review INSERT is gated in the database.** Supersedes the Part A note that the dashboard and RLS still allowed `pending`. `00011` requires a confirmed booking, a session that has ended (`starts_at + duration_mins`), `reviewee_id` the listing host, and one review per booking per role. Host→guest reviews remain unbuilt.
+
+**2026-09-29 — Hosts can delete an empty upcoming session on their own listing.** Not a host cancel: no bookings means no refunds and no strike. `delete_empty_session` (`00012`) is security definer, listing-owner only, and refuses the write if any booking on the row is pending or confirmed. Success sets `sessions.status = 'cancelled'`; the row is never hard-deleted. Clients have no UPDATE grant on sessions, so this is the only host path. Hosting lists every upcoming non-cancelled session (not only those with bookings). Empty rows get Delete; booked rows keep Cancel. The listing page already selects `status = 'open'`, so cancelled sessions disappear there without a page change.
 
 ---
 

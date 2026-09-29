@@ -20,6 +20,12 @@ function formatSessionDateTime(iso) {
   return `${date} at ${time}`
 }
 
+function activeBookingsOn(session) {
+  return (session.bookings ?? []).filter(
+    (b) => b.status === 'pending' || b.status === 'confirmed'
+  )
+}
+
 export default function Hosting() {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -43,10 +49,13 @@ export default function Hosting() {
   const [sessionLoading, setSessionLoading] = useState(false)
 
   const [confirmCancelSessionId, setConfirmCancelSessionId] = useState(null)
+  const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState(null)
   const [confirmDeleteListingId, setConfirmDeleteListingId] = useState(null)
   const [cancelLoading, setCancelLoading] = useState(false)
+  const [deleteSessionLoading, setDeleteSessionLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [cancelError, setCancelError] = useState('')
+  const [deleteSessionError, setDeleteSessionError] = useState('')
   const [deleteError, setDeleteError] = useState('')
   const [payoutsEnabled, setPayoutsEnabled] = useState(true)
   const [payoutSetupLoading, setPayoutSetupLoading] = useState(false)
@@ -97,16 +106,14 @@ export default function Hosting() {
         `
         )
         .in('listing_id', listingIds)
+        .neq('status', 'cancelled')
         .gt('starts_at', new Date().toISOString())
         .order('starts_at', { ascending: true })
 
       if (sessionsError) {
         setError((prev) => prev || sessionsError.message)
       } else {
-        const withBookings = (sessionsData ?? []).filter((session) =>
-          session.bookings?.some((b) => b.status === 'pending' || b.status === 'confirmed')
-        )
-        setHostSessions(withBookings)
+        setHostSessions(sessionsData ?? [])
       }
     } else {
       setHostSessions([])
@@ -204,6 +211,7 @@ export default function Hosting() {
     }
 
     closeSessionForm()
+    await loadData()
   }
 
   async function invokeAuthed(name, body) {
@@ -257,6 +265,25 @@ export default function Hosting() {
     await loadData()
   }
 
+  async function handleDeleteEmptySession(session) {
+    setDeleteSessionError('')
+    setDeleteSessionLoading(true)
+
+    const { error: rpcError } = await supabase.rpc('delete_empty_session', {
+      p_session_id: session.id,
+    })
+
+    setDeleteSessionLoading(false)
+
+    if (rpcError) {
+      setDeleteSessionError(rpcError.message)
+      return
+    }
+
+    setConfirmDeleteSessionId(null)
+    setHostSessions((prev) => prev.filter((s) => s.id !== session.id))
+  }
+
   async function handleDeleteListing(listingId) {
     setDeleteError('')
     setDeleteLoading(true)
@@ -304,6 +331,9 @@ export default function Hosting() {
 
       {error && <p className="error-message" style={{ marginBottom: '20px' }}>{error}</p>}
       {cancelError && <p className="error-message" style={{ marginBottom: '20px' }}>{cancelError}</p>}
+      {deleteSessionError && (
+        <p className="error-message" style={{ marginBottom: '20px' }}>{deleteSessionError}</p>
+      )}
       {deleteError && <p className="error-message" style={{ marginBottom: '20px' }}>{deleteError}</p>}
       {payoutSetupError && (
         <p className="error-message" style={{ marginBottom: '20px' }}>{payoutSetupError}</p>
@@ -348,10 +378,14 @@ export default function Hosting() {
         <h2 className="dashboard-section__title">Upcoming Hosted Sessions</h2>
 
         {hostSessions.length === 0 ? (
-          <p className="empty-state">No upcoming sessions with active bookings.</p>
+          <p className="empty-state">No upcoming sessions.</p>
         ) : (
           <div className="dashboard-list">
-            {hostSessions.map((session) => (
+            {hostSessions.map((session) => {
+              const activeBookings = activeBookingsOn(session)
+              const hasActiveBookings = activeBookings.length > 0
+
+              return (
               <div key={session.id} className="dashboard-card">
                 <p className="dashboard-card__title">
                   {session.listings?.title || 'Unknown listing'}
@@ -359,23 +393,36 @@ export default function Hosting() {
                 <p className="dashboard-card__meta">
                   {session.starts_at ? formatSessionDateTime(session.starts_at) : 'Date TBC'}
                   {' · '}
-                  {(session.bookings ?? []).filter(
-                    (b) => b.status === 'pending' || b.status === 'confirmed'
-                  ).length}{' '}
+                  {activeBookings.length}{' '}
                   active booking(s)
                 </p>
                 <div className="booking-card__actions">
-                  {confirmCancelSessionId !== session.id && (
+                  {hasActiveBookings && confirmCancelSessionId !== session.id && (
                     <button
                       type="button"
                       onClick={() => {
                         setCancelError('')
+                        setConfirmDeleteSessionId(null)
                         setConfirmCancelSessionId(session.id)
                       }}
                       className="btn btn--ghost"
                       style={{ padding: '6px 14px', fontSize: '13px', color: 'var(--error)' }}
                     >
                       Cancel session
+                    </button>
+                  )}
+                  {!hasActiveBookings && confirmDeleteSessionId !== session.id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteSessionError('')
+                        setConfirmCancelSessionId(null)
+                        setConfirmDeleteSessionId(session.id)
+                      }}
+                      className="btn btn--ghost"
+                      style={{ padding: '6px 14px', fontSize: '13px', color: 'var(--error)' }}
+                    >
+                      Delete
                     </button>
                   )}
                 </div>
@@ -387,8 +434,7 @@ export default function Hosting() {
                       strike to your account. Three strikes will deactivate your listing.
                     </p>
                     <p className="cancel-confirm__note">
-                      {(session.bookings ?? [])
-                        .filter((b) => b.status === 'pending' || b.status === 'confirmed')
+                      {activeBookings
                         .map((b) => `Full refund of ${formatCents(b.total_amount)}`)
                         .join(' · ')}
                     </p>
@@ -413,8 +459,37 @@ export default function Hosting() {
                     </div>
                   </div>
                 )}
+
+                {confirmDeleteSessionId === session.id && (
+                  <div className="cancel-confirm">
+                    <p className="cancel-confirm__warning">
+                      Are you sure? This will hide the session from your listing. Guests will
+                      not be able to book it.
+                    </p>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <button
+                        type="button"
+                        disabled={deleteSessionLoading}
+                        onClick={() => handleDeleteEmptySession(session)}
+                        className="btn btn--primary"
+                        style={{ padding: '10px 20px', fontSize: '14px', background: 'var(--error)' }}
+                      >
+                        {deleteSessionLoading ? 'Deleting…' : 'Confirm delete'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteSessionId(null)}
+                        className="btn btn--ghost"
+                        style={{ padding: '10px 20px', fontSize: '14px' }}
+                      >
+                        Keep session
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>

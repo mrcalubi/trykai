@@ -345,6 +345,8 @@ describe('confirmRpcErrorKind', () => {
   it('treats an oversell as a refund-and-cancel, not a confirm', () => {
     expect(confirmRpcErrorKind('insufficient spots')).toBe('oversell')
     expect(confirmRpcErrorKind('INSUFFICIENT SPOTS remaining')).toBe('oversell')
+    expect(confirmRpcErrorKind('session not open')).toBe('oversell')
+    expect(confirmRpcErrorKind('SESSION NOT OPEN')).toBe('oversell')
     expect(confirmRpcErrorKind('booking not pending')).toBe('other')
     expect(confirmRpcErrorKind(undefined)).toBe('other')
   })

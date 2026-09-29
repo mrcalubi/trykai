@@ -233,7 +233,7 @@ describe('Dashboard empty states', () => {
     givenData({ isHost: true })
     await renderHosting()
 
-    expect(screen.getByText('No upcoming sessions with active bookings.')).toBeInTheDocument()
+    expect(screen.getByText('No upcoming sessions.')).toBeInTheDocument()
     expect(within(sectionFor('My Listings')).getByRole('link', { name: 'Create one' })).toHaveAttribute(
       'href',
       '/create-listing'
@@ -529,7 +529,7 @@ describe('Dashboard host cancellation', () => {
     expect(screen.getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
   })
 
-  it('lists only sessions that have active bookings', async () => {
+  it('lists upcoming sessions even when they have no active bookings', async () => {
     givenData({
       listings: [makeMyListing()],
       hostSessions: [
@@ -542,7 +542,73 @@ describe('Dashboard host cancellation', () => {
     })
     await renderHosting()
 
-    expect(within(sectionFor('Upcoming Hosted Sessions')).getAllByText('Latte art')).toHaveLength(1)
+    expect(within(sectionFor('Upcoming Hosted Sessions')).getAllByText('Latte art')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+  })
+
+  it('excludes cancelled sessions from the upcoming list', async () => {
+    givenData({ listings: [makeMyListing()], hostSessions: [] })
+    await renderHosting()
+
+    expect(supabase.__lastCall('sessions', 'select').filters).toContainEqual({
+      method: 'neq',
+      column: 'status',
+      value: 'cancelled',
+    })
+  })
+
+  it('lets the owner delete an empty session', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [makeHostSession({ bookings: [] })],
+    })
+    supabase.rpc.mockImplementation(async (name) => {
+      if (name === 'delete_empty_session') return { data: 'session-1', error: null }
+      return { data: null, error: null }
+    })
+    const { user } = await renderHosting()
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    await waitFor(() =>
+      expect(
+        within(sectionFor('Upcoming Hosted Sessions')).queryByText('Latte art')
+      ).not.toBeInTheDocument()
+    )
+    expect(supabase.rpc).toHaveBeenCalledWith('delete_empty_session', {
+      p_session_id: 'session-1',
+    })
+  })
+
+  it('does not let a non-owner delete a session', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [makeHostSession({ bookings: [] })],
+    })
+    supabase.rpc.mockImplementation(async (name) => {
+      if (name === 'delete_empty_session') {
+        return { data: null, error: { message: 'not allowed' } }
+      }
+      return { data: null, error: null }
+    })
+    const { user } = await renderHosting()
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByText('not allowed')).toBeInTheDocument()
+    expect(within(sectionFor('Upcoming Hosted Sessions')).getByText('Latte art')).toBeInTheDocument()
+  })
+
+  it('does not offer Delete on a session with a confirmed booking', async () => {
+    givenData({ listings: [makeMyListing()], hostSessions: [makeHostSession()] })
+    await renderHosting()
+
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
+    expect(supabase.rpc.mock.calls.some(([name]) => name === 'delete_empty_session')).toBe(false)
   })
 
   it('warns about the strike before cancelling', async () => {
