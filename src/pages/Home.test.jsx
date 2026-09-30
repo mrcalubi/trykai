@@ -115,7 +115,9 @@ describe('Home listing grid', () => {
     renderWithRouter(<Home />)
 
     const latte = await screen.findByRole('link', { name: /Latte art/ })
-    expect(latte.textContent).toContain('$51/person · ★ 4.8 (12)')
+    expect(latte.textContent).toContain('$51/person')
+    expect(latte.textContent).toContain('★ 4.8 (12)')
+    expect(latte.textContent).not.toContain('·')
     const boxing = screen.getByRole('link', { name: /Boxing basics/ })
     expect(boxing.textContent).not.toContain('★')
     expect(within(boxing).getByText('$34/person')).toBeInTheDocument()

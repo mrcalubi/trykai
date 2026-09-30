@@ -350,24 +350,47 @@ describe('Dashboard listings', () => {
       'src',
       'https://cdn.test/latte.jpg'
     )
-    expect(within(card).getByRole('button', { name: 'Add session' })).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Add session' }).className).toContain(
+      'hosting-listing__add'
+    )
     expect(within(sectionFor('My Listings')).getByRole('link', { name: '+ New listing' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
     expect(card.querySelector('.hosting-listing__text')).toBeInTheDocument()
+    expect(card.querySelector('.hosting-listing__menu')).toBeInTheDocument()
+    expect(card.className).toContain('hosting-listing-card')
   })
 
-  it('stacks My Listings actions under the title on phone and keeps the text column shrinkable', () => {
+  it('keeps thumbnail and title on one line, the menu in the card corner, and two columns from 1024px', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
     const listing = css.match(/\.hosting-listing \{[\s\S]*?\n\}/)
+    const main = css.match(/\.hosting-listing__main \{[\s\S]*?\n\}/)
     const text = css.match(/\.hosting-listing__text \{[\s\S]*?\n\}/)
+    const menu = css.match(/\.ui-overflow\.hosting-listing__menu \{[\s\S]*?\n\}/)
+    const add = css.match(/\.hosting-listing__add \{[\s\S]*?\n\}/)
+    const card = css.match(/\.dashboard-card\.hosting-listing-card \{[\s\S]*?\n\}/)
+    const listings = css.match(/\.dashboard-list--listings \{[\s\S]*?\n\}/)
     expect(listing?.[0]).toMatch(/flex-direction:\s*column/)
     expect(listing?.[0]).not.toMatch(/flex-wrap:\s*wrap/)
+    expect(main?.[0]).toMatch(/display:\s*flex/)
+    expect(main?.[0]).not.toMatch(/flex-direction:\s*column/)
     expect(text?.[0]).toMatch(/flex:\s*1/)
     expect(text?.[0]).toMatch(/min-width:\s*0/)
+    expect(menu?.[0]).toMatch(/position:\s*absolute/)
+    expect(menu?.[0]).toMatch(/top:\s*4px/)
+    expect(menu?.[0]).toMatch(/right:\s*4px/)
+    expect(add?.[0]).toMatch(/width:\s*100%/)
+    expect(card?.[0]).toMatch(/padding:\s*12px/)
+    expect(listings?.[0]).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/)
     expect(css).toMatch(
+      /@media \(min-width: 1024px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
+    )
+    expect(css).not.toMatch(
       /@media \(min-width: 768px\) \{\s*\.hosting-listing \{\s*flex-direction:\s*row;/
+    )
+    expect(css).not.toMatch(
+      /@media \(min-width: 768px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2/
     )
   })
 

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Profile from './Profile'
@@ -149,8 +151,11 @@ describe('Profile public content', () => {
     ])
     renderPage()
 
-    expect(await screen.findByText('4.5 · 2 reviews')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Reviews (2)' })).toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Reviews (2)' })
+    expect(document.querySelector('.detail-host__rating').textContent.replace(/\s+/g, ' ').trim()).toBe(
+      '★ 4.5 · 2 reviews'
+    )
+    expect(document.querySelector('.detail-host__star')).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('loads reviews through reviews_for_host, not a bookings embed', async () => {
@@ -218,7 +223,9 @@ describe('Profile public content', () => {
     renderPage()
 
     const latte = await screen.findByRole('link', { name: /Latte art/ })
-    expect(latte.textContent).toContain('$51/person · ★ 4.8 (12)')
+    expect(latte.textContent).toContain('$51/person')
+    expect(latte.textContent).toContain('★ 4.8 (12)')
+    expect(latte.textContent).not.toContain('·')
     const pourOver = screen.getByRole('link', { name: /Pour over/ })
     expect(pourOver.textContent).not.toContain('★')
   })
@@ -277,6 +284,18 @@ describe('Profile own tabs', () => {
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
+  })
+
+  it('scrolls the tab bar horizontally without showing a scrollbar in any browser', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    const tabs = css.match(/\.profile-tabs \{[\s\S]*?\n\}/)
+    expect(tabs?.[0]).toMatch(/overflow-x:\s*auto/)
+    expect(tabs?.[0]).toMatch(/overflow-y:\s*hidden/)
+    expect(tabs?.[0]).toMatch(/scrollbar-width:\s*none/)
+    expect(tabs?.[0]).toMatch(/-ms-overflow-style:\s*none/)
+    expect(css).toMatch(/\.profile-tabs::-webkit-scrollbar(?:,[\s\S]*?)? \{[\s\S]*?display:\s*none/)
+    expect(css).toMatch(/\.profile-tabs::-webkit-scrollbar-track(?:,[\s\S]*?)? \{[\s\S]*?display:\s*none/)
+    expect(css).toMatch(/\.profile-tabs::-webkit-scrollbar-thumb(?:,[\s\S]*?)? \{[\s\S]*?display:\s*none/)
   })
 
   it('keeps Bookings as the default tab and writes it into tab links', async () => {

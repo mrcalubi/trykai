@@ -59,8 +59,10 @@ scaled up with `min-width` queries only. Never `max-width`.
 User-written copy (listing titles, descriptions, review comments, booking
 titles) shares one `overflow-wrap: break-word` rule. Flex text columns next to
 a fixed sibling get `flex: 1` and `min-width: 0` so a long word wraps instead of
-shrinking the line to one character. My Listings rows stack on phone
-(thumbnail + title, then actions) and sit on one row from 768px.
+shrinking the line to one character. My Listings is one card per row below
+1024px and two from 1024px. Each card keeps thumbnail and title on one line,
+with the ⋯ menu in the top-right corner and a full-width Add session button
+below.
 
 Fonts are referenced through `--display` (Bricolage Grotesque), `--sans`
 (Manrope), and `--mono` (Space Mono) so the typefaces can be changed in one
@@ -366,6 +368,7 @@ src/
 │   ├── RequireAdmin.jsx         # is_admin via my_verification(); renders only
 │   ├── ListingCard.jsx          # Superseded by ui/Card browse mode; no page renders it
 │   ├── ReviewCard.jsx
+│   ├── HostRating.jsx           # Profile header and listing-detail Hosted by star + average
 │   ├── StarPicker.jsx
 │   ├── CancellationPolicy.jsx   # Collapsible / info blocks
 │   └── ui/
@@ -472,7 +475,7 @@ Use these alongside the code. When you are reading a file and wondering what it 
 
 *Sarah, 23, saw a latte art session shared on Instagram.*
 
-**1. Lands on trykai.sg.** The Lane 1 headline (“Singapore's not boring…”) sits above the filters and grid. `Home.jsx` fetches listings where `is_active = true`, ordered `created_at` desc, then calls `listing_ratings` once with those ids. Each listing renders through `ui/Card` in browse mode: square photo, category badge overlaid top-left, title clamped to two lines (no reserved empty second line), then one meta line carrying the all-in card price and, only when that listing has guest reviews, `★ 4.8 (12)` with the star in `--star`. No reviews means price only, never an empty star. No sort UI. Grid is 2 columns on phone, 3 from 768px, 4 from 1024px. `full_address` is not fetched. `is_suspended` is not queried; a suspended host's active listings still appear.
+**1. Lands on trykai.sg.** The Lane 1 headline (“Singapore's not boring…”) sits above the filters and grid. `Home.jsx` fetches listings where `is_active = true`, ordered `created_at` desc, then calls `listing_ratings` once with those ids. Each listing renders through `ui/Card` in browse mode: square photo, category badge overlaid top-left, title clamped to two lines (no reserved empty second line), then one meta line with the all-in card price on the left and, only when that listing has guest reviews, `★ 4.8 (12)` on the right in the body font (`--sans`, text colour, count in `--muted`). No reviews means price only, never an empty star. No sort UI. Grid is 2 columns on phone, 3 from 768px, 4 from 1024px. `full_address` is not fetched. `is_suspended` is not queried; a suspended host's active listings still appear.
 
 **2. Filters by category and area.** Filtering is client side on the already fetched array. Category pills are derived from listing data (not a hardcoded six-category list). No additional database call.
 
@@ -540,7 +543,7 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 ## 10. Pages (what they actually do)
 
-**Home.jsx** — Lane 1 headline, then browse of active listings. Category pills derived from data, area dropdown, combinable, newest first. One `listing_ratings` call for the page; cards show `★ average (count)` only when that listing has guest reviews. No auth required. No sort by price or reviews.
+**Home.jsx** — Lane 1 headline, then browse of active listings. Category pills derived from data, area dropdown, combinable, newest first. One `listing_ratings` call for the page; cards put price on the left of the meta line and `★ average (count)` on the right only when that listing has guest reviews (body font, count muted). No auth required. No sort by price or reviews.
 
 **Login.jsx** — kit `Input` for full name, display name ("What should we call you?"), email, and password. Full name, display name, email, and password use floating labels. Display name is required, max 40 characters, with hint "Shown on your profile and reviews." Password also uses the eye toggle. Login and signup. Does not insert into `users`. Login mode links to `/forgot-password`. No T&C checkbox.
 
@@ -548,9 +551,9 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **ResetPassword.jsx** — public. Shows the new-password form only for a genuine recovery (`type=recovery` in the landing URL or `PASSWORD_RECOVERY`). Expired or missing recovery shows a link back to `/forgot-password`. `updateUser({ password })` then goes to `/bookings` (which redirects to the own-profile Bookings tab).
 
-**ListingDetail.jsx** — listing, gallery (swipe on phone, mosaic from 1024px), host display name/avatar high under the area (links to `/u/:hostId`; falls back to first name), host rating as average and count across all their listings (hidden when none), open future sessions, collapsible cancellation policy, guest reviews for this listing via `reviews_for_listing` (not a bookings embed; reviewer display names from the RPC), Card vs PayNow checkout. Two columns with a sticky booking card from 1024px. `guests_count` always 1. `full_address` only via RPC after a confirmed booking.
+**ListingDetail.jsx** — listing, gallery (swipe on phone, mosaic from 1024px), host display name/avatar high under the area (links to `/u/:hostId`; falls back to first name), host rating as `★ average · N reviews` (`HostRating`, star in `--star`) across all their listings (hidden when none), open future sessions, collapsible cancellation policy, guest reviews for this listing via `reviews_for_listing` (not a bookings embed; reviewer display names from the RPC), Card vs PayNow checkout. Two columns with a sticky booking card from 1024px. `guests_count` always 1. `full_address` only via RPC after a confirmed booking.
 
-**Profile.jsx** — `/u/:id` is public. Avatar, display name (first name if `display_name` is empty), ID-verified badge if `verification_status = 'approved'`, host rating across all listings (hidden when none). Other people's profiles show stacked active listings (browse `Card`s, with `listing_ratings` once for those ids) and reviews received as a host via `reviews_for_host`. Does not show reviews they wrote as a guest. Your own profile adds a gear to `/settings` and a horizontally scrolling tab bar: Bookings (default), Hosting (hosts only), Listings, Reviews. The active tab is `?tab=`. Bookings and Hosting are the existing page components mounted as panels (`embedded` hides their Dashboard heading). A non-host's own Listings tab is a Become a host prompt to `/create-listing`.
+**Profile.jsx** — `/u/:id` is public. Avatar, display name (first name if `display_name` is empty), ID-verified badge if `verification_status = 'approved'`, host rating as `★ average · N reviews` (`HostRating`, star in `--star`) across all listings (hidden when none). Other people's profiles show stacked active listings (browse `Card`s, with `listing_ratings` once for those ids) and reviews received as a host via `reviews_for_host`. Does not show reviews they wrote as a guest. Your own profile adds a gear to `/settings` and a horizontally scrolling tab bar (overflow-x, no visible scrollbar): Bookings (default), Hosting (hosts only), Listings, Reviews. The active tab is `?tab=`. Bookings and Hosting are the existing page components mounted as panels (`embedded` hides their Dashboard heading). A non-host's own Listings tab is a Become a host prompt to `/create-listing`.
 
 **CreateListing.jsx** — auth required. Verification gate. Listing insert then `is_host = true`, then `/dashboard` (redirects to `/bookings`, then the own-profile Bookings tab). CancellationPolicyInfo on the form. First session is a separate Hosting-tab action.
 
@@ -564,7 +567,7 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **Bookings.jsx** — guest: upcoming and past bookings, Cancel with calculated refund shown, leave review after the session ends on confirmed only. Polls `?booking=` after Payment Element return, then drops only that key so `tab` stays. Mounted on the own-profile Bookings tab; `/bookings` itself is a redirect.
 
-**Hosting.jsx** — host: My Listings heading with “+ New listing”; each listing is a thumbnail row that opens Edit, with one Add session button and a ⋯ menu (View listing, Edit, Delete). On phone the thumbnail and title stack above the actions; from 768px they share a row. Delete confirms through `delete_listing` (blocked copy when upcoming bookings exist). All upcoming non-cancelled sessions (Delete when empty, Cancel with strike warning when there are pending or confirmed bookings); Connect payout setup. Admins with `pending_count > 0` see a one-line “N verifications waiting · Review” banner. Reads `?connect=` then drops only that key. A signed-in user who is not a host is redirected to `/bookings` if this page is mounted directly. Mounted on the own-profile Hosting tab; `/hosting` itself is a redirect.
+**Hosting.jsx** — host: My Listings heading with “+ New listing”; one card per row below 1024px, two from 1024px. Each card is a thumbnail plus title on one line (opens Edit), a ⋯ menu in the top-right corner (View listing, Edit, Delete), and a full-width Add session button below. Delete confirms through `delete_listing` (blocked copy when upcoming bookings exist). All upcoming non-cancelled sessions (Delete when empty, Cancel with strike warning when there are pending or confirmed bookings); Connect payout setup. Admins with `pending_count > 0` see a one-line “N verifications waiting · Review” banner. Reads `?connect=` then drops only that key. A signed-in user who is not a host is redirected to `/bookings` if this page is mounted directly. Mounted on the own-profile Hosting tab; `/hosting` itself is a redirect.
 
 **Settings.jsx** — auth required. Grouped as Profile (photo, display name, full name with hint "Private, never shown publicly.") and Account (email read-only, deletion contact line). Log out is a button at the bottom. `display_name` UPDATE granted in `00014`; `full_name` and `avatar_url` from `00005` after `00007` revoked verification fields. Linked from the gear on your own profile, not the hamburger or an avatar menu.
 

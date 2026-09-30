@@ -591,10 +591,25 @@ export default function Hosting({ embedded = false }) {
             <Link to="/create-listing">Create one</Link>
           </p>
         ) : (
-          <div className="dashboard-list">
+          <div className="dashboard-list dashboard-list--listings">
             {listings.map((listing) => (
-              <div key={listing.id} className="dashboard-card">
+              <div key={listing.id} className="dashboard-card hosting-listing-card">
                 <div className="hosting-listing">
+                  <OverflowMenu
+                    className="hosting-listing__menu"
+                    items={[
+                      { label: 'View listing', to: `/listings/${listing.id}` },
+                      { label: 'Edit', to: `/edit-listing/${listing.id}` },
+                      {
+                        label: 'Delete',
+                        destructive: true,
+                        onSelect: () => {
+                          setDeleteError('')
+                          setConfirmDeleteListingId(listing.id)
+                        },
+                      },
+                    ]}
+                  />
                   <Link
                     to={`/edit-listing/${listing.id}`}
                     className="hosting-listing__main"
@@ -618,32 +633,17 @@ export default function Hosting({ embedded = false }) {
                       </p>
                     </div>
                   </Link>
-                  <div className="hosting-listing__actions">
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        activeFormId === listing.id
-                          ? closeSessionForm()
-                          : openSessionForm(listing.id)
-                      }
-                    >
-                      {activeFormId === listing.id ? 'Cancel' : 'Add session'}
-                    </Button>
-                    <OverflowMenu
-                      items={[
-                        { label: 'View listing', to: `/listings/${listing.id}` },
-                        { label: 'Edit', to: `/edit-listing/${listing.id}` },
-                        {
-                          label: 'Delete',
-                          destructive: true,
-                          onSelect: () => {
-                            setDeleteError('')
-                            setConfirmDeleteListingId(listing.id)
-                          },
-                        },
-                      ]}
-                    />
-                  </div>
+                  <Button
+                    className="hosting-listing__add"
+                    variant="secondary"
+                    onClick={() =>
+                      activeFormId === listing.id
+                        ? closeSessionForm()
+                        : openSessionForm(listing.id)
+                    }
+                  >
+                    {activeFormId === listing.id ? 'Cancel' : 'Add session'}
+                  </Button>
                 </div>
 
                 {activeFormId === listing.id && (
