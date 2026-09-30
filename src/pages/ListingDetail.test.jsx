@@ -153,8 +153,11 @@ describe('ListingDetail content', () => {
     givenHostReviews([makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })])
     renderPage()
 
-    expect(await screen.findByText('4.5 · 2 reviews')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Reviews (2)' })).toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Reviews (2)' })
+    expect(document.querySelector('.detail-host__rating').textContent.replace(/\s+/g, ' ').trim()).toBe(
+      '★ 4.5 · 2 reviews'
+    )
+    expect(document.querySelector('.detail-host__star')).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('rates the host from every listing, not only this one', async () => {
@@ -166,8 +169,11 @@ describe('ListingDetail content', () => {
     ])
     renderPage()
 
-    expect(await screen.findByText('3.0 · 2 reviews')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Reviews (1)' })).toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Reviews (1)' })
+    expect(document.querySelector('.detail-host__rating').textContent.replace(/\s+/g, ' ').trim()).toBe(
+      '★ 3.0 · 2 reviews'
+    )
+    expect(document.querySelector('.detail-host__star')).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('loads the host average by reviewee_id and listing reviews through the RPC', async () => {

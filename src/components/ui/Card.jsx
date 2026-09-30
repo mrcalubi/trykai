@@ -19,7 +19,9 @@ function RatingMark({ rating, reviewCount }) {
         ★
       </span>{' '}
       {formatRating(rating)}
-      {hasReviewCount(reviewCount) ? ` (${reviewCount})` : ''}
+      {hasReviewCount(reviewCount) ? (
+        <span className="ui-card__review-count"> ({reviewCount})</span>
+      ) : null}
     </>
   )
 }
@@ -59,15 +61,12 @@ export default function Card({
       ? { to, className: classes, ...props }
       : { className: classes, ...props }
 
-  // Browse keeps price and rating on one line, so the price is a bare text node
-  // rather than its own element: the line itself carries the price styling.
   const browseMetaLine =
     price || showRating ? (
       <p className="ui-card__meta-line">
-        {price}
+        {price ? <span className="ui-card__price-text">{price}</span> : null}
         {showRating ? (
           <span className="ui-card__rating">
-            {price ? <span aria-hidden="true"> · </span> : null}
             <RatingMark rating={rating} reviewCount={reviewCount} />
           </span>
         ) : null}

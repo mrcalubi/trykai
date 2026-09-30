@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { AuthedUserContext } from '../lib/authedUser'
 import { publicName } from '../lib/publicName'
+import HostRating from '../components/HostRating'
 import ReviewCard from '../components/ReviewCard'
 import Card from '../components/ui/Card'
 import { formatGuestFacingPrice } from '../lib/pricing'
@@ -11,13 +12,6 @@ import Bookings from './Bookings'
 import Hosting from './Hosting'
 
 const OWN_TABS = ['bookings', 'hosting', 'listings', 'reviews']
-
-function formatHostRating(reviews) {
-  if (!reviews?.length) return null
-  const average = (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
-  const count = reviews.length
-  return `${average} · ${count} ${count === 1 ? 'review' : 'reviews'}`
-}
 
 function tabSearch(searchParams, tab) {
   const params = new URLSearchParams(searchParams)
@@ -186,7 +180,6 @@ export default function Profile() {
   }
 
   const givenName = publicName(profile) || 'Anonymous'
-  const hostRating = formatHostRating(reviews)
   const verified = profile.verification_status === 'approved'
   const isOwn = viewerId === id
   const isHost = Boolean(profile.is_host)
@@ -213,7 +206,7 @@ export default function Profile() {
         <div className="profile-header__copy">
           <h1 className="profile-header__name">{givenName}</h1>
           {verified ? <p className="profile-verified">ID verified</p> : null}
-          {hostRating ? <p className="detail-host__rating">{hostRating}</p> : null}
+          <HostRating reviews={reviews} />
         </div>
         {isOwn ? (
           <Link to="/settings" className="profile-header__settings" aria-label="Settings">

@@ -105,8 +105,11 @@ describe('Card', () => {
     expect(screen.getByText('Food')).toBeInTheDocument()
     expect(container.querySelectorAll('.ui-card__meta-line')).toHaveLength(1)
     expect(container.querySelector('.ui-card__meta-line').textContent).toBe(
-      '$20/person · ★ 4.8'
+      '$20/person★ 4.8'
     )
+    expect(container.querySelector('.ui-card__price-text').textContent).toBe('$20/person')
+    expect(container.querySelector('.ui-card__rating').textContent).toBe('★ 4.8')
+    expect(container.querySelector('.ui-card__meta-line').className).toBe('ui-card__meta-line')
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
@@ -124,8 +127,9 @@ describe('Card', () => {
       </MemoryRouter>
     )
 
-    expect(container.querySelector('.ui-card__meta-line').textContent).toBe('$28 · ★ 4.8 (12)')
+    expect(container.querySelector('.ui-card__meta-line').textContent).toBe('$28★ 4.8 (12)')
     expect(container.querySelector('.ui-card__star')).toBeInTheDocument()
+    expect(container.querySelector('.ui-card__review-count').textContent).toBe(' (12)')
   })
 
   it('drops the dot and the star in browse mode when there is no rating', () => {
@@ -146,9 +150,16 @@ describe('Card', () => {
     expect(browseTitle[0]).not.toMatch(/min-height/)
   })
 
-  it('colours the star with the --star token', () => {
+  it('colours booking-mode stars with --star and browse stars as text', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../../index.css'), 'utf8')
     expect(css).toMatch(/\.ui-card__star \{[\s\S]*?color:\s*var\(--star\)/)
+    const browseStar = css.match(/\.ui-card--browse \.ui-card__star \{[\s\S]*?\n\}/)
+    expect(browseStar?.[0]).toMatch(/color:\s*inherit/)
+    const browseRating = css.match(/\.ui-card--browse \.ui-card__rating \{[\s\S]*?\n\}/)
+    expect(browseRating?.[0]).toMatch(/font-family:\s*var\(--sans\)/)
+    expect(css).toMatch(/\.ui-card--browse \.ui-card__review-count \{[\s\S]*?color:\s*var\(--muted\)/)
+    const metaLine = css.match(/\.ui-card__meta-line \{[\s\S]*?\n\}/)
+    expect(metaLine?.[0]).toMatch(/justify-content:\s*space-between/)
   })
 
   it('lets the title column shrink inside the grid instead of overflowing', () => {

@@ -4,6 +4,7 @@ import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from '../lib/supabase'
 import ReviewCard from '../components/ReviewCard'
+import HostRating from '../components/HostRating'
 import PhotoLightbox from '../components/PhotoLightbox'
 import { CancellationPolicyCollapsible } from '../components/CancellationPolicy'
 import { formatCents } from '../lib/cancellationPolicy'
@@ -33,13 +34,6 @@ function formatSessionTime(iso) {
     minute: '2-digit',
     timeZone: 'Asia/Singapore',
   }).format(new Date(iso))
-}
-
-function formatHostRating(reviews) {
-  if (!reviews?.length) return null
-  const average = (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
-  const count = reviews.length
-  return `${average} · ${count} ${count === 1 ? 'review' : 'reviews'}`
 }
 
 function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel }) {
@@ -323,7 +317,6 @@ export default function ListingDetail() {
 
   const host = listing.users
   const photos = listing.photo_urls?.length ? listing.photo_urls : []
-  const hostRating = formatHostRating(hostReviews)
   const cardPrice = guestFacingPriceCents(listing.price_per_person)
   const paynowPrice = paynowPriceCents(listing.price_per_person)
   const checkoutPrice = checkoutRail
@@ -402,7 +395,7 @@ export default function ListingDetail() {
                   publicName(host) || 'Anonymous'
                 )}
               </p>
-              {hostRating ? <p className="detail-host__rating">{hostRating}</p> : null}
+              <HostRating reviews={hostReviews} />
             </div>
           </div>
 
