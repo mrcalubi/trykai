@@ -79,7 +79,7 @@ Final wordmark execution not yet locked — direction is set; the specific lette
 
 ## 7. Component library and UI decisions (built 24 to 25 August 2026)
 
-A reusable component library now exists in this tree, built in plain CSS matching `index.css` (the project does not use Tailwind), previewable at a private `/style-guide` route. **Partly wired: TopNav and HamburgerMenu are the live chrome, Card browse mode is the live browse grid, Settings uses Button and Input, and Login uses Input for email and password.** SelectableCard is still preview only. Components: Button (primary, secondary, destructive), Input (with label, error state, optional floating-label mode, password show/hide), Card (borderless browse mode and boxed booking mode), SelectableCard (compact horizontal category bar), TopNav, HamburgerMenu.
+A reusable component library now exists in this tree, built in plain CSS matching `index.css` (the project does not use Tailwind), previewable at a private `/style-guide` route. **Partly wired: TopNav and HamburgerMenu are the live chrome, Card browse mode is the live browse grid, Settings uses Button and Input, Hosting listing rows use Button and OverflowMenu, and Login uses Input for email and password.** SelectableCard is still preview only. Components: Button (primary, secondary, destructive), Input (with label, error state, optional floating-label mode, password show/hide), Card (borderless browse mode and boxed booking mode), OverflowMenu (⋯ actions, keyboard and phone), SelectableCard (compact horizontal category bar), TopNav, HamburgerMenu.
 
 **Decisions locked while building these, mobile-first throughout:**
 
@@ -88,11 +88,12 @@ A reusable component library now exists in this tree, built in plain CSS matchin
 - **Top nav.** Centered logo with a Mous-style scroll behaviour: at the top it shows the logo mark plus "TryKai" wordmark at full height; on scroll the wordmark hides and the bar shrinks; returns on scroll to top. Hamburger top-left, login top-right. Logged-out shows a "Log in" link; logged-in shows the user's avatar (photo, or initials in a navy/cream circle if no photo) linking to their own `/u/:id`. Settings is a gear on that profile; Log out is on `/settings`. There is no avatar dropdown.
 - **Navigation is top nav, not bottom nav, for launch.** A bottom tab bar was wanted but rejected for now because as a mobile website (not an app) it collides with the browser's own bottom chrome. Revisit a bottom nav when TryKai becomes a native app, which is the right time to get it properly rather than a compromised web version.
 - **Hamburger menu** slides in from the left with a slight staggered fade per row. Signed-in: Browse, Create listing / Become a host, Verification review for admins. Signed-out: Log in or sign up, Browse, and the three policy links. Bookings and Hosting live as tabs on your own profile, not in the hamburger.
+- **Hosting My Listings** is a heading with “+ New listing” on the right. Each row is a small square thumbnail plus title; tapping the row opens Edit. On phone the thumbnail and title sit on top and the actions sit below; from 768px they share one row. One kit Button (Add session) stays visible. Further actions sit in a ⋯ OverflowMenu (View listing, Edit, Delete in `--error`) that works with keyboard and 44px phone targets, not hover.
 - **Category filter row** sits directly below the top nav as a horizontal band, scrollable sideways, and scrolls away with the content rather than staying pinned.
 
 **Browse experience decided (not all built):**
 - The Lane 1 headline from section 5 sits above the listings grid. No photo banner and no persistent search bar for launch. Two columns on phone (matching Airbnb's mobile browse density), three on tablet, four on desktop.
-- Card shows the category badge overlaid on the image top-left, title, a compact meta line with price and, only if a rating exists, the rating after a dot. A brand-new listing shows price only, never an empty star, deliberately unlike ToGatherSG's "0 reviews" look.
+- Card shows the category badge overlaid on the image top-left, title, a compact meta line with price and, only if a rating exists, `★ 4.8 (12)` after a dot. The star uses `--star`. A brand-new listing shows price only, never an empty star, deliberately unlike ToGatherSG's "0 reviews" look.
 - Only honest scarcity and real discounts as conversion nudges (real "spots left", real PayNow saving). No fabricated urgency, no fake "people viewing now".
 
 **Listing detail decided (built 11 September 2026):**
@@ -101,7 +102,7 @@ A reusable component library now exists in this tree, built in plain CSS matchin
 - Two columns from 1024px, content left and a sticky booking card right. Page content is capped narrower than the browse grid, because a description running the full width of a 1440px screen is unreadable.
 - **The host block stays high, directly under the area, at every width.** On TryKai the guest is buying time with a person, so who is teaching belongs in the first decision, not below the description. Reviews come last.
 
-**What Home actually does today (30 September 2026):** the browse decisions above are built, including the Lane 1 headline and subhead. Grid 2 / 3 / 4 at 768px and 1024px, square images with a cream fallback, category badge overlaid on a cream pill, title clamped to two lines without reserving an empty second line, and one meta line carrying the all-in price. The rating half of the meta line exists in `Card` but never fires on Home, because the listings fetch has no rating to pass; every card is therefore the price-only "new listing" state. Sort is newest only.
+**What Home actually does today (30 September 2026):** the browse decisions above are built, including the Lane 1 headline and subhead. Grid 2 / 3 / 4 at 768px and 1024px, square images with a cream fallback, category badge overlaid on a cream pill, title clamped to two lines without reserving an empty second line, and one meta line carrying the all-in price plus `★ average (count)` when `listing_ratings` returns reviews for that listing. No reviews means price only. Sort is newest only.
 
 ---
 

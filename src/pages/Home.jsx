@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Card from '../components/ui/Card'
+import { ratingsByListingId } from '../lib/listingRatings'
 import { formatGuestFacingPrice } from '../lib/pricing'
 
 export default function Home() {
   const [listings, setListings] = useState([])
+  const [ratings, setRatings] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('All')
@@ -29,9 +31,24 @@ export default function Home() {
 
       if (fetchError) {
         setError(fetchError.message)
-      } else {
-        setListings(data)
+        setListings([])
+        setRatings({})
+        setLoading(false)
+        return
       }
+
+      const rows = data ?? []
+      const listingIds = rows.map((listing) => listing.id)
+      let ratingRows = []
+      if (listingIds.length > 0) {
+        const { data: ratingData } = await supabase.rpc('listing_ratings', {
+          listing_ids: listingIds,
+        })
+        ratingRows = ratingData ?? []
+      }
+
+      setListings(rows)
+      setRatings(ratingsByListingId(ratingRows))
       setLoading(false)
     }
 
@@ -124,6 +141,8 @@ export default function Home() {
                   title={listing.title}
                   titleLevel={2}
                   price={`${formatGuestFacingPrice(listing.price_per_person)}/person`}
+                  rating={ratings[listing.id]?.rating}
+                  reviewCount={ratings[listing.id]?.reviewCount}
                 />
               ))}
             </div>

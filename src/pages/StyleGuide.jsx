@@ -217,7 +217,7 @@ export default function StyleGuide() {
             <p className="style-guide-card__label">Browse card</p>
             <p className="style-guide-card__usage">
               Category badge, title, then one meta line: price, and the rating only if the
-              listing has one. Whole card clickable.
+              listing has one, with the review count. Whole card clickable.
             </p>
             <Card
               mode="browse"
@@ -225,6 +225,7 @@ export default function StyleGuide() {
               badge="Food"
               title="Learn latte art with me"
               rating={4.8}
+              reviewCount={12}
               price="$20/person"
             />
           </article>
