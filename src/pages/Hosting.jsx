@@ -26,7 +26,7 @@ function activeBookingsOn(session) {
   )
 }
 
-export default function Hosting() {
+export default function Hosting({ embedded = false }) {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const userId = useAuthedUserId()
@@ -146,7 +146,11 @@ export default function Hosting() {
       } else {
         setPayoutSetupError('Please finish payout setup to receive payments.')
       }
-      setSearchParams({}, { replace: true })
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('connect')
+        return next
+      }, { replace: true })
     })
 
     return () => {
@@ -319,7 +323,7 @@ export default function Hosting() {
 
   return (
     <div className="page page--narrow">
-      <h1 className="dashboard-heading">Dashboard</h1>
+      {embedded ? null : <h1 className="dashboard-heading">Dashboard</h1>}
 
       {location.state?.message && (
         <p className="success-message">{location.state.message}</p>

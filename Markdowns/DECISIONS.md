@@ -16,9 +16,9 @@ Two host types on the same browse page. **Peer hosts**, everyday people monetisi
 ### Unified accounts
 One account type, both host and guest. Guest by default, becomes a host on first listing. `is_host` flag handles the distinction. Hosts get a visible badge.
 
-Guest bookings are at `/bookings`. Host listings, upcoming hosted sessions, and Stripe payout setup are at `/hosting`. `/dashboard` remains as a redirect so emails and Stripe `return_url`s keep working. Payouts stay in the host area, not account settings. A signed-in user who is not a host is redirected from `/hosting` to `/bookings`. Anyone's public profile is `/u/:id` (display name, listings, reviews received). Own bookings and hosting tabs on that page are not built.
+Guest bookings and host tools live as private tabs on your own `/u/:id` profile (Bookings, Hosting for hosts, Listings, Reviews). `/bookings` and `/hosting` redirect there with `?tab=` and keep every other query key, so `?booking=` polling and `?connect=` from Stripe still work. `/dashboard` remains as a first hop so emails and Stripe `return_url`s keep working (`?connect=` still goes to `/hosting` first). Payouts stay in the host area, not account settings. A signed-in user who is not a host does not see a Hosting tab; `/hosting` still lands on their profile and the unknown tab falls back to Bookings. Anyone's public profile is `/u/:id` (display name, listings, reviews received) with no private tabs and no settings gear.
 
-Profile name, display name, and photo are edited at `/settings`. Email is shown there but not changed in-app. Account deletion is contact-support only until the retain-transactions / remove-personal-data split is designed.
+Profile name, display name, and photo are edited at `/settings` (Profile group). Full name is labelled private, never shown publicly. Email is shown in Account but not changed in-app. Account deletion is contact-support only until the retain-transactions / remove-personal-data split is designed. Log out is on Settings. The avatar in the top nav goes to your own profile.
 
 ### Host price band
 S$10 to S$40 is **guidance** for hosts, not a hard rule. CreateListing does not enforce it. The band is where zero-fixed-cost supply sits and where the guest fee was tuned; it is not a CHECK constraint.
@@ -68,7 +68,7 @@ An optional layer hosts enable on Lane 1 listings only. Host specifies what is d
 ### Identity and social layer
 *Decided direction, to build post MVP, except the thin public profile below.*
 
-**Public profile, part 1 (29 September 2026).** `/u/:id` is public. Avatar, display name, ID-verified badge if approved, host rating and count (hidden when none), active listings, reviews received as a host. Reviews they wrote as a guest are not shown. Own bookings and hosting tabs on that page are part 2 and are not built. Public surfaces (this page, Hosted by, review cards) show `display_name`, falling back to the first word of `full_name`. Review RPCs return the reviewer's `display_name` in jsonb `users.full_name`. `full_name` is still SELECT-able through the API.
+**Public profile (30 September 2026).** `/u/:id` is public. Avatar, display name, ID-verified badge if approved, host rating and count (hidden when none), active listings, reviews received as a host. Reviews they wrote as a guest are not shown. Your own profile adds Bookings (default), Hosting (hosts only), Listings, and Reviews tabs, with a gear to `/settings`. Other people's profiles stay listings + reviews only. Public surfaces (this page, Hosted by, review cards) show `display_name`, falling back to the first word of `full_name`. Review RPCs return the reviewer's `display_name` in jsonb `users.full_name`. `full_name` is still SELECT-able through the API.
 
 The rest of the guest profile as a public artefact that accumulates remains post MVP. Every completed session adds to a visible log. Lane 2 progress shown explicitly with a progress indicator toward a stated goal.
 
@@ -327,6 +327,8 @@ trykai.sg via Vodien, two years, ~$75.98. SGNIC identity verification completed.
 
 Full visual identity is in DESIGN.md.
 
+**Chrome (30 September 2026).** The avatar in the top nav links to your own `/u/:id`. There is no avatar dropdown. Settings is a gear on your own profile header; Log out is on `/settings`. Signed-in hamburger: Browse, Create listing / Become a host, Verification review (admins only, via `my_verification()`). Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
+
 ---
 
 ## KIV: revisit at traction
@@ -452,7 +454,7 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-09-19 — Settings page at `/settings`.** Signed-in users can edit `full_name` and `avatar_url`. Email is read-only; change it via `hello@trykai.sg`. No in-app delete: deletion must keep transaction records for dispute and tax while removing personal data, and that split is not designed. Linked from the avatar account menu.
 
-**2026-09-19 — Hamburger is navigation; the avatar is the account menu.** Signed-in hamburger: Browse, My bookings, Hosting (hosts only), Create listing / Become a host (always, top-level so a non-host can start), Verification review (admins only, via `my_verification()`). Settings and Log out live on the avatar. Public profiles live at `/u/:id`; the hamburger still has no Profile link (own bookings/hosting tabs on that page are part 2). Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
+**2026-09-19 — Hamburger is navigation; the avatar is the account menu.** **Superseded 30 September 2026.** Signed-in hamburger: Browse, My bookings, Hosting (hosts only), Create listing / Become a host (always, top-level so a non-host can start), Verification review (admins only, via `my_verification()`). Settings and Log out live on the avatar. Public profiles live at `/u/:id`; the hamburger still has no Profile link (own bookings/hosting tabs on that page are part 2). Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
 
 **2026-09-19 — Login uses the kit Input.** Email is the floating-label variant; password is the password variant with the eye toggle. Both login and signup modes. Auth, redirect, and form-level error copy are unchanged.
 
@@ -468,6 +470,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-09-29 — S$10 to S$40 is guidance, not a rule.** Hosts are pointed at that band because it is where peer supply can price and where the guest fee was tuned. It is not enforced in CreateListing or as a CHECK. Supersedes wording that treated the band as a hard identity constraint.
 
 **2026-09-29 — Users choose a display name.** Public surfaces (profile, Hosted by, review cards) show `users.display_name` instead of splitting `full_name`. Signup asks "What should we call you?" and Settings edits it next to full name. Trimmed, 1 to 40 characters (`00014`). Existing rows are backfilled from the first word of `full_name`. `handle_new_user` reads it from signup metadata and falls back to that first word. Review RPCs return it in jsonb `users.full_name` so ReviewCard's shape is unchanged. `full_name` remains granted SELECT; it can be revoked for anon once nothing public reads it.
+
+**2026-09-30 — Own profile tabs; avatar goes to profile.** Part 2 of `/u/:id`. Your own profile shows Bookings (default), Hosting (hosts only), Listings, and Reviews, with the active tab in `?tab=`. Bookings and Hosting are the existing pages mounted as panels, not rewritten. `/bookings` and `/hosting` redirect to your profile with the matching tab and every other query key kept, so `?booking=` polling and `?connect=` from Stripe still work. `/dashboard` is still the first hop for emails and Stripe return URLs. Other people's profiles stay listings + reviews, with no private tabs and no gear. The avatar links to your own profile; the account dropdown is gone. Own-profile header has a gear to `/settings`. Settings is grouped as Profile (photo, display name, full name labelled private) and Account (email read-only, deletion contact line), with Log out at the bottom. Signed-in hamburger is Browse, Create listing / Become a host, and Verification review (admins). **Supersedes the 19 September 2026 "hamburger is navigation, avatar is account menu" entry.** Profile listing cards drop the browse-card two-line title min-height so there is no empty gap above the price.
 
 ---
 

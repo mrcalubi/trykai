@@ -23,7 +23,7 @@ function formatSessionDateTime(iso) {
   return `${date} at ${time}`
 }
 
-export default function Bookings() {
+export default function Bookings({ embedded = false }) {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const userId = useAuthedUserId()
@@ -145,20 +145,32 @@ export default function Bookings() {
 
         if (fetchError || !data) {
           setBookingStatusMessage('Could not verify your booking. Check My Bookings below.')
-          setSearchParams({}, { replace: true })
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('booking')
+            return next
+          }, { replace: true })
           return
         }
 
         if (data.status === 'confirmed') {
           setBookingStatusMessage('Booking confirmed! Your payment was successful.')
-          setSearchParams({}, { replace: true })
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('booking')
+            return next
+          }, { replace: true })
           await loadData()
           return
         }
 
         if (data.status === 'cancelled') {
           setBookingStatusMessage('This booking was not completed. You can try booking again.')
-          setSearchParams({}, { replace: true })
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('booking')
+            return next
+          }, { replace: true })
           return
         }
 
@@ -170,7 +182,11 @@ export default function Bookings() {
         setBookingStatusMessage(
           'Payment received — your booking should appear shortly. Refresh if it does not update.'
         )
-        setSearchParams({}, { replace: true })
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('booking')
+          return next
+        }, { replace: true })
       }
     }
 
@@ -289,7 +305,7 @@ export default function Bookings() {
 
   return (
     <div className="page page--narrow">
-      <h1 className="dashboard-heading">Dashboard</h1>
+      {embedded ? null : <h1 className="dashboard-heading">Dashboard</h1>}
 
       {location.state?.message && (
         <p className="success-message">{location.state.message}</p>

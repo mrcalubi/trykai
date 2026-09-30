@@ -11,8 +11,6 @@ const LOGGED_OUT_LINKS = [
 function loggedInLinks({ isAdmin, isHost }) {
   return [
     { label: 'Browse', to: '/' },
-    { label: 'My bookings', to: '/bookings' },
-    ...(isHost ? [{ label: 'Hosting', to: '/hosting' }] : []),
     {
       label: isHost ? 'Create listing' : 'Become a host',
       to: '/create-listing',

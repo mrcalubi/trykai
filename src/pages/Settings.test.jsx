@@ -63,9 +63,12 @@ describe('Settings access', () => {
       'full_name, display_name, email, avatar_url'
     )
     expect(screen.getByLabelText('Full name')).toHaveValue('Mei Ling')
+    expect(screen.getByText('Private, never shown publicly.')).toBeInTheDocument()
     expect(screen.getByLabelText('Display name')).toHaveValue('Mei')
     expect(screen.getByText('Shown on your profile and reviews.')).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toHaveValue('mei@example.com')
+    expect(screen.getByRole('heading', { name: 'Profile' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Account' })).toBeInTheDocument()
   })
 
   it('reports a load failure', async () => {
@@ -99,10 +102,19 @@ describe('Settings profile form', () => {
     await renderSettings()
 
     expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Delete your account' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Delete your account' })).not.toBeInTheDocument()
     expect(
       screen.getByText(/Transaction records may need to be kept for dispute and tax purposes/)
     ).toBeInTheDocument()
+  })
+
+  it('signs the user out and sends them home', async () => {
+    const { user, currentPath } = await renderSettings()
+
+    await user.click(screen.getByRole('button', { name: 'Log out' }))
+
+    expect(supabase.auth.signOut).toHaveBeenCalledOnce()
+    await waitFor(() => expect(currentPath()).toBe('/'))
   })
 
   it('requires a full name before saving', async () => {

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
@@ -117,5 +119,12 @@ describe('Card', () => {
 
     expect(container.querySelector('.ui-card__meta-line').textContent).toBe('$32/person')
     expect(container.querySelector('.ui-card__rating')).not.toBeInTheDocument()
+  })
+
+  it('does not reserve a second line under a one-line browse title', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../../index.css'), 'utf8')
+    const browseTitle = css.match(/\.ui-card--browse \.ui-card__title \{[\s\S]*?\n\}/)
+    expect(browseTitle?.[0]).toBeTruthy()
+    expect(browseTitle[0]).not.toMatch(/min-height/)
   })
 })

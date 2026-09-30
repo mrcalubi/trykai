@@ -28,7 +28,7 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 - Four tier cancellation refunds via `cancel-booking` (guest emailed the refund amount, including $0). `/bookings` and `/hosting` invoke that function; they do not PATCH bookings from the browser
 - CI: Vitest coverage floors 92% / 90% / 87%, money files 100%, Playwright desktop + phone, Deno type-check of shared Edge modules
 - Global chrome is `SiteNav` → `TopNav`. `Navbar.jsx` is deleted. Browse uses the kit `Card`. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only
-- Routes: `/bookings`, `/hosting`, `/settings`. `/dashboard` redirects. Login uses the kit Input with floating labels
+- Avatar goes to your own `/u/:id`. Signed-in hamburger is Browse, Create listing / Become a host, Verification review for admins. `/bookings` and `/hosting` redirect to profile tabs. `/settings` is Profile + Account, with Log out. `/dashboard` still redirects. Login uses the kit Input with floating labels
 - Resend from-address is `TryKai <no-reply@trykai.sg>`. trykai.sg is verified. Staging booking confirmation emails confirmed arriving
 - StyleGuide category PNGs (`food`, `fitness`, `arts`, `music`) are in `src/assets/categories/`. `public/trykai.png` exists
 - Edge Functions: `create-payment-intent`, `stripe-webhook`, `create-connect-account`, `create-account-link`, `cancel-booking`, `admin-cancel-booking`, `admin-verifications`, `create-identity-session`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`. `notify-verification-result` is gone

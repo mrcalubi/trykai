@@ -349,7 +349,8 @@ test.describe('booking reviews', () => {
     await expect(page).toHaveURL(/\/$/)
 
     await page.goto('/bookings')
-    await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible()
+    await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}`))
+    await expect(page.getByRole('heading', { name: 'My Bookings' })).toBeVisible()
   }
 
   const endedBooking = {

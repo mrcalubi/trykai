@@ -13,8 +13,7 @@ import CreateListing from './pages/CreateListing'
 import EditListing from './pages/EditListing'
 import VerifyIdentity from './pages/VerifyIdentity'
 import Dashboard from './pages/Dashboard'
-import Bookings from './pages/Bookings'
-import Hosting from './pages/Hosting'
+import RedirectToOwnProfile from './pages/RedirectToOwnProfile'
 import Settings from './pages/Settings'
 import AdminVerifications from './pages/AdminVerifications'
 import RefundPolicy from './pages/RefundPolicy'
@@ -61,7 +60,7 @@ export default function App() {
           path="/bookings"
           element={
             <RequireAuth>
-              <Bookings />
+              <RedirectToOwnProfile tab="bookings" />
             </RequireAuth>
           }
         />
@@ -69,7 +68,7 @@ export default function App() {
           path="/hosting"
           element={
             <RequireAuth>
-              <Hosting />
+              <RedirectToOwnProfile tab="hosting" />
             </RequireAuth>
           }
         />
