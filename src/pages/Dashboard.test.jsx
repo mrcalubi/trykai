@@ -1,8 +1,10 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Bookings from './Bookings'
 import Hosting from './Hosting'
 import Dashboard from './Dashboard'
+import RedirectToOwnProfile from './RedirectToOwnProfile'
 import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
@@ -102,6 +104,20 @@ function renderDashboardRedirect(options = {}) {
   )
 }
 
+function renderLegacyToProfile(route) {
+  return renderWithRouter(
+    <RequireAuth>
+      <Routes>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/bookings" element={<RedirectToOwnProfile tab="bookings" />} />
+        <Route path="/hosting" element={<RedirectToOwnProfile tab="hosting" />} />
+        <Route path="/u/:id" element={<p>own profile</p>} />
+      </Routes>
+    </RequireAuth>,
+    { route, path: '*', outlivesNavigation: true }
+  )
+}
+
 function sectionFor(title) {
   return screen.getByRole('heading', { name: title, level: 2 }).closest('section')
 }
@@ -141,6 +157,38 @@ describe('Dashboard redirect', () => {
 
     await waitFor(() => expect(currentPath()).toBe('/hosting'))
     expect(currentSearch()).toBe('?connect=return')
+  })
+})
+
+describe('Legacy paths to own profile', () => {
+  it('sends /bookings?booking= to the own profile bookings tab with the query intact', async () => {
+    givenSignedIn()
+    const { currentPath, currentSearch } = renderLegacyToProfile(
+      '/bookings?booking=booking-1'
+    )
+
+    await waitFor(() => expect(currentPath()).toBe(`/u/${USER_ID}`))
+    expect(currentSearch()).toBe('?booking=booking-1&tab=bookings')
+  })
+
+  it('keeps every extra query key on the /bookings redirect', async () => {
+    givenSignedIn()
+    const { currentPath, currentSearch } = renderLegacyToProfile(
+      '/bookings?booking=booking-1&ref=stripe'
+    )
+
+    await waitFor(() => expect(currentPath()).toBe(`/u/${USER_ID}`))
+    expect(currentSearch()).toBe('?booking=booking-1&ref=stripe&tab=bookings')
+  })
+
+  it('sends /dashboard?connect=return to the own profile hosting tab with the query intact', async () => {
+    givenSignedIn()
+    const { currentPath, currentSearch } = renderLegacyToProfile(
+      '/dashboard?connect=return'
+    )
+
+    await waitFor(() => expect(currentPath()).toBe(`/u/${USER_ID}`))
+    expect(currentSearch()).toBe('?connect=return&tab=hosting')
   })
 })
 

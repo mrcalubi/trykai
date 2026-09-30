@@ -175,7 +175,7 @@ test.describe('signed-out navigation', () => {
 })
 
 test.describe('signed-in navigation', () => {
-  test('the avatar menu holds Settings and Log out, not Profile', async ({ page }) => {
+  test('the avatar goes to your own profile, not an account menu', async ({ page }) => {
     await stubAllExternalCalls(
       page,
       { users: [{ id: SIGNED_IN_USER.id, full_name: 'Mei Ling', avatar_url: null, is_host: false }] },
@@ -188,17 +188,14 @@ test.describe('signed-in navigation', () => {
     await page.getByRole('button', { name: 'Log in' }).click()
     await expect(page).toHaveURL(/\/$/)
 
-    await page.getByRole('button', { name: 'Account' }).click()
-    const menu = page.getByRole('menu')
-    await expect(menu.getByRole('menuitem', { name: 'Settings' })).toBeVisible()
-    await expect(menu.getByRole('menuitem', { name: 'Log out' })).toBeVisible()
-    await expect(menu.getByRole('menuitem', { name: 'Profile' })).toHaveCount(0)
-
-    await menu.getByRole('menuitem', { name: 'Settings' }).click()
-    await expect(page).toHaveURL(/\/settings$/)
+    await page.getByRole('link', { name: 'Your profile' }).click()
+    await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}`))
+    await expect(page.getByRole('navigation', { name: 'Profile' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible()
+    await expect(page.getByRole('menu')).toHaveCount(0)
   })
 
-  test('the hamburger is navigation only, with Become a host for a guest', async ({ page }) => {
+  test('the hamburger is Browse, Become a host, and admin review only', async ({ page }) => {
     await stubAllExternalCalls(
       page,
       { users: [{ id: SIGNED_IN_USER.id, full_name: 'Mei Ling', avatar_url: null, is_host: false }] },
@@ -215,11 +212,11 @@ test.describe('signed-in navigation', () => {
     const menu = page.getByRole('navigation', { name: 'Main menu' })
 
     await expect(menu.getByRole('link', { name: 'Browse' })).toBeVisible()
-    await expect(menu.getByRole('link', { name: 'My bookings' })).toBeVisible()
     await expect(menu.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
+    await expect(menu.getByRole('link', { name: 'My bookings' })).toHaveCount(0)
     await expect(menu.getByRole('link', { name: 'Hosting' })).toHaveCount(0)
     await expect(menu.getByRole('link', { name: 'Settings' })).toHaveCount(0)
     await expect(menu.getByRole('link', { name: 'Log out' })).toHaveCount(0)

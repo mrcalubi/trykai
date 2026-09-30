@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { AuthedUserContext } from '../lib/authedUser'
 import { publicName } from '../lib/publicName'
 import ReviewCard from '../components/ReviewCard'
 import Card from '../components/ui/Card'
 import { formatGuestFacingPrice } from '../lib/pricing'
+import Bookings from './Bookings'
+import Hosting from './Hosting'
+
+const OWN_TABS = ['bookings', 'hosting', 'listings', 'reviews']
 
 function formatHostRating(reviews) {
   if (!reviews?.length) return null
@@ -13,13 +18,94 @@ function formatHostRating(reviews) {
   return `${average} · ${count} ${count === 1 ? 'review' : 'reviews'}`
 }
 
+function tabSearch(searchParams, tab) {
+  const params = new URLSearchParams(searchParams)
+  params.set('tab', tab)
+  return `?${params.toString()}`
+}
+
+function SettingsGearIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  )
+}
+
+function ListingCards({ listings }) {
+  if (listings.length === 0) {
+    return <p className="empty-state">No listings yet.</p>
+  }
+
+  return (
+    <div className="listings-grid profile-listings">
+      {listings.map((listing) => (
+        <Card
+          key={listing.id}
+          mode="browse"
+          to={`/listings/${listing.id}`}
+          image={listing.photo_urls?.[0]}
+          badge={listing.category}
+          title={listing.title}
+          titleLevel={3}
+          price={`${formatGuestFacingPrice(listing.price_per_person)}/person`}
+        />
+      ))}
+    </div>
+  )
+}
+
+function ReviewsList({ reviews }) {
+  if (reviews.length === 0) {
+    return <p className="empty-state">No reviews yet.</p>
+  }
+
+  return (
+    <div className="reviews-list">
+      {reviews.map((review) => (
+        <ReviewCard key={review.id} review={review} />
+      ))}
+    </div>
+  )
+}
+
 export default function Profile() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
   const [profile, setProfile] = useState(null)
   const [listings, setListings] = useState([])
   const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [viewerId, setViewerId] = useState(null)
+  const [viewerReady, setViewerReady] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!cancelled) {
+        setViewerId(session?.user?.id ?? null)
+        setViewerReady(true)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     async function fetchProfile() {
@@ -31,7 +117,7 @@ export default function Profile() {
 
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('id, display_name, full_name, avatar_url, verification_status')
+        .select('id, display_name, full_name, avatar_url, verification_status, is_host')
         .eq('id', id)
         .single()
 
@@ -69,7 +155,7 @@ export default function Profile() {
     fetchProfile()
   }, [id])
 
-  if (loading) {
+  if (loading || !viewerReady) {
     return <p className="status-message">Loading…</p>
   }
 
@@ -85,6 +171,17 @@ export default function Profile() {
   const givenName = publicName(profile) || 'Anonymous'
   const hostRating = formatHostRating(reviews)
   const verified = profile.verification_status === 'approved'
+  const isOwn = viewerId === id
+  const isHost = Boolean(profile.is_host)
+  const allowedTabs = isHost ? OWN_TABS : OWN_TABS.filter((tab) => tab !== 'hosting')
+  const requestedTab = searchParams.get('tab')
+  const activeTab = allowedTabs.includes(requestedTab) ? requestedTab : 'bookings'
+  const tabs = [
+    { id: 'bookings', label: 'Bookings' },
+    ...(isHost ? [{ id: 'hosting', label: 'Hosting' }] : []),
+    { id: 'listings', label: 'Listings' },
+    { id: 'reviews', label: 'Reviews' },
+  ]
 
   return (
     <div className="page page--detail">
@@ -101,44 +198,85 @@ export default function Profile() {
           {verified ? <p className="profile-verified">ID verified</p> : null}
           {hostRating ? <p className="detail-host__rating">{hostRating}</p> : null}
         </div>
+        {isOwn ? (
+          <Link to="/settings" className="profile-header__settings" aria-label="Settings">
+            <SettingsGearIcon />
+          </Link>
+        ) : null}
       </header>
 
-      <section className="detail-section" aria-label="Listings">
-        <h2 className="detail-section__title">Listings</h2>
-        {listings.length === 0 ? (
-          <p className="empty-state">No listings yet.</p>
-        ) : (
-          <div className="listings-grid">
-            {listings.map((listing) => (
-              <Card
-                key={listing.id}
-                mode="browse"
-                to={`/listings/${listing.id}`}
-                image={listing.photo_urls?.[0]}
-                badge={listing.category}
-                title={listing.title}
-                titleLevel={3}
-                price={`${formatGuestFacingPrice(listing.price_per_person)}/person`}
-              />
+      {isOwn ? (
+        <>
+          <nav className="profile-tabs" aria-label="Profile">
+            {tabs.map((tab) => (
+              <Link
+                key={tab.id}
+                to={{ pathname: `/u/${id}`, search: tabSearch(searchParams, tab.id) }}
+                className={
+                  activeTab === tab.id
+                    ? 'profile-tabs__tab profile-tabs__tab--active'
+                    : 'profile-tabs__tab'
+                }
+                aria-current={activeTab === tab.id ? 'page' : undefined}
+              >
+                {tab.label}
+              </Link>
             ))}
-          </div>
-        )}
-      </section>
+          </nav>
 
-      <section className="detail-section" aria-label="Reviews">
-        <h2 className="detail-section__title">
-          Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
-        </h2>
-        {reviews.length === 0 ? (
-          <p className="empty-state">No reviews yet.</p>
-        ) : (
-          <div className="reviews-list">
-            {reviews.map((review) => (
-              <ReviewCard key={review.id} review={review} />
-            ))}
-          </div>
-        )}
-      </section>
+          {activeTab === 'bookings' ? (
+            <div className="profile-tab-panel">
+              <AuthedUserContext.Provider value={viewerId}>
+                <Bookings embedded />
+              </AuthedUserContext.Provider>
+            </div>
+          ) : null}
+
+          {activeTab === 'hosting' ? (
+            <div className="profile-tab-panel">
+              <AuthedUserContext.Provider value={viewerId}>
+                <Hosting embedded />
+              </AuthedUserContext.Provider>
+            </div>
+          ) : null}
+
+          {activeTab === 'listings' ? (
+            <section className="detail-section" aria-label="Listings">
+              {!isHost ? (
+                <div className="empty-state">
+                  <p>Share a skill on TryKai.</p>
+                  <Link to="/create-listing">Become a host</Link>
+                </div>
+              ) : (
+                <ListingCards listings={listings} />
+              )}
+            </section>
+          ) : null}
+
+          {activeTab === 'reviews' ? (
+            <section className="detail-section" aria-label="Reviews">
+              <h2 className="detail-section__title">
+                Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
+              </h2>
+              <ReviewsList reviews={reviews} />
+            </section>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <section className="detail-section" aria-label="Listings">
+            <h2 className="detail-section__title">Listings</h2>
+            <ListingCards listings={listings} />
+          </section>
+
+          <section className="detail-section" aria-label="Reviews">
+            <h2 className="detail-section__title">
+              Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
+            </h2>
+            <ReviewsList reviews={reviews} />
+          </section>
+        </>
+      )}
     </div>
   )
 }

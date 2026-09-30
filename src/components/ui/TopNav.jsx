@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import HamburgerMenu from './HamburgerMenu'
 import { getInitials } from './getInitials'
@@ -55,158 +55,18 @@ export function TopNavAccount({ avatarUrl, name, className = '' }) {
   )
 }
 
-function AccountMenu({ avatarUrl, name, onLogout, onOpen }) {
-  const [open, setOpen] = useState(false)
-  const wrapRef = useRef(null)
-  const buttonRef = useRef(null)
-  const menuRef = useRef(null)
-  const menuId = useId()
-  const buttonId = useId()
-
-  function closeMenu({ restoreFocus = false } = {}) {
-    setOpen(false)
-    if (restoreFocus) buttonRef.current?.focus()
-  }
-
-  function openMenu() {
-    onOpen?.()
-    setOpen(true)
-  }
-
-  function toggleMenu() {
-    if (open) {
-      closeMenu()
-      return
-    }
-    openMenu()
-  }
-
-  useLayoutEffect(() => {
-    if (!open) return
-    menuRef.current?.querySelector('[role="menuitem"]')?.focus()
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return undefined
-
-    function handlePointerDown(event) {
-      if (wrapRef.current?.contains(event.target)) return
-      const interactive =
-        event.target instanceof Element &&
-        event.target.closest(
-          'a, button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])'
-        )
-      closeMenu({ restoreFocus: !interactive })
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown)
-    return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return undefined
-
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        closeMenu({ restoreFocus: true })
-        return
-      }
-
-      if (event.key === 'Tab') {
-        closeMenu({ restoreFocus: true })
-        return
-      }
-
-      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-
-      const items = [...(menuRef.current?.querySelectorAll('[role="menuitem"]') ?? [])]
-      if (items.length === 0) return
-
-      event.preventDefault()
-      const currentIndex = items.indexOf(document.activeElement)
-      const delta = event.key === 'ArrowDown' ? 1 : -1
-      const nextIndex =
-        currentIndex === -1
-          ? event.key === 'ArrowDown'
-            ? 0
-            : items.length - 1
-          : (currentIndex + delta + items.length) % items.length
-      items[nextIndex].focus()
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [open])
-
-  return (
-    <div className="ui-account" ref={wrapRef}>
-      <button
-        ref={buttonRef}
-        type="button"
-        id={buttonId}
-        className="ui-account__trigger"
-        aria-label="Account"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={menuId}
-        onClick={toggleMenu}
-        onKeyDown={(event) => {
-          if (open) return
-          if (event.key === 'ArrowDown') {
-            event.preventDefault()
-            openMenu()
-          }
-        }}
-      >
-        <TopNavAccount avatarUrl={avatarUrl} name={name} />
-      </button>
-      {open ? (
-        <div
-          ref={menuRef}
-          id={menuId}
-          className="ui-account-menu"
-          role="menu"
-          aria-labelledby={buttonId}
-        >
-          <Link
-            to="/settings"
-            role="menuitem"
-            className="ui-account-menu__item"
-            onClick={() => closeMenu()}
-          >
-            Settings
-          </Link>
-          <button
-            type="button"
-            role="menuitem"
-            className="ui-account-menu__item"
-            onClick={() => {
-              closeMenu()
-              onLogout?.()
-            }}
-          >
-            Log out
-          </button>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
 export default function TopNav({
   isLoggedIn = false,
   isAdmin = false,
   isHost = false,
+  userId,
   avatarUrl,
   name,
   onMenuClick,
-  onLogout,
   className = '',
 }) {
   const [compact, setCompact] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [accountMenuKey, setAccountMenuKey] = useState(0)
 
   useEffect(() => {
     function updateCompact() {
@@ -231,7 +91,6 @@ export default function TopNav({
 
   function handleMenuToggle() {
     setMenuOpen((open) => !open)
-    setAccountMenuKey((key) => key + 1)
     onMenuClick?.()
   }
 
@@ -282,14 +141,17 @@ export default function TopNav({
           </Link>
 
           <div className="ui-topnav__end">
-            {isLoggedIn ? (
-              <AccountMenu
-                key={accountMenuKey}
-                avatarUrl={avatarUrl}
-                name={name}
-                onLogout={onLogout}
-                onOpen={handleMenuClose}
-              />
+            {isLoggedIn && userId ? (
+              <Link
+                to={`/u/${userId}`}
+                className="ui-topnav__account-link"
+                aria-label="Your profile"
+                onClick={handleMenuClose}
+              >
+                <TopNavAccount avatarUrl={avatarUrl} name={name} />
+              </Link>
+            ) : isLoggedIn ? (
+              <TopNavAccount avatarUrl={avatarUrl} name={name} />
             ) : (
               <Link to="/login" className="ui-topnav__login">
                 Log in

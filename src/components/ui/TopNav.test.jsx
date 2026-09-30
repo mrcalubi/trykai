@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -13,12 +13,12 @@ function renderTopNav(props = {}) {
   )
 }
 
-function accountButton() {
-  return screen.getByRole('button', { name: 'Account' })
+function profileLink() {
+  return screen.getByRole('link', { name: 'Your profile' })
 }
 
 function accountFace() {
-  return accountButton().querySelector('.ui-topnav__account')
+  return profileLink().querySelector('.ui-topnav__account')
 }
 
 describe('getInitials', () => {
@@ -41,22 +41,27 @@ describe('TopNav', () => {
     expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login')
   })
 
-  it('shows a circular photo when logged in with avatarUrl', () => {
-    renderTopNav({ isLoggedIn: true, avatarUrl: '/trykai.png', name: 'Mei Ling' })
+  it('links the avatar to the own profile when logged in with avatarUrl', () => {
+    renderTopNav({
+      isLoggedIn: true,
+      userId: 'user-77',
+      avatarUrl: '/trykai.png',
+      name: 'Mei Ling',
+    })
 
     expect(screen.queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument()
-    const account = accountButton()
-    expect(account).toHaveAttribute('aria-haspopup', 'menu')
-    expect(account).toHaveAttribute('aria-expanded', 'false')
+    expect(profileLink()).toHaveAttribute('href', '/u/user-77')
     expect(accountFace()).toHaveClass('ui-topnav__account--photo')
-    expect(account.querySelector('img')).toHaveAttribute('src', '/trykai.png')
+    expect(profileLink().querySelector('img')).toHaveAttribute('src', '/trykai.png')
+    expect(screen.queryByRole('button', { name: 'Account' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('shows initials when logged in with a name but no avatarUrl', () => {
-    renderTopNav({ isLoggedIn: true, name: 'Mei Ling' })
+    renderTopNav({ isLoggedIn: true, userId: 'user-77', name: 'Mei Ling' })
 
     expect(accountFace()).toHaveClass('ui-topnav__account--initials')
-    expect(accountButton()).toHaveTextContent('ML')
+    expect(profileLink()).toHaveTextContent('ML')
   })
 
   it('opens and closes the hamburger menu from the icon', async () => {
@@ -111,6 +116,21 @@ describe('TopNav', () => {
     )
   })
 
+  it('closes the hamburger when the avatar is pressed', async () => {
+    const user = userEvent.setup()
+    renderTopNav({ isLoggedIn: true, userId: 'user-77', name: 'Mei Ling' })
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).toHaveClass(
+      'ui-hamburger--open'
+    )
+
+    await user.click(profileLink())
+    expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).not.toHaveClass(
+      'ui-hamburger--open'
+    )
+  })
+
   it('compacts after scrolling past the threshold and expands again at the top', () => {
     renderTopNav()
     const bar = screen.getByRole('banner')
@@ -128,153 +148,5 @@ describe('TopNav', () => {
       window.dispatchEvent(new Event('scroll'))
     })
     expect(bar).not.toHaveClass('ui-topnav--compact')
-  })
-})
-
-describe('TopNav account menu', () => {
-  it('opens Settings and Log out from the avatar, with no Profile', async () => {
-    const user = userEvent.setup()
-    const onLogout = vi.fn()
-    renderTopNav({ isLoggedIn: true, name: 'Mei Ling', onLogout })
-
-    const account = accountButton()
-    await user.click(account)
-
-    expect(account).toHaveAttribute('aria-expanded', 'true')
-    const menu = screen.getByRole('menu')
-    expect(menu).toHaveAttribute('aria-labelledby', account.id)
-
-    const settings = screen.getByRole('menuitem', { name: 'Settings' })
-    expect(settings).toHaveAttribute('href', '/settings')
-    expect(settings).toHaveFocus()
-    expect(screen.getByRole('menuitem', { name: 'Log out' })).toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: 'Profile' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('menuitem', { name: 'Log out' }))
-    expect(onLogout).toHaveBeenCalledTimes(1)
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-  })
-
-  it('opens on Enter and Space', async () => {
-    const user = userEvent.setup()
-    renderTopNav({ isLoggedIn: true, name: 'Mei Ling' })
-
-    accountButton().focus()
-    await user.keyboard('{Enter}')
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-    expect(accountButton()).toHaveAttribute('aria-expanded', 'true')
-
-    await user.keyboard('{Escape}')
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-
-    accountButton().focus()
-    await user.keyboard(' ')
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-  })
-
-  it('opens on ArrowDown from the avatar', async () => {
-    const user = userEvent.setup()
-    renderTopNav({ isLoggedIn: true, name: 'Mei Ling' })
-
-    accountButton().focus()
-    await user.keyboard('{ArrowDown}')
-
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveFocus()
-  })
-
-  it('moves between items with the arrow keys', async () => {
-    const user = userEvent.setup()
-    renderTopNav({ isLoggedIn: true, name: 'Mei Ling' })
-
-    await user.click(accountButton())
-    expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveFocus()
-
-    await user.keyboard('{ArrowDown}')
-    expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveFocus()
-
-    await user.keyboard('{ArrowDown}')
-    expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveFocus()
-
-    await user.keyboard('{ArrowUp}')
-    expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveFocus()
-  })
-
-  it('closes on Tab so the next tab stop is after the avatar', async () => {
-    const user = userEvent.setup()
-    renderTopNav({ isLoggedIn: true, name: 'Mei Ling' })
-
-    await user.click(accountButton())
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-
-    await user.keyboard('{Tab}')
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-  })
-
-  it('closes on Escape and returns focus to the avatar', async () => {
-    const user = userEvent.setup()
-    renderTopNav({ isLoggedIn: true, name: 'Mei Ling' })
-
-    await user.click(accountButton())
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-
-    await user.keyboard('{Escape}')
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    expect(accountButton()).toHaveFocus()
-    expect(accountButton()).toHaveAttribute('aria-expanded', 'false')
-  })
-
-  it('closes on an outside click', async () => {
-    const user = userEvent.setup()
-    renderTopNav({ isLoggedIn: true, name: 'Mei Ling' })
-
-    await user.click(accountButton())
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-  })
-
-  it('returns focus to the avatar when the outside click is not on another control', async () => {
-    renderTopNav({ isLoggedIn: true, name: 'Mei Ling' })
-
-    accountButton().focus()
-    fireEvent.click(accountButton())
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-
-    fireEvent.pointerDown(document.body)
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    expect(accountButton()).toHaveFocus()
-  })
-
-  it('closes the hamburger when the account menu opens', async () => {
-    const user = userEvent.setup()
-    renderTopNav({ isLoggedIn: true, name: 'Mei Ling' })
-
-    await user.click(screen.getByRole('button', { name: 'Open menu' }))
-    expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).toHaveClass(
-      'ui-hamburger--open'
-    )
-
-    await user.click(accountButton())
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-    expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).not.toHaveClass(
-      'ui-hamburger--open'
-    )
-  })
-
-  it('closes the account menu when the hamburger opens', async () => {
-    const user = userEvent.setup()
-    renderTopNav({ isLoggedIn: true, name: 'Mei Ling' })
-
-    await user.click(accountButton())
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Open menu' }))
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).toHaveClass(
-      'ui-hamburger--open'
-    )
   })
 })

@@ -26,6 +26,7 @@ describe('SiteNav when signed out', () => {
     renderNav()
 
     expect(await screen.findByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login')
+    expect(screen.queryByRole('link', { name: 'Your profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Account' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Create listing' })).not.toBeInTheDocument()
   })
@@ -47,7 +48,7 @@ describe('SiteNav when signed in', () => {
     })
     renderNav()
 
-    const account = await screen.findByRole('button', { name: 'Account' })
+    const account = await screen.findByRole('link', { name: 'Your profile' })
     await waitFor(() => expect(account).toHaveTextContent('ML'))
     expect(account.querySelector('.ui-topnav__account')).toHaveClass('ui-topnav__account--initials')
     expect(screen.queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument()
@@ -61,7 +62,7 @@ describe('SiteNav when signed in', () => {
     })
     renderNav()
 
-    const account = await screen.findByRole('button', { name: 'Account' })
+    const account = await screen.findByRole('link', { name: 'Your profile' })
     await waitFor(() =>
       expect(account.querySelector('.ui-topnav__account')).toHaveClass('ui-topnav__account--photo')
     )
@@ -73,7 +74,7 @@ describe('SiteNav when signed in', () => {
     supabase.__on('users', 'select', { data: null, error: null })
     renderNav()
 
-    const account = await screen.findByRole('button', { name: 'Account' })
+    const account = await screen.findByRole('link', { name: 'Your profile' })
     await waitFor(() => expect(account).toHaveTextContent('K'))
   })
 
@@ -81,7 +82,7 @@ describe('SiteNav when signed in', () => {
     signedIn(makeAuthSession({ user: { id: 'user-77' } }))
     renderNav()
 
-    await screen.findByRole('button', { name: 'Account' })
+    await screen.findByRole('link', { name: 'Your profile' })
     await waitFor(() => expect(supabase.__calls('users', 'select')).toHaveLength(1))
     expect(supabase.__lastCall('users', 'select').filters).toContainEqual({
       method: 'eq',
@@ -93,6 +94,14 @@ describe('SiteNav when signed in', () => {
       args: ['full_name, avatar_url, is_host'],
     })
   })
+
+  it('takes the avatar to the signed-in user own profile', async () => {
+    signedIn(makeAuthSession({ user: { id: 'user-77' } }))
+    const { user, currentPath } = renderNav()
+
+    await user.click(await screen.findByRole('link', { name: 'Your profile' }))
+    await waitFor(() => expect(currentPath()).toBe('/u/user-77'))
+  })
 })
 
 describe('SiteNav hamburger', () => {
@@ -100,15 +109,15 @@ describe('SiteNav hamburger', () => {
     signedIn()
     const { user } = renderNav()
 
-    await screen.findByRole('button', { name: 'Account' })
+    await screen.findByRole('link', { name: 'Your profile' })
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
 
     expect(screen.getByRole('link', { name: 'Browse' })).toHaveAttribute('href', '/')
-    expect(screen.getByRole('link', { name: 'My bookings' })).toHaveAttribute('href', '/bookings')
     expect(screen.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
+    expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Create listing' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Log out' })).not.toBeInTheDocument()
@@ -117,7 +126,7 @@ describe('SiteNav hamburger', () => {
     expect(screen.queryByRole('link', { name: 'Verification review' })).not.toBeInTheDocument()
   })
 
-  it('adds Hosting and labels Create listing once the profile reports is_host', async () => {
+  it('labels Create listing once the profile reports is_host', async () => {
     signedIn()
     supabase.__on('users', 'select', {
       data: { full_name: 'Mei Ling', avatar_url: null, is_host: true },
@@ -125,15 +134,16 @@ describe('SiteNav hamburger', () => {
     })
     const { user } = renderNav()
 
-    await screen.findByRole('button', { name: 'Account' })
+    await screen.findByRole('link', { name: 'Your profile' })
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
 
-    expect(await screen.findByRole('link', { name: 'Hosting' })).toHaveAttribute('href', '/hosting')
-    expect(screen.getByRole('link', { name: 'Create listing' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Create listing' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
+    expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Become a host' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
   })
 
   it('offers verification review in the menu for an admin', async () => {
@@ -141,7 +151,7 @@ describe('SiteNav hamburger', () => {
     supabase.rpc.mockResolvedValue({ data: [{ is_admin: true }], error: null })
     const { user } = renderNav()
 
-    await screen.findByRole('button', { name: 'Account' })
+    await screen.findByRole('link', { name: 'Your profile' })
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
 
     expect(await screen.findByRole('link', { name: 'Verification review' })).toHaveAttribute(
@@ -156,7 +166,7 @@ describe('SiteNav hamburger', () => {
     supabase.rpc.mockResolvedValue({ data: [{ is_admin: false }], error: null })
     const { user } = renderNav()
 
-    await screen.findByRole('button', { name: 'Account' })
+    await screen.findByRole('link', { name: 'Your profile' })
     await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('my_verification'))
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
 
@@ -190,33 +200,6 @@ describe('SiteNav hamburger', () => {
   })
 })
 
-describe('SiteNav account menu', () => {
-  it('opens Settings from the avatar and does not offer Profile', async () => {
-    signedIn()
-    const { user, currentPath } = renderNav()
-
-    await user.click(await screen.findByRole('button', { name: 'Account' }))
-
-    expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-    expect(screen.getByRole('menuitem', { name: 'Log out' })).toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: 'Profile' })).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('menuitem', { name: 'Settings' }))
-    await waitFor(() => expect(currentPath()).toBe('/settings'))
-  })
-
-  it('signs the user out from the avatar menu and sends them home', async () => {
-    signedIn()
-    const { user, currentPath } = renderNav({ route: '/dashboard' })
-
-    await user.click(await screen.findByRole('button', { name: 'Account' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Log out' }))
-
-    expect(supabase.auth.signOut).toHaveBeenCalledOnce()
-    await waitFor(() => expect(currentPath()).toBe('/'))
-  })
-})
-
 describe('SiteNav auth subscription', () => {
   it('swaps to the signed-in view when an auth event arrives', async () => {
     let emit
@@ -232,7 +215,7 @@ describe('SiteNav auth subscription', () => {
       emit('SIGNED_IN', makeAuthSession())
     })
 
-    expect(await screen.findByRole('button', { name: 'Account' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Your profile' })).toBeInTheDocument()
   })
 
   it('unsubscribes when it unmounts', async () => {

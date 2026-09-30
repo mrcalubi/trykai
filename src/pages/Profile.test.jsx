@@ -3,11 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Profile from './Profile'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
-import { makeListing, makeReview } from '../test/fixtures'
+import { makeAuthSession, makeListing, makeReview } from '../test/fixtures'
 
 vi.mock('../lib/supabase')
 
 const HOST_ID = 'host-1'
+const OTHER_ID = 'user-99'
 
 function givenProfile(profile = {
   id: HOST_ID,
@@ -15,6 +16,7 @@ function givenProfile(profile = {
   full_name: 'Mei Ling Tan',
   avatar_url: null,
   verification_status: 'approved',
+  is_host: true,
 }) {
   supabase.__on('users', 'select', { data: profile, error: null })
 }
@@ -30,9 +32,16 @@ function givenHostReviews(reviews) {
   })
 }
 
-function renderPage() {
+function givenSignedIn(userId = HOST_ID) {
+  supabase.auth.getSession.mockResolvedValue({
+    data: { session: makeAuthSession({ user: { id: userId } }) },
+    error: null,
+  })
+}
+
+function renderPage({ userId = HOST_ID, search = '' } = {}) {
   return renderWithRouter(<Profile />, {
-    route: `/u/${HOST_ID}`,
+    route: `/u/${userId}${search}`,
     path: '/u/:id',
   })
 }
@@ -65,7 +74,9 @@ describe('Profile public content', () => {
 
     expect(await screen.findByRole('heading', { name: 'Mei', level: 1 })).toBeInTheDocument()
     expect(screen.queryByText('Mei Ling Tan')).not.toBeInTheDocument()
-    expect(supabase.auth.getSession).not.toHaveBeenCalled()
+    expect(supabase.auth.getSession).toHaveBeenCalled()
+    expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
   })
 
   it('does not split a multi-word display name', async () => {
@@ -75,6 +86,7 @@ describe('Profile public content', () => {
       full_name: 'Mei Ling Tan',
       avatar_url: null,
       verification_status: 'approved',
+      is_host: true,
     })
     renderPage()
 
@@ -89,6 +101,7 @@ describe('Profile public content', () => {
       full_name: 'Mei Ling Tan',
       avatar_url: null,
       verification_status: 'approved',
+      is_host: true,
     })
     renderPage()
 
@@ -107,6 +120,7 @@ describe('Profile public content', () => {
       full_name: 'Mei Ling',
       avatar_url: null,
       verification_status: 'pending',
+      is_host: true,
     })
     renderPage()
 
@@ -195,7 +209,129 @@ describe('Profile public content', () => {
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
 
     expect(supabase.__lastCall('users', 'select').chain[0].args[0]).toBe(
-      'id, display_name, full_name, avatar_url, verification_status'
+      'id, display_name, full_name, avatar_url, verification_status, is_host'
     )
+  })
+})
+
+describe('Profile own tabs', () => {
+  beforeEach(() => {
+    givenSignedIn(HOST_ID)
+  })
+
+  it('shows private tabs and a settings gear on your own profile', async () => {
+    renderPage()
+
+    expect(await screen.findByRole('navigation', { name: 'Profile' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Bookings' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+    expect(screen.getByRole('link', { name: 'Hosting' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Listings' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Reviews' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
+  })
+
+  it('keeps Bookings as the default tab and writes it into tab links', async () => {
+    renderPage()
+
+    await screen.findByRole('link', { name: 'Bookings' })
+    expect(screen.getByRole('link', { name: 'Bookings' })).toHaveAttribute(
+      'href',
+      `/u/${HOST_ID}?tab=bookings`
+    )
+    expect(screen.getByRole('link', { name: 'Hosting' })).toHaveAttribute(
+      'href',
+      `/u/${HOST_ID}?tab=hosting`
+    )
+  })
+
+  it('opens the hosting panel from ?tab=hosting', async () => {
+    renderPage({ search: '?tab=hosting' })
+
+    expect(await screen.findByRole('heading', { name: 'My Listings' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Hosting' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+    expect(screen.queryByRole('heading', { name: 'My Bookings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
+  })
+
+  it('keeps other query keys when switching tabs', async () => {
+    renderPage({ search: '?booking=booking-1&tab=bookings' })
+
+    await screen.findByRole('link', { name: 'Listings' })
+    expect(screen.getByRole('link', { name: 'Listings' })).toHaveAttribute(
+      'href',
+      `/u/${HOST_ID}?booking=booking-1&tab=listings`
+    )
+  })
+
+  it('falls back to bookings when the tab is unknown', async () => {
+    renderPage({ search: '?tab=not-a-tab' })
+
+    expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Bookings' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+  })
+
+  it('hides Hosting and prompts Become a host on a non-host own Listings tab', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      full_name: 'Mei Ling Tan',
+      avatar_url: null,
+      verification_status: 'approved',
+      is_host: false,
+    })
+    const { user } = renderPage({ search: '?tab=listings' })
+
+    await screen.findByRole('navigation', { name: 'Profile' })
+    expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
+      'href',
+      '/create-listing'
+    )
+    expect(screen.queryByText('No listings yet.')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: 'Bookings' }))
+    expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
+  })
+
+  it('treats ?tab=hosting as bookings when the owner is not a host', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      full_name: 'Mei Ling Tan',
+      avatar_url: null,
+      verification_status: 'approved',
+      is_host: false,
+    })
+    renderPage({ search: '?tab=hosting' })
+
+    expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'My Listings' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Profile of another user', () => {
+  it('shows no private tabs and no gear', async () => {
+    givenSignedIn(OTHER_ID)
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Bookings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Listings' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Reviews' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'My Bookings' })).not.toBeInTheDocument()
   })
 })

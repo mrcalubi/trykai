@@ -346,11 +346,7 @@ a {
   user-select: none;
 }
 
-.ui-account {
-  position: relative;
-}
-
-.ui-account__trigger {
+.ui-topnav__account-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -358,54 +354,15 @@ a {
   height: 44px;
   padding: 0;
   color: inherit;
-  background: none;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.ui-account__trigger:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-.ui-account-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 2;
-  min-width: 11.5rem;
-  max-width: min(18rem, calc(100vw - 24px));
-  padding: 6px 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
-}
-
-.ui-account-menu__item {
-  display: block;
-  width: 100%;
-  padding: 12px 16px;
-  font-family: var(--sans);
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--text-h);
-  text-align: left;
   text-decoration: none;
   background: none;
   border: none;
-  cursor: pointer;
+  border-radius: 50%;
 }
 
-.ui-account-menu__item:hover {
-  background: var(--primary-bg);
-}
-
-.ui-account-menu__item:focus-visible {
+.ui-topnav__account-link:focus-visible {
   outline: 2px solid var(--primary);
-  outline-offset: -2px;
-  background: var(--primary-bg);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1391,8 +1348,6 @@ a {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  /* Two lines whether the title fills them or not, so cards in a row end level */
-  min-height: 2.6em;
   margin-top: 8px;
   font-family: var(--display);
   font-size: 15px;
@@ -1833,6 +1788,62 @@ body.lightbox-open {
   padding: 8px 0 20px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 8px;
+}
+
+.profile-header__settings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-left: auto;
+  color: var(--navy);
+  border-radius: 50%;
+}
+
+.profile-header__settings:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.profile-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 -4px 8px;
+  padding: 4px 4px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-tabs__tab {
+  flex: 0 0 auto;
+  padding: 10px 14px 12px;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.profile-tabs__tab--active {
+  color: var(--navy);
+  border-bottom-color: var(--primary);
+}
+
+.profile-tabs__tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.profile-tab-panel .page {
+  padding-top: 16px;
+  padding-left: 0;
+  padding-right: 0;
+  max-width: none;
 }
 
 .profile-header__name {
@@ -2836,18 +2847,30 @@ body.lightbox-open {
   color: var(--text);
 }
 
-.settings-delete {
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-group + .settings-group {
   margin-top: 32px;
   padding-top: 24px;
   border-top: 1px solid var(--border);
 }
 
-.settings-delete__title {
-  margin: 0 0 8px;
+.settings-group__title {
+  margin: 0;
   font-family: var(--display);
   font-size: 18px;
   font-weight: 600;
   color: var(--text-h);
+}
+
+.settings-logout {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
 }
 
 .settings-delete__copy {
