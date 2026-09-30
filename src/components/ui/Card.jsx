@@ -8,6 +8,22 @@ function formatRating(rating) {
   return rating.toFixed(1)
 }
 
+function hasReviewCount(reviewCount) {
+  return typeof reviewCount === 'number' && !Number.isNaN(reviewCount) && reviewCount > 0
+}
+
+function RatingMark({ rating, reviewCount }) {
+  return (
+    <>
+      <span className="ui-card__star" aria-hidden="true">
+        ★
+      </span>{' '}
+      {formatRating(rating)}
+      {hasReviewCount(reviewCount) ? ` (${reviewCount})` : ''}
+    </>
+  )
+}
+
 export default function Card({
   mode = 'booking',
   image,
@@ -17,6 +33,7 @@ export default function Card({
   titleLevel = 3,
   meta,
   rating,
+  reviewCount,
   price,
   to,
   footer,
@@ -51,7 +68,7 @@ export default function Card({
         {showRating ? (
           <span className="ui-card__rating">
             {price ? <span aria-hidden="true"> · </span> : null}
-            <span aria-hidden="true">★</span> {formatRating(rating)}
+            <RatingMark rating={rating} reviewCount={reviewCount} />
           </span>
         ) : null}
       </p>
@@ -71,7 +88,7 @@ export default function Card({
         ) : null}
         {showRating ? (
           <p className="ui-card__rating">
-            <span aria-hidden="true">★</span> {formatRating(rating)}
+            <RatingMark rating={rating} reviewCount={reviewCount} />
           </p>
         ) : null}
       </div>

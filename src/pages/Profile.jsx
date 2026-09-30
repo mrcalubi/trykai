@@ -6,6 +6,7 @@ import { publicName } from '../lib/publicName'
 import ReviewCard from '../components/ReviewCard'
 import Card from '../components/ui/Card'
 import { formatGuestFacingPrice } from '../lib/pricing'
+import { ratingsByListingId } from '../lib/listingRatings'
 import Bookings from './Bookings'
 import Hosting from './Hosting'
 
@@ -44,7 +45,7 @@ function SettingsGearIcon() {
   )
 }
 
-function ListingCards({ listings }) {
+function ListingCards({ listings, ratings }) {
   if (listings.length === 0) {
     return <p className="empty-state">No listings yet.</p>
   }
@@ -61,6 +62,8 @@ function ListingCards({ listings }) {
           title={listing.title}
           titleLevel={3}
           price={`${formatGuestFacingPrice(listing.price_per_person)}/person`}
+          rating={ratings[listing.id]?.rating}
+          reviewCount={ratings[listing.id]?.reviewCount}
         />
       ))}
     </div>
@@ -86,6 +89,7 @@ export default function Profile() {
   const [searchParams] = useSearchParams()
   const [profile, setProfile] = useState(null)
   const [listings, setListings] = useState([])
+  const [ratings, setRatings] = useState({})
   const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -113,6 +117,7 @@ export default function Profile() {
       setError('')
       setProfile(null)
       setListings([])
+      setRatings({})
       setReviews([])
 
       const { data: userData, error: userError } = await supabase
@@ -141,8 +146,20 @@ export default function Profile() {
 
       if (listingsResult.error) {
         setError(listingsResult.error.message)
+        setListings([])
+        setRatings({})
       } else {
-        setListings(listingsResult.data ?? [])
+        const rows = listingsResult.data ?? []
+        setListings(rows)
+        const listingIds = rows.map((listing) => listing.id)
+        if (listingIds.length > 0) {
+          const { data: ratingRows } = await supabase.rpc('listing_ratings', {
+            listing_ids: listingIds,
+          })
+          setRatings(ratingsByListingId(ratingRows))
+        } else {
+          setRatings({})
+        }
       }
 
       if (!reviewsResult.error) {
@@ -193,7 +210,7 @@ export default function Profile() {
             {givenName[0]?.toUpperCase() || '?'}
           </div>
         )}
-        <div>
+        <div className="profile-header__copy">
           <h1 className="profile-header__name">{givenName}</h1>
           {verified ? <p className="profile-verified">ID verified</p> : null}
           {hostRating ? <p className="detail-host__rating">{hostRating}</p> : null}
@@ -248,7 +265,7 @@ export default function Profile() {
                   <Link to="/create-listing">Become a host</Link>
                 </div>
               ) : (
-                <ListingCards listings={listings} />
+                <ListingCards listings={listings} ratings={ratings} />
               )}
             </section>
           ) : null}
@@ -266,7 +283,7 @@ export default function Profile() {
         <>
           <section className="detail-section" aria-label="Listings">
             <h2 className="detail-section__title">Listings</h2>
-            <ListingCards listings={listings} />
+            <ListingCards listings={listings} ratings={ratings} />
           </section>
 
           <section className="detail-section" aria-label="Reviews">

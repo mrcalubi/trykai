@@ -391,7 +391,7 @@ export default function ListingDetail() {
                 {publicName(host)?.[0]?.toUpperCase() || '?'}
               </div>
             )}
-            <div>
+            <div className="detail-host__copy">
               <p className="detail-host__name">
                 Hosted by{' '}
                 {listing.host_id ? (
@@ -515,7 +515,7 @@ export default function ListingDetail() {
               <div>
                 {sessions.map((session) => (
                   <div key={session.id} className="session-card">
-                    <div>
+                    <div className="session-card__info">
                       <p className="session-card__date">{formatSessionDate(session.starts_at)}</p>
                       <p className="session-card__meta">
                         {formatSessionTime(session.starts_at)} · {session.duration_mins} mins ·{' '}
