@@ -25,11 +25,16 @@ function givenListings(listings) {
   supabase.__on('listings', 'select', { data: listings, error: null })
 }
 
-function givenHostReviews(reviews) {
+function givenRpcs({ hostReviews = [], listingRatings = [] } = {}) {
   supabase.rpc.mockImplementation(async (name) => {
-    if (name === 'reviews_for_host') return { data: reviews, error: null }
+    if (name === 'reviews_for_host') return { data: hostReviews, error: null }
+    if (name === 'listing_ratings') return { data: listingRatings, error: null }
     return { data: null, error: null }
   })
+}
+
+function givenHostReviews(reviews) {
+  givenRpcs({ hostReviews: reviews })
 }
 
 function givenSignedIn(userId = HOST_ID) {
@@ -190,6 +195,45 @@ describe('Profile public content', () => {
       '/listings/listing-9'
     )
     expect(screen.getByText(/\$51\/person/)).toBeInTheDocument()
+  })
+
+  it('rates a listing card only when listing_ratings returns reviews', async () => {
+    givenListings([
+      makeListing({
+        id: 'listing-9',
+        title: 'Latte art',
+        category: 'Food',
+        price_per_person: 4500,
+      }),
+      makeListing({
+        id: 'listing-8',
+        title: 'Pour over',
+        category: 'Food',
+        price_per_person: 4500,
+      }),
+    ])
+    givenRpcs({
+      listingRatings: [{ listing_id: 'listing-9', average: 4.8, review_count: 12 }],
+    })
+    renderPage()
+
+    const latte = await screen.findByRole('link', { name: /Latte art/ })
+    expect(latte.textContent).toContain('$51/person · ★ 4.8 (12)')
+    const pourOver = screen.getByRole('link', { name: /Pour over/ })
+    expect(pourOver.textContent).not.toContain('★')
+  })
+
+  it('asks listing_ratings once for the listings on the profile', async () => {
+    givenListings([
+      makeListing({ id: 'listing-9', title: 'Latte art' }),
+      makeListing({ id: 'listing-8', title: 'Pour over' }),
+    ])
+    renderPage()
+    await screen.findByRole('heading', { name: 'Latte art', level: 3 })
+
+    const ratingCalls = supabase.rpc.mock.calls.filter(([name]) => name === 'listing_ratings')
+    expect(ratingCalls).toHaveLength(1)
+    expect(ratingCalls[0][1]).toEqual({ listing_ids: ['listing-9', 'listing-8'] })
   })
 
   it('scopes listings to this host and to active rows', async () => {

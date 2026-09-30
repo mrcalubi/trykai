@@ -29,7 +29,7 @@ export default function ReviewCard({ review }) {
     <div className="review-card">
       <div className="review-card__header">
         <div className="review-card__avatar">{initial}</div>
-        <div>
+        <div className="review-card__author">
           <p className="review-card__name">{name}</p>
           {review.listing_title ? (
             <p className="review-card__listing">{review.listing_title}</p>

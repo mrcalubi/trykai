@@ -1,4 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Bookings from './Bookings'
@@ -68,7 +70,14 @@ function makeHostSession(overrides = {}) {
 }
 
 function makeMyListing(overrides = {}) {
-  return { id: 'listing-1', title: 'Latte art', area: 'Bedok', category: 'Food', ...overrides }
+  return {
+    id: 'listing-1',
+    title: 'Latte art',
+    area: 'Bedok',
+    category: 'Food',
+    photo_urls: ['https://cdn.test/latte.jpg'],
+    ...overrides,
+  }
 }
 
 // Mounted behind the same guard App.jsx puts it behind, so the page always has
@@ -120,6 +129,22 @@ function renderLegacyToProfile(route) {
 
 function sectionFor(title) {
   return screen.getByRole('heading', { name: title, level: 2 }).closest('section')
+}
+
+function listingCard(title) {
+  return within(sectionFor('My Listings')).getByText(title).closest('.dashboard-card')
+}
+
+async function openListingMenu(user, title = 'Latte art') {
+  const card = listingCard(title)
+  await user.click(within(card).getByRole('button', { name: 'More actions' }))
+  return card
+}
+
+async function openDeleteListing(user, title = 'Latte art') {
+  const card = await openListingMenu(user, title)
+  await user.click(within(card).getByRole('menuitem', { name: 'Delete' }))
+  return card
 }
 
 beforeEach(() => {
@@ -248,25 +273,42 @@ describe('Dashboard access control', () => {
 })
 
 describe('Dashboard verification review', () => {
-  it('offers the review queue to an admin', async () => {
+  it('offers a slim review banner to an admin when submissions are waiting', async () => {
     supabase.rpc.mockImplementation(async (name) => {
-      if (name === 'my_verification') return { data: [{ is_admin: true }], error: null }
+      if (name === 'my_verification') {
+        return { data: [{ is_admin: true, pending_count: 3 }], error: null }
+      }
       return { data: null, error: null }
     })
     givenData({ isHost: true })
     await renderHosting()
 
-    expect(screen.getByRole('link', { name: 'Review verifications' })).toHaveAttribute(
+    expect(screen.getByRole('status')).toHaveTextContent('3 verifications waiting · Review')
+    expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute(
       'href',
       '/admin/verifications'
     )
+  })
+
+  it('hides the banner when an admin has an empty queue', async () => {
+    supabase.rpc.mockImplementation(async (name) => {
+      if (name === 'my_verification') {
+        return { data: [{ is_admin: true, pending_count: 0 }], error: null }
+      }
+      return { data: null, error: null }
+    })
+    givenData({ isHost: true })
+    await renderHosting()
+
+    expect(screen.queryByRole('link', { name: 'Review' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/verifications waiting/)).not.toBeInTheDocument()
   })
 
   it('keeps the review queue off a host dashboard', async () => {
     givenData({ isHost: true })
     await renderHosting()
 
-    expect(screen.queryByRole('link', { name: 'Review verifications' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Review' })).not.toBeInTheDocument()
   })
 })
 
@@ -282,7 +324,12 @@ describe('Dashboard empty states', () => {
     await renderHosting()
 
     expect(screen.getByText('No upcoming sessions.')).toBeInTheDocument()
-    expect(within(sectionFor('My Listings')).getByRole('link', { name: 'Create one' })).toHaveAttribute(
+    const listings = sectionFor('My Listings')
+    expect(within(listings).getByRole('link', { name: 'Create one' })).toHaveAttribute(
+      'href',
+      '/create-listing'
+    )
+    expect(within(listings).getByRole('link', { name: '+ New listing' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
@@ -290,36 +337,138 @@ describe('Dashboard empty states', () => {
 })
 
 describe('Dashboard listings', () => {
-  it('lists the host listings with an edit link', async () => {
+  it('lists the host listings with a thumbnail, add-session, and edit on the row', async () => {
     givenData({ listings: [makeMyListing({ id: 'listing-9', title: 'Boxing' })] })
     await renderHosting()
 
-    expect(screen.getByText('Boxing')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute(
+    const card = listingCard('Boxing')
+    expect(within(card).getByRole('link', { name: /Boxing/ })).toHaveAttribute(
       'href',
       '/edit-listing/listing-9'
     )
+    expect(card.querySelector('.hosting-listing__thumb')).toHaveAttribute(
+      'src',
+      'https://cdn.test/latte.jpg'
+    )
+    expect(within(card).getByRole('button', { name: 'Add session' })).toBeInTheDocument()
+    expect(within(sectionFor('My Listings')).getByRole('link', { name: '+ New listing' })).toHaveAttribute(
+      'href',
+      '/create-listing'
+    )
+    expect(card.querySelector('.hosting-listing__text')).toBeInTheDocument()
   })
 
-  it('deactivates a listing rather than deleting the row', async () => {
+  it('stacks My Listings actions under the title on phone and keeps the text column shrinkable', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    const listing = css.match(/\.hosting-listing \{[\s\S]*?\n\}/)
+    const text = css.match(/\.hosting-listing__text \{[\s\S]*?\n\}/)
+    expect(listing?.[0]).toMatch(/flex-direction:\s*column/)
+    expect(listing?.[0]).not.toMatch(/flex-wrap:\s*wrap/)
+    expect(text?.[0]).toMatch(/flex:\s*1/)
+    expect(text?.[0]).toMatch(/min-width:\s*0/)
+    expect(css).toMatch(
+      /@media \(min-width: 768px\) \{\s*\.hosting-listing \{\s*flex-direction:\s*row;/
+    )
+  })
+
+  it('hides edit, view, and delete behind the overflow menu', async () => {
+    givenData({ listings: [makeMyListing({ id: 'listing-9', title: 'Boxing' })] })
+    const { user } = await renderHosting()
+
+    expect(screen.queryByRole('menuitem', { name: 'Edit' })).not.toBeInTheDocument()
+    await openListingMenu(user, 'Boxing')
+
+    expect(screen.getByRole('menuitem', { name: 'View listing' })).toHaveAttribute(
+      'href',
+      '/listings/listing-9'
+    )
+    expect(screen.getByRole('menuitem', { name: 'Edit' })).toHaveAttribute(
+      'href',
+      '/edit-listing/listing-9'
+    )
+    expect(screen.getByRole('menuitem', { name: 'Delete' }).className).toContain(
+      'ui-overflow__item--destructive'
+    )
+  })
+
+  it('deactivates a listing through delete_listing rather than a client update', async () => {
+    givenData({ listings: [makeMyListing()] })
+    supabase.rpc.mockImplementation(async (name, args) => {
+      if (name === 'delete_listing') return { data: args.p_listing_id, error: null }
+      return { data: null, error: null }
+    })
+    const { user } = await renderHosting()
+
+    await openDeleteListing(user)
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    await waitFor(() =>
+      expect(supabase.rpc).toHaveBeenCalledWith('delete_listing', { p_listing_id: 'listing-1' })
+    )
+    expect(supabase.__calls('listings', 'update')).toHaveLength(0)
+  })
+
+  it('asks only to delete when the listing has no upcoming sessions', async () => {
     givenData({ listings: [makeMyListing()] })
     const { user } = await renderHosting()
 
-    await user.click(screen.getByRole('button', { name: 'Delete listing' }))
+    await openDeleteListing(user)
+
+    expect(screen.getByRole('dialog')).toHaveTextContent("Delete 'Latte art'? This can't be undone.")
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('will be removed too')
+  })
+
+  it('removes empty upcoming sessions when the listing is deleted', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({ id: 's-empty-1', bookings: [] }),
+        makeHostSession({ id: 's-empty-2', bookings: [] }),
+      ],
+    })
+    supabase.rpc.mockImplementation(async (name, args) => {
+      if (name === 'delete_listing') return { data: args.p_listing_id, error: null }
+      return { data: null, error: null }
+    })
+    const { user } = await renderHosting()
+
+    await openDeleteListing(user)
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      "Delete 'Latte art'? This can't be undone. Its 2 upcoming sessions will be removed too."
+    )
+
     await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
 
-    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
-    const call = supabase.__lastCall('listings', 'update')
-    expect(call.payload).toEqual({ is_active: false })
-    expect(call.filters).toContainEqual({ method: 'eq', column: 'id', value: 'listing-1' })
-    expect(call.filters).toContainEqual({ method: 'eq', column: 'host_id', value: USER_ID })
+    await waitFor(() => expect(screen.queryByText('Latte art')).not.toBeInTheDocument())
+    expect(supabase.rpc).toHaveBeenCalledWith('delete_listing', { p_listing_id: 'listing-1' })
+    expect(supabase.__calls('listings', 'update')).toHaveLength(0)
+  })
+
+  it('refuses delete when an upcoming session has an active booking', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [makeHostSession()],
+    })
+    const { user } = await renderHosting()
+
+    await openDeleteListing(user)
+
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      "'Latte art' has 1 upcoming booking. Cancel those sessions first. Guests are refunded in full."
+    )
+    expect(screen.queryByRole('button', { name: 'Confirm delete' })).not.toBeInTheDocument()
+    expect(supabase.rpc.mock.calls.some(([name]) => name === 'delete_listing')).toBe(false)
   })
 
   it('removes the listing from the page once deleted', async () => {
     givenData({ listings: [makeMyListing()] })
+    supabase.rpc.mockImplementation(async (name, args) => {
+      if (name === 'delete_listing') return { data: args.p_listing_id, error: null }
+      return { data: null, error: null }
+    })
     const { user } = await renderHosting()
 
-    await user.click(screen.getByRole('button', { name: 'Delete listing' }))
+    await openDeleteListing(user)
     await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
 
     await waitFor(() => expect(screen.queryByText('Latte art')).not.toBeInTheDocument())
@@ -329,19 +478,24 @@ describe('Dashboard listings', () => {
     givenData({ listings: [makeMyListing()] })
     const { user } = await renderHosting()
 
-    await user.click(screen.getByRole('button', { name: 'Delete listing' }))
+    await openDeleteListing(user)
     await user.click(screen.getByRole('button', { name: 'Keep listing' }))
 
-    expect(supabase.__calls('listings', 'update')).toHaveLength(0)
+    expect(supabase.rpc.mock.calls.some(([name]) => name === 'delete_listing')).toBe(false)
     expect(screen.getByText('Latte art')).toBeInTheDocument()
   })
 
   it('reports a failed deletion', async () => {
     givenData({ listings: [makeMyListing()] })
-    supabase.__on('listings', 'update', { error: { message: 'not your listing' } })
+    supabase.rpc.mockImplementation(async (name) => {
+      if (name === 'delete_listing') {
+        return { data: null, error: { message: 'not your listing' } }
+      }
+      return { data: null, error: null }
+    })
     const { user } = await renderHosting()
 
-    await user.click(screen.getByRole('button', { name: 'Delete listing' }))
+    await openDeleteListing(user)
     await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
 
     expect(await screen.findByText('not your listing')).toBeInTheDocument()
@@ -355,7 +509,7 @@ describe('Dashboard add session', () => {
   })
 
   async function openSessionForm(user) {
-    await user.click(screen.getByRole('button', { name: 'Add Session' }))
+    await user.click(screen.getByRole('button', { name: 'Add session' }))
   }
 
   function fillSession({ date = '2026-09-01', time = '10:30', duration = '90', spots = '4' } = {}) {

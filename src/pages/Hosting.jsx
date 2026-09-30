@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { formatCents } from '../lib/cancellationPolicy'
+import Button from '../components/ui/Button'
+import OverflowMenu from '../components/ui/OverflowMenu'
 
 function formatSessionDateTime(iso) {
   const date = new Intl.DateTimeFormat('en-SG', {
@@ -23,6 +25,87 @@ function formatSessionDateTime(iso) {
 function activeBookingsOn(session) {
   return (session.bookings ?? []).filter(
     (b) => b.status === 'pending' || b.status === 'confirmed'
+  )
+}
+
+function firstRow(data) {
+  if (Array.isArray(data)) return data[0] ?? null
+  return data ?? null
+}
+
+function listingUpcomingStats(listingId, hostSessions) {
+  const sessions = hostSessions.filter((session) => session.listing_id === listingId)
+  const bookings = sessions.flatMap((session) => activeBookingsOn(session))
+  return { sessionCount: sessions.length, bookingCount: bookings.length }
+}
+
+function sessionLabel(count) {
+  return count === 1 ? '1 upcoming session' : `${count} upcoming sessions`
+}
+
+function bookingLabel(count) {
+  return count === 1 ? '1 upcoming booking' : `${count} upcoming bookings`
+}
+
+function ListingDeleteDialog({
+  listing,
+  sessionCount,
+  bookingCount,
+  loading,
+  onClose,
+  onConfirm,
+}) {
+  const blocked = bookingCount > 0
+  const title = listing.title
+
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  return (
+    <div
+      className="confirm-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <div
+        className="confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="listing-delete-title"
+      >
+        <p id="listing-delete-title" className="cancel-confirm__warning">
+          {blocked
+            ? `'${title}' has ${bookingLabel(bookingCount)}. Cancel those sessions first. Guests are refunded in full.`
+            : `Delete '${title}'? This can't be undone.${
+                sessionCount > 0
+                  ? ` Its ${sessionLabel(sessionCount)} will be removed too.`
+                  : ''
+              }`}
+        </p>
+        <div className="confirm-dialog__actions">
+          {blocked ? (
+            <Button variant="secondary" onClick={onClose}>
+              OK
+            </Button>
+          ) : (
+            <>
+              <Button variant="destructive" disabled={loading} onClick={onConfirm}>
+                {loading ? 'Deleting…' : 'Confirm delete'}
+              </Button>
+              <Button variant="secondary" onClick={onClose}>
+                Keep listing
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -61,12 +144,13 @@ export default function Hosting({ embedded = false }) {
   const [payoutSetupLoading, setPayoutSetupLoading] = useState(false)
   const [payoutSetupError, setPayoutSetupError] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
 
   const loadData = useCallback(async () => {
     const [listingsResult, profileResult, adminResult] = await Promise.all([
       supabase
         .from('listings')
-        .select('id, title, area, category')
+        .select('id, title, area, category, photo_urls')
         .eq('host_id', userId)
         .eq('is_active', true)
         .order('created_at', { ascending: false }),
@@ -89,8 +173,10 @@ export default function Hosting({ embedded = false }) {
       setIsHost(Boolean(profileResult.data?.is_host))
     }
 
-    const adminRow = Array.isArray(adminResult.data) ? adminResult.data[0] : adminResult.data
-    setIsAdmin(!adminResult.error && Boolean(adminRow?.is_admin))
+    const adminRow = firstRow(adminResult.data)
+    const admin = !adminResult.error && Boolean(adminRow?.is_admin)
+    setIsAdmin(admin)
+    setPendingCount(admin ? Number(adminRow?.pending_count) || 0 : 0)
 
     const listingIds = listingsResult.data?.map((l) => l.id) ?? []
     if (listingIds.length > 0) {
@@ -292,16 +378,14 @@ export default function Hosting({ embedded = false }) {
     setDeleteError('')
     setDeleteLoading(true)
 
-    const { error: updateError } = await supabase
-      .from('listings')
-      .update({ is_active: false })
-      .eq('id', listingId)
-      .eq('host_id', userId)
+    const { error: rpcError } = await supabase.rpc('delete_listing', {
+      p_listing_id: listingId,
+    })
 
     setDeleteLoading(false)
 
-    if (updateError) {
-      setDeleteError(updateError.message)
+    if (rpcError) {
+      setDeleteError(rpcError.message)
       return
     }
 
@@ -320,6 +404,11 @@ export default function Hosting({ embedded = false }) {
   if (!isHost) {
     return <Navigate to="/bookings" replace />
   }
+
+  const confirmListing = listings.find((listing) => listing.id === confirmDeleteListingId)
+  const confirmStats = confirmListing
+    ? listingUpcomingStats(confirmListing.id, hostSessions)
+    : null
 
   return (
     <div className="page page--narrow">
@@ -343,22 +432,12 @@ export default function Hosting({ embedded = false }) {
         <p className="error-message" style={{ marginBottom: '20px' }}>{payoutSetupError}</p>
       )}
 
-      {isAdmin && (
-        <section className="dashboard-section" aria-label="Verification review">
-          <div className="dashboard-card">
-            <p className="dashboard-card__title">Host verification</p>
-            <p className="dashboard-card__meta">
-              Review pending ID and selfie submissions. Approve, or reject with a reason the host
-              will see.
-            </p>
-            <div className="booking-card__actions">
-              <Link to="/admin/verifications" className="btn btn--primary">
-                Review verifications
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
+      {isAdmin && pendingCount > 0 ? (
+        <p className="verification-banner" role="status">
+          {pendingCount} {pendingCount === 1 ? 'verification' : 'verifications'} waiting ·{' '}
+          <Link to="/admin/verifications">Review</Link>
+        </p>
+      ) : null}
 
       {listings.length > 0 && !payoutsEnabled && (
         <div className="payout-setup">
@@ -499,7 +578,12 @@ export default function Hosting({ embedded = false }) {
       </section>
 
       <section className="dashboard-section">
-        <h2 className="dashboard-section__title">My Listings</h2>
+        <div className="dashboard-section__header">
+          <h2 className="dashboard-section__title">My Listings</h2>
+          <Link to="/create-listing" className="dashboard-section__action">
+            + New listing
+          </Link>
+        </div>
 
         {listings.length === 0 ? (
           <p className="empty-state">
@@ -510,74 +594,57 @@ export default function Hosting({ embedded = false }) {
           <div className="dashboard-list">
             {listings.map((listing) => (
               <div key={listing.id} className="dashboard-card">
-                <div className="dashboard-card__header">
-                  <div>
-                    <p className="dashboard-card__title">{listing.title}</p>
-                    <p className="dashboard-card__meta">
-                      {listing.category} · {listing.area}
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                    <Link
-                      to={`/edit-listing/${listing.id}`}
-                      className="btn btn--ghost"
-                      style={{ padding: '8px 16px', fontSize: '14px', textDecoration: 'none' }}
-                    >
-                      Edit
-                    </Link>
-                    <button
-                      type="button"
+                <div className="hosting-listing">
+                  <Link
+                    to={`/edit-listing/${listing.id}`}
+                    className="hosting-listing__main"
+                  >
+                    {listing.photo_urls?.[0] ? (
+                      <img
+                        src={listing.photo_urls[0]}
+                        alt=""
+                        className="hosting-listing__thumb"
+                      />
+                    ) : (
+                      <div
+                        className="hosting-listing__thumb hosting-listing__thumb--placeholder"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <div className="hosting-listing__text">
+                      <p className="dashboard-card__title">{listing.title}</p>
+                      <p className="dashboard-card__meta">
+                        {listing.category} · {listing.area}
+                      </p>
+                    </div>
+                  </Link>
+                  <div className="hosting-listing__actions">
+                    <Button
+                      variant="secondary"
                       onClick={() =>
                         activeFormId === listing.id
                           ? closeSessionForm()
                           : openSessionForm(listing.id)
                       }
-                      className="btn btn--secondary"
                     >
-                      {activeFormId === listing.id ? 'Cancel' : 'Add Session'}
-                    </button>
-                    {confirmDeleteListingId !== listing.id && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDeleteError('')
-                          setConfirmDeleteListingId(listing.id)
-                        }}
-                        className="btn btn--ghost"
-                        style={{ padding: '8px 16px', fontSize: '14px', color: 'var(--error)' }}
-                      >
-                        Delete listing
-                      </button>
-                    )}
+                      {activeFormId === listing.id ? 'Cancel' : 'Add session'}
+                    </Button>
+                    <OverflowMenu
+                      items={[
+                        { label: 'View listing', to: `/listings/${listing.id}` },
+                        { label: 'Edit', to: `/edit-listing/${listing.id}` },
+                        {
+                          label: 'Delete',
+                          destructive: true,
+                          onSelect: () => {
+                            setDeleteError('')
+                            setConfirmDeleteListingId(listing.id)
+                          },
+                        },
+                      ]}
+                    />
                   </div>
                 </div>
-
-                {confirmDeleteListingId === listing.id && (
-                  <div className="cancel-confirm">
-                    <p className="cancel-confirm__warning">
-                      Are you sure? This will hide your listing and cannot be undone easily.
-                    </p>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <button
-                        type="button"
-                        disabled={deleteLoading}
-                        onClick={() => handleDeleteListing(listing.id)}
-                        className="btn btn--primary"
-                        style={{ padding: '10px 20px', fontSize: '14px', background: 'var(--error)' }}
-                      >
-                        {deleteLoading ? 'Deleting…' : 'Confirm delete'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDeleteListingId(null)}
-                        className="btn btn--ghost"
-                        style={{ padding: '10px 20px', fontSize: '14px' }}
-                      >
-                        Keep listing
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 {activeFormId === listing.id && (
                   <form
@@ -635,14 +702,13 @@ export default function Hosting({ embedded = false }) {
 
                     {sessionError && <p className="error-message">{sessionError}</p>}
 
-                    <button
+                    <Button
                       type="submit"
+                      variant="primary"
                       disabled={sessionLoading}
-                      className="btn btn--primary"
-                      style={{ alignSelf: 'flex-start', padding: '10px 20px', fontSize: '14px' }}
                     >
                       {sessionLoading ? 'Adding…' : 'Add session'}
-                    </button>
+                    </Button>
                   </form>
                 )}
               </div>
@@ -650,6 +716,17 @@ export default function Hosting({ embedded = false }) {
           </div>
         )}
       </section>
+
+      {confirmListing && confirmStats ? (
+        <ListingDeleteDialog
+          listing={confirmListing}
+          sessionCount={confirmStats.sessionCount}
+          bookingCount={confirmStats.bookingCount}
+          loading={deleteLoading}
+          onClose={() => setConfirmDeleteListingId(null)}
+          onConfirm={() => handleDeleteListing(confirmListing.id)}
+        />
+      ) : null}
     </div>
   )
 }

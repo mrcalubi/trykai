@@ -224,7 +224,8 @@ describe('ListingDetail content', () => {
 
   it('wraps user-written listing and booking copy with one overflow-wrap rule', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
-    expect([...css.matchAll(/overflow-wrap:\s*anywhere/g)]).toHaveLength(1)
+    expect([...css.matchAll(/overflow-wrap:\s*break-word/g)]).toHaveLength(1)
+    expect(css).not.toMatch(/overflow-wrap:\s*anywhere/)
     expect(css).toMatch(
       /\.detail-title,\s*\n\.detail-description,\s*\n\.detail-area,\s*\n\.detail-list li,\s*\n\.review-card__comment,\s*\n\.ui-card__title,\s*\n\.dashboard-card__title,\s*\n\.dashboard-card__meta/
     )
