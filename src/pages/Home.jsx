@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import Card from '../components/ui/Card'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { formatGuestFacingPrice } from '../lib/pricing'
+import { sortListingsForBrowse } from '../lib/listingSort'
 
 export default function Home() {
   const [listings, setListings] = useState([])
@@ -23,10 +24,16 @@ export default function Home() {
           area,
           price_per_person,
           category,
-          photo_urls
+          photo_urls,
+          sessions (
+            starts_at,
+            status
+          )
         `
         )
         .eq('is_active', true)
+        .eq('sessions.status', 'open')
+        .gt('sessions.starts_at', new Date().toISOString())
         .order('created_at', { ascending: false })
 
       if (fetchError) {
@@ -37,7 +44,7 @@ export default function Home() {
         return
       }
 
-      const rows = data ?? []
+      const rows = sortListingsForBrowse(data ?? [])
       const listingIds = rows.map((listing) => listing.id)
       let ratingRows = []
       if (listingIds.length > 0) {
