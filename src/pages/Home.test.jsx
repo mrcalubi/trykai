@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Home from './Home'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
-import { makeListing } from '../test/fixtures'
+import { makeListing, makeSession } from '../test/fixtures'
 
 vi.mock('../lib/supabase')
 
@@ -164,6 +164,72 @@ describe('Home listing grid', () => {
     const select = call.chain.find((step) => step.method === 'select')?.args[0]
     expect(select).not.toMatch(/full_name/)
     expect(select).not.toMatch(/host:users/)
+  })
+
+  it('embeds only open sessions that have not started yet', async () => {
+    const before = Date.now()
+    givenListings([LATTE])
+    renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    const call = supabase.__lastCall('listings', 'select')
+    const select = call.chain.find((step) => step.method === 'select')?.args[0]
+    expect(select).toMatch(/sessions\s*\(\s*starts_at,\s*status\s*\)/)
+    expect(call.filters).toContainEqual({ method: 'eq', column: 'sessions.status', value: 'open' })
+    const startsAfter = call.filters.find(
+      (filter) => filter.method === 'gt' && filter.column === 'sessions.starts_at'
+    )
+    expect(new Date(startsAfter.value).getTime()).toBeGreaterThanOrEqual(before)
+  })
+})
+
+describe('Home listing order', () => {
+  const KNIFE_SKILLS = makeListing({
+    id: 'l-4',
+    title: 'Knife skills',
+    category: 'Food',
+    area: 'Bedok',
+    sessions: [],
+  })
+  const LATTE_NEXT_WEEK = {
+    ...LATTE,
+    sessions: [makeSession({ starts_at: '2099-03-17T02:00:00.000Z' })],
+  }
+  const BOXING_TUESDAY_MORNING = {
+    ...BOXING,
+    sessions: [makeSession({ starts_at: '2099-03-10T01:00:00.000Z' })],
+  }
+  const POTTERY_TUESDAY_EVENING_WEEKLY = {
+    ...POTTERY,
+    sessions: [
+      makeSession({ starts_at: '2099-03-10T11:00:00.000Z' }),
+      makeSession({ starts_at: '2099-03-17T11:00:00.000Z' }),
+      makeSession({ starts_at: '2099-03-24T11:00:00.000Z' }),
+    ],
+  }
+  const NEWEST_FIRST = [
+    KNIFE_SKILLS,
+    LATTE_NEXT_WEEK,
+    BOXING_TUESDAY_MORNING,
+    POTTERY_TUESDAY_EVENING_WEEKLY,
+  ]
+
+  it('leads with the soonest session date, then the most sessions, then listings with none', async () => {
+    givenListings(NEWEST_FIRST)
+    renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    expect(listingTitles()).toEqual(['Pottery hour', 'Boxing basics', 'Latte art', 'Knife skills'])
+  })
+
+  it('keeps that order inside a filtered grid', async () => {
+    givenListings(NEWEST_FIRST)
+    const { user } = renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    await user.selectOptions(screen.getByLabelText('Filter by area'), 'Bedok')
+
+    expect(listingTitles()).toEqual(['Pottery hour', 'Boxing basics', 'Knife skills'])
   })
 })
 

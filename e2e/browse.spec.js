@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { stubAllExternalCalls } from './support/network'
-import { BOXING, LATTE_ART } from './support/fixtures'
+import { BOXING, LATTE_ART, hoursFromNow } from './support/fixtures'
 
 test.describe('browsing listings', () => {
   test('shows the landing headline above the grid of every active listing', async ({ page }) => {
@@ -42,6 +42,24 @@ test.describe('browsing listings', () => {
 
     expect(second.y).toBe(first.y)
     expect(second.x).toBeGreaterThan(first.x)
+  })
+
+  test('lists the listing with the soonest session first', async ({ page }) => {
+    const latteNextWeek = {
+      ...LATTE_ART,
+      sessions: [{ starts_at: hoursFromNow(24 * 7), status: 'open' }],
+    }
+    const boxingTomorrow = {
+      ...BOXING,
+      sessions: [{ starts_at: hoursFromNow(24), status: 'open' }],
+    }
+    await stubAllExternalCalls(page, { listings: [latteNextWeek, boxingTomorrow] })
+    await page.goto('/')
+
+    await expect(page.locator('.listings-grid h2')).toHaveText([
+      'Boxing basics',
+      'Learn latte art with me',
+    ])
   })
 
   test('filters by category', async ({ page }) => {
