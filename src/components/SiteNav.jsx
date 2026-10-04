@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import TopNav from './ui/TopNav'
 
@@ -10,8 +9,6 @@ import TopNav from './ui/TopNav'
  * TopNav directly with made-up props; this is the only place it reads auth.
  */
 export default function SiteNav() {
-  const navigate = useNavigate()
-
   const [user, setUser] = useState(null)
   const [fullName, setFullName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
@@ -66,19 +63,14 @@ export default function SiteNav() {
     })
   }, [user])
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    navigate('/')
-  }
-
   return (
     <TopNav
       isLoggedIn={Boolean(user)}
       isAdmin={isAdmin}
       isHost={isHost}
+      userId={user?.id}
       avatarUrl={avatarUrl || undefined}
       name={fullName || user?.email || ''}
-      onLogout={handleLogout}
     />
   )
 }

@@ -221,7 +221,11 @@ export function calculateGuestRefund(
 }
 
 export function confirmRpcErrorKind(message: string | undefined): 'oversell' | 'other' {
-  return (message ?? '').toLowerCase().includes('insufficient spots') ? 'oversell' : 'other'
+  const text = (message ?? '').toLowerCase()
+  if (text.includes('insufficient spots') || text.includes('session not open')) {
+    return 'oversell'
+  }
+  return 'other'
 }
 
 /**

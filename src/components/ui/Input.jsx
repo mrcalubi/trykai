@@ -46,6 +46,7 @@ export default function Input({
   id,
   label,
   error,
+  hint,
   type = 'text',
   className = '',
   floatingLabel = false,
@@ -60,6 +61,9 @@ export default function Input({
   const generatedId = useId()
   const inputId = id ?? generatedId
   const errorId = `${inputId}-error`
+  const hintId = `${inputId}-hint`
+  const describedBy =
+    [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined
   const isPassword = type === 'password'
   const isControlled = value !== undefined
   const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue ?? '')
@@ -98,7 +102,7 @@ export default function Input({
       placeholder={inputPlaceholder}
       {...(isControlled ? { value } : { defaultValue })}
       aria-invalid={error ? true : undefined}
-      aria-describedby={error ? errorId : undefined}
+      aria-describedby={describedBy}
       onChange={(event) => {
         if (!isControlled) setUncontrolledValue(event.target.value)
         onChange?.(event)
@@ -148,6 +152,11 @@ export default function Input({
           {inputWithToggle}
         </>
       )}
+      {hint ? (
+        <p id={hintId} className="ui-field__hint">
+          {hint}
+        </p>
+      ) : null}
       {error ? (
         <p id={errorId} className="error-message" role="alert">
           {error}

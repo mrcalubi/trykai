@@ -26,15 +26,15 @@ Rule that keeps the docs honest: one fact, one home. When two docs disagree, say
 
 **UI**
 - Global nav: `Navbar.jsx` deleted. `SiteNav` mounted once in `App.jsx` feeds real auth into `TopNav`.
-- Hamburger is navigation only: Browse, My bookings, Hosting (hosts only), Create listing / Become a host (always, so non hosts have a route to hosting), Verification review (admins only, gated via `my_verification()`).
-- Avatar is the account menu: Settings, Log out. Profile omitted until it exists.
+- Hamburger is navigation only: Browse, Create listing / Become a host (always, so non hosts have a route to hosting), Verification review (admins only, gated via `my_verification()`). Bookings and Hosting are tabs on your own `/u/:id`, not hamburger links.
+- Avatar links to your own profile. Settings is the gear on that page; Log out is on `/settings`. There is no avatar dropdown.
 - Colour token set at `:root` in `index.css`, including `--scrim`. Status colours use a strong token for text and a tint for backgrounds. Coral stays functional only.
 - Browse grid uses the UI kit `Card`. Square images, 2 line title clamp, one line meta. Hero removed. The price on that card is the card all-in total from `formatGuestFacingPrice`, not the raw lesson price.
 - Listing detail: responsive layout, photo mosaic for 1 to 5 photos, sticky booking card on desktop, host block kept high.
 - Gallery lightbox: opaque dark backdrop, `object-fit: contain`, quiet chrome, full keyboard and focus handling, scroll lock that restores cleanly.
 - CreateListing states the 5 photo limit, read from the enforcing constant.
-- Dashboard split: `/bookings` (guest), `/hosting` (host, includes Stripe payout setup). `/dashboard` redirects so emails and Stripe return URLs keep working.
-- Settings at `/settings`: edit full name and avatar. Email read only. Account deletion is a "contact us" line, deliberately not a button.
+- Dashboard split: guest and host tools live as tabs on your own `/u/:id`. `/bookings` and `/hosting` redirect there. `/dashboard` still redirects so emails and Stripe return URLs keep working.
+- Settings at `/settings`: Profile (photo, display name, full name) and Account (email read only, deletion contact). Log out at the bottom.
 - Login uses the kit `Input`. Width bug fixed in the component. Floating label is now a behaviour that combines with password. Autofill floats the label via CSS. PR #56.
 
 **Data and email**
@@ -73,7 +73,7 @@ Rule that keeps the docs honest: one fact, one home. When two docs disagree, say
 - Forgot password: not built. Supabase's default reset email address is acceptable. Login has no reset link.
 - Prices far outside S$10 to S$40 are accepted ($7,580, $137,027 seen). CreateListing only checks `priceCents > 0`. The listings CHECK is `price_per_person >= 0`. No 1000–4000 band.
 - Browse card rating cannot render: nothing fetches it, no aggregate column. The price on the card is already the all-in card total.
-- `ListingCard` is dead code. Home still joins host `full_name` that the browse `Card` never receives.
+- `ListingCard` is dead code.
 - Category cut to four (Food, Fitness, Arts, Music): undecided. Touches docs, CreateListing, data, possibly a CHECK constraint. CreateListing still offers Language and Other. StyleGuide language/other PNG imports stay commented out.
 - Rating star colour: undecided.
 - Account deletion: needs an anonymisation design (retain transactions for dispute and tax, strip personal data). Ruiheng's. Manual via contact us until then.

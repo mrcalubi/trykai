@@ -17,10 +17,10 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 | **Revenue to date** | Zero |
 | **Entity** | TRYKAI, sole proprietorship, UEN 53526159D |
 | **Banking** | Aspire business account, approved 13 August 2026 |
-| **Payments** | **Stripe Connect**, separate charges and transfers, Express accounts. Guest checkout, webhook confirmation, Connect onboarding, refunds, and `release-payout` are **in this tree**. Remaining is ops: confirm migrations (`00005`, `00008`, `00009`, `00010`, `00011`) on each environment, Vault/GitHub secrets for `release-payout`, Stripe Dashboard webhook + secrets, `RESEND_API_KEY` and function deploys on production, platform payouts **manual**, founding-host flags, one test-mode booking. |
+| **Payments** | **Stripe Connect**, separate charges and transfers, Express accounts. Guest checkout, webhook confirmation, Connect onboarding, refunds, and `release-payout` are **in this tree**. Remaining is ops: confirm migrations (`00005`, `00008`, `00009`, `00010`, `00011`, `00012`) on each environment, Vault/GitHub secrets for `release-payout`, Stripe Dashboard webhook + secrets, `RESEND_API_KEY` and function deploys on production, platform payouts **manual**, founding-host flags, one test-mode booking. |
 
 **In the repo now (walked 21 September)**
-- Schema is `supabase/migrations/` `00001`–`00011`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` via pg_cron. `00011` is listing-page reviews (`reviews_for_listing`) and guest review INSERT gating (confirmed, session ended, one per booking per role).
+- Schema is `supabase/migrations/` `00001`–`00012`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` via pg_cron. `00011` is listing-page reviews (`reviews_for_listing`) and guest review INSERT gating (confirmed, session ended, one per booking per role). `00012` is `delete_empty_session` (soft-delete empty upcoming sessions) and `confirm_paid_booking` requiring `status = 'open'`.
 - Signup profile row is created by `handle_new_user` (`00004`), not by Login.jsx
 - Host verification: Stripe Identity default, manual fallback, review at `/admin/verifications`. Listing and session INSERT require `can_create_listing()`
 - Atomic `spots_remaining` decrement via `confirm_paid_booking` (service role only)
@@ -28,13 +28,13 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 - Four tier cancellation refunds via `cancel-booking` (guest emailed the refund amount, including $0). `/bookings` and `/hosting` invoke that function; they do not PATCH bookings from the browser
 - CI: Vitest coverage floors 92% / 90% / 87%, money files 100%, Playwright desktop + phone, Deno type-check of shared Edge modules
 - Global chrome is `SiteNav` → `TopNav`. `Navbar.jsx` is deleted. Browse uses the kit `Card`. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only
-- Routes: `/bookings`, `/hosting`, `/settings`. `/dashboard` redirects. Login uses the kit Input with floating labels
+- Avatar goes to your own `/u/:id`. Signed-in hamburger is Browse, Create listing / Become a host, Verification review for admins. `/bookings` and `/hosting` redirect to profile tabs. `/settings` is Profile + Account, with Log out. `/dashboard` still redirects. Login uses the kit Input with floating labels
 - Resend from-address is `TryKai <no-reply@trykai.sg>`. trykai.sg is verified. Staging booking confirmation emails confirmed arriving
 - StyleGuide category PNGs (`food`, `fitness`, `arts`, `music`) are in `src/assets/categories/`. `public/trykai.png` exists
 - Edge Functions: `create-payment-intent`, `stripe-webhook`, `create-connect-account`, `create-account-link`, `cancel-booking`, `admin-cancel-booking`, `admin-verifications`, `create-identity-session`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`. `notify-verification-result` is gone
 
 **Blocked or in flight**
-- Production vs staging is unconfirmed from this repo. Confirm production has `00008` through `00011`, `RESEND_API_KEY`, and current Edge Function deploys
+- Production vs staging is unconfirmed from this repo. Confirm production has `00008` through `00012`, `RESEND_API_KEY`, and current Edge Function deploys
 - Bug 4: Hosting shows "Payout setup submitted" on `?connect=return` without re-checking `stripe_payouts_enabled`
 - Two test cancellations: confirm Stripe refunds and `cancel-booking invoked` in function logs
 - Apply `00010` plus Vault/`PAYOUT_CRON_SECRET` on each environment. Platform payouts must stay manual

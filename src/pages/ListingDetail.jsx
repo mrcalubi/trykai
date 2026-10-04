@@ -4,6 +4,7 @@ import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from '../lib/supabase'
 import ReviewCard from '../components/ReviewCard'
+import HostRating from '../components/HostRating'
 import PhotoLightbox from '../components/PhotoLightbox'
 import { CancellationPolicyCollapsible } from '../components/CancellationPolicy'
 import { formatCents } from '../lib/cancellationPolicy'
@@ -14,6 +15,7 @@ import {
   paynowPriceCents,
 } from '../lib/pricing'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
+import { publicName } from '../lib/publicName'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -32,13 +34,6 @@ function formatSessionTime(iso) {
     minute: '2-digit',
     timeZone: 'Asia/Singapore',
   }).format(new Date(iso))
-}
-
-function formatHostRating(reviews) {
-  if (!reviews?.length) return null
-  const average = (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
-  const count = reviews.length
-  return `${average} · ${count} ${count === 1 ? 'review' : 'reviews'}`
 }
 
 function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel }) {
@@ -133,6 +128,7 @@ export default function ListingDetail() {
           whats_provided,
           host_id,
           users!host_id (
+            display_name,
             full_name,
             avatar_url,
             stripe_payouts_enabled
@@ -321,7 +317,6 @@ export default function ListingDetail() {
 
   const host = listing.users
   const photos = listing.photo_urls?.length ? listing.photo_urls : []
-  const hostRating = formatHostRating(hostReviews)
   const cardPrice = guestFacingPriceCents(listing.price_per_person)
   const paynowPrice = paynowPriceCents(listing.price_per_person)
   const checkoutPrice = checkoutRail
@@ -386,12 +381,21 @@ export default function ListingDetail() {
               <img src={host.avatar_url} alt="" className="detail-host__avatar" />
             ) : (
               <div className="detail-host__avatar-placeholder">
-                {host?.full_name?.[0]?.toUpperCase() || '?'}
+                {publicName(host)?.[0]?.toUpperCase() || '?'}
               </div>
             )}
-            <div>
-              <p className="detail-host__name">Hosted by {host?.full_name || 'Anonymous'}</p>
-              {hostRating ? <p className="detail-host__rating">{hostRating}</p> : null}
+            <div className="detail-host__copy">
+              <p className="detail-host__name">
+                Hosted by{' '}
+                {listing.host_id ? (
+                  <Link to={`/u/${listing.host_id}`} className="detail-host__link">
+                    {publicName(host) || 'Anonymous'}
+                  </Link>
+                ) : (
+                  publicName(host) || 'Anonymous'
+                )}
+              </p>
+              <HostRating reviews={hostReviews} />
             </div>
           </div>
 
@@ -504,7 +508,7 @@ export default function ListingDetail() {
               <div>
                 {sessions.map((session) => (
                   <div key={session.id} className="session-card">
-                    <div>
+                    <div className="session-card__info">
                       <p className="session-card__date">{formatSessionDate(session.starts_at)}</p>
                       <p className="session-card__meta">
                         {formatSessionTime(session.starts_at)} · {session.duration_mins} mins ·{' '}

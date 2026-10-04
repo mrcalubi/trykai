@@ -60,6 +60,21 @@ describe('Input', () => {
     expect(field.className).toContain('ui-input--error')
   })
 
+  it('shows a hint below the field and describes the input with it', () => {
+    render(
+      <Input
+        id="display-name"
+        label="What should we call you?"
+        hint="Shown on your profile and reviews."
+      />
+    )
+
+    const field = screen.getByLabelText('What should we call you?')
+    const hint = screen.getByText('Shown on your profile and reviews.')
+    expect(hint).toHaveClass('ui-field__hint')
+    expect(field).toHaveAttribute('aria-describedby', 'display-name-hint')
+  })
+
   it('passes through standard input props', () => {
     render(<Input id="email" label="Email" required autoComplete="email" />)
 

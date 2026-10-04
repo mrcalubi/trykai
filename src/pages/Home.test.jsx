@@ -63,6 +63,7 @@ describe('Home loading and error states', () => {
     renderWithRouter(<Home />)
 
     expect(await screen.findByText('No listings yet. Check back soon.')).toBeInTheDocument()
+    expect(supabase.rpc).not.toHaveBeenCalled()
     expect(
       screen.getByRole('heading', {
         level: 1,
@@ -103,6 +104,36 @@ describe('Home listing grid', () => {
     expect(card.textContent).not.toContain('·')
   })
 
+  it('shows the rating only when listing_ratings returns reviews', async () => {
+    givenListings([LATTE, BOXING])
+    supabase.rpc.mockImplementation(async (name) => {
+      if (name === 'listing_ratings') {
+        return { data: [{ listing_id: 'l-1', average: 4.8, review_count: 12 }], error: null }
+      }
+      return { data: null, error: null }
+    })
+    renderWithRouter(<Home />)
+
+    const latte = await screen.findByRole('link', { name: /Latte art/ })
+    expect(latte.textContent).toContain('$51/person')
+    expect(latte.textContent).toContain('★ 4.8 (12)')
+    expect(latte.textContent).not.toContain('·')
+    const boxing = screen.getByRole('link', { name: /Boxing basics/ })
+    expect(boxing.textContent).not.toContain('★')
+    expect(within(boxing).getByText('$34/person')).toBeInTheDocument()
+  })
+
+  it('asks listing_ratings once for every listing on the page', async () => {
+    givenListings([LATTE, BOXING])
+    renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    expect(supabase.rpc).toHaveBeenCalledTimes(1)
+    expect(supabase.rpc).toHaveBeenCalledWith('listing_ratings', {
+      listing_ids: ['l-1', 'l-2'],
+    })
+  })
+
   it('shows the landing headline above the grid', async () => {
     givenListings([LATTE])
     renderWithRouter(<Home />)
@@ -130,6 +161,9 @@ describe('Home listing grid', () => {
       method: 'order',
       args: ['created_at', { ascending: false }],
     })
+    const select = call.chain.find((step) => step.method === 'select')?.args[0]
+    expect(select).not.toMatch(/full_name/)
+    expect(select).not.toMatch(/host:users/)
   })
 })
 

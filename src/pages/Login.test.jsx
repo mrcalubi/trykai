@@ -19,8 +19,12 @@ async function fillCredentials(user, { email = 'kai@example.com', password = 'hu
   await user.type(screen.getByLabelText('Password'), password)
 }
 
-async function fillSignup(user, { name = 'Mei Ling', email = 'kai@example.com', password = 'hunter22' } = {}) {
+async function fillSignup(
+  user,
+  { name = 'Mei Ling', displayName = 'Mei', email = 'kai@example.com', password = 'hunter22' } = {}
+) {
   await user.type(screen.getByLabelText('Full name'), name)
+  await user.type(screen.getByLabelText('What should we call you?'), displayName)
   await fillCredentials(user, { email, password })
 }
 
@@ -37,6 +41,7 @@ describe('Login form', () => {
     renderLogin()
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('What should we call you?')).not.toBeInTheDocument()
 
     const email = screen.getByLabelText('Email')
     const password = screen.getByLabelText('Password')
@@ -58,6 +63,10 @@ describe('Login form', () => {
     await switchToSignup(user)
     expect(screen.getByRole('heading', { name: 'Create account' })).toBeInTheDocument()
     expect(screen.getByLabelText('Full name').closest('.ui-field')).toHaveClass('ui-field--floating')
+    expect(screen.getByLabelText('What should we call you?').closest('.ui-field')).toHaveClass(
+      'ui-field--floating'
+    )
+    expect(screen.getByText('Shown on your profile and reviews.')).toBeInTheDocument()
     expect(screen.getByLabelText('Email').closest('.ui-field')).toHaveClass('ui-field--floating')
     expect(screen.getByLabelText('Password').closest('.ui-field')).toHaveClass('ui-field--floating')
     expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
@@ -90,10 +99,12 @@ describe('Login form', () => {
     expect(password).toHaveAttribute('type', 'password')
   })
 
-  it('marks the full name field as required on the signup form', async () => {
+  it('marks the full name and display name fields as required on the signup form', async () => {
     const { user } = renderLogin()
     await switchToSignup(user)
     expect(screen.getByLabelText('Full name')).toBeRequired()
+    expect(screen.getByLabelText('What should we call you?')).toBeRequired()
+    expect(screen.getByLabelText('What should we call you?')).toHaveAttribute('maxLength', '40')
   })
 })
 
@@ -163,7 +174,7 @@ describe('Signing up', () => {
     givenSignupSucceeds()
     const { user } = renderLogin()
     await switchToSignup(user)
-    await fillSignup(user, { name: '  Mei Ling  ', email: 'mei@example.com' })
+    await fillSignup(user, { name: '  Mei Ling  ', displayName: '  Mei  ', email: 'mei@example.com' })
 
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
 
@@ -171,7 +182,7 @@ describe('Signing up', () => {
     expect(supabase.auth.signUp).toHaveBeenCalledWith({
       email: 'mei@example.com',
       password: 'hunter22',
-      options: { data: { full_name: 'Mei Ling' } },
+      options: { data: { full_name: 'Mei Ling', display_name: 'Mei' } },
     })
     expect(supabase.__calls('users', 'insert')).toHaveLength(0)
   })
@@ -181,11 +192,26 @@ describe('Signing up', () => {
     const { user } = renderLogin()
     await switchToSignup(user)
     await user.type(screen.getByLabelText('Full name'), '   ')
+    await user.type(screen.getByLabelText('What should we call you?'), 'Mei')
     await fillCredentials(user)
 
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
 
     expect(await screen.findByText('Please enter your full name.')).toBeInTheDocument()
+    expect(supabase.auth.signUp).not.toHaveBeenCalled()
+  })
+
+  it('requires a display name before calling signup', async () => {
+    givenSignupSucceeds()
+    const { user } = renderLogin()
+    await switchToSignup(user)
+    await user.type(screen.getByLabelText('Full name'), 'Mei Ling')
+    await user.type(screen.getByLabelText('What should we call you?'), '   ')
+    await fillCredentials(user)
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    expect(await screen.findByText('Please enter a display name.')).toBeInTheDocument()
     expect(supabase.auth.signUp).not.toHaveBeenCalled()
   })
 

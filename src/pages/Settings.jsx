@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import Input from '../components/ui/Input'
@@ -7,13 +8,16 @@ import { getInitials } from '../components/ui/getInitials'
 
 export default function Settings() {
   const userId = useAuthedUserId()
+  const navigate = useNavigate()
 
   const [fullName, setFullName] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('')
   const [nameError, setNameError] = useState('')
+  const [displayNameError, setDisplayNameError] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(true)
@@ -22,7 +26,7 @@ export default function Settings() {
   const loadProfile = useCallback(async () => {
     const { data, error: loadError } = await supabase
       .from('users')
-      .select('full_name, email, avatar_url')
+      .select('full_name, display_name, email, avatar_url')
       .eq('id', userId)
       .single()
 
@@ -33,6 +37,7 @@ export default function Settings() {
     }
 
     setFullName(data?.full_name || '')
+    setDisplayName(data?.display_name || '')
     setEmail(data?.email || '')
     setAvatarUrl(data?.avatar_url || '')
     setLoading(false)
@@ -87,10 +92,20 @@ export default function Settings() {
     setError('')
     setSuccess('')
     setNameError('')
+    setDisplayNameError('')
 
     const name = fullName.trim()
+    const handle = displayName.trim()
     if (!name) {
       setNameError('Please enter your full name.')
+      return
+    }
+    if (!handle) {
+      setDisplayNameError('Please enter a display name.')
+      return
+    }
+    if (handle.length > 40) {
+      setDisplayNameError('Display name must be 40 characters or fewer.')
       return
     }
 
@@ -107,7 +122,7 @@ export default function Settings() {
       }
     }
 
-    const payload = { full_name: name }
+    const payload = { full_name: name, display_name: handle }
     if (avatarFile) payload.avatar_url = nextAvatarUrl
 
     const { error: updateError } = await supabase
@@ -123,6 +138,7 @@ export default function Settings() {
     }
 
     setFullName(name)
+    setDisplayName(handle)
     setAvatarUrl(nextAvatarUrl)
     setAvatarFile(null)
     setAvatarPreviewUrl((previous) => {
@@ -130,6 +146,11 @@ export default function Settings() {
       return ''
     })
     setSuccess('Your profile has been saved.')
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    navigate('/')
   }
 
   if (loading) {
@@ -143,7 +164,7 @@ export default function Settings() {
     <div className="page page--form settings-page">
       <div className="form-card">
         <h1 className="form-card__title">Settings</h1>
-        <p className="form-card__subtitle">Your name and photo, as they appear on TryKai.</p>
+        <p className="form-card__subtitle">Your public profile and account.</p>
 
         {success && (
           <p className="settings-banner settings-banner--success" role="status">
@@ -156,34 +177,63 @@ export default function Settings() {
           </p>
         )}
 
-        <form onSubmit={handleSave} className="form">
-          <div className="settings-avatar">
-            {previewSrc ? (
-              <img src={previewSrc} alt="" className="settings-avatar__image" />
-            ) : (
-              <span className="settings-avatar__initials" aria-hidden="true">
-                {initials || '?'}
-              </span>
-            )}
-          </div>
+        <section className="settings-group" aria-labelledby="settings-profile-heading">
+          <h2 id="settings-profile-heading" className="settings-group__title">
+            Profile
+          </h2>
 
-          <Input
-            id="settings-full-name"
-            label="Full name"
-            type="text"
-            value={fullName}
-            onChange={(event) => setFullName(event.target.value)}
-            autoComplete="name"
-            error={nameError}
-          />
+          <form onSubmit={handleSave} className="form">
+            <div className="settings-avatar">
+              {previewSrc ? (
+                <img src={previewSrc} alt="" className="settings-avatar__image" />
+              ) : (
+                <span className="settings-avatar__initials" aria-hidden="true">
+                  {initials || '?'}
+                </span>
+              )}
+            </div>
 
-          <Input
-            id="settings-avatar"
-            label="Profile photo"
-            type="file"
-            accept="image/*"
-            onChange={handleAvatarChange}
-          />
+            <Input
+              id="settings-avatar"
+              label="Profile photo"
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarChange}
+            />
+
+            <Input
+              id="settings-display-name"
+              label="Display name"
+              type="text"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              autoComplete="nickname"
+              maxLength={40}
+              hint="Shown on your profile and reviews."
+              error={displayNameError}
+            />
+
+            <Input
+              id="settings-full-name"
+              label="Full name"
+              type="text"
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              autoComplete="name"
+              hint="Private, never shown publicly."
+              error={nameError}
+            />
+
+            <Button type="submit" variant="primary" disabled={saving}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </Button>
+          </form>
+        </section>
+
+        <section className="settings-group" aria-labelledby="settings-account-heading">
+          <h2 id="settings-account-heading" className="settings-group__title">
+            Account
+          </h2>
 
           <div className="settings-email">
             <Input
@@ -201,15 +251,6 @@ export default function Settings() {
             </p>
           </div>
 
-          <Button type="submit" variant="primary" disabled={saving}>
-            {saving ? 'Saving…' : 'Save changes'}
-          </Button>
-        </form>
-
-        <section className="settings-delete" aria-labelledby="settings-delete-heading">
-          <h2 id="settings-delete-heading" className="settings-delete__title">
-            Delete your account
-          </h2>
           <p className="settings-delete__copy">
             Account deletion is not available in the app yet. To delete your account, email{' '}
             <a href="mailto:hello@trykai.sg">hello@trykai.sg</a>. Transaction records may need
@@ -217,6 +258,12 @@ export default function Settings() {
             process has not been designed.
           </p>
         </section>
+
+        <div className="settings-logout">
+          <Button type="button" variant="secondary" onClick={handleLogout}>
+            Log out
+          </Button>
+        </div>
       </div>
     </div>
   )

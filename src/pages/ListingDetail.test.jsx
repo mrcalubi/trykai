@@ -117,18 +117,34 @@ describe('ListingDetail content', () => {
     expect(screen.queryByText('$45')).not.toBeInTheDocument()
   })
 
-  it('names the host', async () => {
+  it('names the host by display name and links to their profile', async () => {
+    givenListing(
+      makeListing({
+        users: { display_name: 'Latte Queen', full_name: 'Mei Ling Tan', avatar_url: null },
+      })
+    )
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: 'Latte Queen' })).toHaveAttribute(
+      'href',
+      '/u/host-1'
+    )
+    expect(screen.queryByText('Mei Ling Tan')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the first name when display_name is missing', async () => {
     givenListing(makeListing({ users: { full_name: 'Mei Ling', avatar_url: null } }))
     renderPage()
 
-    expect(await screen.findByText('Hosted by Mei Ling')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Mei' })).toHaveAttribute('href', '/u/host-1')
+    expect(screen.queryByText('Mei Ling')).not.toBeInTheDocument()
   })
 
   it('falls back to Anonymous when the host profile is missing', async () => {
     givenListing(makeListing({ users: null }))
     renderPage()
 
-    expect(await screen.findByText('Hosted by Anonymous')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Anonymous' })).toHaveAttribute('href', '/u/host-1')
   })
 
   it('averages the host reviews to one decimal place', async () => {
@@ -137,8 +153,11 @@ describe('ListingDetail content', () => {
     givenHostReviews([makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })])
     renderPage()
 
-    expect(await screen.findByText('4.5 · 2 reviews')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Reviews (2)' })).toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Reviews (2)' })
+    expect(document.querySelector('.detail-host__rating').textContent.replace(/\s+/g, ' ').trim()).toBe(
+      '★ 4.5 · 2 reviews'
+    )
+    expect(document.querySelector('.detail-host__star')).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('rates the host from every listing, not only this one', async () => {
@@ -150,8 +169,11 @@ describe('ListingDetail content', () => {
     ])
     renderPage()
 
-    expect(await screen.findByText('3.0 · 2 reviews')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Reviews (1)' })).toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Reviews (1)' })
+    expect(document.querySelector('.detail-host__rating').textContent.replace(/\s+/g, ' ').trim()).toBe(
+      '★ 3.0 · 2 reviews'
+    )
+    expect(document.querySelector('.detail-host__star')).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('loads the host average by reviewee_id and listing reviews through the RPC', async () => {
@@ -177,10 +199,11 @@ describe('ListingDetail content', () => {
 
   it('still shows listing reviews to a signed-out visitor', async () => {
     givenListing()
-    givenReviews([makeReview({ comment: 'Great latte class' })])
+    givenReviews([makeReview({ comment: 'Great latte class', users: { full_name: 'Arun' } })])
     renderPage()
 
     expect(await screen.findByText('Great latte class')).toBeInTheDocument()
+    expect(screen.getByText('Arun')).toBeInTheDocument()
     expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_listing', { p_listing_id: 'listing-1' })
   })
 
@@ -207,7 +230,8 @@ describe('ListingDetail content', () => {
 
   it('wraps user-written listing and booking copy with one overflow-wrap rule', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
-    expect([...css.matchAll(/overflow-wrap:\s*anywhere/g)]).toHaveLength(1)
+    expect([...css.matchAll(/overflow-wrap:\s*break-word/g)]).toHaveLength(1)
+    expect(css).not.toMatch(/overflow-wrap:\s*anywhere/)
     expect(css).toMatch(
       /\.detail-title,\s*\n\.detail-description,\s*\n\.detail-area,\s*\n\.detail-list li,\s*\n\.review-card__comment,\s*\n\.ui-card__title,\s*\n\.dashboard-card__title,\s*\n\.dashboard-card__meta/
     )
@@ -219,7 +243,7 @@ describe('ListingDetail content', () => {
     givenHostReviews([])
     renderPage()
 
-    await screen.findByText('Hosted by Mei Ling')
+    await screen.findByRole('link', { name: 'Mei' })
     expect(document.querySelector('.detail-host__rating')).not.toBeInTheDocument()
     expect(screen.getByText('No reviews yet.')).toBeInTheDocument()
     expect(screen.queryByText(/· \d+ reviews?/)).not.toBeInTheDocument()
@@ -313,7 +337,7 @@ describe('ListingDetail content', () => {
     givenReviews([makeReview({ id: 'r1', rating: 5 })])
     renderPage()
 
-    await screen.findByText('Hosted by Mei Ling')
+    await screen.findByRole('link', { name: 'Mei' })
     const order = [...document.querySelectorAll('.detail-host, .detail-section__title')].map(
       (node) => (node.className.includes('detail-host') ? 'host' : node.textContent)
     )

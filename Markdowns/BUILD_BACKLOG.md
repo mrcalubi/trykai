@@ -52,18 +52,23 @@ Verification approval is now on the platform. Suspension that does not hide list
 
 Not a calendar. Capacity is 8 hours a week.
 
-1. **Ops (not app code):** confirm `00005`, `00008`, `00009`, `00010`, and `00011` on each environment; Vault/GitHub secrets for `release-payout`; Stripe Dashboard webhook + secrets; `RESEND_API_KEY` and current Edge Function deploys on production; platform payouts **manual**; flag eleven `is_founding_host`; one staging test-mode booking; confirm the two test cancellations were refunded on Stripe.
+1. **Ops (not app code):** confirm `00005`, `00008`, `00009`, `00010`, `00011`, and `00012` on each environment; Vault/GitHub secrets for `release-payout`; Stripe Dashboard webhook + secrets; `RESEND_API_KEY` and current Edge Function deploys on production; platform payouts **manual**; flag eleven `is_founding_host`; one staging test-mode booking; confirm the two test cancellations were refunded on Stripe.
 2. **Bug 4:** Hosting treats `?connect=return` as "Payout setup submitted" without re-checking `stripe_payouts_enabled`. Money path.
 3. **P0.4** app actually filters `is_suspended` on browse and Book. Listing/session INSERT is already gated by `can_create_listing()` (`00008`). One-click admin can wait if Table Editor plus this filter is reliable.
 4. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
 5. Browse card rating: the listings fetch does not supply one and there is no aggregate rating column. The card already shows the all-in card price.
 6. **P2.3** review gating is done (`00011`). Then the rest of P2 in listed order.
+7. JWT "issued at future" on browse: retry once, friendly error, never show raw error text.
+8. Host cancel warning: replace per-guest refund amounts with "Cancelling refunds all N guests in full and adds a strike".
+9. Review reminder email, about 3h after session ends.
+10. `full_name` SELECT for anon can be revoked once nothing public reads it (`display_name` is the public name; pages still fall back to `full_name`).
+11. Reword S$10 to S$40 as guidance, not a rule (decided; remaining copy in HOST_ONBOARDING / BUSINESS / HANDOVER).
 
 ---
 
 ## P0: blocks launch
 
-> **Status, 21 September 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, guest address reveal path of P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement on browse/Book, `full_address` column grant. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September. P0.9 assets resolved 9 September. `00008` listing gate, `00009` session/booking read, `00010` `release-payout` schedule, and `00011` review gate are in the tree.
+> **Status, 21 September 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, guest address reveal path of P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement on browse/Book, `full_address` column grant. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September. P0.9 assets resolved 9 September. `00008` listing gate, `00009` session/booking read, `00010` `release-payout` schedule, `00011` review gate, and `00012` empty-session delete are in the tree.
 
 ### P0.1 — Host payout details — OBSOLETE
 Under Stripe Connect Express, Stripe collects the host's bank details. Do not add `payout_method` / `payout_identifier` columns.
@@ -114,10 +119,10 @@ Still to build:
 
 ## P1: the payment build — DONE IN CODE, 27–31 August 2026
 
-Stripe Connect (separate charges and transfers, Express) is implemented. Do not adapt `hitpay-wip-2026-08`. Remaining work is ops: confirm `00005` / `00008` / `00009` / `00010` / `00011`, Vault/GitHub secrets for `release-payout`, Stripe Dashboard webhook + secrets, `RESEND_API_KEY` and function deploys on production, platform payouts manual, founding-host flags, staging test-mode booking.
+Stripe Connect (separate charges and transfers, Express) is implemented. Do not adapt `hitpay-wip-2026-08`. Remaining work is ops: confirm `00005` / `00008` / `00009` / `00010` / `00011` / `00012`, Vault/GitHub secrets for `release-payout`, Stripe Dashboard webhook + secrets, `RESEND_API_KEY` and function deploys on production, platform payouts manual, founding-host flags, staging test-mode booking.
 
 ### P1.1 — Payment confirmation webhook — DONE
-`supabase/functions/stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, emails both parties, refunds on oversell, cancels pending on failed/canceled intents, syncs `stripe_payouts_enabled` from `account.updated`.
+`supabase/functions/stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, emails both parties, refunds on oversell (including a cancelled / not-`open` session), cancels pending on failed/canceled intents, syncs `stripe_payouts_enabled` from `account.updated`.
 
 ### P1.2 — Fee calculation — DONE
 `calculateGuestCharge` in `_shared/booking.ts`: 12% + S$2.50 floor, round up to a whole dollar, PayNow 5% off that total. Browse and listing show the card all-in price. Host fee 10% from the fourth confirmed booking; founding hosts never.
@@ -157,7 +162,7 @@ Within 7 days, reviewed manually. Needs a submission form and an admin view.
 Disputes arrive by email today. At launch volume that is survivable.
 
 ### P2.8 — Wire the UI kit and decided browse
-**Mostly done, 9–21 September 2026.** TopNav and HamburgerMenu are the live chrome (`Navbar.jsx` is deleted), and Home is the decided browse: Lane 1 headline, 2 / 3 / 4 columns, square images, badge on a cream pill, two-line title clamp, one meta line with the all-in card price. Settings uses Button and Input. Login uses Input (floating + password). Left over: the rating on the browse card needs the listings fetch to supply one (no aggregate rating column exists yet), SelectableCard is still `/style-guide` only, and `ListingCard.jsx` plus its `.listing-card` CSS are dead code waiting on a deletion pass. Home still joins host `full_name` that the browse `Card` never receives.
+**Mostly done, 9–21 September 2026.** TopNav and HamburgerMenu are the live chrome (`Navbar.jsx` is deleted), and Home is the decided browse: Lane 1 headline, 2 / 3 / 4 columns, square images, badge on a cream pill, two-line title clamp, one meta line with the all-in card price. Settings uses Button and Input. Login uses Input (floating + password). Left over: the rating on the browse card needs the listings fetch to supply one (no aggregate rating column exists yet), SelectableCard is still `/style-guide` only, and `ListingCard.jsx` plus its `.listing-card` CSS are dead code waiting on a deletion pass.
 
 ### P2.9 — Checkout and legal gaps visible in the app
 - `guests_count` hardcoded to 1 in ListingDetail
@@ -167,6 +172,21 @@ Disputes arrive by email today. At launch volume that is survivable.
 - No photography guidance on CreateListing (the 5 photo limit copy is not that)
 - No sort UI (DECISIONS.md listed newest / price / most reviewed as live; only newest exists)
 - Phone OTP before booking: not built
+
+### P2.10 — JWT "issued at future" on browse
+Clock skew on the guest JWT can fail the listings fetch. Retry the request once, then show a friendly error. Never surface the raw error text.
+
+### P2.11 — Host cancel warning copy
+Replace the per-guest refund amounts in the Hosting confirm dialog with: "Cancelling refunds all N guests in full and adds a strike".
+
+### P2.12 — Review reminder email
+About 3 hours after the session ends, email the guest if they have not left a review.
+
+### P2.13 — First names are UI-only
+Public surfaces show `display_name` (`00014`). Review RPCs return it in jsonb `users.full_name`. Pages still SELECT `full_name` and fall back to `firstName(full_name)` when `display_name` is empty. The `full_name` column is still granted SELECT to anon and authenticated (`00005`). A crafted query can still read the whole name. Revoke that SELECT for anon once nothing public reads the column.
+
+### P2.14 — S$10 to S$40 is guidance, not a rule
+Decided 29 September 2026. Remaining: HOST_ONBOARDING, BUSINESS, and HANDOVER still describe it as a hard band. CreateListing already only checks `priceCents > 0`.
 
 ---
 

@@ -40,11 +40,11 @@ describe('HamburgerMenu', () => {
     renderMenu({ open: true, isLoggedIn: true })
 
     expect(screen.getByRole('link', { name: 'Browse' })).toHaveAttribute('href', '/')
-    expect(screen.getByRole('link', { name: 'My bookings' })).toHaveAttribute('href', '/bookings')
     expect(screen.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
+    expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Create listing' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument()
@@ -54,16 +54,16 @@ describe('HamburgerMenu', () => {
     expect(screen.queryByRole('link', { name: 'Verification review' })).not.toBeInTheDocument()
   })
 
-  it('adds Hosting and labels Create listing for a host', () => {
+  it('labels Create listing for a host and does not add Hosting', () => {
     renderMenu({ open: true, isLoggedIn: true, isHost: true })
 
     expect(screen.getByRole('link', { name: 'Browse' })).toHaveAttribute('href', '/')
-    expect(screen.getByRole('link', { name: 'My bookings' })).toHaveAttribute('href', '/bookings')
-    expect(screen.getByRole('link', { name: 'Hosting' })).toHaveAttribute('href', '/hosting')
     expect(screen.getByRole('link', { name: 'Create listing' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
+    expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Become a host' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()

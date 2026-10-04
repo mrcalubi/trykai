@@ -10,6 +10,7 @@ export default function Login() {
 
   const [isSignup, setIsSignup] = useState(false)
   const [fullName, setFullName] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -43,8 +44,17 @@ export default function Login() {
     setMessage('')
 
     const name = fullName.trim()
+    const handle = displayName.trim()
     if (!name) {
       setError('Please enter your full name.')
+      return
+    }
+    if (!handle) {
+      setError('Please enter a display name.')
+      return
+    }
+    if (handle.length > 40) {
+      setError('Display name must be 40 characters or fewer.')
       return
     }
 
@@ -53,7 +63,7 @@ export default function Login() {
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: name } },
+      options: { data: { full_name: name, display_name: handle } },
     })
 
     setLoading(false)
@@ -103,17 +113,32 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="form">
           {isSignup && (
-            <Input
-              id="login-full-name"
-              label="Full name"
-              type="text"
-              floatingLabel
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Your name"
-              autoComplete="name"
-              required
-            />
+            <>
+              <Input
+                id="login-full-name"
+                label="Full name"
+                type="text"
+                floatingLabel
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Your name"
+                autoComplete="name"
+                required
+              />
+              <Input
+                id="login-display-name"
+                label="What should we call you?"
+                type="text"
+                floatingLabel
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="A name"
+                autoComplete="nickname"
+                required
+                maxLength={40}
+                hint="Shown on your profile and reviews."
+              />
+            </>
           )}
 
           <Input

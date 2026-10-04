@@ -1,3 +1,5 @@
+import { publicName } from '../lib/publicName'
+
 function formatReviewDate(iso) {
   return new Intl.DateTimeFormat('en-SG', {
     month: 'short',
@@ -20,15 +22,18 @@ function StarDisplay({ rating }) {
 }
 
 export default function ReviewCard({ review }) {
-  const name = review.users?.full_name || 'Guest'
+  const name = publicName({ display_name: review.users?.full_name }) || 'Guest'
   const initial = name[0]?.toUpperCase() || '?'
 
   return (
     <div className="review-card">
       <div className="review-card__header">
         <div className="review-card__avatar">{initial}</div>
-        <div>
+        <div className="review-card__author">
           <p className="review-card__name">{name}</p>
+          {review.listing_title ? (
+            <p className="review-card__listing">{review.listing_title}</p>
+          ) : null}
           <div className="review-card__meta">
             <StarDisplay rating={review.rating} />
             <span className="review-card__date">{formatReviewDate(review.created_at)}</span>

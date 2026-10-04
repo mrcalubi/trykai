@@ -8,6 +8,24 @@ function formatRating(rating) {
   return rating.toFixed(1)
 }
 
+function hasReviewCount(reviewCount) {
+  return typeof reviewCount === 'number' && !Number.isNaN(reviewCount) && reviewCount > 0
+}
+
+function RatingMark({ rating, reviewCount }) {
+  return (
+    <>
+      <span className="ui-card__star" aria-hidden="true">
+        ★
+      </span>{' '}
+      {formatRating(rating)}
+      {hasReviewCount(reviewCount) ? (
+        <span className="ui-card__review-count"> ({reviewCount})</span>
+      ) : null}
+    </>
+  )
+}
+
 export default function Card({
   mode = 'booking',
   image,
@@ -17,6 +35,7 @@ export default function Card({
   titleLevel = 3,
   meta,
   rating,
+  reviewCount,
   price,
   to,
   footer,
@@ -42,16 +61,13 @@ export default function Card({
       ? { to, className: classes, ...props }
       : { className: classes, ...props }
 
-  // Browse keeps price and rating on one line, so the price is a bare text node
-  // rather than its own element: the line itself carries the price styling.
   const browseMetaLine =
     price || showRating ? (
       <p className="ui-card__meta-line">
-        {price}
+        {price ? <span className="ui-card__price-text">{price}</span> : null}
         {showRating ? (
           <span className="ui-card__rating">
-            {price ? <span aria-hidden="true"> · </span> : null}
-            <span aria-hidden="true">★</span> {formatRating(rating)}
+            <RatingMark rating={rating} reviewCount={reviewCount} />
           </span>
         ) : null}
       </p>
@@ -71,7 +87,7 @@ export default function Card({
         ) : null}
         {showRating ? (
           <p className="ui-card__rating">
-            <span aria-hidden="true">★</span> {formatRating(rating)}
+            <RatingMark rating={rating} reviewCount={reviewCount} />
           </p>
         ) : null}
       </div>

@@ -28,8 +28,12 @@ describe('ListingCard', () => {
   })
 
   it('builds the meta line from host, area and all-in price', () => {
-    renderCard({ area: 'Tampines', price_per_person: 3000, host: { full_name: 'Mei Ling' } })
-    expect(screen.getByText('Mei Ling · Tampines · $34/person')).toBeInTheDocument()
+    renderCard({
+      area: 'Tampines',
+      price_per_person: 3000,
+      host: { display_name: 'Mei', full_name: 'Mei Ling' },
+    })
+    expect(screen.getByText('Mei · Tampines · $34/person')).toBeInTheDocument()
   })
 
   it('reads the host name from the `users` relation when `host` is absent', () => {

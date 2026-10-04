@@ -32,17 +32,17 @@ Each week has three sections, one per founder, tagged **[CRITICAL]**, **[HIGH]**
 Week 8 of the original plan (15–21 September) is ending. The week-by-week sections below stay as the historical plan. Read this snapshot first.
 
 **In the tree now (not true of the 31 August snapshot):**
-- Schema is `00001`–`00011`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` hourly via pg_cron. `00011` is `reviews_for_listing` plus guest review INSERT (confirmed, session ended, one per booking per role). Not yet applied on staging.
-- `Navbar.jsx` is deleted. `SiteNav` mounts `TopNav` once in `App.jsx`. Hamburger is navigation only. Avatar is Settings and Log out.
+- Schema is `00001`–`00012`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` hourly via pg_cron. `00011` is `reviews_for_listing` plus guest review INSERT (confirmed, session ended, one per booking per role). `00012` is `delete_empty_session` (soft-delete empty upcoming sessions) and `confirm_paid_booking` requiring `status = 'open'`. Not yet applied on staging.
+- `Navbar.jsx` is deleted. `SiteNav` mounts `TopNav` once in `App.jsx`. Signed-in hamburger is Browse, Create listing / Become a host, Verification review for admins. Avatar goes to your own profile.
 - Browse uses the kit `Card` and shows the card all-in price. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only.
-- Guest bookings at `/bookings`, host tools and payout setup at `/hosting`, profile at `/settings`. `/dashboard` redirects.
+- Guest bookings and host tools live as tabs on your own `/u/:id`. `/bookings` and `/hosting` redirect there. `/settings` is the account page. `/dashboard` redirects.
 - trykai.sg is verified in Resend. From-address is `TryKai <no-reply@trykai.sg>`. `notify-verification-pending` is secret-gated. `notify-verification-result` is gone. Staging booking confirmation emails confirmed arriving.
 - `cancel-booking` emails the guest the refund amount (including $0) and the host only on a guest cancel. `/bookings` and `/hosting` invoke that function.
 - StyleGuide category PNGs and `public/trykai.png` are in the repo.
 - Edge Functions: `create-payment-intent`, `stripe-webhook`, `create-connect-account`, `create-account-link`, `cancel-booking`, `admin-cancel-booking`, `admin-verifications`, `create-identity-session`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`.
 
 **Still ops, not app code:**
-- Confirm `00005`, `00008`, `00009`, `00010`, and `00011` on each environment. Confirm production has `RESEND_API_KEY` and current function deploys. This repo cannot see production.
+- Confirm `00005`, `00008`, `00009`, `00010`, `00011`, and `00012` on each environment. Confirm production has `RESEND_API_KEY` and current function deploys. This repo cannot see production.
 - Apply `00010` and set Vault secrets so `release-payout` actually runs. The GitHub Action only fires from `main`. Platform payouts must stay **manual**. See **Host Transfers** below.
 - Stripe Dashboard webhook + secrets, `is_founding_host` flags, one test-mode booking.
 - Confirm the two test cancellations were refunded on Stripe. API PATCH 204s are the expected service-role writes from `cancel-booking`, not proof of a client bypass.
@@ -585,11 +585,11 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Approved host can create listings
 
 ## Cancellations
-- [ ] Guest can cancel from `/bookings` (invokes `cancel-booking`)
+- [ ] Guest can cancel from the Bookings tab (invokes `cancel-booking`; `/bookings` redirects there)
 - [ ] Four tier refund correctly calculated, 100 / 50 / 25 / 0 at 48hr, 24hr, 6hr, with platform fee forfeited on partial tiers
 - [x] Refund amount stored and included directly in the cancellation email
 - [ ] Guest can reschedule instead of cancelling, once per booking, 48hr cutoff
-- [ ] Host can cancel from `/hosting`
+- [ ] Host can cancel from the Hosting tab (`/hosting` redirects there)
 - [ ] Host cancellation increments strikes
 - [ ] Guest can report a host no show, distinct from host initiated cancel, triggering 2 strikes and account review
 - [ ] Host can appeal a strike within 7 days
@@ -608,12 +608,12 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Review prompt appears after the session date passes
 
 ## Dashboard
-- [ ] Host view at `/hosting`: listings, upcoming sessions, Add Session, Edit, payout setup
+- [ ] Host view on own profile Hosting tab (`/hosting` redirects): listings, upcoming sessions, Add Session, Edit, payout setup
 - [ ] Host view: Cancel with strike warning
-- [ ] Guest view at `/bookings`: upcoming and past bookings
+- [ ] Guest view on own profile Bookings tab (`/bookings` redirects): upcoming and past bookings
 - [ ] Guest view: Cancel with refund amount shown (calls `cancel-booking`, does not PATCH bookings from the browser)
 - [ ] Guest view: Leave review after the session
-- [ ] Both views reachable from one account (hamburger: My bookings; Hosting if `is_host`)
+- [ ] Both views on one account (own profile tabs: Bookings; Hosting if `is_host`)
 
 ## Auth and accounts
 - [ ] Signup, login, logout working
@@ -665,7 +665,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Verification documents in a private bucket
 - [ ] Prices stored as integers in cents
 - [ ] No sensitive data in client side code or console logs
-- [x] Database schema in version control (`supabase/migrations/` `00001`–`00011`)
+- [x] Database schema in version control (`supabase/migrations/` `00001`–`00012`)
 
 ## Infrastructure
 - [x] trykai.sg pointing at Vercel

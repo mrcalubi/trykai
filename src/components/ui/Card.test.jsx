@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
@@ -103,9 +105,31 @@ describe('Card', () => {
     expect(screen.getByText('Food')).toBeInTheDocument()
     expect(container.querySelectorAll('.ui-card__meta-line')).toHaveLength(1)
     expect(container.querySelector('.ui-card__meta-line').textContent).toBe(
-      '$20/person · ★ 4.8'
+      '$20/person★ 4.8'
     )
+    expect(container.querySelector('.ui-card__price-text').textContent).toBe('$20/person')
+    expect(container.querySelector('.ui-card__rating').textContent).toBe('★ 4.8')
+    expect(container.querySelector('.ui-card__meta-line').className).toBe('ui-card__meta-line')
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('appends the review count on the browse meta line when reviews exist', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Card
+          mode="browse"
+          to="/listings/latte"
+          title="Learn latte art with me"
+          rating={4.8}
+          reviewCount={12}
+          price="$28"
+        />
+      </MemoryRouter>
+    )
+
+    expect(container.querySelector('.ui-card__meta-line').textContent).toBe('$28★ 4.8 (12)')
+    expect(container.querySelector('.ui-card__star')).toBeInTheDocument()
+    expect(container.querySelector('.ui-card__review-count').textContent).toBe(' (12)')
   })
 
   it('drops the dot and the star in browse mode when there is no rating', () => {
@@ -117,5 +141,31 @@ describe('Card', () => {
 
     expect(container.querySelector('.ui-card__meta-line').textContent).toBe('$32/person')
     expect(container.querySelector('.ui-card__rating')).not.toBeInTheDocument()
+  })
+
+  it('does not reserve a second line under a one-line browse title', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../../index.css'), 'utf8')
+    const browseTitle = css.match(/\.ui-card--browse \.ui-card__title \{[\s\S]*?\n\}/)
+    expect(browseTitle?.[0]).toBeTruthy()
+    expect(browseTitle[0]).not.toMatch(/min-height/)
+  })
+
+  it('colours booking-mode stars with --star and browse stars as text', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../../index.css'), 'utf8')
+    expect(css).toMatch(/\.ui-card__star \{[\s\S]*?color:\s*var\(--star\)/)
+    const browseStar = css.match(/\.ui-card--browse \.ui-card__star \{[\s\S]*?\n\}/)
+    expect(browseStar?.[0]).toMatch(/color:\s*inherit/)
+    const browseRating = css.match(/\.ui-card--browse \.ui-card__rating \{[\s\S]*?\n\}/)
+    expect(browseRating?.[0]).toMatch(/font-family:\s*var\(--sans\)/)
+    expect(css).toMatch(/\.ui-card--browse \.ui-card__review-count \{[\s\S]*?color:\s*var\(--muted\)/)
+    const metaLine = css.match(/\.ui-card__meta-line \{[\s\S]*?\n\}/)
+    expect(metaLine?.[0]).toMatch(/justify-content:\s*space-between/)
+  })
+
+  it('lets the title column shrink inside the grid instead of overflowing', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../../index.css'), 'utf8')
+    const body = css.match(/\.ui-card__body \{[\s\S]*?\n\}/)
+    expect(body?.[0]).toMatch(/flex:\s*1/)
+    expect(body?.[0]).toMatch(/min-width:\s*0/)
   })
 })

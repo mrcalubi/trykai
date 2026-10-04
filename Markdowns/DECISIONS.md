@@ -16,9 +16,12 @@ Two host types on the same browse page. **Peer hosts**, everyday people monetisi
 ### Unified accounts
 One account type, both host and guest. Guest by default, becomes a host on first listing. `is_host` flag handles the distinction. Hosts get a visible badge.
 
-Guest bookings are at `/bookings`. Host listings, upcoming hosted sessions, and Stripe payout setup are at `/hosting`. `/dashboard` remains as a redirect so emails and Stripe `return_url`s keep working. Payouts stay in the host area, not account settings. A signed-in user who is not a host is redirected from `/hosting` to `/bookings`.
+Guest bookings and host tools live as private tabs on your own `/u/:id` profile (Bookings, Hosting for hosts, Listings, Reviews). `/bookings` and `/hosting` redirect there with `?tab=` and keep every other query key, so `?booking=` polling and `?connect=` from Stripe still work. `/dashboard` remains as a first hop so emails and Stripe `return_url`s keep working (`?connect=` still goes to `/hosting` first). Payouts stay in the host area, not account settings. A signed-in user who is not a host does not see a Hosting tab; `/hosting` still lands on their profile and the unknown tab falls back to Bookings. Anyone's public profile is `/u/:id` (display name, listings, reviews received) with no private tabs and no settings gear.
 
-Profile name and photo are edited at `/settings`. Email is shown there but not changed in-app. Account deletion is contact-support only until the retain-transactions / remove-personal-data split is designed.
+Profile name, display name, and photo are edited at `/settings` (Profile group). Full name is labelled private, never shown publicly. Email is shown in Account but not changed in-app. Account deletion is contact-support only until the retain-transactions / remove-personal-data split is designed. Log out is on Settings. The avatar in the top nav goes to your own profile.
+
+### Host price band
+S$10 to S$40 is **guidance** for hosts, not a hard rule. CreateListing does not enforce it. The band is where zero-fixed-cost supply sits and where the guest fee was tuned; it is not a CHECK constraint.
 
 ### Progressive disclosure at signup
 Ask for information when it becomes relevant, not upfront.
@@ -43,7 +46,7 @@ Reviews are the core trust mechanism, not vetting.
 **Stripe Identity is the default path**, decided 10 September 2026: a hosted document plus live-selfie check, USD 1.50 per completed verification, and **TryKai never stores the images**. Manual upload to the private `verification-docs` bucket is the fallback, reviewed by Caleb at **`/admin/verifications`** (not the Table Editor). Consent is explicit and recorded. Status flow: unverified → pending → approved → rejected, now with a CHECK constraint, and **only approved, unsuspended hosts can insert a listing or a session**, enforced in RLS rather than in the page. Every decision writes a `verification_reviews` audit row.
 
 ### Browse
-Live now: category pills (built from listing data, not a fixed six-item list) and an area dropdown, both combinable. Order is newest (`created_at` desc). **Sort by price or most reviewed is not built.**
+Live now: category pills (built from listing data, not a fixed six-item list) and an area dropdown, both combinable. Order is newest (`created_at` desc). **Sort by price or most reviewed is not built.** Browse and profile listing cards put price on the left of the meta line and `★ average (count)` on the right from `listing_ratings` when that listing has guest reviews; a listing with none is price only, never an empty star.
 Stage 2: "This weekend" filter, price range slider.
 Stage 3: personalisation from booking history.
 
@@ -63,9 +66,11 @@ An optional layer hosts enable on Lane 1 listings only. Host specifies what is d
 **Why:** it taps a trigger that refuels itself. Dates, anniversaries, "we need to do something different". Not a one time purchase. It is a natural upsell at near zero extra cost to the host, and it permanently differentiates TryKai from any tuition platform.
 
 ### Identity and social layer
-*Decided direction, to build post MVP.*
+*Decided direction, to build post MVP, except the thin public profile below.*
 
-The guest profile is a public artefact that accumulates, not just an account page. Every completed session adds to a visible log. Lane 2 progress shown explicitly with a progress indicator toward a stated goal.
+**Public profile (30 September 2026).** `/u/:id` is public. Avatar, display name, ID-verified badge if approved, host rating and count (hidden when none), active listings, reviews received as a host. Reviews they wrote as a guest are not shown. Your own profile adds Bookings (default), Hosting (hosts only), Listings, and Reviews tabs, with a gear to `/settings`. Other people's profiles stay listings + reviews only. Public surfaces (this page, Hosted by, review cards) show `display_name`, falling back to the first word of `full_name`. Review RPCs return the reviewer's `display_name` in jsonb `users.full_name`. `full_name` is still SELECT-able through the API.
+
+The rest of the guest profile as a public artefact that accumulates remains post MVP. Every completed session adds to a visible log. Lane 2 progress shown explicitly with a progress indicator toward a stated goal.
 
 **Trophies**, named and specific rather than generic: First Timer, Explorer (5 categories), Night Owl, Date Night Pro, Regulars Club (same host 3+ times), Polyglot in Progress, Still Going (4 week streak). Visible to anyone viewing the profile.
 
@@ -221,6 +226,7 @@ Published at /cancellation-policy, /refund-policy, /dispute-policy. Finalised 29
 | Guest cancels 6 to 24hrs before | 25% of lesson fee, platform fee forfeited |
 | Guest cancels under 6hrs, or no show | No refund |
 | Host cancels, any time | Full guest refund including platform fee, 1 strike |
+| Host deletes an empty session | No guests; `delete_empty_session` sets `sessions.status = 'cancelled'`. No refund, no strike. Not a host cancel. |
 | Host no show | Full guest refund including platform fee, discretionary compensation, 2 strikes immediately, account reviewed |
 | 3 strikes | Listings auto deactivated |
 
@@ -320,6 +326,8 @@ trykai.sg via Vodien, two years, ~$75.98. SGNIC identity verification completed.
 **SEO**, flagged for later. "TryKai" is common enough that brand search will not rank well. Strategy is long tail instead: "learn pottery Singapore", "things to do Singapore this weekend", via listing pages. Needs clean URL slugs rather than raw UUIDs, and unique meta title and description per listing. Not built.
 
 Full visual identity is in DESIGN.md.
+
+**Chrome (30 September 2026).** The avatar in the top nav links to your own `/u/:id`. There is no avatar dropdown. Settings is a gear on your own profile header; Log out is on `/settings`. Signed-in hamburger: Browse, Create listing / Become a host, Verification review (admins only, via `my_verification()`). Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
 
 ---
 
@@ -446,7 +454,7 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-09-19 — Settings page at `/settings`.** Signed-in users can edit `full_name` and `avatar_url`. Email is read-only; change it via `hello@trykai.sg`. No in-app delete: deletion must keep transaction records for dispute and tax while removing personal data, and that split is not designed. Linked from the avatar account menu.
 
-**2026-09-19 — Hamburger is navigation; the avatar is the account menu.** Signed-in hamburger: Browse, My bookings, Hosting (hosts only), Create listing / Become a host (always, top-level so a non-host can start), Verification review (admins only, via `my_verification()`). Settings and Log out live on the avatar. No Profile link until that page exists. Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
+**2026-09-19 — Hamburger is navigation; the avatar is the account menu.** **Superseded 30 September 2026.** Signed-in hamburger: Browse, My bookings, Hosting (hosts only), Create listing / Become a host (always, top-level so a non-host can start), Verification review (admins only, via `my_verification()`). Settings and Log out live on the avatar. Public profiles live at `/u/:id`; the hamburger still has no Profile link (own bookings/hosting tabs on that page are part 2). Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
 
 **2026-09-19 — Login uses the kit Input.** Email is the floating-label variant; password is the password variant with the eye toggle. Both login and signup modes. Auth, redirect, and form-level error copy are unchanged.
 
@@ -454,6 +462,20 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-09-19 — Host Transfers are scheduled; Stripe logs stay empty until the job runs.** Not a new money-flow decision. `release-payout` existed but nothing invoked it, so Connect Transfers (`tr_`) never appeared. Staging uses pg_cron + Vault (`00010`). The GitHub Action is the extra caller once that workflow is on `main` (GitHub `schedule` only runs there). Platform payouts stay **manual**. Do not Transfer without `source_transaction` after a platform bank payout; that would take a later guest's funds. Ops steps live in OPERATIONS.md.
 
 **2026-09-24 — Guest review INSERT is gated in the database.** Supersedes the Part A note that the dashboard and RLS still allowed `pending`. `00011` requires a confirmed booking, a session that has ended (`starts_at + duration_mins`), `reviewee_id` the listing host, and one review per booking per role. Host→guest reviews remain unbuilt.
+
+**2026-09-29 — Hosts can delete an empty upcoming session on their own listing.** Not a host cancel: no bookings means no refunds and no strike. `delete_empty_session` (`00012`) is security definer, listing-owner only, and refuses the write if any booking on the row is pending or confirmed. Success sets `sessions.status = 'cancelled'`; the row is never hard-deleted. Clients have no UPDATE grant on sessions, so this is the only host path. Hosting lists every upcoming non-cancelled session (not only those with bookings). Empty rows get Delete; booked rows keep Cancel. The listing page already selects `status = 'open'`, so cancelled sessions disappear there without a page change.
+
+**2026-09-29 — Public profile at `/u/:id`, first names only on public surfaces.** Part 1: anyone can view avatar, first name, ID-verified if approved, host rating, active listings, and reviews received as a host (`reviews_for_host`). Reviews they wrote as a guest are not shown. Hosted by on listing detail links here. Part 2 (own bookings and hosting tabs on your own profile) is not built. Review RPCs return the reviewer's first name in jsonb `users.full_name`. Host names on listing and profile pages still use `firstName`; `full_name` remains granted SELECT.
+
+**2026-09-29 — S$10 to S$40 is guidance, not a rule.** Hosts are pointed at that band because it is where peer supply can price and where the guest fee was tuned. It is not enforced in CreateListing or as a CHECK. Supersedes wording that treated the band as a hard identity constraint.
+
+**2026-09-29 — Users choose a display name.** Public surfaces (profile, Hosted by, review cards) show `users.display_name` instead of splitting `full_name`. Signup asks "What should we call you?" and Settings edits it next to full name. Trimmed, 1 to 40 characters (`00014`). Existing rows are backfilled from the first word of `full_name`. `handle_new_user` reads it from signup metadata and falls back to that first word. Review RPCs return it in jsonb `users.full_name` so ReviewCard's shape is unchanged. `full_name` remains granted SELECT; it can be revoked for anon once nothing public reads it.
+
+**2026-09-30 — Own profile tabs; avatar goes to profile.** Part 2 of `/u/:id`. Your own profile shows Bookings (default), Hosting (hosts only), Listings, and Reviews, with the active tab in `?tab=`. Bookings and Hosting are the existing pages mounted as panels, not rewritten. `/bookings` and `/hosting` redirect to your profile with the matching tab and every other query key kept, so `?booking=` polling and `?connect=` from Stripe still work. `/dashboard` is still the first hop for emails and Stripe return URLs. Other people's profiles stay listings + reviews, with no private tabs and no gear. The avatar links to your own profile; the account dropdown is gone. Own-profile header has a gear to `/settings`. Settings is grouped as Profile (photo, display name, full name labelled private) and Account (email read-only, deletion contact line), with Log out at the bottom. Signed-in hamburger is Browse, Create listing / Become a host, and Verification review (admins). **Supersedes the 19 September 2026 "hamburger is navigation, avatar is account menu" entry.** Profile listing cards drop the browse-card two-line title min-height so there is no empty gap above the price.
+
+**2026-09-30 — Browse ratings, Hosting listing rows, listing delete RPC.** Home and the profile Listings tab show `★ average (count)` from `listing_ratings` (`00015`), one call per page with every listing id, same reviews → bookings → sessions join as `reviews_for_listing`. No guest reviews means price only, never an empty star. Delete is `delete_listing` (`00015`): owner only; refuses if any upcoming session has a pending or confirmed booking; otherwise `is_active = false` and empty upcoming sessions become `cancelled` in one transaction. Confirm copy names the listing; empty sessions mention they will be removed; active bookings block delete and tell the host to cancel those sessions first. The Hosting admin verification card is a one-line banner (`N verifications waiting · Review`) only when `my_verification().pending_count > 0`. Shared long-word wrapping is `overflow-wrap: break-word`, not `anywhere`, so flex titles do not collapse letter by letter.
+
+**2026-09-30 — Host rating star, hidden profile-tab scrollbars, My Listings grid, browse meta.** Profile header and listing-detail Hosted by show `★ average · N reviews` with the glyph in `--star` (`HostRating`). Own-profile tabs still scroll sideways on a narrow screen but never show a scrollbar. My Listings is one card per row below 1024px and two from 1024px; each card keeps thumbnail and title on one line, the ⋯ menu in the top-right corner, and Add session as a full-width secondary button below, with tighter phone padding. Browse cards put price on the left of the meta line and `★ average (count)` on the right in the body font (text colour, count `--muted`); no rating still means price only.
 
 ---
 
