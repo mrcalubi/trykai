@@ -2043,6 +2043,148 @@ body.lightbox-open {
   letter-spacing: -0.02em;
 }
 
+.session-calendar {
+  margin-bottom: 20px;
+}
+
+.session-calendar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.session-calendar__month {
+  font-family: var(--heading);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.session-calendar__nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  font-family: inherit;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-h);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.session-calendar__nav:hover:not(:disabled) {
+  background: var(--primary-bg);
+}
+
+.session-calendar__nav:disabled {
+  color: var(--disabled);
+  border-color: transparent;
+  cursor: not-allowed;
+}
+
+.session-calendar__nav:focus-visible,
+.session-calendar__day:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.session-calendar__weekdays,
+.session-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.session-calendar__weekdays {
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text);
+}
+
+.session-calendar__grid {
+  transition: opacity 0.15s ease;
+}
+
+.session-calendar[aria-busy='true'] .session-calendar__grid {
+  opacity: 0.6;
+}
+
+.session-calendar__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 4px 0;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--disabled);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+}
+
+.session-calendar__day--today {
+  border-color: var(--border);
+}
+
+.session-calendar__day--available {
+  font-weight: 600;
+  color: var(--text-h);
+  background: var(--primary-bg);
+  cursor: pointer;
+}
+
+.session-calendar__day--available:hover {
+  border-color: var(--primary);
+}
+
+.session-calendar__day--selected,
+.session-calendar__day--selected:hover {
+  color: var(--cream);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.session-calendar__count {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.session-calendar__day--selected .session-calendar__count {
+  color: var(--cream);
+}
+
+.session-day__title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.payment-panel__session {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
 .payment-panel {
   margin-bottom: 20px;
   padding: 20px;

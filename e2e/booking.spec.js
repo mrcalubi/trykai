@@ -49,6 +49,49 @@ test.describe('listing detail', () => {
     await expect(page.getByRole('button', { name: 'Book' })).toBeDisabled()
   })
 
+  test('picks a date on the calendar, then books one of that day’s times', async ({ page }) => {
+    const tenth = {
+      ...OPEN_SESSION,
+      id: 'session-tenth',
+      starts_at: '2099-06-10T03:00:00.000Z',
+      duration_mins: 90,
+      spots_remaining: 3,
+      status: 'open',
+    }
+    const twentieth = {
+      ...OPEN_SESSION,
+      id: 'session-twentieth',
+      starts_at: '2099-06-20T11:00:00.000Z',
+      duration_mins: 45,
+      spots_remaining: 2,
+      status: 'open',
+    }
+    await stubAllExternalCalls(page, {
+      listings: [LATTE_ART],
+      sessions: [tenth, twentieth],
+      reviews: [],
+    })
+    await page.goto('/listings/listing-latte')
+
+    const card = page.locator('.detail-booking-card')
+    const calendar = page.locator('.session-calendar')
+    await expect(calendar).toBeVisible()
+    await expect(page.getByRole('heading', { name: /10 Jun · 1 session/ })).toBeVisible()
+
+    const cardBox = await card.boundingBox()
+    const calendarBox = await calendar.boundingBox()
+    expect(calendarBox.width).toBeLessThanOrEqual(cardBox.width + 1)
+    expect(await calendar.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+
+    await page.getByRole('button', { name: /20 June, 1 session/ }).click()
+    await expect(page.getByRole('heading', { name: /20 Jun · 1 session/ })).toBeVisible()
+    await expect(page.getByText(/45 mins · 2 spots left/)).toBeVisible()
+    await expect(page.getByText(/90 mins · 3 spots left/)).toBeHidden()
+
+    await page.getByRole('button', { name: 'Book' }).click()
+    await expect(page).toHaveURL(/\/login$/)
+  })
+
   test('says when there is nothing available to book', async ({ page }) => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART], sessions: [], reviews: [] })
     await page.goto('/listings/listing-latte')

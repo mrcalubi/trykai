@@ -1,10 +1,4 @@
-// en-CA formats as YYYY-MM-DD, so date keys compare correctly as strings.
-const singaporeDateKey = new Intl.DateTimeFormat('en-CA', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  timeZone: 'Asia/Singapore',
-})
+import { singaporeDateKey } from './sessionCalendar'
 
 function upcomingStartTimes(listing, nowMs) {
   return (listing.sessions ?? [])
@@ -38,7 +32,7 @@ export function sortListingsForBrowse(listings, now = new Date()) {
       return {
         listing,
         nextDateKey: startTimes.length
-          ? singaporeDateKey.format(Math.min(...startTimes))
+          ? singaporeDateKey(Math.min(...startTimes))
           : null,
         upcomingCount: startTimes.length,
       }

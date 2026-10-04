@@ -6,6 +6,7 @@ import ListingDetail from './ListingDetail'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { hoursFromNow, makeAuthSession, makeListing, makeReview, makeSession } from '../test/fixtures'
+import { monthBounds } from '../lib/sessionCalendar'
 
 vi.mock('../lib/supabase')
 
@@ -32,7 +33,29 @@ function givenListing(listing = makeListing()) {
 }
 
 function givenSessions(sessions) {
-  supabase.__on('sessions', 'select', { data: sessions, error: null })
+  supabase.__on('sessions', 'select', (call) => {
+    let rows = sessions.filter((session) =>
+      call.filters.every((filter) => {
+        const value = session[filter.column]
+        if (filter.method === 'eq') return value === filter.value
+        if (filter.method === 'gt') return value > filter.value
+        if (filter.method === 'gte') return value >= filter.value
+        if (filter.method === 'lt') return value < filter.value
+        return true
+      })
+    )
+
+    const order = call.chain.findLast((step) => step.method === 'order')
+    if (order) {
+      const [column, options] = order.args
+      const direction = options?.ascending === false ? -1 : 1
+      rows.sort((a, b) => (a[column] < b[column] ? -1 : a[column] > b[column] ? 1 : 0) * direction)
+    }
+
+    const limit = call.chain.findLast((step) => step.method === 'limit')
+    if (limit) rows = rows.slice(0, limit.args[0])
+    return { data: rows, error: null }
+  })
 }
 
 function givenReviews(reviews) {
@@ -346,6 +369,15 @@ describe('ListingDetail content', () => {
 })
 
 describe('ListingDetail sessions', () => {
+  it('shows the listing error when the session range cannot be loaded', async () => {
+    givenListing()
+    supabase.__on('sessions', 'select', { data: null, error: { message: 'range failed' } })
+    renderPage()
+
+    expect(await screen.findByText('range failed')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Back to browse/ })).toBeInTheDocument()
+  })
+
   it('says when there is nothing to book', async () => {
     givenListing()
     givenSessions([])
@@ -388,6 +420,189 @@ describe('ListingDetail sessions', () => {
     expect(call.filters).toContainEqual({ method: 'eq', column: 'status', value: 'open' })
     expect(call.filters.some((filter) => filter.method === 'gt' && filter.column === 'starts_at'))
       .toBe(true)
+  })
+
+  it('opens on the soonest day and lists only that day’s times', async () => {
+    givenListing()
+    givenSessions([
+      makeSession({
+        id: 'late',
+        starts_at: '2099-10-09T15:00:00.000Z',
+        duration_mins: 45,
+        spots_remaining: 1,
+      }),
+      makeSession({
+        id: 'morning',
+        starts_at: '2099-10-09T03:00:00.000Z',
+        duration_mins: 33,
+        spots_remaining: 2,
+      }),
+      makeSession({
+        id: 'other-day',
+        starts_at: '2099-10-27T03:00:00.000Z',
+        duration_mins: 111,
+        spots_remaining: 4,
+      }),
+      makeSession({ id: 'past', starts_at: '2000-01-01T00:00:00.000Z' }),
+      makeSession({ id: 'full', starts_at: '2099-10-09T05:00:00.000Z', status: 'full' }),
+    ])
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: /9 Oct · 2 sessions/ })).toBeInTheDocument()
+    expect(screen.getByText('11:00 am')).toBeInTheDocument()
+    expect(screen.getByText(/33 mins · 2 spots left/)).toBeInTheDocument()
+    expect(screen.getByText('11:00 pm')).toBeInTheDocument()
+    expect(screen.queryByText(/111 mins/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /9 October, 2 sessions/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(screen.getByRole('button', { name: 'Previous month' })).toBeDisabled()
+  })
+
+  it('shows another day’s times when that date is chosen', async () => {
+    givenListing()
+    givenSessions([
+      makeSession({ id: 'ninth', starts_at: '2099-10-09T03:00:00.000Z', duration_mins: 33 }),
+      makeSession({ id: 'twenty-seventh', starts_at: '2099-10-27T03:00:00.000Z', duration_mins: 111 }),
+    ])
+    const { user } = renderPage()
+    await screen.findByRole('heading', { name: /9 Oct · 1 session/ })
+
+    await user.click(screen.getByRole('button', { name: /27 October, 1 session/ }))
+
+    expect(screen.getByRole('heading', { name: /27 Oct · 1 session/ })).toBeInTheDocument()
+    expect(screen.getByText(/111 mins/)).toBeInTheDocument()
+    expect(screen.queryByText(/33 mins/)).not.toBeInTheDocument()
+  })
+
+  it('loads each month once, bounded by Singapore midnights', async () => {
+    givenListing()
+    givenSessions([
+      makeSession({ id: 'october', starts_at: '2099-10-09T03:00:00.000Z', duration_mins: 33 }),
+      makeSession({ id: 'november', starts_at: '2099-11-02T03:00:00.000Z', duration_mins: 60 }),
+    ])
+    const { user } = renderPage()
+    await screen.findByRole('heading', { name: /9 Oct · 1 session/ })
+
+    const october = monthBounds('2099-10')
+    const firstMonth = supabase.__calls('sessions', 'select').find((call) =>
+      call.filters.some((filter) => filter.method === 'gte')
+    )
+    expect(firstMonth.filters).toContainEqual({
+      method: 'gte',
+      column: 'starts_at',
+      value: october.startIso,
+    })
+    expect(firstMonth.filters).toContainEqual({
+      method: 'lt',
+      column: 'starts_at',
+      value: october.endIso,
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Next month' }))
+    expect(await screen.findByRole('heading', { name: /2 Nov · 1 session/ })).toBeInTheDocument()
+    expect(screen.getByText(/60 mins/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Previous month' }))
+    expect(await screen.findByRole('heading', { name: /9 Oct · 1 session/ })).toBeInTheDocument()
+
+    const ranged = supabase
+      .__calls('sessions', 'select')
+      .filter((call) => call.filters.some((filter) => filter.method === 'gte'))
+    expect(ranged.map((call) => call.filters.find((filter) => filter.method === 'gte').value)).toEqual([
+      october.startIso,
+      monthBounds('2099-11').startIso,
+    ])
+  })
+
+  it('asks for one month even when a listing has a thousand sessions', async () => {
+    const sessions = []
+    for (let i = 0; i < 1000; i += 1) {
+      const month = i < 500 ? 9 : 10
+      sessions.push(
+        makeSession({
+          id: `bulk-${i}`,
+          starts_at: new Date(Date.UTC(2099, month, (i % 28) + 1, i % 12)).toISOString(),
+        })
+      )
+    }
+    givenListing()
+    givenSessions(sessions)
+    renderPage()
+
+    const books = await screen.findAllByRole('button', { name: 'Book' })
+    expect(books.length).toBeLessThan(40)
+    expect(screen.getByRole('heading', { name: /1 Oct · \d+ sessions/ })).toBeInTheDocument()
+
+    const ranged = supabase
+      .__calls('sessions', 'select')
+      .filter((call) => call.filters.some((filter) => filter.method === 'gte'))
+    expect(ranged).toHaveLength(1)
+    expect(ranged[0].filters).toContainEqual({
+      method: 'gte',
+      column: 'starts_at',
+      value: monthBounds('2099-10').startIso,
+    })
+    const bounded = supabase.__calls('sessions', 'select').filter((call) =>
+      call.chain.some((step) => step.method === 'limit')
+    )
+    expect(bounded).toHaveLength(2)
+  })
+
+  it('says when a month between the first and last session has nothing', async () => {
+    givenListing()
+    givenSessions([
+      makeSession({ id: 'october', starts_at: '2099-10-09T03:00:00.000Z' }),
+      makeSession({ id: 'december', starts_at: '2099-12-02T03:00:00.000Z', duration_mins: 40 }),
+    ])
+    const { user } = renderPage()
+    await screen.findByRole('heading', { name: /9 Oct · 1 session/ })
+
+    await user.click(screen.getByRole('button', { name: 'Next month' }))
+
+    expect(await screen.findByText('No sessions in November 2099.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Book' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Next month' }))
+
+    expect(await screen.findByRole('heading', { name: /2 Dec · 1 session/ })).toBeInTheDocument()
+    expect(screen.getByText(/40 mins/)).toBeInTheDocument()
+  })
+
+  it('keeps the listing on screen when a month fails to load', async () => {
+    givenListing()
+    supabase.__on('sessions', 'select', (call) => {
+      if (call.filters.some((filter) => filter.method === 'gte')) {
+        return { data: null, error: { message: 'sessions unavailable' } }
+      }
+      return {
+        data: [makeSession({ starts_at: '2099-10-09T03:00:00.000Z' })],
+        error: null,
+      }
+    })
+    renderPage()
+
+    expect(await screen.findByText('sessions unavailable')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Learn latte art with me' })).toBeInTheDocument()
+  })
+
+  it('hides the calendar while checking out and brings it back on cancel', async () => {
+    givenListing()
+    givenSessions([makeSession({ id: 'session-7', starts_at: '2099-10-09T03:00:00.000Z' })])
+    givenSignedIn()
+    const { user } = renderPage()
+
+    expect(await screen.findByRole('group', { name: 'October 2099' })).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    expect(screen.queryByRole('group', { name: 'October 2099' })).not.toBeInTheDocument()
+    expect(screen.getByText(/9 Oct/)).toBeInTheDocument()
+    expect(screen.getByText(/11:00 am · 90 mins/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByRole('group', { name: 'October 2099' })).toBeInTheDocument()
   })
 })
 

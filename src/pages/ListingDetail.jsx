@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
@@ -6,8 +6,19 @@ import { supabase } from '../lib/supabase'
 import ReviewCard from '../components/ReviewCard'
 import HostRating from '../components/HostRating'
 import PhotoLightbox from '../components/PhotoLightbox'
+import SessionCalendar from '../components/SessionCalendar'
 import { CancellationPolicyCollapsible } from '../components/CancellationPolicy'
 import { formatCents } from '../lib/cancellationPolicy'
+import {
+  formatDayTitle,
+  formatMonthTitle,
+  groupSessionsByDay,
+  monthBounds,
+  sessionCountLabel,
+  shiftMonth,
+  singaporeDateKey,
+  singaporeMonthKey,
+} from '../lib/sessionCalendar'
 import {
   checkoutPriceCents,
   formatGuestFacingPrice,
@@ -34,6 +45,15 @@ function formatSessionTime(iso) {
     minute: '2-digit',
     timeZone: 'Asia/Singapore',
   }).format(new Date(iso))
+}
+
+function upcomingSessions(listingId, columns) {
+  return supabase
+    .from('sessions')
+    .select(columns)
+    .eq('listing_id', listingId)
+    .eq('status', 'open')
+    .gt('starts_at', new Date().toISOString())
 }
 
 function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel }) {
@@ -92,7 +112,14 @@ export default function ListingDetail() {
   const location = useLocation()
 
   const [listing, setListing] = useState(null)
-  const [sessions, setSessions] = useState([])
+  // { firstMonth, lastMonth, todayKey } when the listing has upcoming sessions, else null.
+  const [sessionRange, setSessionRange] = useState(null)
+  const [visibleMonth, setVisibleMonth] = useState(null)
+  const [selectedDateKey, setSelectedDateKey] = useState(null)
+  // Keyed by `${listingId}:${monthKey}` so a late reply never lands on another listing.
+  const [sessionsByMonth, setSessionsByMonth] = useState({})
+  const [monthError, setMonthError] = useState(null)
+  const requestedMonths = useRef(new Set())
   const [reviews, setReviews] = useState([])
   const [hostReviews, setHostReviews] = useState([])
   const [loading, setLoading] = useState(true)
@@ -113,6 +140,9 @@ export default function ListingDetail() {
   useEffect(() => {
     async function fetchListing() {
       setRevealedAddress(null)
+      setSessionRange(null)
+      setVisibleMonth(null)
+      setSelectedDateKey(null)
 
       const { data: listingData, error: listingError } = await supabase
         .from('listings')
@@ -147,27 +177,35 @@ export default function ListingDetail() {
 
       setListing(listingData)
 
-      const [sessionsResult, reviewsResult, hostReviewsResult, authResult] = await Promise.all([
-        supabase
-          .from('sessions')
-          .select('id, starts_at, duration_mins, spots_remaining')
-          .eq('listing_id', id)
-          .eq('status', 'open')
-          .gt('starts_at', new Date().toISOString())
-          .order('starts_at', { ascending: true }),
-        supabase.rpc('reviews_for_listing', { p_listing_id: id }),
-        supabase
-          .from('reviews')
-          .select('rating')
-          .eq('reviewee_id', listingData.host_id)
-          .eq('role', 'guest'),
-        supabase.auth.getSession(),
-      ])
+      const [firstSessionResult, lastSessionResult, reviewsResult, hostReviewsResult, authResult] =
+        await Promise.all([
+          upcomingSessions(id, 'starts_at').order('starts_at', { ascending: true }).limit(1),
+          upcomingSessions(id, 'starts_at').order('starts_at', { ascending: false }).limit(1),
+          supabase.rpc('reviews_for_listing', { p_listing_id: id }),
+          supabase
+            .from('reviews')
+            .select('rating')
+            .eq('reviewee_id', listingData.host_id)
+            .eq('role', 'guest'),
+          supabase.auth.getSession(),
+        ])
 
-      if (sessionsResult.error) {
-        setError(sessionsResult.error.message)
+      const sessionRangeError = firstSessionResult.error || lastSessionResult.error
+      if (sessionRangeError) {
+        setError(sessionRangeError.message)
       } else {
-        setSessions(sessionsResult.data)
+        const firstStart = firstSessionResult.data?.[0]?.starts_at
+        const lastStart = lastSessionResult.data?.[0]?.starts_at ?? firstStart
+        if (firstStart) {
+          const first = singaporeMonthKey(firstStart)
+          const last = singaporeMonthKey(lastStart)
+          setSessionRange({
+            firstMonth: first,
+            lastMonth: last > first ? last : first,
+            todayKey: singaporeDateKey(Date.now()),
+          })
+          setVisibleMonth(first)
+        }
       }
 
       if (!reviewsResult.error) {
@@ -205,6 +243,33 @@ export default function ListingDetail() {
     fetchListing()
   }, [id])
 
+  useEffect(() => {
+    if (!visibleMonth) return
+    const cacheKey = `${id}:${visibleMonth}`
+    if (requestedMonths.current.has(cacheKey)) return
+    requestedMonths.current.add(cacheKey)
+
+    async function fetchMonth() {
+      const { startIso, endIso } = monthBounds(visibleMonth)
+      const { data, error: fetchError } = await upcomingSessions(
+        id,
+        'id, starts_at, duration_mins, spots_remaining'
+      )
+        .gte('starts_at', startIso)
+        .lt('starts_at', endIso)
+        .order('starts_at', { ascending: true })
+
+      if (fetchError) {
+        requestedMonths.current.delete(cacheKey)
+        setMonthError({ cacheKey, message: fetchError.message })
+        return
+      }
+      setSessionsByMonth((prev) => ({ ...prev, [cacheKey]: data ?? [] }))
+    }
+
+    fetchMonth()
+  }, [id, visibleMonth])
+
   // CSS scroll-snap does the swiping; this only keeps the position dots in step.
   function trackGalleryPosition(e) {
     const { scrollLeft, clientWidth } = e.currentTarget
@@ -219,6 +284,11 @@ export default function ListingDetail() {
     setBookingId(null)
     setTotalAmount(null)
     setPaymentError('')
+  }
+
+  function showMonth(monthKey) {
+    setVisibleMonth(monthKey)
+    setSelectedDateKey(null)
   }
 
   function handlePaymentSuccess() {
@@ -324,6 +394,67 @@ export default function ListingDetail() {
     : cardPrice
   const canTakePayments = hostCanTakePayments()
   const isOwnListing = viewerIsHost()
+
+  const monthCacheKey = visibleMonth ? `${id}:${visibleMonth}` : null
+  const monthSessions = monthCacheKey ? sessionsByMonth[monthCacheKey] : undefined
+  const sessionsByDay = monthSessions ? groupSessionsByDay(monthSessions, visibleMonth) : {}
+  const countsByDay = Object.fromEntries(
+    Object.entries(sessionsByDay).map(([dateKey, daySessions]) => [dateKey, daySessions.length])
+  )
+  const activeDateKey = sessionsByDay[selectedDateKey]
+    ? selectedDateKey
+    : (Object.keys(sessionsByDay).sort()[0] ?? null)
+  const daySessions = activeDateKey ? sessionsByDay[activeDateKey] : []
+  const checkoutSession = daySessions.find((session) => session.id === checkoutSessionId) ?? null
+
+  function renderDaySessions() {
+    if (!monthSessions) {
+      return monthError?.cacheKey === monthCacheKey ? (
+        <p className="error-message">{monthError.message}</p>
+      ) : (
+        <p className="hint">Loading sessions…</p>
+      )
+    }
+
+    if (!activeDateKey) {
+      return <p className="empty-state">No sessions in {formatMonthTitle(visibleMonth)}.</p>
+    }
+
+    return (
+      <>
+        <h3 className="session-day__title">
+          {formatDayTitle(activeDateKey)} · {sessionCountLabel(daySessions.length)}
+        </h3>
+        {daySessions.map((session) => (
+          <div key={session.id} className="session-card">
+            <div className="session-card__info">
+              <p id={`session-${session.id}-time`} className="session-card__date">
+                {formatSessionTime(session.starts_at)}
+              </p>
+              <p className="session-card__meta">
+                {session.duration_mins} mins · {session.spots_remaining} spot
+                {session.spots_remaining !== 1 ? 's' : ''} left
+              </p>
+            </div>
+            <div className="session-card__actions">
+              <span className="session-card__price">
+                {formatGuestFacingPrice(listing.price_per_person)}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleBook(session.id)}
+                disabled={session.spots_remaining === 0 || !canTakePayments || isOwnListing}
+                aria-describedby={`session-${session.id}-time`}
+                className="btn btn--book"
+              >
+                Book
+              </button>
+            </div>
+          </div>
+        ))}
+      </>
+    )
+  }
 
   return (
     <div className="page page--detail">
@@ -440,7 +571,7 @@ export default function ListingDetail() {
             <p className="detail-booking-card__note">
               {checkoutRail === 'paynow'
                 ? 'PayNow · 5% off the advertised price'
-                : 'Select a session to book'}
+                : 'Pick a date, then a time'}
             </p>
 
             <CancellationPolicyCollapsible />
@@ -452,6 +583,20 @@ export default function ListingDetail() {
             {checkoutSessionId && (
               <div className="payment-panel">
                 <h3 className="payment-panel__title">Complete your booking</h3>
+                {checkoutSession && (
+                  <div className="payment-panel__session">
+                    <div>
+                      <p className="session-card__date">
+                        {formatSessionDate(checkoutSession.starts_at)}
+                      </p>
+                      <p className="session-card__meta">
+                        {formatSessionTime(checkoutSession.starts_at)} ·{' '}
+                        {checkoutSession.duration_mins} mins
+                      </p>
+                    </div>
+                    <span className="session-card__price">{formatCents(checkoutPrice)}</span>
+                  </div>
+                )}
                 {!clientSecret ? (
                   <div className="payment-rails">
                     <p className="payment-rails__hint">
@@ -502,52 +647,35 @@ export default function ListingDetail() {
               </div>
             )}
 
-            {sessions.length === 0 ? (
+            {!sessionRange && (
               <p className="empty-state">No upcoming sessions available.</p>
-            ) : (
-              <div>
-                {sessions.map((session) => (
-                  <div key={session.id} className="session-card">
-                    <div className="session-card__info">
-                      <p className="session-card__date">{formatSessionDate(session.starts_at)}</p>
-                      <p className="session-card__meta">
-                        {formatSessionTime(session.starts_at)} · {session.duration_mins} mins ·{' '}
-                        {session.spots_remaining} spot{session.spots_remaining !== 1 ? 's' : ''}{' '}
-                        left
-                      </p>
-                    </div>
-                    <div className="session-card__actions">
-                      <span className="session-card__price">
-                        {session.id === checkoutSessionId
-                          ? formatCents(checkoutPrice)
-                          : formatGuestFacingPrice(listing.price_per_person)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleBook(session.id)}
-                        disabled={
-                          session.spots_remaining === 0 ||
-                          bookingLoading ||
-                          !canTakePayments ||
-                          isOwnListing
-                        }
-                        className="btn btn--book"
-                      >
-                        {bookingLoading ? 'Loading…' : 'Book'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
             )}
 
-            {isOwnListing && sessions.length > 0 && (
+            {sessionRange && !checkoutSessionId && (
+              <>
+                <SessionCalendar
+                  monthKey={visibleMonth}
+                  countsByDay={countsByDay}
+                  selectedDateKey={activeDateKey}
+                  todayKey={sessionRange.todayKey}
+                  onSelectDate={setSelectedDateKey}
+                  onPrevMonth={() => showMonth(shiftMonth(visibleMonth, -1))}
+                  onNextMonth={() => showMonth(shiftMonth(visibleMonth, 1))}
+                  canGoPrev={visibleMonth > sessionRange.firstMonth}
+                  canGoNext={visibleMonth < sessionRange.lastMonth}
+                  loading={!monthSessions}
+                />
+                <div className="session-day">{renderDaySessions()}</div>
+              </>
+            )}
+
+            {isOwnListing && sessionRange && (
               <p className="hint detail-booking-card__hint">
                 This is your own listing. Hosts cannot book their own sessions.
               </p>
             )}
 
-            {!isOwnListing && !canTakePayments && sessions.length > 0 && (
+            {!isOwnListing && !canTakePayments && sessionRange && (
               <p className="hint detail-booking-card__hint">
                 This host is still setting up payouts. Booking will open once that is complete.
               </p>
