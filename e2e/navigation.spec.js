@@ -3,30 +3,32 @@ import { stubAllExternalCalls } from './support/network'
 import { LATTE_ART, SIGNED_IN_USER, makeAuthSession } from './support/fixtures'
 
 const POLICY_PAGES = [
-  ['Refund Policy', '/refund-policy'],
-  ['Cancellation Policy', '/cancellation-policy'],
-  ['Dispute Policy', '/dispute-policy'],
+  ['Refund Policy', '/refund-policy', 'Refund Policy'],
+  ['Cancellation Policy', '/cancellation-policy', 'Cancellation Policy'],
+  ['Dispute Policy', '/dispute-policy', 'Dispute Policy'],
+  ['Terms', '/terms', 'Terms of Service'],
+  ['Privacy', '/privacy', 'Privacy Policy'],
 ]
 
 test.describe('policy pages', () => {
-  for (const [name, path] of POLICY_PAGES) {
-    test(`reaches the ${name} from the footer`, async ({ page }) => {
+  for (const [linkName, path, heading] of POLICY_PAGES) {
+    test(`reaches the ${heading} from the footer`, async ({ page }) => {
       await stubAllExternalCalls(page, { listings: [LATTE_ART] })
       await page.goto('/')
 
-      await page.getByRole('contentinfo').getByRole('link', { name }).click()
+      await page.getByRole('contentinfo').getByRole('link', { name: linkName }).click()
 
       await expect(page).toHaveURL(new RegExp(`${path}$`))
-      await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
     })
 
     // Guests arrive on these pages from emails and search results, so the SPA
     // rewrite has to serve them on a cold load, not only via client routing.
-    test(`serves the ${name} on a direct load`, async ({ page }) => {
+    test(`serves the ${heading} on a direct load`, async ({ page }) => {
       await stubAllExternalCalls(page, {})
       await page.goto(path)
 
-      await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
     })
   }
 
@@ -96,6 +98,8 @@ test.describe('signed-out navigation', () => {
     await expect(page.getByLabel('Email')).toBeVisible()
     await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Show password' })).toBeVisible()
+    await expect(page.getByRole('checkbox', { name: /18 or older/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign up' })).toBeDisabled()
   })
 
   test('redirects the dashboard to login', async ({ page }) => {

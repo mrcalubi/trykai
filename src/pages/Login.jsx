@@ -13,6 +13,7 @@ export default function Login() {
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -57,13 +58,19 @@ export default function Login() {
       setError('Display name must be 40 characters or fewer.')
       return
     }
+    if (!acceptedTerms) {
+      setError('Please confirm you are 18 or older and agree to the Terms and Privacy Policy.')
+      return
+    }
 
     setLoading(true)
 
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: name, display_name: handle } },
+      options: {
+        data: { full_name: name, display_name: handle, terms_accepted: true },
+      },
     })
 
     setLoading(false)
@@ -97,6 +104,7 @@ export default function Login() {
 
   function toggleMode() {
     setIsSignup((prev) => !prev)
+    setAcceptedTerms(false)
     setError('')
     setMessage('')
   }
@@ -166,6 +174,22 @@ export default function Login() {
             autoComplete={isSignup ? 'new-password' : 'current-password'}
           />
 
+          {isSignup && (
+            <label className="checkbox-label checkbox-label--agree">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                required
+              />
+              <span>
+                I&apos;m 18 or older and agree to the{' '}
+                <Link to="/terms">Terms</Link> and{' '}
+                <Link to="/privacy">Privacy Policy</Link>
+              </span>
+            </label>
+          )}
+
           {!isSignup && (
             <p className="form-card__forgot">
               <Link to="/forgot-password" className="link-btn">
@@ -177,7 +201,11 @@ export default function Login() {
           {error && <p className="error-message">{error}</p>}
           {message && <p className="success-message">{message}</p>}
 
-          <button type="submit" disabled={loading} className="btn btn--primary">
+          <button
+            type="submit"
+            disabled={loading || (isSignup && !acceptedTerms)}
+            className="btn btn--primary"
+          >
             {loading ? 'Please wait…' : isSignup ? 'Sign up' : 'Log in'}
           </button>
         </form>

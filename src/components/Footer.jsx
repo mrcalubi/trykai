@@ -13,6 +13,16 @@ export default function Footer() {
         <Link to="/dispute-policy" className="site-footer__link">
           Dispute Policy
         </Link>
+        <Link to="/terms" className="site-footer__link">
+          Terms
+        </Link>
+        <Link to="/privacy" className="site-footer__link">
+          Privacy
+        </Link>
+      </div>
+      <div className="site-footer__meta">
+        <span>UEN 53526159D</span>
+        <a href="mailto:privacy@trykai.sg">privacy@trykai.sg</a>
       </div>
     </footer>
   )

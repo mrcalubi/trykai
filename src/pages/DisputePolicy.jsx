@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 export default function DisputePolicy() {
   return (
     <div className="page page--narrow policy-page">
@@ -94,7 +96,8 @@ export default function DisputePolicy() {
       </p>
       <p>
         We are not a court or an arbitrator, and we cannot guarantee a specific
-        outcome. Our full liability terms are set out in our Terms of Service.
+        outcome. Our full liability terms are set out in our{' '}
+        <Link to="/terms">Terms of Service</Link>.
         For anything involving physical harm, property damage, or a safety
         incident, we also encourage you to contact the relevant authorities
         directly, this is not something we can resolve on your behalf.

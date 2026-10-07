@@ -624,17 +624,17 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Avatar or initial in navbar when logged in (`SiteNav` / `TopNav`; `Navbar.jsx` is deleted)
 
 ## Legal, required before any real money moves
-- [ ] Terms of Service live at /terms
-- [ ] Privacy Policy live at /privacy
+- [x] Terms of Service live at /terms
+- [x] Privacy Policy live at /privacy
 - [x] Refund Policy live
 - [x] Cancellation Policy live
 - [x] Dispute Policy live
-- [ ] DPO contact, privacy@trykai.sg, visible in the Privacy Policy and site footer
-- [ ] UEN 53526159D visible in the footer or About page
-- [ ] T&C checkbox at signup
+- [x] DPO contact, privacy@trykai.sg, visible in the Privacy Policy and site footer
+- [x] UEN 53526159D visible in the footer or About page
+- [x] T&C checkbox at signup
 - [ ] T&C checkbox at create listing
 - [ ] T&C acknowledgment at checkout
-- [ ] Age 18+ gate in signup terms
+- [x] Age 18+ gate in signup terms
 - [ ] Founders' agreement signed by all three
 
 ## Email

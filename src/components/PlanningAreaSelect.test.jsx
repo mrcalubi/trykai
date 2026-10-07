@@ -56,7 +56,7 @@ describe('PlanningAreaSelect', () => {
     expect(screen.getByText('No matching planning areas')).toBeInTheDocument()
   })
 
-  it('reverts a partial query that is not a planning area', async () => {
+  it('keeps an unmatched query invalid instead of guessing', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     renderSelect({ value: 'Changi', onChange })
@@ -67,7 +67,9 @@ describe('PlanningAreaSelect', () => {
     await user.tab()
 
     expect(onChange).not.toHaveBeenCalled()
-    expect(screen.getByRole('combobox')).toHaveValue('Changi')
+    expect(screen.getByRole('combobox')).toHaveValue('Katong')
+    expect(screen.getByRole('combobox')).toBeInvalid()
+    expect(screen.getByText('Pick an area from the list.')).toBeInTheDocument()
   })
 })
 

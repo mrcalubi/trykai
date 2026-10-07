@@ -8,7 +8,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 >
 > 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 24 hours after `starts_at`. Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). The host is emailed only when the guest cancelled.
-> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00016`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
+> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00017`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
 > 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home shows the Lane 1 headline above the kit's** `Card` **in browse mode, with a rating on the meta line only when** `listing_ratings` **returns reviews.** `ListingCard.jsx` still exists but no page renders it. Button is live on Settings and Hosting listing rows. Input is live on Settings and Login. SelectableCard is still used only by `/style-guide`.
 > 6. **All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a hex value in a component. See section 2, Styling.
@@ -105,6 +105,7 @@ is_suspended boolean default false
 suspended_at timestamptz
 suspension_reason text
 created_at timestamptz default now()
+terms_accepted_at timestamptz     -- set by handle_new_user when signup metadata terms_accepted is true. Not client-readable or writable (00017). Existing rows stay null.
 ```
 
 Manual payout columns (payout_method, identifier, name) were considered and not added. Under Stripe Connect Express, Stripe collects the host's bank details at onboarding. `stripe_account_id` is the payout handle.
@@ -213,7 +214,7 @@ created_at timestamptz
 
 Append-only, service role only, no client grant of any kind. Written by `review_verification` in the same transaction as the status change, so a decision cannot be applied without a record. This is both the PDPA justification trail for holding NRIC copies and the review history the safety protocol assumes.
 
-**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`. Listing-page reviews and guest INSERT gating are `00011_reviews_for_listing.sql` (`reviews_for_listing`, `guest_can_leave_review`, one review per booking per role). Empty-session soft-delete is `00012_delete_empty_session.sql` (`delete_empty_session`). `00012` also redefines `confirm_paid_booking` so a session that is not `open` (including `cancelled`) cannot confirm; the webhook refunds that the same way it refunds an oversell. Host-profile reviews are `00013_reviews_for_host.sql` (`reviews_for_host`): guest reviews this user received as a host, plus listing title, without embedding `bookings`. `00013` also redefines `reviews_for_listing` so both RPCs return the reviewer's first name in `users.full_name`. Display names are `00014_display_name.sql`: `users.display_name`, `handle_new_user` from signup metadata, and both review RPCs return `display_name` in jsonb `users.full_name`. Browse-card averages and owner listing delete are `00015_listing_ratings_and_delete_listing.sql` (`listing_ratings`, `delete_listing`). `00015` also redefines `my_verification` so admins get `pending_count` (everyone else gets 0). Planning areas are `00016_planning_areas.sql`: 55 URA names tagged to five regions, public SELECT, `listings.area` FK.
+**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`. Listing-page reviews and guest INSERT gating are `00011_reviews_for_listing.sql` (`reviews_for_listing`, `guest_can_leave_review`, one review per booking per role). Empty-session soft-delete is `00012_delete_empty_session.sql` (`delete_empty_session`). `00012` also redefines `confirm_paid_booking` so a session that is not `open` (including `cancelled`) cannot confirm; the webhook refunds that the same way it refunds an oversell. Host-profile reviews are `00013_reviews_for_host.sql` (`reviews_for_host`): guest reviews this user received as a host, plus listing title, without embedding `bookings`. `00013` also redefines `reviews_for_listing` so both RPCs return the reviewer's first name in `users.full_name`. Display names are `00014_display_name.sql`: `users.display_name`, `handle_new_user` from signup metadata, and both review RPCs return `display_name` in jsonb `users.full_name`. Browse-card averages and owner listing delete are `00015_listing_ratings_and_delete_listing.sql` (`listing_ratings`, `delete_listing`). `00015` also redefines `my_verification` so admins get `pending_count` (everyone else gets 0). Planning areas are `00016_planning_areas.sql`: 55 URA names tagged to five regions, public SELECT, `listings.area` FK. Terms agreement is `00017_terms_accepted_at.sql`: `users.terms_accepted_at`, `handle_new_user` from signup metadata `terms_accepted`, `guard_user_self_update` blocks client writes. No SELECT or UPDATE grant.
 
 ---
 
@@ -299,13 +300,13 @@ Under Express accounts, Stripe collects the host's bank details at onboarding. H
 
 Supabase built in auth, email and password for MVP. Session handling is Supabase's default; no manual JWT management.
 
-**Signup.** `Login.jsx` does **not** insert a `public.users` row. Tests assert this. `handle_new_user` (trigger on `auth.users`, `00004`, redefined in `00014`) inserts `id`, `email`, `full_name`, and `display_name` from signup metadata. `display_name` falls back to the first word of `full_name`. `guard_user_self_insert` forces `stripe_account_id`, `stripe_payouts_enabled`, and `is_founding_host` off on authenticated inserts.
+**Signup.** `Login.jsx` does **not** insert a `public.users` row. Tests assert this. `handle_new_user` (trigger on `auth.users`, `00004`, redefined in `00017`) inserts `id`, `email`, `full_name`, `display_name`, and `terms_accepted_at` from signup metadata. `display_name` falls back to the first word of `full_name`. `terms_accepted_at` is `now()` when metadata `terms_accepted` is true (`true` / `t` / `1`), otherwise null. Signup requires a checkbox that sends `terms_accepted: true`. Existing rows are not backfilled. `guard_user_self_insert` forces `stripe_account_id`, `stripe_payouts_enabled`, and `is_founding_host` off on authenticated inserts.
 
 **Signup note:** a required email confirmation setting plus the free tier mailer's low hourly send limit was silently breaking signup. Email confirmation was turned off on staging to unblock testing. Confirm the production setting deliberately before launch.
 
 **Verification submission goes through** `submit_verification` **(**`00007`**).** VerifyIdentity uploads to the private `verification-docs` bucket, then calls the RPC with both paths and an explicit consent flag. The client has **no** UPDATE grant on `verification_status`, `id_photo_url`, or `selfie_url`. The RPC is security definer and still trips `guard_user_self_update`, which permits only unverified/rejected → pending, so it cannot be used to self-approve. A host reads their own state via `my_verification()`.
 
-**Column grants (after** `00007`**), not a public-profile VIEW.** `00005` revokes ALL on `users` then re-grants specific columns; `00007` narrows that further. `verification_status` is still granted SELECT, because the ID-verified trust badge is meant to be public. `id_photo_url` and `selfie_url` are granted to **neither** anon nor authenticated, so the storage bucket is no longer the only barrier. `is_admin` and the verification metadata columns are granted to no client role at all, which is why `my_verification()` exists instead of a wider SELECT grant. RLS `"Anyone can view host profiles" USING (true)` still exists.
+**Column grants (after** `00007`**), not a public-profile VIEW.** `00005` revokes ALL on `users` then re-grants specific columns; `00007` narrows that further. `verification_status` is still granted SELECT, because the ID-verified trust badge is meant to be public. `id_photo_url` and `selfie_url` are granted to **neither** anon nor authenticated, so the storage bucket is no longer the only barrier. `is_admin` and the verification metadata columns are granted to no client role at all, which is why `my_verification()` exists instead of a wider SELECT grant. `terms_accepted_at` is likewise granted to neither anon nor authenticated (`00017`); `guard_user_self_update` also blocks writes so a later additive GRANT cannot let a client stamp it. RLS `"Anyone can view host profiles" USING (true)` still exists.
 
 **The listing gate is enforced in the database.** `hosts_create_listings_verified` and `hosts_create_sessions_verified` require `can_create_listing()` (`00008`): approved and not suspended. That function is security definer and reads only `auth.uid()`, because the 00007 policies used to subquery `users.is_suspended` as the caller and 00005 never granted that column, so listing INSERT failed with `permission denied for table users`. Do not SELECT-grant `is_suspended`; the public-profile policy is `USING (true)`. Ownership (`host_id = auth.uid()`, session belongs to the caller's listing) still lives in the policies. Before `00007` the only check was `auth.uid() = host_id`, so an unverified account could insert a listing straight through PostgREST; the approval check lived only in `CreateListing.jsx`.
 
@@ -313,8 +314,8 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 
 **Trusted functions that move money or status:**
 
-- `handle_new_user()` — trigger on `auth.users`. Creates the profile row, including `display_name` (`00014`).
-- `guard_user_self_update()` / `guard_user_self_insert()` — block self-approval and strike/suspension/stripe/founding-host/admin writes. Does not inspect `display_name`; authenticated UPDATE of that granted column is allowed.
+- `handle_new_user()` — trigger on `auth.users`. Creates the profile row, including `display_name` (`00014`) and `terms_accepted_at` (`00017`).
+- `guard_user_self_update()` / `guard_user_self_insert()` — block self-approval and strike/suspension/stripe/founding-host/admin/terms-accepted writes. Does not inspect `display_name`; authenticated UPDATE of that granted column is allowed.
 - `submit_verification(id_photo_url, selfie_url, consent)` — the only way a client reaches `pending`. Requires consent.
 - `my_verification()` — the caller's own verification state, so a rejection reason and `is_admin` need no table-wide SELECT grant. `pending_count` is the number of `verification_status = 'pending'` rows, and is 0 unless the caller is an admin (`00015`).
 - `can_create_listing()` — whether the caller may insert a listing or a session. Security definer so the policy does not need a SELECT grant on `is_suspended`.
@@ -372,10 +373,12 @@ src/
 │   ├── StyleGuide.jsx           # UI kit preview at /style-guide
 │   ├── RefundPolicy.jsx
 │   ├── CancellationPolicy.jsx
-│   └── DisputePolicy.jsx
+│   ├── DisputePolicy.jsx
+│   ├── Terms.jsx
+│   └── Privacy.jsx
 ├── components/
 │   ├── SiteNav.jsx              # Live chrome: feeds real auth into TopNav
-│   ├── Footer.jsx               # Policy links only
+│   ├── Footer.jsx               # Policy links, UEN, privacy@trykai.sg
 │   ├── RequireAuth.jsx
 │   ├── RequireAdmin.jsx         # is_admin via my_verification(); renders only
 │   ├── ListingCard.jsx          # Superseded by ui/Card browse mode; no page renders it
@@ -412,7 +415,8 @@ supabase/migrations/
 ├── 00013_reviews_for_host.sql
 ├── 00014_display_name.sql
 ├── 00015_listing_ratings_and_delete_listing.sql
-└── 00016_planning_areas.sql
+├── 00016_planning_areas.sql
+└── 00017_terms_accepted_at.sql
 
 supabase/functions/
 ├── _shared/
@@ -449,6 +453,9 @@ supabase/functions/
 | Public profile                                             | `src/pages/Profile.jsx` (`/u/:id`)                                                                  |
 | Own-profile private tabs                                   | same page; Bookings/Hosting mounted as panels; `?tab=`                                              |
 | Login and signup                                           | `src/pages/Login.jsx`                                                                               |
+| Terms of Service                                           | `src/pages/Terms.jsx` (`/terms`); copy in `Markdowns/Policies/terms.md`                             |
+| Privacy Policy                                             | `src/pages/Privacy.jsx` (`/privacy`); copy in `Markdowns/Policies/privacy.md`                       |
+| Signup terms timestamp                                     | `users.terms_accepted_at` (`00017`); `handle_new_user` from metadata; not client-writable           |
 | Forgot password request                                    | `src/pages/ForgotPassword.jsx` (`/forgot-password`)                                                 |
 | Reset password from email                                  | `src/pages/ResetPassword.jsx` (`/reset-password`)                                                   |
 | Create listing                                             | `src/pages/CreateListing.jsx`                                                                       |
@@ -477,7 +484,7 @@ supabase/functions/
 | Connect onboarding                                         | `supabase/functions/create-account-link/`                                                           |
 
 
-**Routes in** `App.jsx`**:** `/`, `/login`, `/forgot-password`, `/reset-password`, `/listings/:id`, `/u/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/bookings`, `/hosting`, `/dashboard`, `/settings` (`/create-listing` through `/settings` behind `RequireAuth`; `/dashboard` redirects to `/bookings`, or `/hosting` when `?connect=` is present; `/bookings` and `/hosting` then redirect to `/u/:id` with `?tab=bookings` or `?tab=hosting` and the rest of the query string kept), `/admin/verifications` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/style-guide`. No `/terms`, `/privacy`, or 404 route. Unknown paths still render SiteNav + Footer.
+**Routes in** `App.jsx`**:** `/`, `/login`, `/forgot-password`, `/reset-password`, `/listings/:id`, `/u/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/bookings`, `/hosting`, `/dashboard`, `/settings` (`/create-listing` through `/settings` behind `RequireAuth`; `/dashboard` redirects to `/bookings`, or `/hosting` when `?connect=` is present; `/bookings` and `/hosting` then redirect to `/u/:id` with `?tab=bookings` or `?tab=hosting` and the rest of the query string kept), `/admin/verifications` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/terms`, `/privacy`, `/style-guide`. No 404 route. Unknown paths still render SiteNav + Footer.
 
 ---
 
@@ -499,7 +506,7 @@ Use these alongside the code. When you are reading a file and wondering what it 
 
 The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, with position dots) and a height-capped mosaic from 1024px, laid out by photo count from `data-photo-count` on the scroller. From 1024px the page is two columns, content left and a sticky booking card right. Content order is the same at every width: category, title, area, host, then description, what's provided, and reviews last.
 
-**4. Not logged in.** Redirected to `Login.jsx`, then back to the listing after auth. Signup calls `auth.signUp` with `full_name` and `display_name` in metadata. The profile row is created by `handle_new_user`.
+**4. Not logged in.** Redirected to `Login.jsx`, then back to the listing after auth. Signup requires a checkbox ("I'm 18 or older and agree to the Terms and Privacy Policy", both linked). Sign up stays disabled until it is ticked. `auth.signUp` sends `full_name`, `display_name`, and `terms_accepted: true` in metadata. The profile row is created by `handle_new_user`, which stamps `terms_accepted_at`.
 
 **5. Phone verification.** OTP required before booking, per progressive disclosure. **Not built.**
 
@@ -561,7 +568,7 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **Home.jsx** — Lane 1 headline, then browse of active listings. Category pills derived from data, region dropdown (All plus the five URA regions), combinable, newest first. One `listing_ratings` call for the page; cards put price on the left of the meta line and `★ average (count)` on the right only when that listing has guest reviews (body font, count muted). No auth required. No sort by price or reviews.
 
-**Login.jsx** — kit `Input` for full name, display name ("What should we call you?"), email, and password. Full name, display name, email, and password use floating labels. Display name is required, max 40 characters, with hint "Shown on your profile and reviews." Password also uses the eye toggle. Login and signup. Does not insert into `users`. Login mode links to `/forgot-password`. No T&C checkbox.
+**Login.jsx** — kit `Input` for full name, display name ("What should we call you?"), email, and password. Full name, display name, email, and password use floating labels. Display name is required, max 40 characters, with hint "Shown on your profile and reviews." Password also uses the eye toggle. Login and signup. Does not insert into `users`. Login mode links to `/forgot-password`. Signup requires a checkbox ("I'm 18 or older and agree to the Terms and Privacy Policy", both linked); Sign up stays disabled until it is ticked. Sends `terms_accepted: true` in signup metadata.
 
 **ForgotPassword.jsx** — public. Requests `resetPasswordForEmail` with `redirectTo` `/reset-password`. Always confirms; only rate limits and network failures surface as errors.
 
@@ -589,6 +596,8 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **StyleGuide.jsx** — private preview of the UI kit at `/style-guide`. Imports `src/assets/categories/{food,fitness,arts,music}.png`, all four of which are now in the repo. Language/Other imports are still commented out; uncommenting either without adding the PNG fails `vite build`, because App always imports this page. It no longer mounts its own TopNav: the live `SiteNav` bar serves the page, and the preview-only "Simulate logged in" toggle is gone.
 
+**Terms.jsx** / **Privacy.jsx** — public policy pages at `/terms` and `/privacy`, same `policy-page` layout as refund, cancellation, and dispute. Last updated 7 October 2026. Source copies in `Markdowns/Policies/`. Footer links them as Terms and Privacy, and shows UEN 53526159D and `privacy@trykai.sg`.
+
 ---
 
 
@@ -615,8 +624,7 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 **Not built, decided**
 
 - Phone OTP before booking
-- Terms of Service and Privacy Policy routes
-- T&C checkboxes at signup, create listing, and checkout
+- T&C checkboxes at create listing and checkout (signup is live)
 - Guest count picker (`guests_count` hardcoded to 1)
 - Catch-all 404
 - Photography guidance on create listing

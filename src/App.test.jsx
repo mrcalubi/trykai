@@ -84,6 +84,8 @@ describe('App routes', () => {
     ['/refund-policy', 'Refund Policy'],
     ['/cancellation-policy', 'Cancellation Policy'],
     ['/dispute-policy', 'Dispute Policy'],
+    ['/terms', 'Terms of Service'],
+    ['/privacy', 'Privacy Policy'],
     ['/style-guide', 'Component preview'],
   ])('serves %s', async (path, heading) => {
     renderAt(path)

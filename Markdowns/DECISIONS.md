@@ -29,6 +29,7 @@ Ask for information when it becomes relevant, not upfront.
 - Booking: phone OTP
 - Creating a listing: ID and selfie verification
 - Do not ask for date of birth or address at signup
+- Age 18+ at signup is a required self-declaration checkbox (Terms and Privacy), not a date of birth
 
 ### Location handling
 Hosts pick a URA planning area (55 names, FK to `planning_areas`). Public listings show that name, e.g. "Tampines". Browse filters by the five regions (Central, North, North-East, East, West), not by planning area. Full address is revealed only after a confirmed booking, and must never appear in a browse or search query. Mirrors Airbnb, protects host privacy.
@@ -252,13 +253,13 @@ Sole proprietorship, TRYKAI, UEN 53526159D, SSIC 63209. Registered address is ho
 **No legal separation between Caleb and the business.** All liabilities are personal. Given real money, strangers meeting in person, and physical activity, this is a meaningful exposure. Full detail in BUSINESS.md section 11.
 
 ### Terms of Service and Privacy Policy
-Full draft exists as `TryKai_Terms_Privacy_DRAFT.docx`, covering platform terms, host terms, guest booking terms, and privacy policy. **Not lawyer reviewed. Not published.**
+Published at `/terms` and `/privacy` (7 October 2026). Source copies live in `Markdowns/Policies/`. **Not lawyer reviewed.**
 
 **Layered acceptance**, not one blanket checkbox:
-- Signup: platform terms and privacy policy, age 18+ gate
-- Create listing: host terms, liability, fees, payouts, indemnity
-- Checkout: guest booking terms and cancellation policy
-- Verification: privacy policy linked specifically re NRIC and selfie handling
+- Signup: **live.** Required checkbox "I'm 18 or older and agree to the Terms and Privacy Policy", both linked. Sign up is disabled until ticked. `users.terms_accepted_at` is set by `handle_new_user` from signup metadata (`00017`). Existing accounts are not backfilled. Not client-writable.
+- Create listing: host terms, liability, fees, payouts, indemnity — **not built**
+- Checkout: guest booking terms and cancellation policy — **not built**
+- Verification: privacy policy linked specifically re NRIC and selfie handling (manual consent checkbox exists; not a second acknowledge of the published policy)
 
 Each acknowledgment ties to the specific risky action, which is better UX than a wall of text at signup and more defensible than a single upfront agreement.
 
@@ -276,9 +277,9 @@ DPO is Caleb. Contact is **privacy@trykai.sg**, an alias on his individual mailb
 ### Data retention
 - **Rejected verification documents:** deleted after 30 days by `purge-verification-docs`, scheduled daily. Long enough for resubmission confusion, short enough to limit exposure. Stripe Identity rejections store no images, so there is nothing to delete.
 - **Approved host verification documents:** retained while the account is active.
-- **Closed accounts:** core records, not ID images, retained 6 months, then purged.
+- **Closed accounts:** published Privacy Policy (7 October 2026): profile data deleted within 6 months of closure; booking and payment records kept for 5 years after the transaction.
 
-**Open gap:** five year transaction record retention is the normal expectation for anything payments adjacent, and TryKai does not currently meet it. Aspire was told this honestly during onboarding. Needs a decision.
+**Open gap:** five year booking/payment retention is now the published policy. Confirm the data layer actually retains those rows that long (there is no purge of bookings, and no separate archive job). Aspire was told this honestly during onboarding.
 
 ### Benchmarking against SmileTutor
 An existing Singapore middleman platform with comparable real world meetup liability. Their T&C uses the same "not liable for disputes between the parties" framing, confirming ours is industry standard rather than unusually weak. They explicitly disclaim guaranteeing tutor qualifications since they rely on user submitted information, which makes **TryKai's ID verification stronger vetting than theirs**. They also control first contact, sharing personal details only after confirmation, which validates our delayed address disclosure. Takeaway: there is no cleverer legal trick being used by comparable platforms.
@@ -479,6 +480,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-07 — Hosts pick a URA planning area; browse filters by region.** Supersedes the area dropdown built from whatever strings listings already had, and the shorter hardcoded create/edit list that included Katong (a neighbourhood, not a planning area). `planning_areas` (`00016`) is the 55 Master Plan names, each tagged Central, North, North-East, East, or West, with public SELECT. `listings.area` is a FK to that table. Existing values are mapped by case-insensitive exact match; anything else is set to null rather than guessed. Create and edit use a searchable dropdown of those 55 names. Home filters All / the five regions, combinable with category. Cards and listing detail still show the planning area name.
 
+**2026-10-07 — Terms and Privacy published; agreement recorded at signup.** `/terms` and `/privacy` are live policy pages in the same layout as refund, cancellation, and dispute. Footer adds Terms, Privacy, UEN 53526159D, and `privacy@trykai.sg`. Signup requires "I'm 18 or older and agree to the Terms and Privacy Policy" (both linked); Sign up stays disabled until ticked. `users.terms_accepted_at` (`00017`) is set by `handle_new_user` from metadata `terms_accepted`; existing rows stay null; the column is not client-writable or readable. The cancellation page no longer promises rescheduling (not built) and says cancel from "your profile" rather than a dashboard. Create-listing and checkout T&C checkboxes are still not built. The published Privacy Policy commits to 5-year booking and payment retention; that supersedes the open "not decided" retention question as a policy statement (ops still needs to confirm the data layer keeps those rows).
+
 ---
 
 # Analysed but not decided
@@ -489,6 +492,6 @@ Live questions with work already done. Each needs a call.
 
 **Which axis drives top level navigation.** Casual versus professional is orthogonal to one-off versus progression. The documents currently assume Lane 1 and Lane 2 drive the top level. A business tab would quietly introduce a second axis and a two by two. Needs a deliberate decision before either is built.
 
-**Five year transaction retention.** Standard expectation for anything payments adjacent. TryKai does not currently meet it and Aspire was told so honestly. Not decided.
+**Five year transaction retention.** Standard expectation for anything payments adjacent. **Superseded 7 October 2026 as a policy statement:** the published Privacy Policy keeps booking and payment records for 5 years. Whether the data layer needs an explicit archive job is ops, not an open product decision.
 
 **Gamified, shareable dashboard.** Parked until there is usage data to build it on. Not decided.

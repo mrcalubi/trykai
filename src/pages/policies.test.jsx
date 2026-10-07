@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import CancellationPolicy from './CancellationPolicy'
 import DisputePolicy from './DisputePolicy'
 import RefundPolicy from './RefundPolicy'
+import Terms from './Terms'
+import Privacy from './Privacy'
 import { renderWithRouter } from '../test/render'
 
 /**
@@ -51,6 +53,16 @@ describe('Cancellation Policy page', () => {
       'href',
       'mailto:hello@trykai.sg'
     )
+  })
+
+  it('tells guests to cancel from their profile, not a dashboard', () => {
+    expect(screen.getByText(/Cancel anytime from your profile/)).toBeInTheDocument()
+    expect(screen.queryByText(/Dashboard/)).not.toBeInTheDocument()
+  })
+
+  it('does not promise a reschedule that is not built', () => {
+    expect(screen.queryByRole('heading', { name: 'Rescheduling instead of cancelling' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/reschedule your booking/)).not.toBeInTheDocument()
   })
 })
 
@@ -111,5 +123,70 @@ describe('Dispute Policy page', () => {
       'href',
       'mailto:hello@trykai.sg'
     )
+  })
+
+  it('links to the published terms', () => {
+    expect(screen.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute('href', '/terms')
+  })
+})
+
+describe('Terms of Service page', () => {
+  beforeEach(() => {
+    renderWithRouter(<Terms />)
+  })
+
+  it('requires users to be 18 and names the UEN', () => {
+    expect(screen.getByText(/You must be 18 or older/)).toBeInTheDocument()
+    expect(screen.getByText(/UEN 53526159D/)).toBeInTheDocument()
+  })
+
+  it('caps TryKai liability at the booking fee for that booking', () => {
+    expect(
+      screen.getByText(/limited to the booking fee TryKai received for the booking/)
+    ).toBeInTheDocument()
+  })
+
+  it('states the host fee starts on the fourth confirmed booking', () => {
+    expect(screen.getByText(/starting from your fourth confirmed booking/)).toBeInTheDocument()
+  })
+
+  it('links to the privacy, dispute, cancellation and refund policies', () => {
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy')
+    expect(screen.getByRole('link', { name: 'Dispute Policy' })).toHaveAttribute(
+      'href',
+      '/dispute-policy'
+    )
+    expect(screen.getAllByRole('link', { name: 'Cancellation Policy' })[0]).toHaveAttribute(
+      'href',
+      '/cancellation-policy'
+    )
+    expect(screen.getByRole('link', { name: 'Refund Policy' })).toHaveAttribute(
+      'href',
+      '/refund-policy'
+    )
+  })
+})
+
+describe('Privacy Policy page', () => {
+  beforeEach(() => {
+    renderWithRouter(<Privacy />)
+  })
+
+  it('names the DPO and the PDPA', () => {
+    expect(screen.getByText(/Personal Data Protection Act 2012/)).toBeInTheDocument()
+    expect(screen.getByText(/Caleb Ong/)).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'privacy@trykai.sg' })[0]).toHaveAttribute(
+      'href',
+      'mailto:privacy@trykai.sg'
+    )
+  })
+
+  it('does not claim TryKai stores Stripe Identity images', () => {
+    expect(screen.getByText(/TryKai does not receive or store those images/)).toBeInTheDocument()
+  })
+
+  it('keeps booking records for five years and does not sell personal data', () => {
+    expect(screen.getByText(/kept for 5 years/)).toBeInTheDocument()
+    expect(screen.getByText(/We do not sell personal data/)).toBeInTheDocument()
   })
 })

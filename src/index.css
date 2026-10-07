@@ -816,6 +816,14 @@ a {
   color: var(--muted);
 }
 
+.planning-area-select .error-message {
+  margin-top: 6px;
+}
+
+.planning-area-select .input[aria-invalid='true'] {
+  border-color: var(--error);
+}
+
 .input--textarea {
   resize: vertical;
   min-height: 100px;
@@ -856,6 +864,21 @@ a {
   font-weight: 400;
   color: var(--text-h);
   cursor: pointer;
+}
+
+.checkbox-label--agree {
+  align-items: flex-start;
+  line-height: 1.45;
+}
+
+.checkbox-label--agree input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.checkbox-label--agree a {
+  color: var(--navy);
+  text-underline-offset: 2px;
 }
 
 /* Buttons */
@@ -3032,6 +3055,30 @@ body.lightbox-open {
   color: var(--navy-hover);
 }
 
+.policy-page__table-wrap {
+  overflow-x: auto;
+  margin: 0 0 14px;
+}
+
+.policy-page table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.policy-page th,
+.policy-page td {
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+
+.policy-page th {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
 /* Site footer */
 .site-footer {
   margin-top: auto;
@@ -3057,6 +3104,27 @@ body.lightbox-open {
 }
 
 .site-footer__link:hover {
+  color: var(--navy);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.site-footer__meta {
+  max-width: 1200px;
+  margin: 12px auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 13px;
+  color: var(--navy-muted);
+}
+
+.site-footer__meta a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.site-footer__meta a:hover {
   color: var(--navy);
   text-decoration: underline;
   text-underline-offset: 2px;
