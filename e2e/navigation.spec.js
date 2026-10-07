@@ -16,7 +16,10 @@ test.describe('policy pages', () => {
       await stubAllExternalCalls(page, { listings: [LATTE_ART] })
       await page.goto('/')
 
-      await page.getByRole('contentinfo').getByRole('link', { name: linkName }).click()
+      await page
+        .getByRole('contentinfo')
+        .getByRole('link', { name: linkName, exact: true })
+        .click()
 
       await expect(page).toHaveURL(new RegExp(`${path}$`))
       await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
@@ -75,9 +78,9 @@ test.describe('signed-out navigation', () => {
     await page.getByRole('button', { name: 'Open menu' }).click()
     const menu = page.getByRole('navigation', { name: 'Main menu' })
 
-    await expect(menu.getByRole('link', { name: 'Refund policy' })).toBeVisible()
-    await expect(menu.getByRole('link', { name: 'Dispute policy' })).toBeVisible()
-    await menu.getByRole('link', { name: 'Cancellation policy' }).click()
+    await expect(menu.getByRole('link', { name: 'Refund policy', exact: true })).toBeVisible()
+    await expect(menu.getByRole('link', { name: 'Dispute policy', exact: true })).toBeVisible()
+    await menu.getByRole('link', { name: 'Cancellation policy', exact: true }).click()
 
     await expect(page).toHaveURL(/\/cancellation-policy$/)
     await expect(
