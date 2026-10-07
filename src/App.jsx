@@ -19,6 +19,8 @@ import AdminVerifications from './pages/AdminVerifications'
 import RefundPolicy from './pages/RefundPolicy'
 import CancellationPolicy from './pages/CancellationPolicy'
 import DisputePolicy from './pages/DisputePolicy'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
 import StyleGuide from './pages/StyleGuide'
 
 export default function App() {
@@ -101,6 +103,8 @@ export default function App() {
         <Route path="/refund-policy" element={<RefundPolicy />} />
         <Route path="/cancellation-policy" element={<CancellationPolicy />} />
         <Route path="/dispute-policy" element={<DisputePolicy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/style-guide" element={<StyleGuide />} />
       </Routes>
       <Footer />

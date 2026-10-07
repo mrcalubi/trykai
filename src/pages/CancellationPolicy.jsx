@@ -42,18 +42,8 @@ export default function CancellationPolicy() {
         </li>
       </ul>
       <p>
-        Cancel anytime from your Dashboard. The refund amount is calculated
+        Cancel anytime from your profile. The refund amount is calculated
         automatically and shown to you before you confirm.
-      </p>
-
-      <h3>Rescheduling instead of cancelling</h3>
-      <p>
-        If your plans change, you can reschedule your booking to a different
-        available session with the same host instead of cancelling outright, as
-        long as you do this 48 hours or more before your original session
-        starts. Each booking can be rescheduled once. If you need to cancel or
-        reschedule again after that, the standard cancellation terms above
-        apply.
       </p>
 
       <h2>If you are a host</h2>

@@ -52,10 +52,17 @@ async function fillValidForm(user, overrides = {}) {
   await user.selectOptions(screen.getByLabelText('Category'), values.category)
   await user.type(screen.getByLabelText('Price per person (SGD)'), values.price)
   await user.type(screen.getByLabelText('Max guests'), values.maxGuests)
-  await user.selectOptions(screen.getByLabelText('Area'), values.area)
+  await choosePlanningArea(user, values.area)
   // The address label also wraps a hint span, so it needs a partial match.
   await user.type(screen.getByLabelText(/^Full address/), values.fullAddress)
   return values
+}
+
+async function choosePlanningArea(user, name) {
+  const input = screen.getByLabelText('Area')
+  await user.clear(input)
+  await user.type(input, name)
+  await user.click(screen.getByRole('option', { name }))
 }
 
 function imageFile(name = 'photo.png') {

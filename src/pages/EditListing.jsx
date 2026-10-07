@@ -2,42 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
+import PlanningAreaSelect from '../components/PlanningAreaSelect'
 
 const MAX_PHOTOS = 5
 
 const CATEGORIES = ['Food', 'Fitness', 'Arts', 'Music', 'Language', 'Other']
-
-const SINGAPORE_AREAS = [
-  'Ang Mo Kio',
-  'Bedok',
-  'Bishan',
-  'Bukit Batok',
-  'Bukit Merah',
-  'Bukit Panjang',
-  'Bukit Timah',
-  'Changi',
-  'Choa Chu Kang',
-  'Clementi',
-  'Downtown Core',
-  'Geylang',
-  'Hougang',
-  'Jurong East',
-  'Jurong West',
-  'Katong',
-  'Marine Parade',
-  'Novena',
-  'Orchard',
-  'Pasir Ris',
-  'Punggol',
-  'Queenstown',
-  'Sembawang',
-  'Sengkang',
-  'Serangoon',
-  'Tampines',
-  'Toa Payoh',
-  'Woodlands',
-  'Yishun',
-]
 
 const WHATS_PROVIDED_OPTIONS = ['Materials', 'Equipment', 'Food & drinks', 'None']
 
@@ -92,7 +61,7 @@ export default function EditListing() {
       setCategory(data.category)
       setPrice(centsToDollars(data.price_per_person))
       setMaxGuests(String(data.max_guests))
-      setArea(data.area)
+      setArea(data.area ?? '')
       setFullAddress(data.full_address)
       setWhatsProvided(data.whats_provided?.length ? data.whats_provided : [])
       setExistingPhotos(data.photo_urls ?? [])
@@ -336,19 +305,7 @@ export default function EditListing() {
 
           <label className="label">
             Area
-            <select
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
-              required
-              className="input"
-            >
-              <option value="">Select an area</option>
-              {SINGAPORE_AREAS.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
+            <PlanningAreaSelect value={area} onChange={setArea} required />
           </label>
 
           <label className="label">

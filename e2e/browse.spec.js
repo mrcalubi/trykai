@@ -73,12 +73,12 @@ test.describe('browsing listings', () => {
     await expect(page.getByRole('heading', { name: 'Learn latte art with me' })).toBeHidden()
   })
 
-  test('filters by area', async ({ page }) => {
+  test('filters by region', async ({ page }) => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART, BOXING] })
     await page.goto('/')
     await expect(page.getByRole('heading', { name: 'Boxing basics' })).toBeVisible()
 
-    await page.getByLabel('Filter by area').selectOption('Bedok')
+    await page.getByLabel('Filter by region').selectOption('East')
 
     await expect(page.getByRole('heading', { name: 'Boxing basics' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Learn latte art with me' })).toBeHidden()
@@ -90,7 +90,7 @@ test.describe('browsing listings', () => {
     await expect(page.getByRole('heading', { name: 'Boxing basics' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Food', exact: true }).click()
-    await page.getByLabel('Filter by area').selectOption('Bedok')
+    await page.getByLabel('Filter by region').selectOption('East')
 
     await expect(page.getByText('No listings match your filters.')).toBeVisible()
   })

@@ -227,7 +227,7 @@ describe('Home listing order', () => {
     const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
-    await user.selectOptions(screen.getByLabelText('Filter by area'), 'Bedok')
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
 
     expect(listingTitles()).toEqual(['Pottery hour', 'Boxing basics', 'Knife skills'])
   })
@@ -255,23 +255,33 @@ describe('Home filters', () => {
     expect(listingTitles()).toEqual(['Boxing basics'])
   })
 
-  it('narrows the grid to the chosen area', async () => {
+  it('narrows the grid to the chosen region', async () => {
     givenListings([LATTE, BOXING, POTTERY])
     const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
-    await user.selectOptions(screen.getByLabelText('Filter by area'), 'Bedok')
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
 
     expect(listingTitles()).toEqual(['Boxing basics', 'Pottery hour'])
   })
 
-  it('combines the category and area filters', async () => {
+  it('keeps a neighbourhood that is not a planning area off every region filter', async () => {
+    givenListings([LATTE, BOXING])
+    const { user } = renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'Central')
+
+    expect(screen.getByText('No listings match your filters.')).toBeInTheDocument()
+  })
+
+  it('combines the category and region filters', async () => {
     givenListings([LATTE, BOXING, POTTERY])
     const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
     await user.click(screen.getByRole('button', { name: 'Arts' }))
-    await user.selectOptions(screen.getByLabelText('Filter by area'), 'Bedok')
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
 
     expect(listingTitles()).toEqual(['Pottery hour'])
   })
@@ -282,7 +292,7 @@ describe('Home filters', () => {
     await screen.findByText('Latte art')
 
     await user.click(screen.getByRole('button', { name: 'Food' }))
-    await user.selectOptions(screen.getByLabelText('Filter by area'), 'Bedok')
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
 
     expect(screen.getByText('No listings match your filters.')).toBeInTheDocument()
   })
@@ -298,15 +308,15 @@ describe('Home filters', () => {
     expect(listingTitles()).toEqual(['Latte art', 'Boxing basics'])
   })
 
-  it('lists each area once even when several listings share it', async () => {
+  it('always offers All plus the five regions', async () => {
     givenListings([LATTE, BOXING, POTTERY])
     renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
-    const options = within(screen.getByLabelText('Filter by area'))
+    const options = within(screen.getByLabelText('Filter by region'))
       .getAllByRole('option')
       .map((option) => option.textContent)
-    expect(options).toEqual(['All areas', 'Bedok', 'Tiong Bahru'])
+    expect(options).toEqual(['All regions', 'Central', 'North', 'North-East', 'East', 'West'])
   })
 
   it('ignores listings with no category when building the pills', async () => {

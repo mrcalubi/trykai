@@ -13,11 +13,7 @@ Refunds are calculated based on how far in advance you cancel, measured from the
 - **Between 6 and 24 hours before the session starts:** 25% of the lesson fee refunded. The platform fee is not refunded in this case.
 - **Less than 6 hours before the session starts, or a no show:** no refund. This applies the same whether you cancel at the last minute or simply do not turn up.
 
-Cancel anytime from your Dashboard. The refund amount is calculated automatically and shown to you before you confirm.
-
-### Rescheduling instead of cancelling
-
-If your plans change, you can reschedule your booking to a different available session with the same host instead of cancelling outright, as long as you do this 48 hours or more before your original session starts. Each booking can be rescheduled once. If you need to cancel or reschedule again after that, the standard cancellation terms above apply.
+Cancel anytime from your profile. The refund amount is calculated automatically and shown to you before you confirm.
 
 ## If you are a host
 
