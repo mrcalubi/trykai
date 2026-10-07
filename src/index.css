@@ -771,6 +771,51 @@ a {
   box-shadow: 0 0 0 3px var(--primary-bg);
 }
 
+.planning-area-select {
+  position: relative;
+}
+
+.planning-area-select__list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  max-height: 240px;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+
+.planning-area-select__option {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--text-h);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.planning-area-select__option:hover,
+.planning-area-select__option--active {
+  background: var(--primary-bg);
+}
+
+.planning-area-select__empty {
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
 .input--textarea {
   resize: vertical;
   min-height: 100px;

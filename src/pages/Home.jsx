@@ -4,6 +4,7 @@ import Card from '../components/ui/Card'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { sortListingsForBrowse } from '../lib/listingSort'
+import { REGIONS, regionForPlanningArea } from '../lib/planningAreas'
 
 export default function Home() {
   const [listings, setListings] = useState([])
@@ -11,7 +12,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('All')
-  const [areaFilter, setAreaFilter] = useState('All')
+  const [regionFilter, setRegionFilter] = useState('All')
 
   useEffect(() => {
     async function fetchListings() {
@@ -62,11 +63,6 @@ export default function Home() {
     fetchListings()
   }, [])
 
-  const areas = useMemo(() => {
-    const unique = [...new Set(listings.map((l) => l.area).filter(Boolean))]
-    return unique.sort()
-  }, [listings])
-
   const categories = useMemo(() => {
     const unique = [...new Set(listings.map((l) => l.category).filter(Boolean))]
     return ['All', ...unique.sort()]
@@ -81,10 +77,11 @@ export default function Home() {
     return listings.filter((listing) => {
       const matchesCategory =
         activeCategory === 'All' || listing.category === activeCategory
-      const matchesArea = areaFilter === 'All' || listing.area === areaFilter
-      return matchesCategory && matchesArea
+      const matchesRegion =
+        regionFilter === 'All' || regionForPlanningArea(listing.area) === regionFilter
+      return matchesCategory && matchesRegion
     })
-  }, [listings, activeCategory, areaFilter])
+  }, [listings, activeCategory, regionFilter])
 
   return (
     <div className="page page--browse">
@@ -120,15 +117,15 @@ export default function Home() {
               ))}
             </div>
             <select
-              value={areaFilter}
-              onChange={(e) => setAreaFilter(e.target.value)}
+              value={regionFilter}
+              onChange={(e) => setRegionFilter(e.target.value)}
               className="filter-area"
-              aria-label="Filter by area"
+              aria-label="Filter by region"
             >
-              <option value="All">All areas</option>
-              {areas.map((area) => (
-                <option key={area} value={area}>
-                  {area}
+              <option value="All">All regions</option>
+              {REGIONS.map((region) => (
+                <option key={region} value={region}>
+                  {region}
                 </option>
               ))}
             </select>

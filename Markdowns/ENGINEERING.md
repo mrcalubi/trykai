@@ -8,7 +8,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 >
 > 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 24 hours after `starts_at`. Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). The host is emailed only when the guest cancelled.
-> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00015`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
+> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00016`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
 > 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home shows the Lane 1 headline above the kit's** `Card` **in browse mode, with a rating on the meta line only when** `listing_ratings` **returns reviews.** `ListingCard.jsx` still exists but no page renders it. Button is live on Settings and Hosting listing rows. Input is live on Settings and Login. SelectableCard is still used only by `/style-guide`.
 > 6. **All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a hex value in a component. See section 2, Styling.
@@ -119,7 +119,7 @@ description text
 category text
 price_per_person integer  -- cents, e.g. $20 = 2000
 max_guests integer
-area text                 -- general area shown publicly, e.g. "Tampines"
+area text                 -- FK → planning_areas.name; public planning area, e.g. "Tampines"
 full_address text         -- intended to be revealed only after confirmed booking
 photo_urls text[]
 whats_provided text[]
@@ -127,7 +127,18 @@ is_active boolean default true
 created_at timestamp
 ```
 
+`00016` FKs `area` to `planning_areas`. Unmatched existing values were set to null rather than guessed. Hosts pick from the 55 URA names; browse filters by region, not by area. Cards and listing detail still show the planning area name.
+
 `00001` still `GRANT ALL` on `listings` to anon and authenticated. Public pages do not SELECT `full_address`, but a crafted query against an active listing can still read the column. P0.7 is incomplete at the data layer. See BUILD_BACKLOG.
+
+### planning_areas
+
+```sql
+name text PK              -- URA planning area, e.g. "Tampines"
+region text not null      -- CHECK: Central | North | North-East | East | West
+```
+
+Seeded with the 55 Master Plan planning areas (`00016`). Public SELECT. No client INSERT/UPDATE/DELETE. Client list in `src/lib/planningAreas.js` must match the seed.
 
 ### sessions
 
@@ -202,7 +213,7 @@ created_at timestamptz
 
 Append-only, service role only, no client grant of any kind. Written by `review_verification` in the same transaction as the status change, so a decision cannot be applied without a record. This is both the PDPA justification trail for holding NRIC copies and the review history the safety protocol assumes.
 
-**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`. Listing-page reviews and guest INSERT gating are `00011_reviews_for_listing.sql` (`reviews_for_listing`, `guest_can_leave_review`, one review per booking per role). Empty-session soft-delete is `00012_delete_empty_session.sql` (`delete_empty_session`). `00012` also redefines `confirm_paid_booking` so a session that is not `open` (including `cancelled`) cannot confirm; the webhook refunds that the same way it refunds an oversell. Host-profile reviews are `00013_reviews_for_host.sql` (`reviews_for_host`): guest reviews this user received as a host, plus listing title, without embedding `bookings`. `00013` also redefines `reviews_for_listing` so both RPCs return the reviewer's first name in `users.full_name`. Display names are `00014_display_name.sql`: `users.display_name`, `handle_new_user` from signup metadata, and both review RPCs return `display_name` in jsonb `users.full_name`. Browse-card averages and owner listing delete are `00015_listing_ratings_and_delete_listing.sql` (`listing_ratings`, `delete_listing`). `00015` also redefines `my_verification` so admins get `pending_count` (everyone else gets 0).
+**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`. Listing-page reviews and guest INSERT gating are `00011_reviews_for_listing.sql` (`reviews_for_listing`, `guest_can_leave_review`, one review per booking per role). Empty-session soft-delete is `00012_delete_empty_session.sql` (`delete_empty_session`). `00012` also redefines `confirm_paid_booking` so a session that is not `open` (including `cancelled`) cannot confirm; the webhook refunds that the same way it refunds an oversell. Host-profile reviews are `00013_reviews_for_host.sql` (`reviews_for_host`): guest reviews this user received as a host, plus listing title, without embedding `bookings`. `00013` also redefines `reviews_for_listing` so both RPCs return the reviewer's first name in `users.full_name`. Display names are `00014_display_name.sql`: `users.display_name`, `handle_new_user` from signup metadata, and both review RPCs return `display_name` in jsonb `users.full_name`. Browse-card averages and owner listing delete are `00015_listing_ratings_and_delete_listing.sql` (`listing_ratings`, `delete_listing`). `00015` also redefines `my_verification` so admins get `pending_count` (everyone else gets 0). Planning areas are `00016_planning_areas.sql`: 55 URA names tagged to five regions, public SELECT, `listings.area` FK.
 
 ---
 
@@ -340,6 +351,7 @@ src/
 │   ├── firstName.js             # Fallback split of full_name
 │   ├── publicName.js            # Public surfaces: display_name, else firstName(full_name)
 │   ├── listingRatings.js        # Map listing_ratings RPC rows onto Card rating props
+│   ├── planningAreas.js         # 55 URA planning areas and their five regions
 │   └── edgeFunctionError.js     # Read Edge Function error bodies
 ├── pages/
 │   ├── Home.jsx                 # Browse: grid of ui/Card, listing_ratings once per page, newest first
@@ -371,6 +383,7 @@ src/
 │   ├── HostRating.jsx           # Profile header and listing-detail Hosted by star + average
 │   ├── StarPicker.jsx
 │   ├── CancellationPolicy.jsx   # Collapsible / info blocks
+│   ├── PlanningAreaSelect.jsx   # Searchable planning-area combobox on create/edit
 │   └── ui/
 │       ├── TopNav.jsx           # Global top bar; avatar links to own profile, via SiteNav
 │       ├── HamburgerMenu.jsx    # Slide-in panel, contents adapt to auth state
@@ -397,7 +410,9 @@ supabase/migrations/
 ├── 00011_reviews_for_listing.sql
 ├── 00012_delete_empty_session.sql
 ├── 00013_reviews_for_host.sql
-└── 00014_display_name.sql
+├── 00014_display_name.sql
+├── 00015_listing_ratings_and_delete_listing.sql
+└── 00016_planning_areas.sql
 
 supabase/functions/
 ├── _shared/
@@ -424,6 +439,7 @@ supabase/functions/
 | Looking for                                                | Where                                                                                               |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Browse page and filters                                    | `src/pages/Home.jsx`                                                                                |
+| Planning areas and browse regions                          | `src/lib/planningAreas.js`, `00016`                                                                 |
 | Listing detail and booking                                 | `src/pages/ListingDetail.jsx`                                                                       |
 | Listing-page reviews                                       | `reviews_for_listing` (`00011`); do not embed `bookings` from the client                            |
 | Browse and profile listing-card ratings                    | `listing_ratings` (`00015`); one RPC per page, never per card                                       |
@@ -477,7 +493,7 @@ Use these alongside the code. When you are reading a file and wondering what it 
 
 **1. Lands on trykai.sg.** The Lane 1 headline (“Singapore's not boring…”) sits above the filters and grid. `Home.jsx` fetches listings where `is_active = true`, with open future sessions embedded and ordered `created_at` desc, then sorts them in `sortListingsForBrowse`: soonest Singapore session day first, more upcoming sessions on a tie, listings with none last. It then calls `listing_ratings` once with those ids. Each listing renders through `ui/Card` in browse mode: square photo, category badge overlaid top-left, title clamped to two lines (no reserved empty second line), then one meta line with the all-in card price on the left and, only when that listing has guest reviews, `★ 4.8 (12)` on the right in the body font (`--sans`, text colour, count in `--muted`). No reviews means price only, never an empty star. No sort UI. Grid is 2 columns on phone, 3 from 768px, 4 from 1024px. `full_address` is not fetched. `is_suspended` is not queried; a suspended host's active listings still appear.
 
-**2. Filters by category and area.** Filtering is client side on the already fetched array. Category pills are derived from listing data (not a hardcoded six-category list). No additional database call.
+**2. Filters by category and region.** Filtering is client side on the already fetched array. Category pills are derived from listing data (not a hardcoded six-category list). Region is All, Central, North, North-East, East, or West, mapped from `listings.area` via `planningAreas.js`. No additional database call. Cards still do not show the area; listing detail does.
 
 **3. Opens the listing.** `ListingDetail.jsx` fetches the listing, the host profile (including `stripe_payouts_enabled`), guest reviews for this listing via `reviews_for_listing`, and the host's public reviews by `reviewee_id` for the "Hosted by" average. That RPC is what scopes the reviews list to the listing; the host line is the average and count across all their listings, hidden when they have none. Hosted by shows the host's display name (falling back to first name) and links to `/u/:hostId`. Sessions are not loaded in one list: two queries find the first and last open future session, then the booking card loads one Singapore calendar month at a time (`starts_at` from local midnight to the next month) and caches it. Each date shows how many sessions it has. Choosing a date lists only that day's times, and Book starts checkout for that one. Cancellation policy shown collapsed above the calendar. `full_address` still not shown. Book is disabled until the host can receive payouts.
 
@@ -509,7 +525,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 4. **The outcome is recorded.** For Stripe Identity, `stripe-webhook` handles `identity.verification_session.verified` and `.requires_input`. A `requires_input` event is only treated as a failure when it carries a `last_error`, since a fresh session sits in that status. The failure code maps to host-readable copy in `IDENTITY_FAILURE_REASONS`; `consent_declined` and `country_not_supported` point at manual review, because an automated check cannot help there.
 
    For manual submissions, Caleb reviews at `/admin/verifications`: both documents side by side, approve, or reject with a reason. Both paths call `review_verification` (`00007`, service role only), which writes the decision, the reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record, and `method` records which route decided it. Whichever function made the decision emails the host. A rejected host also sees the reason on `/verify-identity` when they try again.
-5. **Creates the listing.** Title, description, category, price in cents, max guests, public area, private full address, up to 5 photos, what's provided. Inserts into `listings`, sets `is_host = true`, navigates to `/dashboard` (which redirects to `/bookings`, then the own-profile Bookings tab). **Does not create the first session in the same form.** No photography guidance. No T&C checkbox.
+5. **Creates the listing.** Title, description, category, price in cents, max guests, a URA planning area (searchable dropdown), private full address, up to 5 photos, what's provided. Inserts into `listings`, sets `is_host = true`, navigates to `/dashboard` (which redirects to `/bookings`, then the own-profile Bookings tab). **Does not create the first session in the same form.** No photography guidance. No T&C checkbox.
 6. **Adds a session** from the Hosting tab “Add session”. Date, time, duration, spots. `spots_total` and `spots_remaining` both set to the entered number, `status = 'open'`. The new row appears under Upcoming Hosted Sessions even with zero bookings. An empty upcoming session can be removed with Delete, which calls `delete_empty_session` and sets `status = 'cancelled'` (no strike, no refund). A session with pending or confirmed bookings has Cancel instead, not Delete.
 7. **Payout setup.** Hosting “Set up payouts” → `create-account-link` → Stripe Express onboarding. Account Link `return_url`/`refresh_url` still use `/dashboard?connect=`, which redirects to `/hosting?connect=`, then `/u/:id?connect=&tab=hosting`. Book stays disabled for guests until `stripe_payouts_enabled`.
 8. **Receives bookings.** Email from `stripe-webhook` after confirmation, with guest name, session details, guest count.
@@ -543,7 +559,7 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 ## 10. Pages (what they actually do)
 
-**Home.jsx** — Lane 1 headline, then browse of active listings. Category pills derived from data, area dropdown, combinable, newest first. One `listing_ratings` call for the page; cards put price on the left of the meta line and `★ average (count)` on the right only when that listing has guest reviews (body font, count muted). No auth required. No sort by price or reviews.
+**Home.jsx** — Lane 1 headline, then browse of active listings. Category pills derived from data, region dropdown (All plus the five URA regions), combinable, newest first. One `listing_ratings` call for the page; cards put price on the left of the meta line and `★ average (count)` on the right only when that listing has guest reviews (body font, count muted). No auth required. No sort by price or reviews.
 
 **Login.jsx** — kit `Input` for full name, display name ("What should we call you?"), email, and password. Full name, display name, email, and password use floating labels. Display name is required, max 40 characters, with hint "Shown on your profile and reviews." Password also uses the eye toggle. Login and signup. Does not insert into `users`. Login mode links to `/forgot-password`. No T&C checkbox.
 
@@ -555,9 +571,9 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **Profile.jsx** — `/u/:id` is public. Avatar, display name (first name if `display_name` is empty), ID-verified badge if `verification_status = 'approved'`, host rating as `★ average · N reviews` (`HostRating`, star in `--star`) across all listings (hidden when none). Other people's profiles show stacked active listings (browse `Card`s, with `listing_ratings` once for those ids) and reviews received as a host via `reviews_for_host`. Does not show reviews they wrote as a guest. Your own profile adds a gear to `/settings` and a horizontally scrolling tab bar (overflow-x, no visible scrollbar): Bookings (default), Hosting (hosts only), Listings, Reviews. The active tab is `?tab=`. Bookings and Hosting are the existing page components mounted as panels (`embedded` hides their Dashboard heading). A non-host's own Listings tab is a Become a host prompt to `/create-listing`.
 
-**CreateListing.jsx** — auth required. Verification gate. Listing insert then `is_host = true`, then `/dashboard` (redirects to `/bookings`, then the own-profile Bookings tab). CancellationPolicyInfo on the form. First session is a separate Hosting-tab action.
+**CreateListing.jsx** — auth required. Verification gate. Planning area is a searchable dropdown of the 55 URA names (`PlanningAreaSelect`). Listing insert then `is_host = true`, then `/dashboard` (redirects to `/bookings`, then the own-profile Bookings tab). CancellationPolicyInfo on the form. First session is a separate Hosting-tab action.
 
-**EditListing.jsx** — auth required, ownership checked, pre fills including `full_address` and existing photos.
+**EditListing.jsx** — auth required, ownership checked, pre fills including `full_address`, planning area, and existing photos.
 
 **VerifyIdentity.jsx** — Stripe Identity first. Manual fallback uploads to the private bucket, then `submit_verification` with consent. Pending users see an under review message. A rejection reason from either path is shown on resubmit.
 

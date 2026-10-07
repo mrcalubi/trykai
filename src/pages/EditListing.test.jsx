@@ -214,7 +214,9 @@ describe('EditListing saving', () => {
 
   it('saves a listing that has moved to a new address', async () => {
     const { user } = await renderLoaded()
-    await user.selectOptions(screen.getByLabelText('Area'), 'Tampines')
+    await user.clear(screen.getByLabelText('Area'))
+    await user.type(screen.getByLabelText('Area'), 'Tampines')
+    await user.click(screen.getByRole('option', { name: 'Tampines' }))
     await user.clear(screen.getByLabelText(/^Full address/))
     await user.type(screen.getByLabelText(/^Full address/), '5 Espresso Lane')
 

@@ -31,7 +31,7 @@ Ask for information when it becomes relevant, not upfront.
 - Do not ask for date of birth or address at signup
 
 ### Location handling
-Public listings show general area only, e.g. "Tampines". Full address is revealed only after a confirmed booking, and must never appear in a browse or search query. Mirrors Airbnb, protects host privacy.
+Hosts pick a URA planning area (55 names, FK to `planning_areas`). Public listings show that name, e.g. "Tampines". Browse filters by the five regions (Central, North, North-East, East, West), not by planning area. Full address is revealed only after a confirmed booking, and must never appear in a browse or search query. Mirrors Airbnb, protects host privacy.
 
 **Implementation, 31 August:** guests get the address via `get_listing_address` (confirmed booking only). Public pages do not SELECT `full_address`. The column is still granted on `listings` from `00001`, so a crafted query can still read it. Hosts edit the address via listings SELECT; the RPC does not return it to the owning host.
 
@@ -46,7 +46,7 @@ Reviews are the core trust mechanism, not vetting.
 **Stripe Identity is the default path**, decided 10 September 2026: a hosted document plus live-selfie check, USD 1.50 per completed verification, and **TryKai never stores the images**. Manual upload to the private `verification-docs` bucket is the fallback, reviewed by Caleb at **`/admin/verifications`** (not the Table Editor). Consent is explicit and recorded. Status flow: unverified → pending → approved → rejected, now with a CHECK constraint, and **only approved, unsuspended hosts can insert a listing or a session**, enforced in RLS rather than in the page. Every decision writes a `verification_reviews` audit row.
 
 ### Browse
-Live now: category pills (built from listing data, not a fixed six-item list) and an area dropdown, both combinable. Order is newest (`created_at` desc). **Sort by price or most reviewed is not built.** Browse and profile listing cards put price on the left of the meta line and `★ average (count)` on the right from `listing_ratings` when that listing has guest reviews; a listing with none is price only, never an empty star.
+Live now: category pills (built from listing data, not a fixed six-item list) and a region filter (All, Central, North, North-East, East, West), both combinable. Listing detail and hosting rows still show the planning area name. Order is newest (`created_at` desc). **Sort by price or most reviewed is not built.** Browse and profile listing cards put price on the left of the meta line and `★ average (count)` on the right from `listing_ratings` when that listing has guest reviews; a listing with none is price only, never an empty star.
 Stage 2: "This weekend" filter, price range slider.
 Stage 3: personalisation from booking history.
 
@@ -476,6 +476,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-09-30 — Browse ratings, Hosting listing rows, listing delete RPC.** Home and the profile Listings tab show `★ average (count)` from `listing_ratings` (`00015`), one call per page with every listing id, same reviews → bookings → sessions join as `reviews_for_listing`. No guest reviews means price only, never an empty star. Delete is `delete_listing` (`00015`): owner only; refuses if any upcoming session has a pending or confirmed booking; otherwise `is_active = false` and empty upcoming sessions become `cancelled` in one transaction. Confirm copy names the listing; empty sessions mention they will be removed; active bookings block delete and tell the host to cancel those sessions first. The Hosting admin verification card is a one-line banner (`N verifications waiting · Review`) only when `my_verification().pending_count > 0`. Shared long-word wrapping is `overflow-wrap: break-word`, not `anywhere`, so flex titles do not collapse letter by letter.
 
 **2026-09-30 — Host rating star, hidden profile-tab scrollbars, My Listings grid, browse meta.** Profile header and listing-detail Hosted by show `★ average · N reviews` with the glyph in `--star` (`HostRating`). Own-profile tabs still scroll sideways on a narrow screen but never show a scrollbar. My Listings is one card per row below 1024px and two from 1024px; each card keeps thumbnail and title on one line, the ⋯ menu in the top-right corner, and Add session as a full-width secondary button below, with tighter phone padding. Browse cards put price on the left of the meta line and `★ average (count)` on the right in the body font (text colour, count `--muted`); no rating still means price only.
+
+**2026-10-07 — Hosts pick a URA planning area; browse filters by region.** Supersedes the area dropdown built from whatever strings listings already had, and the shorter hardcoded create/edit list that included Katong (a neighbourhood, not a planning area). `planning_areas` (`00016`) is the 55 Master Plan names, each tagged Central, North, North-East, East, or West, with public SELECT. `listings.area` is a FK to that table. Existing values are mapped by case-insensitive exact match; anything else is set to null rather than guessed. Create and edit use a searchable dropdown of those 55 names. Home filters All / the five regions, combinable with category. Cards and listing detail still show the planning area name.
 
 ---
 
