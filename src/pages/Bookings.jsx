@@ -6,7 +6,25 @@ import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import StarPicker from '../components/StarPicker'
 import Button from '../components/ui/Button'
 import { guestRefundDescription } from '../lib/cancellationPolicy'
+import {
+  bookingStatusMessage,
+  paymentStatusFromIntent,
+  paymentWasDeclined,
+} from '../lib/paymentReturn'
 import { canLeaveGuestReview } from '../lib/reviewGate'
+
+const POLL_ATTEMPTS = 20
+const POLL_INTERVAL_MS = 2000
+
+let stripePromise
+function getStripe() {
+  const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+  if (!key) return Promise.resolve(null)
+  if (!stripePromise) {
+    stripePromise = import('@stripe/stripe-js').then(({ loadStripe }) => loadStripe(key))
+  }
+  return stripePromise
+}
 
 function formatSessionDateTime(iso) {
   const date = new Intl.DateTimeFormat('en-SG', {
@@ -33,7 +51,13 @@ export default function Bookings({ embedded = false }) {
   const [error, setError] = useState('')
 
   const pendingBookingId = searchParams.get('booking')
-  const [bookingStatusMessage, setBookingStatusMessage] = useState('')
+  const redirectStatus = searchParams.get('redirect_status')
+  const clientPaymentStatus = searchParams.get('payment')
+  const stripeClientSecret = searchParams.get('payment_intent_client_secret')
+  const [bookingNotice, setBookingNotice] = useState(null)
+  // The bookings list can still say pending after the guest cancels checkout.
+  // Once we know the real outcome, keep showing it even if a slower read lands.
+  const [settledBooking, setSettledBooking] = useState(null)
 
   const [reviewedBookingIds, setReviewedBookingIds] = useState(new Set())
   const [activeReviewBookingId, setActiveReviewBookingId] = useState(null)
@@ -127,13 +151,62 @@ export default function Bookings({ embedded = false }) {
     if (!pendingBookingId) return
 
     let cancelled = false
-    let attempts = 0
-    const maxAttempts = 15
+    let timer
+    let wake
+
+    function wait(ms) {
+      return new Promise((resolve) => {
+        wake = resolve
+        timer = setTimeout(resolve, ms)
+      })
+    }
+
+    function clearPaymentQuery() {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('booking')
+        next.delete('payment')
+        next.delete('payment_intent')
+        next.delete('payment_intent_client_secret')
+        next.delete('redirect_status')
+        return next
+      }, { replace: true })
+    }
+
+    function remember(status) {
+      setSettledBooking((prev) => {
+        if (prev?.id === pendingBookingId && prev.status === status) return prev
+        if (prev?.id === pendingBookingId && prev.status === 'confirmed' && status !== 'confirmed') {
+          return prev
+        }
+        return { id: pendingBookingId, status }
+      })
+    }
 
     async function pollBookingStatus() {
-      setBookingStatusMessage('Processing your booking…')
+      let paymentStatus = clientPaymentStatus
+      if (!paymentStatus && !redirectStatus && stripeClientSecret) {
+        const stripe = await getStripe()
+        if (cancelled) return
+        if (stripe) {
+          try {
+            const { paymentIntent } = await stripe.retrievePaymentIntent(stripeClientSecret)
+            paymentStatus = paymentStatusFromIntent(paymentIntent?.status)
+          } catch {
+            paymentStatus = null
+          }
+        }
+      }
 
-      while (!cancelled && attempts < maxAttempts) {
+      if (cancelled) return
+
+      const signals = { redirectStatus, paymentStatus }
+      if (paymentWasDeclined(signals)) remember('cancelled')
+
+      setBookingNotice(bookingStatusMessage({ ...signals, timedOut: false }))
+
+      let attempts = 0
+      while (!cancelled && attempts < POLL_ATTEMPTS) {
         const { data, error: fetchError } = await supabase
           .from('bookings')
           .select('status')
@@ -144,60 +217,61 @@ export default function Bookings({ embedded = false }) {
         if (cancelled) return
 
         if (fetchError || !data) {
-          setBookingStatusMessage('Could not verify your booking. Check My Bookings below.')
-          setSearchParams((prev) => {
-            const next = new URLSearchParams(prev)
-            next.delete('booking')
-            return next
-          }, { replace: true })
+          setBookingNotice({
+            tone: 'error',
+            text: 'Could not verify your booking. Check My Bookings below.',
+          })
+          clearPaymentQuery()
           return
         }
 
-        if (data.status === 'confirmed') {
-          setBookingStatusMessage('Booking confirmed! Your payment was successful.')
-          setSearchParams((prev) => {
-            const next = new URLSearchParams(prev)
-            next.delete('booking')
-            return next
-          }, { replace: true })
+        if (data.status === 'confirmed' || data.status === 'cancelled') {
+          remember(data.status)
+          setBookingNotice(bookingStatusMessage({ bookingStatus: data.status, ...signals }))
           await loadData()
-          return
-        }
-
-        if (data.status === 'cancelled') {
-          setBookingStatusMessage('This booking was not completed. You can try booking again.')
-          setSearchParams((prev) => {
-            const next = new URLSearchParams(prev)
-            next.delete('booking')
-            return next
-          }, { replace: true })
+          if (!cancelled) clearPaymentQuery()
           return
         }
 
         attempts += 1
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+        const timedOut = attempts >= POLL_ATTEMPTS
+        setBookingNotice(
+          bookingStatusMessage({ bookingStatus: data.status, ...signals, timedOut })
+        )
+        if (timedOut) break
+        await wait(POLL_INTERVAL_MS)
       }
 
-      if (!cancelled) {
-        setBookingStatusMessage(
-          'Payment received — your booking should appear shortly. Refresh if it does not update.'
-        )
-        setSearchParams((prev) => {
-          const next = new URLSearchParams(prev)
-          next.delete('booking')
-          return next
-        }, { replace: true })
-      }
+      if (!cancelled) clearPaymentQuery()
     }
 
-    void Promise.resolve().then(() => {
-      if (!cancelled) void pollBookingStatus()
-    })
+    void pollBookingStatus()
 
     return () => {
       cancelled = true
+      clearTimeout(timer)
+      wake?.()
     }
-  }, [pendingBookingId, userId, loadData, setSearchParams])
+  }, [
+    pendingBookingId,
+    redirectStatus,
+    clientPaymentStatus,
+    stripeClientSecret,
+    userId,
+    loadData,
+    setSearchParams,
+  ])
+
+  function presentBooking(booking) {
+    if (booking.status !== 'pending') return booking
+    if (settledBooking?.id === booking.id && settledBooking.status !== 'pending') {
+      return { ...booking, status: settledBooking.status }
+    }
+    if (redirectStatus === 'failed' && booking.id === pendingBookingId) {
+      return { ...booking, status: 'cancelled' }
+    }
+    return booking
+  }
 
   function isUpcoming(startsAt) {
     return startsAt && new Date(startsAt) > new Date()
@@ -311,8 +385,10 @@ export default function Bookings({ embedded = false }) {
         <p className="success-message">{location.state.message}</p>
       )}
 
-      {bookingStatusMessage && (
-        <p className="success-message">{bookingStatusMessage}</p>
+      {bookingNotice && (
+        <p className={bookingNotice.tone === 'error' ? 'status-banner--error' : 'success-message'}>
+          {bookingNotice.text}
+        </p>
       )}
 
       {error && <p className="error-message" style={{ marginBottom: '20px' }}>{error}</p>}
@@ -325,7 +401,9 @@ export default function Bookings({ embedded = false }) {
           <p className="empty-state">No bookings yet.</p>
         ) : (
           <div className="dashboard-list">
-            {bookings.map((booking) => (
+            {bookings.map((rawBooking) => {
+              const booking = presentBooking(rawBooking)
+              return (
               <div key={booking.id} className="dashboard-card">
                 <p className="dashboard-card__title">
                   {booking.sessions?.listings?.title || 'Unknown listing'}
@@ -444,7 +522,8 @@ export default function Bookings({ embedded = false }) {
                   </form>
                 )}
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>

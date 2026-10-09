@@ -214,7 +214,7 @@ export default function CreateListing() {
       return
     }
 
-    navigate('/dashboard', { replace: true })
+    navigate('/hosting', { replace: true })
   }
 
   if (!verificationChecked) {

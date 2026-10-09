@@ -393,6 +393,11 @@ describe('Dashboard listings', () => {
     expect(css).not.toMatch(
       /@media \(min-width: 768px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2/
     )
+    expect(css).toMatch(
+      /\.dashboard-card\.hosting-listing-card:has\(\.ui-overflow__menu\) \{[^}]*z-index:\s*30;/
+    )
+    expect(css).toMatch(/\.ui-overflow__menu \{[^}]*opacity:\s*1;/)
+    expect(css).toMatch(/\.ui-overflow__item \{[^}]*background-color:\s*var\(--bg-elevated\);/)
   })
 
   it('hides edit, view, and delete behind the overflow menu', async () => {
@@ -1330,5 +1335,63 @@ describe('Dashboard post-payment status', () => {
     const poll = supabase.__calls('bookings', 'select').find((call) => call.single)
     expect(poll.filters).toContainEqual({ method: 'eq', column: 'id', value: 'booking-1' })
     expect(poll.filters).toContainEqual({ method: 'eq', column: 'guest_id', value: USER_ID })
+  })
+
+  it('does not say payment was received when the guest cancelled checkout', async () => {
+    givenData({ bookings: [makeBooking({ status: 'pending' })] })
+    supabase.__on('bookings', 'select', (call) =>
+      call.single
+        ? { data: { status: 'pending' }, error: null }
+        : { data: [makeBooking({ status: 'pending' })], error: null }
+    )
+    renderWithRouter(
+      <RequireAuth>
+        <Bookings />
+      </RequireAuth>,
+      {
+        route: '/bookings?booking=booking-1&redirect_status=failed',
+        path: '/bookings',
+      }
+    )
+
+    const notice = await screen.findByText(
+      'This booking was not completed. You can try booking again.'
+    )
+    expect(notice).toHaveClass('status-banner--error')
+    expect(screen.queryByText(/Payment received/)).not.toBeInTheDocument()
+    expect(await screen.findByText('cancelled')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
+  })
+
+  it('keeps waiting when Stripe accepted the payment and the booking is still pending', async () => {
+    supabase.__on('bookings', 'select', (call) =>
+      call.single ? { data: { status: 'pending' }, error: null } : { data: [], error: null }
+    )
+    renderWithRouter(
+      <RequireAuth>
+        <Bookings />
+      </RequireAuth>,
+      { route: '/bookings?booking=booking-1&payment=succeeded', path: '/bookings' }
+    )
+
+    expect(await screen.findByText('Processing your booking…')).toBeInTheDocument()
+    expect(screen.queryByText(/Payment received/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/not completed/)).not.toBeInTheDocument()
+  })
+
+  it('shows a still-listed pending row as cancelled once the return poll says so', async () => {
+    supabase.__on('bookings', 'select', (call) =>
+      call.single
+        ? { data: { status: 'cancelled' }, error: null }
+        : { data: [makeBooking({ status: 'pending' })], error: null }
+    )
+    renderReturningFromPayment()
+
+    expect(
+      await screen.findByText('This booking was not completed. You can try booking again.')
+    ).toBeInTheDocument()
+    expect(await screen.findByText('cancelled')).toBeInTheDocument()
+    expect(screen.queryByText('pending')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
   })
 })

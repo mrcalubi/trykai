@@ -90,7 +90,10 @@ function renderPage() {
 beforeEach(() => {
   supabase.__reset()
   stripe.instance.confirmPayment.mockReset()
-  stripe.instance.confirmPayment.mockResolvedValue({ error: null })
+  stripe.instance.confirmPayment.mockResolvedValue({
+    error: null,
+    paymentIntent: { status: 'succeeded' },
+  })
 })
 
 describe('ListingDetail loading and failure', () => {
@@ -831,7 +834,22 @@ describe('ListingDetail checkout', () => {
     await user.click(screen.getByRole('button', { name: 'Pay now' }))
 
     await waitFor(() => expect(currentPath()).toBe('/dashboard'))
-    expect(currentSearch()).toBe('?booking=booking-1')
+    expect(currentSearch()).toBe('?booking=booking-1&payment=succeeded')
+  })
+
+  it('stays on the listing when the guest cancels the payment', async () => {
+    stripe.instance.confirmPayment.mockResolvedValue({
+      error: null,
+      paymentIntent: { status: 'canceled' },
+    })
+    const { user, currentPath } = await openCheckout()
+
+    await user.click(screen.getByRole('button', { name: 'Pay now' }))
+
+    expect(
+      await screen.findByText('Payment was not completed. You have not been charged.')
+    ).toBeInTheDocument()
+    expect(currentPath()).toBe('/listings/listing-1')
   })
 
   it('keeps the guest on the page and shows why the card was declined', async () => {
