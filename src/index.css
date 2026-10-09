@@ -1492,6 +1492,15 @@ a {
   border-radius: var(--radius-sm);
 }
 
+.status-banner--error {
+  margin: 0 0 20px;
+  padding: 14px 18px;
+  font-size: 14px;
+  color: var(--error);
+  background: var(--error-bg);
+  border-radius: var(--radius-sm);
+}
+
 /* Detail page */
 .detail-gallery {
   margin-bottom: 32px;
@@ -2437,6 +2446,13 @@ body.lightbox-open {
   padding: 12px;
 }
 
+/* Grid items paint in order, so the next listing covers a dropdown that
+   overflows this card. Lift the open card above its siblings. */
+.dashboard-card.hosting-listing-card:has(.ui-overflow__menu) {
+  /* Above .ui-overflow.hosting-listing__menu (z-index 20) on the next card. */
+  z-index: 30;
+}
+
 @media (min-width: 768px) {
   .dashboard-card.hosting-listing-card {
     padding: 16px;
@@ -2525,7 +2541,8 @@ body.lightbox-open {
   margin: 0;
   padding: 6px;
   list-style: none;
-  background: var(--bg-elevated);
+  background-color: var(--bg-elevated);
+  opacity: 1;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
@@ -2543,7 +2560,7 @@ body.lightbox-open {
   color: var(--navy);
   text-align: left;
   text-decoration: none;
-  background: transparent;
+  background-color: var(--bg-elevated);
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -2551,7 +2568,8 @@ body.lightbox-open {
 
 .ui-overflow__item:hover,
 .ui-overflow__item:focus {
-  background: var(--primary-bg);
+  /* Flatten the tint so the row stays opaque over the listing behind it. */
+  background-color: color-mix(in srgb, var(--navy) 8%, var(--bg-elevated));
   outline: none;
 }
 

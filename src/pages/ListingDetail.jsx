@@ -26,6 +26,7 @@ import {
   paynowPriceCents,
 } from '../lib/pricing'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
+import { checkoutCanLeaveForWebhook } from '../lib/paymentReturn'
 import { publicName } from '../lib/publicName'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
@@ -69,7 +70,7 @@ function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel }) {
     setError('')
     setLoading(true)
 
-    const { error: confirmError } = await stripe.confirmPayment({
+    const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
         return_url: `${window.location.origin}/dashboard?booking=${bookingId}`,
@@ -79,12 +80,12 @@ function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel }) {
 
     setLoading(false)
 
-    if (confirmError) {
-      setError(confirmError.message)
+    if (confirmError || !checkoutCanLeaveForWebhook(paymentIntent?.status)) {
+      setError(confirmError?.message || 'Payment was not completed. You have not been charged.')
       return
     }
 
-    onSuccess()
+    onSuccess(paymentIntent.status)
   }
 
   return (
@@ -291,8 +292,9 @@ export default function ListingDetail() {
     setSelectedDateKey(null)
   }
 
-  function handlePaymentSuccess() {
-    navigate(`/dashboard?booking=${bookingId}`)
+  function handlePaymentSuccess(paymentStatus) {
+    const payment = paymentStatus === 'processing' ? 'processing' : 'succeeded'
+    navigate(`/dashboard?booking=${bookingId}&payment=${payment}`)
   }
 
   function hostCanTakePayments() {

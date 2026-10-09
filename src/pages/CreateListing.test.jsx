@@ -225,7 +225,7 @@ describe('CreateListing submission', () => {
     expect(supabase.__lastCall('listings', 'insert').payload.price_per_person).toBe(1999)
   })
 
-  it('promotes the user to a host and lands them on the dashboard', async () => {
+  it('promotes the user to a host and lands them on the hosting tab', async () => {
     const { user, currentPath } = renderPage()
     await screen.findByLabelText('Title')
     await fillValidForm(user)
@@ -234,7 +234,7 @@ describe('CreateListing submission', () => {
 
     await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
     expect(supabase.__lastCall('users', 'update').payload).toEqual({ is_host: true })
-    await waitFor(() => expect(currentPath()).toBe('/dashboard'))
+    await waitFor(() => expect(currentPath()).toBe('/hosting'))
   })
 
   it('stops and reports a failed insert without promoting the user', async () => {
