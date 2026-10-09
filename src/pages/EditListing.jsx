@@ -193,22 +193,32 @@ export default function EditListing() {
       return
     }
 
-    const { error: updateError } = await supabase
+    const listingPayload = {
+      title: title.trim(),
+      description: description.trim(),
+      category,
+      price_per_person: priceCents,
+      max_guests: guests,
+      duration_mins: duration,
+      area,
+      full_address: fullAddress.trim(),
+      whats_provided: provided,
+      photo_urls: photoUrls,
+    }
+    let { error: updateError } = await supabase
       .from('listings')
-      .update({
-        title: title.trim(),
-        description: description.trim(),
-        category,
-        price_per_person: priceCents,
-        max_guests: guests,
-        duration_mins: duration,
-        area,
-        full_address: fullAddress.trim(),
-        whats_provided: provided,
-        photo_urls: photoUrls,
-      })
+      .update(listingPayload)
       .eq('id', id)
       .eq('host_id', userId)
+    if (updateError && /duration_mins/.test(updateError.message ?? '')) {
+      const withoutDuration = { ...listingPayload }
+      delete withoutDuration.duration_mins
+      ;({ error: updateError } = await supabase
+        .from('listings')
+        .update(withoutDuration)
+        .eq('id', id)
+        .eq('host_id', userId))
+    }
 
     setLoading(false)
 

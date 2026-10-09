@@ -542,6 +542,39 @@ describe('Dashboard add session', () => {
     fireEvent.change(screen.getByLabelText('Spots total'), { target: { value: spots } })
   }
 
+  it('still lists the host listings when duration_mins is not in the database yet', async () => {
+    supabase.__on('listings', 'select', (call) => {
+      const selected = String(call.chain.find((step) => step.method === 'select')?.args[0] ?? '')
+      if (selected.includes('duration_mins')) {
+        return { data: null, error: { message: 'column listings.duration_mins does not exist' } }
+      }
+      const listing = makeMyListing()
+      delete listing.duration_mins
+      return { data: [listing], error: null }
+    })
+    const { user } = await renderHosting()
+
+    expect(screen.queryByText(/duration_mins does not exist/)).not.toBeInTheDocument()
+    expect(screen.getByText('Latte art')).toBeInTheDocument()
+
+    await openSessionForm(user)
+    expect(screen.getByLabelText('Duration (mins)')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Duration (mins)'), { target: { value: '60' } })
+    fillSession()
+
+    await user.click(screen.getByRole('button', { name: 'Add session' }))
+
+    await waitFor(() => expect(supabase.__calls('sessions', 'insert')).toHaveLength(1))
+    expect(supabase.__lastCall('sessions', 'insert').payload).toMatchObject({
+      listing_id: 'listing-1',
+      duration_mins: 60,
+      spots_total: 4,
+      spots_remaining: 4,
+      status: 'open',
+    })
+    expect(supabase.rpc.mock.calls.some(([name]) => name === 'add_listing_session')).toBe(false)
+  })
+
   it('shows the listing duration and does not ask for one', async () => {
     const { user } = await renderHosting()
     await openSessionForm(user)
