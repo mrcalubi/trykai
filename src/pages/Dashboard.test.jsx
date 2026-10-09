@@ -730,9 +730,12 @@ describe('Dashboard guest cancellation', () => {
   })
 
   it('does not offer cancellation for an already cancelled booking', async () => {
-    givenData({ bookings: [makeBooking({ status: 'cancelled' })] })
+    givenData({
+      bookings: [makeBooking({ status: 'cancelled', stripe_charge_id: 'ch_1' })],
+    })
     await renderBookings()
 
+    expect(screen.getByText('Learn latte art with me')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
   })
 
@@ -857,6 +860,22 @@ describe('Dashboard host cancellation', () => {
     expect(within(sectionFor('Upcoming Hosted Sessions')).getAllByText('Latte art')).toHaveLength(2)
     expect(screen.getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+  })
+
+  it('does not treat an unpaid checkout as an active hosted booking', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({
+          bookings: [{ id: 'b-pending', status: 'pending', guests_count: 1, total_amount: 4500 }],
+        }),
+      ],
+    })
+    await renderHosting()
+
+    expect(screen.getByText(/0 active booking\(s\)/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel session' })).not.toBeInTheDocument()
   })
 
   it('excludes cancelled sessions from the upcoming list', async () => {
@@ -1070,6 +1089,7 @@ describe('Dashboard reviews', () => {
     await renderBookings()
 
     expect(screen.getByRole('button', { name: 'Leave a review' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
   })
 
   it('does not invite a review before the session ends', async () => {
@@ -1165,7 +1185,11 @@ describe('Dashboard reviews', () => {
   })
 
   it('does not invite a review on a cancelled booking', async () => {
-    givenData({ bookings: [makeBooking({ ...pastBooking(), status: 'cancelled' })] })
+    givenData({
+      bookings: [
+        makeBooking({ ...pastBooking(), status: 'cancelled', stripe_charge_id: 'ch_1' }),
+      ],
+    })
     await renderBookings()
 
     expect(screen.queryByRole('button', { name: 'Leave a review' })).not.toBeInTheDocument()
@@ -1359,7 +1383,8 @@ describe('Dashboard post-payment status', () => {
     )
     expect(notice).toHaveClass('status-banner--error')
     expect(screen.queryByText(/Payment received/)).not.toBeInTheDocument()
-    expect(await screen.findByText('cancelled')).toBeInTheDocument()
+    expect(screen.queryByText('Learn latte art with me')).not.toBeInTheDocument()
+    expect(screen.queryByText('pending')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
   })
 
@@ -1379,7 +1404,7 @@ describe('Dashboard post-payment status', () => {
     expect(screen.queryByText(/not completed/)).not.toBeInTheDocument()
   })
 
-  it('shows a still-listed pending row as cancelled once the return poll says so', async () => {
+  it('drops an unpaid booking once checkout is cancelled', async () => {
     supabase.__on('bookings', 'select', (call) =>
       call.single
         ? { data: { status: 'cancelled' }, error: null }
@@ -1390,8 +1415,28 @@ describe('Dashboard post-payment status', () => {
     expect(
       await screen.findByText('This booking was not completed. You can try booking again.')
     ).toBeInTheDocument()
-    expect(await screen.findByText('cancelled')).toBeInTheDocument()
+    expect(screen.getByText('No bookings yet.')).toBeInTheDocument()
     expect(screen.queryByText('pending')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
+  })
+
+  it('does not list an abandoned checkout that is still pending', async () => {
+    givenData({
+      bookings: [
+        makeBooking({
+          status: 'pending',
+          sessions: {
+            starts_at: hoursFromNow(48),
+            duration_mins: 90,
+            listings: { title: 'test review bug', host_id: HOST_ID },
+          },
+        }),
+      ],
+    })
+    await renderBookings()
+
+    expect(screen.getByText('No bookings yet.')).toBeInTheDocument()
+    expect(screen.queryByText('test review bug')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
   })
 })

@@ -5,13 +5,17 @@ import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import StarPicker from '../components/StarPicker'
 import Button from '../components/ui/Button'
-import { guestRefundDescription } from '../lib/cancellationPolicy'
+import {
+  awaitingPaidBookingId,
+  guestBookingActions,
+  guestCancellationNote,
+  showGuestBooking,
+} from '../lib/guestBookings'
 import {
   bookingStatusMessage,
   paymentStatusFromIntent,
   paymentWasDeclined,
 } from '../lib/paymentReturn'
-import { canLeaveGuestReview } from '../lib/reviewGate'
 
 const POLL_ATTEMPTS = 20
 const POLL_INTERVAL_MS = 2000
@@ -83,6 +87,9 @@ export default function Bookings({ embedded = false }) {
           guests_count,
           total_amount,
           platform_fee,
+          stripe_charge_id,
+          stripe_refund_id,
+          refund_amount,
           sessions (
             starts_at,
             duration_mins,
@@ -90,7 +97,8 @@ export default function Bookings({ embedded = false }) {
             listings (
               id,
               title,
-              host_id
+              host_id,
+              duration_mins
             )
           )
         `
@@ -201,7 +209,19 @@ export default function Bookings({ embedded = false }) {
       if (cancelled) return
 
       const signals = { redirectStatus, paymentStatus }
-      if (paymentWasDeclined(signals)) remember('cancelled')
+      if (paymentWasDeclined(signals)) {
+        remember('cancelled')
+        void (async () => {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession()
+          if (cancelled) return
+          await supabase.functions.invoke('cancel-booking', {
+            body: { booking_id: pendingBookingId },
+            headers: { Authorization: `Bearer ${session?.access_token}` },
+          })
+        })()
+      }
 
       setBookingNotice(bookingStatusMessage({ ...signals, timedOut: false }))
 
@@ -273,21 +293,14 @@ export default function Bookings({ embedded = false }) {
     return booking
   }
 
-  function isUpcoming(startsAt) {
-    return startsAt && new Date(startsAt) > new Date()
-  }
-
-  function canCancelBooking(booking) {
-    return (
-      isUpcoming(booking.sessions?.starts_at) &&
-      (booking.status === 'pending' || booking.status === 'confirmed')
-    )
+  function actionsFor(booking) {
+    return guestBookingActions(booking, {
+      alreadyReviewed: reviewedBookingIds.has(booking.id),
+    })
   }
 
   function canLeaveReview(booking) {
-    return canLeaveGuestReview(booking, {
-      alreadyReviewed: reviewedBookingIds.has(booking.id),
-    })
+    return actionsFor(booking).review
   }
 
   function openReviewForm(bookingId) {
@@ -377,6 +390,15 @@ export default function Bookings({ embedded = false }) {
     return <p className="status-message">Loading…</p>
   }
 
+  const awaitingBookingId = awaitingPaidBookingId({
+    bookingId: pendingBookingId,
+    redirectStatus,
+    paymentStatus: clientPaymentStatus,
+  })
+  const visibleBookings = bookings
+    .map((booking) => presentBooking(booking))
+    .filter((booking) => showGuestBooking(booking, { awaitingBookingId }))
+
   return (
     <div className="page page--narrow">
       {embedded ? null : <h1 className="dashboard-heading">Dashboard</h1>}
@@ -397,12 +419,12 @@ export default function Bookings({ embedded = false }) {
       <section className="dashboard-section">
         <h2 className="dashboard-section__title">My Bookings</h2>
 
-        {bookings.length === 0 ? (
+        {visibleBookings.length === 0 ? (
           <p className="empty-state">No bookings yet.</p>
         ) : (
           <div className="dashboard-list">
-            {bookings.map((rawBooking) => {
-              const booking = presentBooking(rawBooking)
+            {visibleBookings.map((booking) => {
+              const actions = actionsFor(booking)
               return (
               <div key={booking.id} className="dashboard-card">
                 <p className="dashboard-card__title">
@@ -423,7 +445,7 @@ export default function Bookings({ embedded = false }) {
                   <span className={`badge badge--${booking.status}`}>
                     {booking.status}
                   </span>
-                  {canLeaveReview(booking) && activeReviewBookingId !== booking.id && (
+                  {actions.review && activeReviewBookingId !== booking.id && (
                     <Button
                       type="button"
                       variant="secondary"
@@ -432,7 +454,7 @@ export default function Bookings({ embedded = false }) {
                       Leave a review
                     </Button>
                   )}
-                  {canCancelBooking(booking) && confirmCancelBookingId !== booking.id && (
+                  {actions.cancel && confirmCancelBookingId !== booking.id && (
                     <button
                       type="button"
                       onClick={() => {
@@ -453,11 +475,7 @@ export default function Bookings({ embedded = false }) {
                 {confirmCancelBookingId === booking.id && (
                   <div className="cancel-confirm">
                     <p className="cancel-confirm__note">
-                      {guestRefundDescription(
-                        booking.total_amount,
-                        booking.sessions.starts_at,
-                        booking.platform_fee
-                      )}
+                      {guestCancellationNote(booking)}
                     </p>
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <button

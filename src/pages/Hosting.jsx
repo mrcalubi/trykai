@@ -23,9 +23,8 @@ function formatSessionDateTime(iso) {
 }
 
 function activeBookingsOn(session) {
-  return (session.bookings ?? []).filter(
-    (b) => b.status === 'pending' || b.status === 'confirmed'
-  )
+  // Pending rows are unpaid checkouts, not guests the host has to refund.
+  return (session.bookings ?? []).filter((b) => b.status === 'confirmed')
 }
 
 function firstRow(data) {

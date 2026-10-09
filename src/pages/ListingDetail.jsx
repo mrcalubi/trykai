@@ -57,7 +57,7 @@ function upcomingSessions(listingId, columns) {
     .gt('starts_at', new Date().toISOString())
 }
 
-function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel }) {
+function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel, onPaymentFailed }) {
   const stripe = useStripe()
   const elements = useElements()
   const [error, setError] = useState('')
@@ -82,6 +82,9 @@ function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel }) {
 
     if (confirmError || !checkoutCanLeaveForWebhook(paymentIntent?.status)) {
       setError(confirmError?.message || 'Payment was not completed. You have not been charged.')
+      // A declined card can be retried on this same payment. Cancelling the
+      // payment sheet, or Stripe cancelling the intent, closes the checkout.
+      if (paymentIntent?.status === 'canceled') onPaymentFailed?.()
       return
     }
 
@@ -278,13 +281,26 @@ export default function ListingDetail() {
     setActivePhoto(Math.round(scrollLeft / clientWidth))
   }
 
+  async function voidUnpaidBooking(id) {
+    if (!id) return
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    await supabase.functions.invoke('cancel-booking', {
+      body: { booking_id: id },
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    })
+  }
+
   function cancelPayment() {
+    const unpaidId = bookingId
     setCheckoutSessionId(null)
     setCheckoutRail(null)
     setClientSecret(null)
     setBookingId(null)
     setTotalAmount(null)
     setPaymentError('')
+    void voidUnpaidBooking(unpaidId)
   }
 
   function showMonth(monthKey) {
@@ -643,6 +659,7 @@ export default function ListingDetail() {
                       bookingId={bookingId}
                       onSuccess={handlePaymentSuccess}
                       onCancel={cancelPayment}
+                      onPaymentFailed={() => void voidUnpaidBooking(bookingId)}
                     />
                   </Elements>
                 )}

@@ -837,6 +837,20 @@ describe('ListingDetail checkout', () => {
     expect(currentSearch()).toBe('?booking=booking-1&payment=succeeded')
   })
 
+  it('closes the unpaid checkout when the guest backs out', async () => {
+    const { user } = await openCheckout()
+
+    await user.click(within(screen.getByTestId('stripe-elements')).getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(supabase.functions.invoke).toHaveBeenCalledWith('cancel-booking', {
+        body: { booking_id: 'booking-1' },
+        headers: { Authorization: 'Bearer test-access-token' },
+      }),
+    )
+  })
+
   it('stays on the listing when the guest cancels the payment', async () => {
     stripe.instance.confirmPayment.mockResolvedValue({
       error: null,
