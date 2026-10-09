@@ -179,6 +179,17 @@ describe('EditListing validation', () => {
     expect(await screen.findByText('Please enter a valid price.')).toBeInTheDocument()
   })
 
+  it('rejects a duration below one minute', async () => {
+    const { user } = await renderLoaded()
+    await user.clear(screen.getByLabelText('Duration (mins)'))
+    await user.type(screen.getByLabelText('Duration (mins)'), '0')
+
+    submitForm()
+
+    expect(await screen.findByText('Duration must be at least 1 minute.')).toBeInTheDocument()
+    expect(supabase.__calls('listings', 'update')).toHaveLength(0)
+  })
+
   it('rejects a guest count below one', async () => {
     const { user } = await renderLoaded()
     await user.clear(screen.getByLabelText('Max guests'))
@@ -206,6 +217,7 @@ describe('EditListing saving', () => {
       title: 'Latte art, level two',
       price_per_person: 5525,
       max_guests: 4,
+      duration_mins: 90,
       area: 'Bedok',
       full_address: '12 Coffee Road',
     })

@@ -41,6 +41,7 @@ async function fillValidForm(user, overrides = {}) {
     category: 'Food',
     price: '45',
     maxGuests: '4',
+    duration: '90',
     area: 'Bedok',
     fullAddress: '12 Coffee Road',
     ...overrides,
@@ -52,6 +53,7 @@ async function fillValidForm(user, overrides = {}) {
   await user.selectOptions(screen.getByLabelText('Category'), values.category)
   await user.type(screen.getByLabelText('Price per person (SGD)'), values.price)
   await user.type(screen.getByLabelText('Max guests'), values.maxGuests)
+  await user.type(screen.getByLabelText('Duration (mins)'), values.duration)
   await choosePlanningArea(user, values.area)
   // The address label also wraps a hint span, so it needs a partial match.
   await user.type(screen.getByLabelText(/^Full address/), values.fullAddress)
@@ -163,6 +165,17 @@ describe('CreateListing validation', () => {
     expect(supabase.__calls('listings', 'insert')).toHaveLength(0)
   })
 
+  it('rejects a duration below one minute', async () => {
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await fillValidForm(user, { duration: '0' })
+
+    submitForm()
+
+    expect(await screen.findByText('Duration must be at least 1 minute.')).toBeInTheDocument()
+    expect(supabase.__calls('listings', 'insert')).toHaveLength(0)
+  })
+
   it('rejects a guest count below one', async () => {
     const { user } = renderPage()
     await screen.findByLabelText('Title')
@@ -194,6 +207,7 @@ describe('CreateListing submission', () => {
       category: 'Food',
       price_per_person: 4550,
       max_guests: 4,
+      duration_mins: 90,
       area: 'Bedok',
       full_address: '12 Coffee Road',
       is_active: true,

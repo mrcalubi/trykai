@@ -126,7 +126,6 @@ export default function Hosting({ embedded = false }) {
   const [activeFormId, setActiveFormId] = useState(null)
   const [sessionDate, setSessionDate] = useState('')
   const [sessionTime, setSessionTime] = useState('')
-  const [durationMins, setDurationMins] = useState('')
   const [spotsTotal, setSpotsTotal] = useState('')
   const [sessionError, setSessionError] = useState('')
   const [sessionLoading, setSessionLoading] = useState(false)
@@ -150,7 +149,7 @@ export default function Hosting({ embedded = false }) {
     const [listingsResult, profileResult, adminResult] = await Promise.all([
       supabase
         .from('listings')
-        .select('id, title, area, category, photo_urls')
+        .select('id, title, area, category, photo_urls, duration_mins')
         .eq('host_id', userId)
         .eq('is_active', true)
         .order('created_at', { ascending: false }),
@@ -248,7 +247,6 @@ export default function Hosting({ embedded = false }) {
     setActiveFormId(listingId)
     setSessionDate('')
     setSessionTime('')
-    setDurationMins('')
     setSpotsTotal('')
     setSessionError('')
   }
@@ -262,16 +260,16 @@ export default function Hosting({ embedded = false }) {
     e.preventDefault()
     setSessionError('')
 
-    const duration = parseInt(durationMins, 10)
     const spots = parseInt(spotsTotal, 10)
+    const listing = listings.find((item) => item.id === listingId)
 
     if (!sessionDate || !sessionTime) {
       setSessionError('Please enter a date and time.')
       return
     }
 
-    if (Number.isNaN(duration) || duration < 1) {
-      setSessionError('Duration must be at least 1 minute.')
+    if (!listing?.duration_mins || listing.duration_mins < 1) {
+      setSessionError('Set a duration on this listing before adding a session.')
       return
     }
 
@@ -280,24 +278,34 @@ export default function Hosting({ embedded = false }) {
       return
     }
 
-    const startsAt = new Date(`${sessionDate}T${sessionTime}:00+08:00`).toISOString()
+    const startsAtDate = new Date(`${sessionDate}T${sessionTime}:00+08:00`)
+    if (Number.isNaN(startsAtDate.getTime()) || startsAtDate.getTime() <= Date.now()) {
+      setSessionError('Choose a time in the future.')
+      return
+    }
 
     setSessionLoading(true)
 
-    const { error: insertError } = await supabase.from('sessions').insert({
-      listing_id: listingId,
-      starts_at: startsAt,
-      duration_mins: duration,
-      spots_total: spots,
-      spots_remaining: spots,
-      status: 'open',
+    const { data, error: rpcError } = await supabase.rpc('add_listing_session', {
+      p_listing_id: listingId,
+      p_starts_at: startsAtDate.toISOString(),
+      p_spots: spots,
     })
 
     setSessionLoading(false)
 
-    if (insertError) {
-      setSessionError(insertError.message)
+    if (rpcError) {
+      setSessionError(rpcError.message)
       return
+    }
+
+    if (data?.action === 'merged') {
+      const added = data.spots_added
+      const left = data.spots_remaining
+      const when = data.starts_at ? formatSessionDateTime(data.starts_at) : 'that time'
+      setBookingStatusMessage(
+        `Added ${added} spot${added === 1 ? '' : 's'} to the session on ${when}. ${left} spot${left === 1 ? '' : 's'} left.`
+      )
     }
 
     closeSessionForm()
@@ -673,32 +681,23 @@ export default function Hosting({ embedded = false }) {
                         />
                       </label>
                     </div>
-                    <div className="form__row">
-                      <label className="label">
-                        Duration (mins)
-                        <input
-                          type="number"
-                          value={durationMins}
-                          onChange={(e) => setDurationMins(e.target.value)}
-                          min="1"
-                          placeholder="60"
-                          required
-                          className="input"
-                        />
-                      </label>
-                      <label className="label">
-                        Spots total
-                        <input
-                          type="number"
-                          value={spotsTotal}
-                          onChange={(e) => setSpotsTotal(e.target.value)}
-                          min="1"
-                          placeholder="4"
-                          required
-                          className="input"
-                        />
-                      </label>
-                    </div>
+                    <p className="hint">
+                      {listing.duration_mins
+                        ? `Each session is ${listing.duration_mins} minutes.`
+                        : 'Set a duration on this listing before adding a session.'}
+                    </p>
+                    <label className="label">
+                      Spots total
+                      <input
+                        type="number"
+                        value={spotsTotal}
+                        onChange={(e) => setSpotsTotal(e.target.value)}
+                        min="1"
+                        placeholder="4"
+                        required
+                        className="input"
+                      />
+                    </label>
 
                     {sessionError && <p className="error-message">{sessionError}</p>}
 

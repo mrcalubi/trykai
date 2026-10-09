@@ -164,6 +164,8 @@ test.describe('signed-out navigation', () => {
     // form they asked for, not on the home page.
     await expect(page).toHaveURL(/\/create-listing$/)
     await expect(page.getByLabel('Title')).toBeVisible()
+    await expect(page.getByLabel('Duration (mins)')).toBeVisible()
+    await expect(page.getByText('How long every session of this listing lasts.')).toBeVisible()
   })
 
   test('renders the home page without console errors', async ({ page }) => {
