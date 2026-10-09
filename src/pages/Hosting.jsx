@@ -126,6 +126,7 @@ export default function Hosting({ embedded = false }) {
   const [activeFormId, setActiveFormId] = useState(null)
   const [sessionDate, setSessionDate] = useState('')
   const [sessionTime, setSessionTime] = useState('')
+  const [durationMins, setDurationMins] = useState('')
   const [spotsTotal, setSpotsTotal] = useState('')
   const [sessionError, setSessionError] = useState('')
   const [sessionLoading, setSessionLoading] = useState(false)
@@ -146,13 +147,8 @@ export default function Hosting({ embedded = false }) {
   const [pendingCount, setPendingCount] = useState(0)
 
   const loadData = useCallback(async () => {
-    const [listingsResult, profileResult, adminResult] = await Promise.all([
-      supabase
-        .from('listings')
-        .select('id, title, area, category, photo_urls, duration_mins')
-        .eq('host_id', userId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false }),
+    const listingColumns = 'id, title, area, category, photo_urls'
+    const [profileResult, adminResult] = await Promise.all([
       supabase
         .from('users')
         .select('stripe_payouts_enabled, is_host')
@@ -161,10 +157,30 @@ export default function Hosting({ embedded = false }) {
       supabase.rpc('my_verification'),
     ])
 
+    let listingsResult = await supabase
+      .from('listings')
+      .select(`${listingColumns}, duration_mins`)
+      .eq('host_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+
+    // 00018 adds duration_mins. Until that migration is applied, asking for
+    // the column fails the whole listings read and the host cannot add a session.
+    if (listingsResult.error && /duration_mins/.test(listingsResult.error.message ?? '')) {
+      listingsResult = await supabase
+        .from('listings')
+        .select(listingColumns)
+        .eq('host_id', userId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+    }
+
     if (listingsResult.error) {
       setError(listingsResult.error.message)
+      setListings([])
     } else {
-      setListings(listingsResult.data)
+      setError('')
+      setListings(listingsResult.data ?? [])
     }
 
     if (!profileResult.error) {
@@ -247,6 +263,7 @@ export default function Hosting({ embedded = false }) {
     setActiveFormId(listingId)
     setSessionDate('')
     setSessionTime('')
+    setDurationMins('')
     setSpotsTotal('')
     setSessionError('')
   }
@@ -262,14 +279,17 @@ export default function Hosting({ embedded = false }) {
 
     const spots = parseInt(spotsTotal, 10)
     const listing = listings.find((item) => item.id === listingId)
+    const listingDuration = listing?.duration_mins
+    const usesListingDuration = Number.isInteger(listingDuration) && listingDuration >= 1
+    const duration = parseInt(durationMins, 10)
 
     if (!sessionDate || !sessionTime) {
       setSessionError('Please enter a date and time.')
       return
     }
 
-    if (!listing?.duration_mins || listing.duration_mins < 1) {
-      setSessionError('Set a duration on this listing before adding a session.')
+    if (!usesListingDuration && (Number.isNaN(duration) || duration < 1)) {
+      setSessionError('Duration must be at least 1 minute.')
       return
     }
 
@@ -286,11 +306,27 @@ export default function Hosting({ embedded = false }) {
 
     setSessionLoading(true)
 
-    const { data, error: rpcError } = await supabase.rpc('add_listing_session', {
-      p_listing_id: listingId,
-      p_starts_at: startsAtDate.toISOString(),
-      p_spots: spots,
-    })
+    let data
+    let rpcError
+    if (usesListingDuration) {
+      const result = await supabase.rpc('add_listing_session', {
+        p_listing_id: listingId,
+        p_starts_at: startsAtDate.toISOString(),
+        p_spots: spots,
+      })
+      data = result.data
+      rpcError = result.error
+    } else {
+      const result = await supabase.from('sessions').insert({
+        listing_id: listingId,
+        starts_at: startsAtDate.toISOString(),
+        duration_mins: duration,
+        spots_total: spots,
+        spots_remaining: spots,
+        status: 'open',
+      })
+      rpcError = result.error
+    }
 
     setSessionLoading(false)
 
@@ -681,11 +717,22 @@ export default function Hosting({ embedded = false }) {
                         />
                       </label>
                     </div>
-                    <p className="hint">
-                      {listing.duration_mins
-                        ? `Each session is ${listing.duration_mins} minutes.`
-                        : 'Set a duration on this listing before adding a session.'}
-                    </p>
+                    {Number.isInteger(listing.duration_mins) && listing.duration_mins >= 1 ? (
+                      <p className="hint">Each session is {listing.duration_mins} minutes.</p>
+                    ) : (
+                      <label className="label">
+                        Duration (mins)
+                        <input
+                          type="number"
+                          value={durationMins}
+                          onChange={(e) => setDurationMins(e.target.value)}
+                          min="1"
+                          placeholder="60"
+                          required
+                          className="input"
+                        />
+                      </label>
+                    )}
                     <label className="label">
                       Spots total
                       <input

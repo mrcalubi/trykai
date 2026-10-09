@@ -175,7 +175,7 @@ export default function CreateListing() {
       return
     }
 
-    const { error: listingError } = await supabase.from('listings').insert({
+    const listingPayload = {
       host_id: userId,
       title: title.trim(),
       description: description.trim(),
@@ -188,7 +188,13 @@ export default function CreateListing() {
       whats_provided: provided,
       photo_urls: photoUrls,
       is_active: true,
-    })
+    }
+    let { error: listingError } = await supabase.from('listings').insert(listingPayload)
+    if (listingError && /duration_mins/.test(listingError.message ?? '')) {
+      const withoutDuration = { ...listingPayload }
+      delete withoutDuration.duration_mins
+      ;({ error: listingError } = await supabase.from('listings').insert(withoutDuration))
+    }
 
     if (listingError) {
       setLoading(false)
