@@ -120,6 +120,7 @@ description text
 category text
 price_per_person integer  -- cents, e.g. $20 = 2000
 max_guests integer
+duration_mins integer     -- length of sessions added from now on; each session row keeps its own copy
 area text                 -- FK → planning_areas.name; public planning area, e.g. "Tampines"
 full_address text         -- intended to be revealed only after confirmed booking
 photo_urls text[]
@@ -129,6 +130,8 @@ created_at timestamp
 ```
 
 `00016` FKs `area` to `planning_areas`. Unmatched existing values were set to null rather than guessed. Hosts pick from the 55 URA names; browse filters by region, not by area. Cards and listing detail still show the planning area name.
+
+`00018` adds `duration_mins` (at least 1). Existing listings take it from their latest non-cancelled session, else any session, else 60. Editing it changes sessions added afterwards. It does not rewrite `sessions.duration_mins`.
 
 `00001` still `GRANT ALL` on `listings` to anon and authenticated. Public pages do not SELECT `full_address`, but a crafted query against an active listing can still read the column. P0.7 is incomplete at the data layer. See BUILD_BACKLOG.
 
@@ -157,7 +160,7 @@ created_at timestamp
 
 `completed` is never written. There is no session auto-complete job. `cancelled` is a soft-delete: `delete_empty_session` (`00012`) sets it when the listing owner removes an upcoming session that has no pending or confirmed bookings. Rows are never hard-deleted. There is no CHECK on status.
 
-Browse still uses `"Anyone can view open sessions"` (`status = 'open'`), so a cancelled session disappears from the listing page. Guests and hosts also read their own sessions in any status via `session_visible_to_me()` (`00009`), so a sold-out (`full`) session still appears on the dashboard; Hosting excludes `cancelled` in its query. Guests who booked an inactive listing read its title via `listing_booked_by_me()`. Clients have SELECT + INSERT on sessions, no UPDATE (`00009`); changing status to `cancelled` is the RPC, not a client PATCH.
+Browse still uses `"Anyone can view open sessions"` (`status = 'open'`), so a cancelled session disappears from the listing page. Guests and hosts also read their own sessions in any status via `session_visible_to_me()` (`00009`), so a sold-out (`full`) session still appears on the dashboard; Hosting excludes `cancelled` in its query. Guests who booked an inactive listing read its title via `listing_booked_by_me()`. Clients have SELECT + INSERT on sessions, no UPDATE (`00009`); changing status to `cancelled` is the RPC, not a client PATCH. New sessions go through `add_listing_session` (`00018`). A before-insert trigger still refuses an overlapping INSERT that skips the function. A session occupies `[starts_at, starts_at + duration)`; a session that starts when another ends is allowed. Cancelled rows do not count. The same start and duration as an open or full session adds spots to that row and sets it back to `open`.
 
 ### bookings
 
@@ -325,6 +328,7 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 - `listing_ratings(listing_ids)` — average and `review_count` per listing, same reviews → bookings → sessions join as `reviews_for_listing`, `role = 'guest'`. Listings with no guest reviews are omitted. Granted to anon and authenticated. Home and the profile Listings tab call it once with every listing id on the page.
 - `guest_can_leave_review(booking_id, reviewer_id, reviewee_id)` — INSERT gate for guest reviews. Security definer. Requires confirmed booking, session ended, reviewer is the guest, reviewee is the listing host.
 - `delete_empty_session(session_id)` — listing owner only. Soft-deletes an upcoming session (`status = 'cancelled'`) when no booking on it is pending or confirmed. Never hard-deletes. Revoked from anon.
+- `add_listing_session(listing_id, starts_at, spots)` — listing owner, and `can_create_listing()` (`00018`). Duration comes from the listing, not the caller. Locks the listing, then either adds spots to the open or full session with that exact start and duration, or inserts one open session. Overlaps raise. A start time that is not in the future raises. Revoked from anon. Direct INSERT is still granted; `sessions_reject_overlap` enforces the same overlap rule.
 - `delete_listing(listing_id)` — listing owner only (`00015`, argument `p_listing_id`). Soft-deletes with `is_active = false`. Refuses if any upcoming session has a pending or confirmed booking; otherwise also sets that listing's empty upcoming sessions to `cancelled`, in one transaction. Revoked from anon. The client no longer PATCHes `is_active` for this path.
 - `reviews_for_host(host_id)` — guest reviews this user has received as a host, with listing title. Security definer so the public profile does not embed `bookings`. Does not return reviews they wrote as a guest. Reviewer name is `display_name` in jsonb `users.full_name`, same shape as `reviews_for_listing` (`00014`).
 - `confirm_paid_booking(...)` and `confirm_booking` wrapper — flip pending → confirmed and decrement `spots_remaining` atomically under a row lock. **Service role only.** Requires `sessions.status = 'open'` (`00012`). The Stripe webhook calls `confirm_paid_booking`. If spots are gone or the session is not open (including cancelled), the webhook refunds instead of confirming.
@@ -416,7 +420,8 @@ supabase/migrations/
 ├── 00014_display_name.sql
 ├── 00015_listing_ratings_and_delete_listing.sql
 ├── 00016_planning_areas.sql
-└── 00017_terms_accepted_at.sql
+├── 00017_terms_accepted_at.sql
+└── 00018_listing_duration_and_session_overlap.sql
 
 supabase/functions/
 ├── _shared/
@@ -532,8 +537,8 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 4. **The outcome is recorded.** For Stripe Identity, `stripe-webhook` handles `identity.verification_session.verified` and `.requires_input`. A `requires_input` event is only treated as a failure when it carries a `last_error`, since a fresh session sits in that status. The failure code maps to host-readable copy in `IDENTITY_FAILURE_REASONS`; `consent_declined` and `country_not_supported` point at manual review, because an automated check cannot help there.
 
    For manual submissions, Caleb reviews at `/admin/verifications`: both documents side by side, approve, or reject with a reason. Both paths call `review_verification` (`00007`, service role only), which writes the decision, the reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record, and `method` records which route decided it. Whichever function made the decision emails the host. A rejected host also sees the reason on `/verify-identity` when they try again.
-5. **Creates the listing.** Title, description, category, price in cents, max guests, a URA planning area (searchable dropdown), private full address, up to 5 photos, what's provided. Inserts into `listings`, sets `is_host = true`, navigates to `/dashboard` (which redirects to `/bookings`, then the own-profile Bookings tab). **Does not create the first session in the same form.** No photography guidance. No T&C checkbox.
-6. **Adds a session** from the Hosting tab “Add session”. Date, time, duration, spots. `spots_total` and `spots_remaining` both set to the entered number, `status = 'open'`. The new row appears under Upcoming Hosted Sessions even with zero bookings. An empty upcoming session can be removed with Delete, which calls `delete_empty_session` and sets `status = 'cancelled'` (no strike, no refund). A session with pending or confirmed bookings has Cancel instead, not Delete.
+5. **Creates the listing.** Title, description, category, price in cents, max guests, duration in minutes, a URA planning area (searchable dropdown), private full address, up to 5 photos, what's provided. Inserts into `listings`, sets `is_host = true`, navigates to `/dashboard` (which redirects to `/bookings`, then the own-profile Bookings tab). **Does not create the first session in the same form.** No photography guidance. No T&C checkbox.
+6. **Adds a session** from the Hosting tab “Add session”. Date, time, and spots. The length shown is the listing's `duration_mins`. The call is `add_listing_session`. The same start time as an existing open or full session of that length adds the spots onto it (and reopens it if it was full). Any other overlap is refused, including a session that starts during another one. A session that starts when another ends is allowed. A new row appears under Upcoming Hosted Sessions even with zero bookings. An empty upcoming session can be removed with Delete, which calls `delete_empty_session` and sets `status = 'cancelled'` (no strike, no refund). A session with pending or confirmed bookings has Cancel instead, not Delete.
 7. **Payout setup.** Hosting “Set up payouts” → `create-account-link` → Stripe Express onboarding. Account Link `return_url`/`refresh_url` still use `/dashboard?connect=`, which redirects to `/hosting?connect=`, then `/u/:id?connect=&tab=hosting`. Book stays disabled for guests until `stripe_payouts_enabled`.
 8. **Receives bookings.** Email from `stripe-webhook` after confirmation, with guest name, session details, guest count.
 9. **Edits and deletes.** `EditListing.jsx` checks `host_id = current user`. The Hosting listing row opens Edit when tapped. Delete is in the ⋯ menu and goes through `delete_listing`: owner only, refuses if any upcoming session has a pending or confirmed booking, otherwise `is_active = false` and empty upcoming sessions become `cancelled`.

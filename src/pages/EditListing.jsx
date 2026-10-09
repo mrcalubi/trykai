@@ -26,6 +26,7 @@ export default function EditListing() {
   const [category, setCategory] = useState('')
   const [price, setPrice] = useState('')
   const [maxGuests, setMaxGuests] = useState('')
+  const [durationMins, setDurationMins] = useState('')
   const [area, setArea] = useState('')
   const [fullAddress, setFullAddress] = useState('')
   const [whatsProvided, setWhatsProvided] = useState([])
@@ -61,6 +62,7 @@ export default function EditListing() {
       setCategory(data.category)
       setPrice(centsToDollars(data.price_per_person))
       setMaxGuests(String(data.max_guests))
+      setDurationMins(data.duration_mins != null ? String(data.duration_mins) : '')
       setArea(data.area ?? '')
       setFullAddress(data.full_address)
       setWhatsProvided(data.whats_provided?.length ? data.whats_provided : [])
@@ -150,6 +152,7 @@ export default function EditListing() {
 
     const priceCents = Math.round(parseFloat(price) * 100)
     const guests = parseInt(maxGuests, 10)
+    const duration = parseInt(durationMins, 10)
 
     if (!title.trim() || !description.trim() || !category || !area || !fullAddress.trim()) {
       setError('Please fill in all required fields.')
@@ -163,6 +166,11 @@ export default function EditListing() {
 
     if (Number.isNaN(guests) || guests < 1) {
       setError('Max guests must be at least 1.')
+      return
+    }
+
+    if (Number.isNaN(duration) || duration < 1) {
+      setError('Duration must be at least 1 minute.')
       return
     }
 
@@ -193,6 +201,7 @@ export default function EditListing() {
         category,
         price_per_person: priceCents,
         max_guests: guests,
+        duration_mins: duration,
         area,
         full_address: fullAddress.trim(),
         whats_provided: provided,
@@ -302,6 +311,22 @@ export default function EditListing() {
               />
             </label>
           </div>
+
+          <label className="label">
+            Duration (mins)
+            <input
+              type="number"
+              value={durationMins}
+              onChange={(e) => setDurationMins(e.target.value)}
+              placeholder="60"
+              min="1"
+              required
+              className="input"
+            />
+          </label>
+          <span className="hint">
+            New sessions use this length. Sessions already added keep theirs.
+          </span>
 
           <label className="label">
             Area

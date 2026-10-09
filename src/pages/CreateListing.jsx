@@ -22,6 +22,7 @@ export default function CreateListing() {
   const [category, setCategory] = useState('')
   const [price, setPrice] = useState('')
   const [maxGuests, setMaxGuests] = useState('')
+  const [durationMins, setDurationMins] = useState('')
   const [area, setArea] = useState('')
   const [fullAddress, setFullAddress] = useState('')
   const [whatsProvided, setWhatsProvided] = useState([])
@@ -134,6 +135,7 @@ export default function CreateListing() {
 
     const priceCents = Math.round(parseFloat(price) * 100)
     const guests = parseInt(maxGuests, 10)
+    const duration = parseInt(durationMins, 10)
 
     if (!title.trim() || !description.trim() || !category || !area || !fullAddress.trim()) {
       setError('Please fill in all required fields.')
@@ -147,6 +149,11 @@ export default function CreateListing() {
 
     if (Number.isNaN(guests) || guests < 1) {
       setError('Max guests must be at least 1.')
+      return
+    }
+
+    if (Number.isNaN(duration) || duration < 1) {
+      setError('Duration must be at least 1 minute.')
       return
     }
 
@@ -175,6 +182,7 @@ export default function CreateListing() {
       category,
       price_per_person: priceCents,
       max_guests: guests,
+      duration_mins: duration,
       area,
       full_address: fullAddress.trim(),
       whats_provided: provided,
@@ -303,6 +311,20 @@ export default function CreateListing() {
               />
             </label>
           </div>
+
+          <label className="label">
+            Duration (mins)
+            <input
+              type="number"
+              value={durationMins}
+              onChange={(e) => setDurationMins(e.target.value)}
+              placeholder="60"
+              min="1"
+              required
+              className="input"
+            />
+          </label>
+          <span className="hint">How long every session of this listing lasts.</span>
 
           <label className="label">
             Area

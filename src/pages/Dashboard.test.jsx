@@ -76,6 +76,7 @@ function makeMyListing(overrides = {}) {
     area: 'Bedok',
     category: 'Food',
     photo_urls: ['https://cdn.test/latte.jpg'],
+    duration_mins: 90,
     ...overrides,
   }
 }
@@ -535,44 +536,77 @@ describe('Dashboard add session', () => {
     await user.click(screen.getByRole('button', { name: 'Add session' }))
   }
 
-  function fillSession({ date = '2026-09-01', time = '10:30', duration = '90', spots = '4' } = {}) {
+  function fillSession({ date = '2099-09-01', time = '10:30', spots = '4' } = {}) {
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: date } })
     fireEvent.change(screen.getByLabelText('Time'), { target: { value: time } })
-    fireEvent.change(screen.getByLabelText('Duration (mins)'), { target: { value: duration } })
     fireEvent.change(screen.getByLabelText('Spots total'), { target: { value: spots } })
   }
+
+  it('shows the listing duration and does not ask for one', async () => {
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+
+    expect(screen.getByText('Each session is 90 minutes.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Duration (mins)')).not.toBeInTheDocument()
+  })
 
   it('stores the start time as UTC converted from Singapore time', async () => {
     const { user } = await renderHosting()
     await openSessionForm(user)
-    fillSession({ date: '2026-09-01', time: '10:30' })
+    fillSession({ date: '2099-09-01', time: '10:30' })
 
     await user.click(screen.getByRole('button', { name: 'Add session' }))
 
-    await waitFor(() => expect(supabase.__calls('sessions', 'insert')).toHaveLength(1))
-    expect(supabase.__lastCall('sessions', 'insert').payload).toEqual({
-      listing_id: 'listing-1',
-      starts_at: '2026-09-01T02:30:00.000Z',
-      duration_mins: 90,
-      spots_total: 4,
-      spots_remaining: 4,
-      status: 'open',
-    })
+    await waitFor(() =>
+      expect(supabase.rpc).toHaveBeenCalledWith('add_listing_session', {
+        p_listing_id: 'listing-1',
+        p_starts_at: '2099-09-01T02:30:00.000Z',
+        p_spots: 4,
+      })
+    )
+    expect(supabase.__calls('sessions', 'insert')).toHaveLength(0)
   })
 
-  it('opens a new session with every spot available', async () => {
+  it('sends the spot count and lets the database set the length', async () => {
     const { user } = await renderHosting()
     await openSessionForm(user)
     fillSession({ spots: '6' })
 
     await user.click(screen.getByRole('button', { name: 'Add session' }))
 
-    await waitFor(() => expect(supabase.__calls('sessions', 'insert')).toHaveLength(1))
-    const { spots_total: total, spots_remaining: remaining } = supabase.__lastCall(
-      'sessions',
-      'insert'
-    ).payload
-    expect(remaining).toBe(total)
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalled())
+    const [, args] = supabase.rpc.mock.calls.find(([name]) => name === 'add_listing_session')
+    expect(args.p_spots).toBe(6)
+    expect(args).not.toHaveProperty('duration_mins')
+  })
+
+  it('says when the same time was added onto the existing session', async () => {
+    supabase.rpc.mockImplementation(async (name) => {
+      if (name === 'add_listing_session') {
+        return {
+          data: {
+            action: 'merged',
+            spots_added: 4,
+            spots_remaining: 7,
+            starts_at: '2099-09-01T02:30:00.000Z',
+          },
+          error: null,
+        }
+      }
+      return { data: null, error: null }
+    })
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+    fillSession()
+
+    await user.click(screen.getByRole('button', { name: 'Add session' }))
+
+    expect(
+      await screen.findByText(
+        'Added 4 spots to the session on Tue, 1 Sept at 10:30 am. 7 spots left.'
+      )
+    ).toBeInTheDocument()
+    expect(screen.queryByLabelText('Date')).not.toBeInTheDocument()
   })
 
   it('rejects a session with no date or time', async () => {
@@ -581,16 +615,17 @@ describe('Dashboard add session', () => {
     fireEvent.submit(document.querySelector('.dashboard-card__form'))
 
     expect(await screen.findByText('Please enter a date and time.')).toBeInTheDocument()
-    expect(supabase.__calls('sessions', 'insert')).toHaveLength(0)
+    expect(supabase.rpc.mock.calls.some(([name]) => name === 'add_listing_session')).toBe(false)
   })
 
-  it('rejects a zero-minute session', async () => {
+  it('rejects a time that has already passed', async () => {
     const { user } = await renderHosting()
     await openSessionForm(user)
-    fillSession({ duration: '0' })
+    fillSession({ date: '2020-01-01', time: '10:30' })
     fireEvent.submit(document.querySelector('.dashboard-card__form'))
 
-    expect(await screen.findByText('Duration must be at least 1 minute.')).toBeInTheDocument()
+    expect(await screen.findByText('Choose a time in the future.')).toBeInTheDocument()
+    expect(supabase.rpc.mock.calls.some(([name]) => name === 'add_listing_session')).toBe(false)
   })
 
   it('rejects a session with no spots', async () => {
@@ -613,14 +648,28 @@ describe('Dashboard add session', () => {
   })
 
   it('keeps the form open and shows the error when the save fails', async () => {
-    supabase.__on('sessions', 'insert', { error: { message: 'overlapping session' } })
+    supabase.rpc.mockImplementation(async (name) => {
+      if (name === 'add_listing_session') {
+        return {
+          data: null,
+          error: {
+            message: 'That time overlaps the session on Fri, 9 Oct at 11:11 am (90 mins).',
+          },
+        }
+      }
+      return { data: null, error: null }
+    })
     const { user } = await renderHosting()
     await openSessionForm(user)
     fillSession()
 
     await user.click(screen.getByRole('button', { name: 'Add session' }))
 
-    expect(await screen.findByText('overlapping session')).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'That time overlaps the session on Fri, 9 Oct at 11:11 am (90 mins).'
+      )
+    ).toBeInTheDocument()
     expect(screen.getByLabelText('Date')).toBeInTheDocument()
   })
 })
