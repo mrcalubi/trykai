@@ -11,6 +11,8 @@ import {
   calculateHostFee,
   calculateHostPayout,
   confirmRpcErrorKind,
+  decideAbandonCheckout,
+  guestCancelDecision,
   discountedLessonCents,
   discountedPerPersonCents,
   groupDiscountRate,
@@ -22,6 +24,8 @@ import {
   isHostBookingOwnListing,
   prepareBooking,
   refundAmountForCancel,
+  shouldEmailCancellation,
+  unpaidCheckoutCancelPatch,
   roundUpToDollar,
   spotsToRestore,
 } from './booking.ts'
@@ -385,6 +389,105 @@ describe('oversell of a group booking', () => {
       }),
     ).toBe(charge.totalAmount)
     expect(spotsToRestore('confirmed', 3)).toBe(3)
+  })
+})
+
+describe('unpaid checkout cancel', () => {
+  it('refuses a guest cancel of a booking that was never paid', () => {
+    expect(guestCancelDecision('pending')).toEqual({
+      allow: false,
+      status: 400,
+      message: 'This checkout was never paid',
+    })
+    expect(guestCancelDecision('confirmed')).toEqual({ allow: true })
+  })
+
+  it('refuses a guest cancel of a row that is no longer cancellable', () => {
+    expect(guestCancelDecision('cancelled')).toEqual({
+      allow: false,
+      status: 400,
+      message: 'Booking cannot be cancelled',
+    })
+  })
+
+  it('marks an unpaid checkout cancelled with a zero refund', () => {
+    const guest = unpaidCheckoutCancelPatch()
+    expect(guest).toMatchObject({
+      status: 'cancelled',
+      cancelled_by: 'guest',
+      refund_amount: 0,
+    })
+    expect(Number.isNaN(Date.parse(guest.cancelled_at))).toBe(false)
+
+    expect(unpaidCheckoutCancelPatch('host')).toMatchObject({
+      status: 'cancelled',
+      cancelled_by: 'host',
+      refund_amount: 0,
+    })
+  })
+
+  it('does not email a cancellation for a never-paid row', () => {
+    expect(shouldEmailCancellation('pending')).toBe(false)
+    expect(shouldEmailCancellation('confirmed')).toBe(true)
+  })
+})
+
+describe('abandon-checkout', () => {
+  it('is 403 unless the caller JWT is the booking guest', () => {
+    expect(
+      decideAbandonCheckout({
+        callerId: null,
+        guestId: 'guest-1',
+        bookingStatus: 'pending',
+      }),
+    ).toEqual({ httpStatus: 403, error: 'Forbidden' })
+    expect(
+      decideAbandonCheckout({
+        callerId: 'other-guest',
+        guestId: 'guest-1',
+        bookingStatus: 'pending',
+      }),
+    ).toEqual({ httpStatus: 403, error: 'Forbidden' })
+    expect(
+      decideAbandonCheckout({
+        callerId: 'guest-1',
+        guestId: null,
+        bookingStatus: 'pending',
+      }),
+    ).toEqual({ httpStatus: 403, error: 'Forbidden' })
+    expect(
+      decideAbandonCheckout({
+        callerId: 'guest-1',
+        guestId: 'guest-1',
+        bookingStatus: 'pending',
+      }),
+    ).toEqual({ abandon: true })
+  })
+
+  it('leaves the booking untouched when the PaymentIntent has already succeeded', () => {
+    expect(
+      decideAbandonCheckout({
+        callerId: 'guest-1',
+        guestId: 'guest-1',
+        bookingStatus: 'pending',
+        intentStatus: 'succeeded',
+      }),
+    ).toEqual({ abandon: false, reason: 'payment_succeeded' })
+    expect(
+      decideAbandonCheckout({
+        callerId: 'guest-1',
+        guestId: 'guest-1',
+        bookingStatus: 'pending',
+        intentStatus: 'processing',
+      }),
+    ).toEqual({ abandon: false, reason: 'payment_succeeded' })
+    expect(
+      decideAbandonCheckout({
+        callerId: 'guest-1',
+        guestId: 'guest-1',
+        bookingStatus: 'confirmed',
+      }),
+    ).toEqual({ abandon: false, reason: 'not_pending' })
   })
 })
 

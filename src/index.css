@@ -2345,6 +2345,12 @@ body.lightbox-open {
   color: var(--text);
 }
 
+.guest-stepper__hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--accent);
+}
+
 .payment-agree {
   margin: 0;
   font-size: 13px;
@@ -2374,6 +2380,11 @@ body.lightbox-open {
   text-align: left;
   cursor: pointer;
   color: inherit;
+}
+
+.payment-rail--paynow {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
 }
 
 .payment-rail[aria-pressed='true'] {

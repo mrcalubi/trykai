@@ -1,6 +1,11 @@
 import Stripe from 'https://esm.sh/stripe@13.3.0?target=deno'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { refundAmountForCancel, spotsToRestore } from '../_shared/booking.ts'
+import {
+  guestCancelDecision,
+  refundAmountForCancel,
+  shouldEmailCancellation,
+  spotsToRestore,
+} from '../_shared/booking.ts'
 import { formatSessionDate, sendCancellationEmails } from '../_shared/email.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
 
@@ -213,15 +218,17 @@ Deno.serve(async (req) => {
         })
         const result = await cancelOneBooking(admin, { ...booking, sessions: { starts_at: session.starts_at, spots_remaining: 0 } }, 'host', refundAmount)
         if (result.error) return jsonResponse({ error: result.error }, 500)
-        await notifyCancellation(admin, {
-          cancelledBy: 'host',
-          refundAmount: result.refund_amount ?? refundAmount,
-          guestId: booking.guest_id,
-          hostId: listing?.host_id,
-          listingTitle: listing?.title,
-          sessionStartsAt: session.starts_at,
-          guestsCount: booking.guests_count,
-        })
+        if (shouldEmailCancellation(booking.status)) {
+          await notifyCancellation(admin, {
+            cancelledBy: 'host',
+            refundAmount: result.refund_amount ?? refundAmount,
+            guestId: booking.guest_id,
+            hostId: listing?.host_id,
+            listingTitle: listing?.title,
+            sessionStartsAt: session.starts_at,
+            guestsCount: booking.guests_count,
+          })
+        }
         results.push(result)
       }
 
@@ -255,6 +262,11 @@ Deno.serve(async (req) => {
 
     if (error || !booking) return jsonResponse({ error: 'Booking not found' }, 404)
     if (booking.guest_id !== user.id) return textResponse('Forbidden', 403)
+
+    const decision = guestCancelDecision(booking.status)
+    if (!decision.allow) {
+      return jsonResponse({ error: decision.message }, decision.status ?? 400)
+    }
 
     const session = asRecord(booking.sessions)
     if (!session?.starts_at || new Date(session.starts_at) <= new Date()) {

@@ -42,8 +42,9 @@ describe('formatCents', () => {
     expect(formatCents(1)).toBe('$0.01')
   })
 
-  it('formats large amounts without grouping separators', () => {
-    expect(formatCents(1234567)).toBe('$12345.67')
+  it('groups thousands the way a guest reads a price', () => {
+    expect(formatCents(1234567)).toBe('$12,345.67')
+    expect(formatCents(135800)).toBe('$1,358')
   })
 })
 

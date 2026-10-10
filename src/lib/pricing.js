@@ -74,11 +74,36 @@ export function formatCheckoutPrice(
   )
 }
 
-export function groupPriceLabel(pricePerPersonCents, guestsCount, groupPricing = true) {
+export function allInEachCents(
+  pricePerPersonCents,
+  guestsCount = 1,
+  groupPricing = true,
+  rail = 'card',
+) {
+  const total = checkoutPriceCents(pricePerPersonCents, rail, guestsCount, groupPricing)
+  return Math.round(total / Math.max(guestsCount, 1))
+}
+
+export function groupPriceLabel(
+  pricePerPersonCents,
+  guestsCount,
+  groupPricing = true,
+  rail = 'card',
+) {
   const each = formatCents(
-    discountedPerPersonCents(pricePerPersonCents, guestsCount, groupPricing),
+    allInEachCents(pricePerPersonCents, guestsCount, groupPricing, rail),
   )
   const rate = groupDiscountRate(guestsCount, groupPricing)
+  if (guestsCount <= 1) return `${each} per person`
   if (rate === 0) return `${each} each`
-  return `${each} each, ${Math.round(rate * 100)}% group price`
+  return `${each} each · ${Math.round(rate * 100)}% group discount`
+}
+
+export function nextGroupTierHint(guestsCount, groupPricing, maxGuests) {
+  if (!groupPricing) return ''
+  if (guestsCount >= maxGuests) return ''
+  const nextRate = groupDiscountRate(guestsCount + 1, true)
+  const current = groupDiscountRate(guestsCount, true)
+  if (nextRate <= current) return ''
+  return `Add 1 more for ${Math.round(nextRate * 100)}% off`
 }

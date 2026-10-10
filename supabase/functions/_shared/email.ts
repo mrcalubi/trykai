@@ -1,8 +1,13 @@
 const RESEND_FROM = 'TryKai <no-reply@trykai.sg>'
 
 export function formatCents(cents: number): string {
-  const dollars = cents / 100
-  return dollars % 1 === 0 ? `$${dollars}` : `$${dollars.toFixed(2)}`
+  const dollars = Number(cents) / 100
+  if (!Number.isFinite(dollars)) return '$0'
+  const formatted = new Intl.NumberFormat('en-SG', {
+    minimumFractionDigits: dollars % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: dollars % 1 === 0 ? 0 : 2,
+  }).format(dollars)
+  return `$${formatted}`
 }
 
 export async function sendResendEmail(options: {

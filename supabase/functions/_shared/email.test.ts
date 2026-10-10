@@ -189,6 +189,10 @@ describe('formatCents', () => {
   it('still renders zero as an amount', () => {
     expect(formatCents(0)).toBe('$0')
   })
+
+  it('groups thousands the way a guest reads a price', () => {
+    expect(formatCents(135800)).toBe('$1,358')
+  })
 })
 
 describe('cancellation emails', () => {
