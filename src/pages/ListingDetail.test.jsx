@@ -633,13 +633,19 @@ describe('ListingDetail booking', () => {
 
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
     const paynow = screen.getByRole('button', { name: /PayNow/ })
-    const card = screen.getByRole('button', { name: /Card · Credit or debit card/ })
+    const card = screen.getByRole('button', { name: /^Card/ })
     expect(paynow.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(paynow).toHaveClass('payment-rail--paynow')
-    expect(paynow).toHaveTextContent('Best price')
+    expect(paynow).toHaveTextContent('Save 5%')
+    expect(paynow).not.toHaveTextContent('Best price')
+    expect(paynow).not.toHaveTextContent('·')
     expect(paynow).toHaveTextContent('$51')
     expect(paynow).toHaveTextContent('$48.45')
     expect(card).toHaveTextContent('$51')
+    expect(card).not.toHaveTextContent('Credit or debit card')
+    expect(screen.getAllByRole('heading', { name: 'Complete your booking' })).toHaveLength(1)
+    expect(screen.queryByText('Pick a date, then a time')).not.toBeInTheDocument()
+    expect(document.querySelector('.detail-booking-card__note')).not.toBeInTheDocument()
   })
 
   it('asks the edge function for a card payment intent after the guest picks a rail', async () => {
@@ -653,7 +659,7 @@ describe('ListingDetail booking', () => {
     await user.click(await screen.findByRole('button', { name: 'Book' }))
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
 
-    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
     expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
@@ -671,7 +677,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     expect(await screen.findByTestId('stripe-elements')).toBeInTheDocument()
     expect(screen.getByText('Total: $51')).toBeInTheDocument()
@@ -688,7 +694,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     expect(await screen.findByText('The price has changed. Please refresh.')).toBeInTheDocument()
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
@@ -709,7 +715,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     expect(await screen.findByText('Failed to fetch')).toBeInTheDocument()
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
@@ -729,7 +735,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     expect(await screen.findByText('This host cannot take bookings yet.')).toBeInTheDocument()
   })
@@ -760,7 +766,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     expect(await screen.findByText('Not enough spots')).toBeInTheDocument()
   })
@@ -771,7 +777,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     expect(await screen.findByText('Failed to start payment. Please try again.')).toBeInTheDocument()
   })
@@ -829,6 +835,43 @@ describe('ListingDetail booking', () => {
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
   })
 
+  it('shows an $8 rail total without a thousands separator', async () => {
+    givenListing(makeListing({ price_per_person: 550 }))
+    givenSignedIn()
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.getByRole('button', { name: /^Card/ })).toHaveTextContent('$8')
+    expect(screen.getByRole('button', { name: /PayNow/ })).toHaveTextContent('$8')
+    expect(screen.getByRole('button', { name: /PayNow/ }).querySelector('.price__group')).toBeNull()
+  })
+
+  it('renders a $9,999 rail total with the comma in the body font', async () => {
+    givenListing(makeListing({ price_per_person: 892768 }))
+    givenSignedIn()
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.getByRole('button', { name: /^Card/ })).toHaveTextContent('$9,999')
+    expect(screen.getByRole('button', { name: /PayNow/ }).querySelector('.price__group')).toHaveTextContent(',')
+  })
+
+  it('hides the next-tier button when group pricing is off', async () => {
+    givenListing(makeListing({ price_per_person: 2500, group_pricing: false }))
+    givenSessions([makeSession({ id: 'session-7', spots_remaining: 4 })])
+    givenSignedIn()
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.queryByRole('button', { name: /Add 1 more/ })).not.toBeInTheDocument()
+  })
+
+  it('hides the next-tier button when only one seat remains', async () => {
+    givenListing(makeListing({ price_per_person: 2500 }))
+    givenSessions([makeSession({ id: 'session-7', spots_remaining: 1 })])
+    givenSignedIn()
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.queryByRole('button', { name: /Add 1 more/ })).not.toBeInTheDocument()
+  })
+
   it('updates the live per-person price when more guests are added', async () => {
     givenListing(makeListing({ price_per_person: 2500 }))
     givenSessions([makeSession({ id: 'session-7', spots_remaining: 4 })])
@@ -838,15 +881,19 @@ describe('ListingDetail booking', () => {
     await user.click(await screen.findByRole('button', { name: 'Book' }))
 
     expect(screen.getByText('$28 per person')).toBeInTheDocument()
-    expect(screen.getByText('Add 1 more for 5% off')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Card · Credit or debit card/ })).toHaveTextContent('$28')
+    expect(screen.getByRole('button', { name: 'Add 1 more for 5% off' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Card/ })).toHaveTextContent('$28')
 
-    await user.click(screen.getByRole('button', { name: 'More guests' }))
-    await user.click(screen.getByRole('button', { name: 'More guests' }))
-    await user.click(screen.getByRole('button', { name: 'More guests' }))
+    await user.click(screen.getByRole('button', { name: 'Add 1 more for 5% off' }))
+    expect(screen.getByText('$27 each · 5% group discount')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add 1 more for 10% off' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Add 1 more for 10% off' }))
+    await user.click(screen.getByRole('button', { name: 'Add 1 more for 15% off' }))
 
     expect(screen.getByText('$24 each · 15% group discount')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Card · Credit or debit card/ })).toHaveTextContent('$96')
+    expect(screen.queryByRole('button', { name: /Add 1 more/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Card/ })).toHaveTextContent('$96')
     expect(screen.getByRole('button', { name: /PayNow/ })).toHaveTextContent('$96')
     expect(screen.getByRole('button', { name: /PayNow/ })).toHaveTextContent('$91.20')
   })
@@ -864,7 +911,7 @@ describe('ListingDetail booking', () => {
     await screen.findByText(/spots left/)
     await user.click(await screen.findByRole('button', { name: 'Book' }))
     await user.click(screen.getByRole('button', { name: 'More guests' }))
-    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
     expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
@@ -902,7 +949,7 @@ describe('ListingDetail checkout', () => {
     const utils = renderPage()
     await screen.findByText(/spots left/)
     await utils.user.click(await screen.findByRole('button', { name: 'Book' }))
-    await utils.user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
+    await utils.user.click(await screen.findByRole('button', { name: /^Card/ }))
     await screen.findByTestId('stripe-elements')
     return utils
   }

@@ -35,3 +35,6 @@ blob-report
 
 # Generated documents (rebuild with the generators in scripts/)
 *.docx
+
+# Supabase CLI local cache (project ref, versions, pooler URL)
+supabase/.temp/
