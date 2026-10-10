@@ -269,15 +269,18 @@ Deno.serve(async (req) => {
     const result = await cancelOneBooking(admin, { ...booking, sessions: session }, 'guest', refundAmount)
     if (result.error) return jsonResponse({ error: result.error }, 500)
 
-    const listing = asRecord(session.listings)
-    await notifyCancellation(admin, {
-      cancelledBy: 'guest',
-      refundAmount: result.refund_amount ?? refundAmount,
-      guestId: booking.guest_id,
-      hostId: listing?.host_id,
-      listingTitle: listing?.title,
-      sessionStartsAt: session.starts_at,
-    })
+    // A pending row was never charged. Don't email a refund that does not exist.
+    if (booking.status !== 'pending') {
+      const listing = asRecord(session.listings)
+      await notifyCancellation(admin, {
+        cancelledBy: 'guest',
+        refundAmount: result.refund_amount ?? refundAmount,
+        guestId: booking.guest_id,
+        hostId: listing?.host_id,
+        listingTitle: listing?.title,
+        sessionStartsAt: session.starts_at,
+      })
+    }
     return jsonResponse(result)
   } catch (err) {
     return jsonResponse({ error: err.message }, 500)
