@@ -121,6 +121,7 @@ category text
 price_per_person integer  -- cents, e.g. $20 = 2000
 max_guests integer
 duration_mins integer     -- length of sessions added from now on; each session row keeps its own copy
+group_pricing boolean default true  -- automatic group discount; host can turn off
 area text                 -- FK → planning_areas.name; public planning area, e.g. "Tampines"
 full_address text         -- intended to be revealed only after confirmed booking
 photo_urls text[]
@@ -132,6 +133,8 @@ created_at timestamp
 `00016` FKs `area` to `planning_areas`. Unmatched existing values were set to null rather than guessed. Hosts pick from the 55 URA names; browse filters by region, not by area. Cards and listing detail still show the planning area name.
 
 `00018` adds `duration_mins` (at least 1). Existing listings take it from their latest non-cancelled session, else any session, else 60. Editing it changes sessions added afterwards. It does not rewrite `sessions.duration_mins`.
+
+`00020` adds `group_pricing` (default true). Checkout discounts the lesson price per person when this is on: 5% for 2 guests, 10% for 3, 15% for 4, 20% for 5 or more. Never more than 20%. The host can turn it off on Create and Edit listing.
 
 `00001` still `GRANT ALL` on `listings` to anon and authenticated. Public pages do not SELECT `full_address`, but a crafted query against an active listing can still read the column. P0.7 is incomplete at the data layer. See BUILD_BACKLOG.
 
@@ -266,13 +269,15 @@ Also decided but **not yet built**: reschedule, once per booking, same 48 hour c
 
 *Decided 23 August 2026. See DECISIONS.md for the full modelling and rationale. Code of record:* `supabase/functions/_shared/booking.ts` *and* `src/lib/pricing.js`*.*
 
-**Guest fee.** Card fee is 12% of the lesson price with a S$2.50 floor, then the total is rounded UP to the nearest whole dollar so it can never dip below the floor. This all in total is shown identically from the browse card through to card checkout, the price never rises between viewing and paying.
+**Guest fee.** Card fee is 12% of the lesson total with a S$2.50 floor, then the total is rounded UP to the nearest whole dollar so it can never dip below the floor. Browse cards still show the one-person card all-in so the price never rises between viewing and paying. Checkout recomputes from `guests_count` and the listing's `group_pricing` flag; `create-payment-intent` ignores any client total.
 
-**PayNow.** Shown as a flat 5% discount off that same all in total, displayed prominently at checkout and never before, as a bold percentage. The price only ever gets cheaper than advertised, never more expensive.
+**Group pricing.** When `listings.group_pricing` is true (the default), the lesson price per person is discounted then multiplied by guests, in integer cents: 5% for 2, 10% for 3, 15% for 4, 20% for 5 or more. Never more than 20%. The card fee and the PayNow 5% apply once to that discounted lesson total. A group booking is one booking row.
 
-**Host fee.** 10% of the lesson, triggered per host: every non founding host's first three **confirmed** bookings are free, their fourth booking onward pays the fee. Founding hosts (`is_founding_host`) never pay.
+**PayNow.** Shown as a flat 5% discount off the card all-in total for that guest count, displayed at checkout only.
 
-Do not hardcode a flat percentage. Worked checks: $10 → $13, $20 → $23, $25 → $28, $30 → $34, $40 → $45. PayNow example: $25 lesson → $26.60.
+**Host fee.** 10% of the discounted lesson total, triggered per host: every non founding host's first three **confirmed** bookings are free, their fourth booking onward pays the fee. A group booking counts as one toward those three. Founding hosts (`is_founding_host`) never pay.
+
+Do not hardcode a flat percentage. Worked one-person checks: $10 → $13, $20 → $23, $25 → $28, $30 → $34, $40 → $45. PayNow example: $25 lesson → $26.60. Code of record is `booking.ts` and `pricing.js`; they must agree.
 
 ---
 
@@ -351,7 +356,8 @@ src/
 │   ├── supabase.js              # Supabase client init
 │   ├── authedUser.js            # RequireAuth context: useAuthedUserId
 │   ├── cancellationPolicy.js    # Four-tier guest refund copy + arithmetic
-│   ├── pricing.js               # All-in card / PayNow prices shown in the UI
+│   ├── pricing.js               # All-in card / PayNow prices; wraps booking.ts group helpers
+│   ├── duration.js              # Hours and minutes, never "390 mins"
 │   ├── reviewGate.js            # Guest review eligibility (confirmed + session ended)
 │   ├── firstName.js             # Fallback split of full_name
 │   ├── publicName.js            # Public surfaces: display_name, else firstName(full_name)
@@ -421,11 +427,13 @@ supabase/migrations/
 ├── 00015_listing_ratings_and_delete_listing.sql
 ├── 00016_planning_areas.sql
 ├── 00017_terms_accepted_at.sql
-└── 00018_listing_duration_and_session_overlap.sql
+├── 00018_listing_duration_and_session_overlap.sql
+├── 00019_unpaid_checkouts.sql
+└── 00020_group_pricing.sql
 
 supabase/functions/
 ├── _shared/
-│   ├── booking.ts               # Guest charge, host fee, refunds
+│   ├── booking.ts               # Guest charge, group discount, host fee, refunds
 │   ├── http.ts                  # JSON/CORS/secret helpers
 │   ├── connect.ts               # Express account v2 helpers
 │   ├── email.ts                 # Resend helper + booking and cancellation HTML
@@ -515,7 +523,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 **5. Phone verification.** OTP required before booking, per progressive disclosure. **Not built.**
 
-**6. Checkout.** `guests_count` is hardcoded to 1. Guest picks Card or PayNow (5% off, shown only here) *before* `create-payment-intent`. The function creates a pending booking, then a PaymentIntent locked to that rail. No host email is sent here.
+**6. Checkout.** Guest picks 1 to N guests, N = min(spots remaining, 10). The per-person lesson price updates live when group pricing is on. Guest then picks Card or PayNow (5% off that card total) *before* `create-payment-intent`. The function recomputes the price from `guests_count` and listing settings and ignores any client total. It creates a pending booking, then a PaymentIntent locked to that rail. No host email is sent here. `confirm_paid_booking` decrements spots by `guests_count`; if not enough remain, the whole booking is refunded. Cancellation is the whole booking only, same four refund tiers.
 
 **7. Payment.** Payment Element `confirmPayment` uses `return_url=/dashboard?booking=<id>`. `stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, freezes host fee/payout, emails guest and host via `_shared/email.ts`. Failed/canceled intents mark the pending row cancelled without touching spots. Oversell refunds immediately, including when confirm finds the session cancelled or otherwise not `open`. `account.updated` syncs `stripe_payouts_enabled`.
 
@@ -579,13 +587,13 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **ResetPassword.jsx** — public. Shows the new-password form only for a genuine recovery (`type=recovery` in the landing URL or `PASSWORD_RECOVERY`). Expired or missing recovery shows a link back to `/forgot-password`. `updateUser({ password })` then goes to `/bookings` (which redirects to the own-profile Bookings tab).
 
-**ListingDetail.jsx** — listing, gallery (swipe on phone, mosaic from 1024px), host display name/avatar high under the area (links to `/u/:hostId`; falls back to first name), host rating as `★ average · N reviews` (`HostRating`, star in `--star`) across all their listings (hidden when none), open future sessions, collapsible cancellation policy, guest reviews for this listing via `reviews_for_listing` (not a bookings embed; reviewer display names from the RPC), Card vs PayNow checkout. Two columns with a sticky booking card from 1024px. `guests_count` always 1. `full_address` only via RPC after a confirmed booking.
+**ListingDetail.jsx** — listing, gallery (swipe on phone, mosaic from 1024px), host display name/avatar high under the area (links to `/u/:hostId`; falls back to first name), host rating as `★ average · N reviews` (`HostRating`, star in `--star`) across all their listings (hidden when none), open future sessions, collapsible cancellation policy, guest reviews for this listing via `reviews_for_listing` (not a bookings embed; reviewer display names from the RPC), guest stepper (1 to min(spots remaining, 10)) with live per-person group price, Card vs PayNow checkout, booking-terms line above the pay buttons. Duration is shown as hours and minutes (`6 hr 30 min`), never a raw minute count. Two columns with a sticky booking card from 1024px. `full_address` only via RPC after a confirmed booking.
 
 **Profile.jsx** — `/u/:id` is public. Avatar, display name (first name if `display_name` is empty), ID-verified badge if `verification_status = 'approved'`, host rating as `★ average · N reviews` (`HostRating`, star in `--star`) across all listings (hidden when none). Other people's profiles show stacked active listings (browse `Card`s, with `listing_ratings` once for those ids) and reviews received as a host via `reviews_for_host`. Does not show reviews they wrote as a guest. Your own profile adds a gear to `/settings` and a horizontally scrolling tab bar (overflow-x, no visible scrollbar): Bookings (default), Hosting (hosts only), Listings, Reviews. The active tab is `?tab=`. Bookings and Hosting are the existing page components mounted as panels (`embedded` hides their Dashboard heading). A non-host's own Listings tab is a Become a host prompt to `/create-listing`.
 
-**CreateListing.jsx** — auth required. Verification gate. Planning area is a searchable dropdown of the 55 URA names (`PlanningAreaSelect`). Listing insert then `is_host = true`, then `/dashboard` (redirects to `/bookings`, then the own-profile Bookings tab). CancellationPolicyInfo on the form. First session is a separate Hosting-tab action.
+**CreateListing.jsx** — auth required. Verification gate. Planning area is a searchable dropdown of the 55 URA names (`PlanningAreaSelect`). Group-pricing toggle (default on). Required "I agree to the Host terms" checkbox linking to `/terms#part-2-hosting`; submit stays disabled until it is ticked. Listing insert then `is_host = true`, then `/dashboard` (redirects to `/bookings`, then the own-profile Bookings tab). CancellationPolicyInfo on the form. First session is a separate Hosting-tab action.
 
-**EditListing.jsx** — auth required, ownership checked, pre fills including `full_address`, planning area, and existing photos.
+**EditListing.jsx** — auth required, ownership checked, pre fills including `full_address`, planning area, existing photos, and the group-pricing toggle.
 
 **VerifyIdentity.jsx** — Stripe Identity first. Manual fallback uploads to the private bucket, then `submit_verification` with consent. Pending users see an under review message. A rejection reason from either path is shown on resubmit.
 
@@ -593,9 +601,9 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **RedirectToOwnProfile.jsx** — auth required. `/bookings` → `/u/:id?tab=bookings`; `/hosting` → `/u/:id?tab=hosting`. Copies every existing query key (so `?booking=` polling and `?connect=` from Stripe still work).
 
-**Bookings.jsx** — guest: upcoming and past bookings, Cancel with calculated refund shown, leave review after the session ends on confirmed only. Polls `?booking=` after Payment Element return, then drops only that key so `tab` stays. Mounted on the own-profile Bookings tab; `/bookings` itself is a redirect.
+**Bookings.jsx** — guest: upcoming and past bookings with guest count on each card, Cancel with calculated refund shown (whole booking only), leave review after the session ends on confirmed only. Polls `?booking=` after Payment Element return, then drops only that key so `tab` stays. Mounted on the own-profile Bookings tab; `/bookings` itself is a redirect.
 
-**Hosting.jsx** — host: My Listings heading with “+ New listing”; one card per row below 1024px, two from 1024px. Each card is a thumbnail plus title on one line (opens Edit), a ⋯ menu in the top-right corner (View listing, Edit, Delete), and a full-width Add session button below. Delete confirms through `delete_listing` (blocked copy when upcoming bookings exist). All upcoming non-cancelled sessions (Delete when empty, Cancel with strike warning when there are pending or confirmed bookings); Connect payout setup. Admins with `pending_count > 0` see a one-line “N verifications waiting · Review” banner. Reads `?connect=` then drops only that key. A signed-in user who is not a host is redirected to `/bookings` if this page is mounted directly. Mounted on the own-profile Hosting tab; `/hosting` itself is a redirect.
+**Hosting.jsx** — host: My Listings heading with “+ New listing”; one card per row below 1024px, two from 1024px. Each card is a thumbnail plus title on one line (opens Edit), a ⋯ menu in the top-right corner (View listing, Edit, Delete), and a full-width Add session button below. Delete confirms through `delete_listing` (blocked copy when upcoming bookings exist). All upcoming non-cancelled sessions show active booking count and guest count (Delete when empty, Cancel with strike warning when there are pending or confirmed bookings); Connect payout setup. Admins with `pending_count > 0` see a one-line “N verifications waiting · Review” banner. Reads `?connect=` then drops only that key. A signed-in user who is not a host is redirected to `/bookings` if this page is mounted directly. Mounted on the own-profile Hosting tab; `/hosting` itself is a redirect.
 
 **Settings.jsx** — auth required. Grouped as Profile (photo, display name, full name with hint "Private, never shown publicly.") and Account (email read-only, deletion contact line). Log out is a button at the bottom. `display_name` UPDATE granted in `00014`; `full_name` and `avatar_url` from `00005` after `00007` revoked verification fields. Linked from the gear on your own profile, not the hamburger or an avatar menu.
 
@@ -629,8 +637,8 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 **Not built, decided**
 
 - Phone OTP before booking
-- T&C checkboxes at create listing and checkout (signup is live)
-- Guest count picker (`guests_count` hardcoded to 1)
+- ~~T&C checkboxes at create listing and checkout (signup is live)~~ Signup, create listing (Host terms), and checkout (Booking terms + Cancellation Policy) are live
+- ~~Guest count picker (`guests_count` hardcoded to 1)~~ Live. Partial cancel ("remove a guest") is the first post-launch money item; see BUILD_BACKLOG
 - Catch-all 404
 - Photography guidance on create listing
 - Sort by newest / price / most reviewed (DECISIONS.md currently overclaims this as live)

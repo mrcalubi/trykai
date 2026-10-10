@@ -584,7 +584,7 @@ describe('Dashboard add session', () => {
     const { user } = await renderHosting()
     await openSessionForm(user)
 
-    expect(screen.getByText('Each session is 90 minutes.')).toBeInTheDocument()
+    expect(screen.getByText('Each session is 1 hr 30 min.')).toBeInTheDocument()
     expect(screen.queryByLabelText('Duration (mins)')).not.toBeInTheDocument()
   })
 
@@ -736,6 +736,7 @@ describe('Dashboard guest cancellation', () => {
     await renderBookings()
 
     expect(screen.getByText('Learn latte art with me')).toBeInTheDocument()
+    expect(screen.getByText(/1 guest/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
   })
 
@@ -744,7 +745,8 @@ describe('Dashboard guest cancellation', () => {
     await renderBookings()
 
     expect(screen.getByText('Unknown listing')).toBeInTheDocument()
-    expect(screen.getByText('Date TBC')).toBeInTheDocument()
+    expect(screen.getByText(/Date TBC/)).toBeInTheDocument()
+    expect(screen.getByText(/1 guest/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
   })
 
@@ -841,6 +843,7 @@ describe('Dashboard host cancellation', () => {
     await renderHosting()
 
     expect(within(sectionFor('Upcoming Hosted Sessions')).getByText('Latte art')).toBeInTheDocument()
+    expect(screen.getByText(/4 guests/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
   })
 
@@ -873,7 +876,7 @@ describe('Dashboard host cancellation', () => {
     })
     await renderHosting()
 
-    expect(screen.getByText(/0 active booking\(s\)/)).toBeInTheDocument()
+    expect(screen.getByText(/0 active booking\(s\) · 0 guests/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel session' })).not.toBeInTheDocument()
   })

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { CancellationPolicyInfo } from '../components/CancellationPolicy'
@@ -28,6 +28,8 @@ export default function CreateListing() {
   const [whatsProvided, setWhatsProvided] = useState([])
   const [photos, setPhotos] = useState([])
   const photosRef = useRef(photos)
+  const [groupPricing, setGroupPricing] = useState(true)
+  const [acceptedHostTerms, setAcceptedHostTerms] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -157,6 +159,11 @@ export default function CreateListing() {
       return
     }
 
+    if (!acceptedHostTerms) {
+      setError('Please agree to the Host terms.')
+      return
+    }
+
     const provided =
       whatsProvided.includes('None') || whatsProvided.length === 0
         ? []
@@ -183,6 +190,7 @@ export default function CreateListing() {
       price_per_person: priceCents,
       max_guests: guests,
       duration_mins: duration,
+      group_pricing: groupPricing,
       area,
       full_address: fullAddress.trim(),
       whats_provided: provided,
@@ -190,10 +198,11 @@ export default function CreateListing() {
       is_active: true,
     }
     let { error: listingError } = await supabase.from('listings').insert(listingPayload)
-    if (listingError && /duration_mins/.test(listingError.message ?? '')) {
-      const withoutDuration = { ...listingPayload }
-      delete withoutDuration.duration_mins
-      ;({ error: listingError } = await supabase.from('listings').insert(withoutDuration))
+    if (listingError && /duration_mins|group_pricing/.test(listingError.message ?? '')) {
+      const retry = { ...listingPayload }
+      if (/duration_mins/.test(listingError.message ?? '')) delete retry.duration_mins
+      if (/group_pricing/.test(listingError.message ?? '')) delete retry.group_pricing
+      ;({ error: listingError } = await supabase.from('listings').insert(retry))
     }
 
     if (listingError) {
@@ -332,6 +341,19 @@ export default function CreateListing() {
           </label>
           <span className="hint">How long every session of this listing lasts.</span>
 
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={groupPricing}
+              onChange={(e) => setGroupPricing(e.target.checked)}
+            />
+            Offer group pricing
+          </label>
+          <span className="hint">
+            5% off for 2 guests, up to 20% for 5 or more. Applies to the lesson
+            price per person.
+          </span>
+
           <label className="label">
             Area
             <PlanningAreaSelect value={area} onChange={setArea} required />
@@ -406,7 +428,19 @@ export default function CreateListing() {
 
           <CancellationPolicyInfo />
 
-          <button type="submit" disabled={loading} className="btn btn--primary">
+          <label className="checkbox-label checkbox-label--agree">
+            <input
+              type="checkbox"
+              checked={acceptedHostTerms}
+              onChange={(e) => setAcceptedHostTerms(e.target.checked)}
+              required
+            />
+            <span>
+              I agree to the <Link to="/terms#part-2-hosting">Host terms</Link>
+            </span>
+          </label>
+
+          <button type="submit" disabled={loading || !acceptedHostTerms} className="btn btn--primary">
             {loading ? (photos.length > 0 ? 'Uploading…' : 'Creating…') : 'Create listing'}
           </button>
         </form>

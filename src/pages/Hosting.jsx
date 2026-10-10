@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { formatCents } from '../lib/cancellationPolicy'
+import { formatDuration } from '../lib/duration'
 import Button from '../components/ui/Button'
 import OverflowMenu from '../components/ui/OverflowMenu'
 
@@ -510,6 +511,10 @@ export default function Hosting({ embedded = false }) {
             {hostSessions.map((session) => {
               const activeBookings = activeBookingsOn(session)
               const hasActiveBookings = activeBookings.length > 0
+              const guestTotal = activeBookings.reduce(
+                (sum, booking) => sum + (booking.guests_count || 0),
+                0,
+              )
 
               return (
               <div key={session.id} className="dashboard-card">
@@ -521,6 +526,8 @@ export default function Hosting({ embedded = false }) {
                   {' · '}
                   {activeBookings.length}{' '}
                   active booking(s)
+                  {' · '}
+                  {guestTotal === 1 ? '1 guest' : `${guestTotal} guests`}
                 </p>
                 <div className="booking-card__actions">
                   {hasActiveBookings && confirmCancelSessionId !== session.id && (
@@ -717,7 +724,7 @@ export default function Hosting({ embedded = false }) {
                       </label>
                     </div>
                     {Number.isInteger(listing.duration_mins) && listing.duration_mins >= 1 ? (
-                      <p className="hint">Each session is {listing.duration_mins} minutes.</p>
+                      <p className="hint">Each session is {formatDuration(listing.duration_mins)}.</p>
                     ) : (
                       <label className="label">
                         Duration (mins)

@@ -101,6 +101,7 @@ export function bookingCancelledGuestHtml(options: {
   sessionDate: string
   refundAmountCents: number
   cancelledBy: 'guest' | 'host'
+  guestsCount: number
 }): string {
   const who =
     options.cancelledBy === 'host'
@@ -109,6 +110,7 @@ export function bookingCancelledGuestHtml(options: {
   return `
     <h2>${who}</h2>
     <p>The session was <strong>${escapeHtml(options.listingTitle)}</strong> on ${escapeHtml(options.sessionDate)}.</p>
+    <p><strong>Guests:</strong> ${options.guestsCount}</p>
     <p><strong>Refund amount:</strong> ${formatCents(options.refundAmountCents)}</p>
     <p>Any refund goes back to your original payment method. Details are in your <a href="https://trykai.sg/dashboard">TryKai dashboard</a>.</p>
   `
@@ -118,11 +120,13 @@ export function bookingCancelledHostHtml(options: {
   guestName: string
   listingTitle: string
   sessionDate: string
+  guestsCount: number
 }): string {
   return `
     <h2>A guest cancelled</h2>
     <p><strong>${escapeHtml(options.guestName)}</strong> cancelled their booking for <strong>${escapeHtml(options.listingTitle)}</strong>.</p>
     <p><strong>Session:</strong> ${escapeHtml(options.sessionDate)}</p>
+    <p><strong>Guests:</strong> ${options.guestsCount}</p>
     <p>The spot is available again. See your <a href="https://trykai.sg/dashboard">TryKai dashboard</a>.</p>
   `
 }
@@ -141,6 +145,7 @@ export async function sendCancellationEmails(options: {
   guestEmail: string | null | undefined
   hostEmail: string | null | undefined
   guestName?: string | null
+  guestsCount: number
 }): Promise<void> {
   try {
     await sendResendEmail({
@@ -152,6 +157,7 @@ export async function sendCancellationEmails(options: {
         sessionDate: options.sessionDate,
         refundAmountCents: options.refundAmountCents,
         cancelledBy: options.cancelledBy,
+        guestsCount: options.guestsCount,
       }),
     })
     if (options.cancelledBy === 'guest') {
@@ -163,6 +169,7 @@ export async function sendCancellationEmails(options: {
           guestName: options.guestName || 'A guest',
           listingTitle: options.listingTitle,
           sessionDate: options.sessionDate,
+          guestsCount: options.guestsCount,
         }),
       })
     }

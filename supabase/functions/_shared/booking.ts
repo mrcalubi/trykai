@@ -10,13 +10,51 @@ export const CARD_FEE_FLOOR_CENTS = 250
 export const PAYNOW_DISCOUNT_RATE = 0.05
 export const HOST_FEE_RATE = 0.1
 export const HOST_FEE_FREE_BOOKINGS = 3
+export const MAX_GUESTS_PER_BOOKING = 10
+
+/** 0 / 5 / 10 / 15 / 20 percent. Never more than 20. */
+export function groupDiscountRate(
+  guestsCount: number,
+  groupPricing = true,
+): number {
+  if (!groupPricing || guestsCount <= 1) return 0
+  if (guestsCount === 2) return 0.05
+  if (guestsCount === 3) return 0.1
+  if (guestsCount === 4) return 0.15
+  return 0.2
+}
+
+export function discountedPerPersonCents(
+  pricePerPerson: number,
+  guestsCount: number,
+  groupPricing = true,
+): number {
+  const rate = groupDiscountRate(guestsCount, groupPricing)
+  return Math.round(pricePerPerson * (1 - rate))
+}
+
+/** Per-person after discount, times guests, in integer cents. */
+export function discountedLessonCents(
+  pricePerPerson: number,
+  guestsCount: number,
+  groupPricing = true,
+): number {
+  return (
+    discountedPerPersonCents(pricePerPerson, guestsCount, groupPricing) *
+    guestsCount
+  )
+}
 
 export const PAYMENT_RAILS = ['card', 'paynow'] as const
 export type PaymentRail = (typeof PAYMENT_RAILS)[number]
 
 export interface BookingSession {
   spots_remaining: number
-  listings?: { price_per_person?: number | null; host_id?: string | null } | null
+  listings?: {
+    price_per_person?: number | null
+    host_id?: string | null
+    group_pricing?: boolean | null
+  } | null
 }
 
 export interface GuestCharge {
@@ -111,7 +149,12 @@ export function spotsToRestore(status: string, guestsCount: number): number {
  * session at a fraction of its price.
  */
 export function isValidGuestsCount(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+  return (
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value >= 1 &&
+    value <= MAX_GUESTS_PER_BOOKING
+  )
 }
 
 /**
@@ -168,7 +211,8 @@ export function prepareBooking(
     return { ok: false, status: 400, message: 'Listing price unavailable' }
   }
 
-  const lessonAmount = pricePerPerson * guestsCount
+  const groupPricing = session.listings?.group_pricing !== false
+  const lessonAmount = discountedLessonCents(pricePerPerson, guestsCount, groupPricing)
   const charge = calculateGuestCharge(lessonAmount, paymentRail)
 
   return {
