@@ -118,13 +118,23 @@ a {
 
 .paynow-badge {
   display: inline-block;
-  padding: 4px 10px;
-  font-family: var(--mono);
+  flex-shrink: 0;
+  padding: 3px 8px;
+  font-family: var(--sans);
   font-size: 12px;
   font-weight: 700;
-  color: var(--accent);
-  background: var(--accent-bg);
+  line-height: 1.2;
+  color: var(--success);
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--success) 28%, transparent);
   border-radius: 999px;
+}
+
+.price__group {
+  font-family: var(--sans);
+  font-weight: 600;
+  letter-spacing: 0;
+  padding-inline: 0.16em;
 }
 
 /* Layout */
@@ -2046,6 +2056,7 @@ body.lightbox-open {
   color: var(--text-h);
   margin: 0 0 4px;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .detail-booking-card__unit {
@@ -2118,6 +2129,7 @@ body.lightbox-open {
   font-size: 15px;
   color: var(--text-h);
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .session-calendar {
@@ -2282,6 +2294,7 @@ body.lightbox-open {
   font-weight: 700;
   color: var(--text-h);
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .payment-form {
@@ -2346,9 +2359,24 @@ body.lightbox-open {
 }
 
 .guest-stepper__hint {
+  display: inline-flex;
+  align-self: flex-start;
   margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
   font-size: 13px;
-  color: var(--accent);
+  font-weight: 600;
+  color: var(--success);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.guest-stepper__hint:hover,
+.guest-stepper__hint:focus-visible {
+  color: var(--success);
 }
 
 .payment-agree {
@@ -2369,10 +2397,11 @@ body.lightbox-open {
 
 .payment-rail {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   width: 100%;
+  min-width: 0;
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -2383,8 +2412,8 @@ body.lightbox-open {
 }
 
 .payment-rail--paynow {
-  background: var(--accent-bg);
-  border-color: var(--accent-border);
+  background: var(--success-bg);
+  border-color: color-mix(in srgb, var(--success) 28%, transparent);
 }
 
 .payment-rail[aria-pressed='true'] {
@@ -2402,10 +2431,15 @@ body.lightbox-open {
   cursor: not-allowed;
 }
 
-.payment-rail__label {
+.payment-rail__row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
+}
+
+.payment-rail__name {
   font-weight: 600;
   color: var(--text-h);
 }
@@ -2416,19 +2450,32 @@ body.lightbox-open {
   font-size: 13px;
 }
 
-.payment-rail__price {
+.payment-rail__amounts {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-end;
+  align-self: flex-end;
+  gap: 4px;
+  min-width: 0;
+}
+
+.payment-rail__now {
   font-family: var(--mono);
   font-weight: 700;
   color: var(--text-h);
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
 .payment-rail__was {
+  font-family: var(--mono);
   font-weight: 400;
+  font-size: 13px;
   color: var(--muted);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
 .payout-setup {

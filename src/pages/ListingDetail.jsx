@@ -8,7 +8,7 @@ import HostRating from '../components/HostRating'
 import PhotoLightbox from '../components/PhotoLightbox'
 import SessionCalendar from '../components/SessionCalendar'
 import { CancellationPolicyCollapsible } from '../components/CancellationPolicy'
-import { formatCents } from '../lib/cancellationPolicy'
+import FormattedPrice from '../components/FormattedPrice'
 import {
   formatDayTitle,
   formatMonthTitle,
@@ -21,7 +21,6 @@ import {
 } from '../lib/sessionCalendar'
 import {
   checkoutPriceCents,
-  formatGuestFacingPrice,
   groupPriceLabel,
   guestFacingPriceCents,
   MAX_GUESTS_PER_BOOKING,
@@ -98,7 +97,7 @@ function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel, onPaymentFa
   return (
     <form onSubmit={handleSubmit} className="payment-form">
       <p className="payment-form__total">
-        Total: {formatCents(totalAmount)}
+        Total: <FormattedPrice cents={totalAmount} />
       </p>
       <PaymentElement />
       {error && <p className="error-message">{error}</p>}
@@ -509,7 +508,7 @@ export default function ListingDetail() {
             </div>
             <div className="session-card__actions">
               <span className="session-card__price">
-                {formatGuestFacingPrice(listing.price_per_person)}
+                <FormattedPrice cents={guestFacingPriceCents(listing.price_per_person)} />
               </span>
               <button
                 type="button"
@@ -636,14 +635,14 @@ export default function ListingDetail() {
         <aside className="detail-sidebar">
           <div className="detail-booking-card">
             <p className="detail-booking-card__price">
-              {formatCents(checkoutPrice)}
+              <FormattedPrice cents={checkoutPrice} />
               {!checkoutSessionId && (
                 <span className="detail-booking-card__unit"> / person</span>
               )}
             </p>
-            <p className="detail-booking-card__note">
-              {checkoutSessionId ? 'Complete your booking' : 'Pick a date, then a time'}
-            </p>
+            {!checkoutSessionId && (
+              <p className="detail-booking-card__note">Pick a date, then a time</p>
+            )}
 
             <CancellationPolicyCollapsible />
 
@@ -665,7 +664,9 @@ export default function ListingDetail() {
                         {formatDuration(checkoutSession.duration_mins)}
                       </p>
                     </div>
-                    <span className="session-card__price">{formatCents(checkoutPrice)}</span>
+                    <span className="session-card__price">
+                      <FormattedPrice cents={checkoutPrice} />
+                    </span>
                   </div>
                 )}
                 {!clientSecret ? (
@@ -711,7 +712,13 @@ export default function ListingDetail() {
                           )}
                         </p>
                         {nextHint ? (
-                          <p className="guest-stepper__hint">{nextHint}</p>
+                          <button
+                            type="button"
+                            className="guest-stepper__hint"
+                            onClick={() => changeGuests(guestsCount + 1)}
+                          >
+                            {nextHint}
+                          </button>
                         ) : null}
                       </div>
                     )}
@@ -727,13 +734,17 @@ export default function ListingDetail() {
                       aria-pressed={checkoutRail === 'paynow'}
                       onClick={() => startPayment('paynow')}
                     >
-                      <span className="payment-rail__label">
-                        PayNow · <span className="paynow-badge">5% off</span>
-                        <span className="paynow-badge">Best price</span>
+                      <span className="payment-rail__row">
+                        <span className="payment-rail__name">PayNow</span>
+                        <span className="paynow-badge">Save 5%</span>
                       </span>
-                      <span className="payment-rail__price">
-                        <s className="payment-rail__was">{formatCents(cardPrice)}</s>
-                        {formatCents(paynowPrice)}
+                      <span className="payment-rail__amounts">
+                        <s className="payment-rail__was">
+                          <FormattedPrice cents={cardPrice} />
+                        </s>
+                        <span className="payment-rail__now">
+                          <FormattedPrice cents={paynowPrice} />
+                        </span>
                       </span>
                     </button>
                     <button
@@ -743,10 +754,14 @@ export default function ListingDetail() {
                       aria-pressed={checkoutRail === 'card'}
                       onClick={() => startPayment('card')}
                     >
-                      <span className="payment-rail__label">
-                        Card · Credit or debit card
+                      <span className="payment-rail__row">
+                        <span className="payment-rail__name">Card</span>
                       </span>
-                      <span className="payment-rail__price">{formatCents(cardPrice)}</span>
+                      <span className="payment-rail__amounts">
+                        <span className="payment-rail__now">
+                          <FormattedPrice cents={cardPrice} />
+                        </span>
+                      </span>
                     </button>
                     <button type="button" onClick={cancelPayment} className="btn btn--ghost">
                       Cancel
