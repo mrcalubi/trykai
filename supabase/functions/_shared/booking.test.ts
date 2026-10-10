@@ -25,6 +25,7 @@ import {
   prepareBooking,
   refundAmountForCancel,
   shouldEmailCancellation,
+  unpaidCheckoutCancelPatch,
   roundUpToDollar,
   spotsToRestore,
 } from './booking.ts'
@@ -401,6 +402,30 @@ describe('unpaid checkout cancel', () => {
     expect(guestCancelDecision('confirmed')).toEqual({ allow: true })
   })
 
+  it('refuses a guest cancel of a row that is no longer cancellable', () => {
+    expect(guestCancelDecision('cancelled')).toEqual({
+      allow: false,
+      status: 400,
+      message: 'Booking cannot be cancelled',
+    })
+  })
+
+  it('marks an unpaid checkout cancelled with a zero refund', () => {
+    const guest = unpaidCheckoutCancelPatch()
+    expect(guest).toMatchObject({
+      status: 'cancelled',
+      cancelled_by: 'guest',
+      refund_amount: 0,
+    })
+    expect(Number.isNaN(Date.parse(guest.cancelled_at))).toBe(false)
+
+    expect(unpaidCheckoutCancelPatch('host')).toMatchObject({
+      status: 'cancelled',
+      cancelled_by: 'host',
+      refund_amount: 0,
+    })
+  })
+
   it('does not email a cancellation for a never-paid row', () => {
     expect(shouldEmailCancellation('pending')).toBe(false)
     expect(shouldEmailCancellation('confirmed')).toBe(true)
@@ -420,6 +445,13 @@ describe('abandon-checkout', () => {
       decideAbandonCheckout({
         callerId: 'other-guest',
         guestId: 'guest-1',
+        bookingStatus: 'pending',
+      }),
+    ).toEqual({ httpStatus: 403, error: 'Forbidden' })
+    expect(
+      decideAbandonCheckout({
+        callerId: 'guest-1',
+        guestId: null,
         bookingStatus: 'pending',
       }),
     ).toEqual({ httpStatus: 403, error: 'Forbidden' })
