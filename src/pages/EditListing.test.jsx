@@ -97,6 +97,7 @@ describe('EditListing prefill', () => {
     expect(screen.getByLabelText('Max guests')).toHaveValue(4)
     expect(screen.getByLabelText('Area')).toHaveValue('Bedok')
     expect(screen.getByLabelText(/^Full address/)).toHaveValue('12 Coffee Road')
+    expect(screen.getByRole('checkbox', { name: 'Offer group pricing' })).toBeChecked()
   })
 
   it('converts the stored cents back into dollars', async () => {
@@ -218,6 +219,7 @@ describe('EditListing saving', () => {
       price_per_person: 5525,
       max_guests: 4,
       duration_mins: 90,
+      group_pricing: true,
       area: 'Bedok',
       full_address: '12 Coffee Road',
     })

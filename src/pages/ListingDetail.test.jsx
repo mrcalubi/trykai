@@ -394,7 +394,7 @@ describe('ListingDetail sessions', () => {
     givenSessions([makeSession({ duration_mins: 90, spots_remaining: 3 })])
     renderPage()
 
-    expect(await screen.findByText(/90 mins · 3 spots left/)).toBeInTheDocument()
+    expect(await screen.findByText(/1 hr 30 min · 3 spots left/)).toBeInTheDocument()
   })
 
   it('uses the singular when only one spot is left', async () => {
@@ -453,9 +453,9 @@ describe('ListingDetail sessions', () => {
 
     expect(await screen.findByRole('heading', { name: /9 Oct · 2 sessions/ })).toBeInTheDocument()
     expect(screen.getByText('11:00 am')).toBeInTheDocument()
-    expect(screen.getByText(/33 mins · 2 spots left/)).toBeInTheDocument()
+    expect(screen.getByText(/33 min · 2 spots left/)).toBeInTheDocument()
     expect(screen.getByText('11:00 pm')).toBeInTheDocument()
-    expect(screen.queryByText(/111 mins/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/1 hr 51 min/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /9 October, 2 sessions/ })).toHaveAttribute(
       'aria-pressed',
       'true'
@@ -475,8 +475,8 @@ describe('ListingDetail sessions', () => {
     await user.click(screen.getByRole('button', { name: /27 October, 1 session/ }))
 
     expect(screen.getByRole('heading', { name: /27 Oct · 1 session/ })).toBeInTheDocument()
-    expect(screen.getByText(/111 mins/)).toBeInTheDocument()
-    expect(screen.queryByText(/33 mins/)).not.toBeInTheDocument()
+    expect(screen.getByText(/1 hr 51 min/)).toBeInTheDocument()
+    expect(screen.queryByText(/33 min/)).not.toBeInTheDocument()
   })
 
   it('loads each month once, bounded by Singapore midnights', async () => {
@@ -505,7 +505,7 @@ describe('ListingDetail sessions', () => {
 
     await user.click(screen.getByRole('button', { name: 'Next month' }))
     expect(await screen.findByRole('heading', { name: /2 Nov · 1 session/ })).toBeInTheDocument()
-    expect(screen.getByText(/60 mins/)).toBeInTheDocument()
+    expect(screen.getByText(/1 hr · 3 spots left/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Previous month' }))
     expect(await screen.findByRole('heading', { name: /9 Oct · 1 session/ })).toBeInTheDocument()
@@ -570,7 +570,7 @@ describe('ListingDetail sessions', () => {
     await user.click(screen.getByRole('button', { name: 'Next month' }))
 
     expect(await screen.findByRole('heading', { name: /2 Dec · 1 session/ })).toBeInTheDocument()
-    expect(screen.getByText(/40 mins/)).toBeInTheDocument()
+    expect(screen.getByText(/40 min · 3 spots left/)).toBeInTheDocument()
   })
 
   it('keeps the listing on screen when a month fails to load', async () => {
@@ -601,7 +601,7 @@ describe('ListingDetail sessions', () => {
 
     expect(screen.queryByRole('group', { name: 'October 2099' })).not.toBeInTheDocument()
     expect(screen.getByText(/9 Oct/)).toBeInTheDocument()
-    expect(screen.getByText(/11:00 am · 90 mins/)).toBeInTheDocument()
+    expect(screen.getByText(/11:00 am · 1 hr 30 min/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
@@ -632,8 +632,9 @@ describe('ListingDetail booking', () => {
     await user.click(await screen.findByRole('button', { name: 'Book' }))
 
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: /Pay by card/ })).toHaveTextContent('$51')
-    expect(screen.getByRole('button', { name: /PayNow/ })).toHaveTextContent('$48.45')
+    expect(screen.getByRole('button', { name: /Card · Credit or debit card/ })).toHaveTextContent('$51')
+    expect(screen.getByRole('button', { name: /PayNow · 5% off/ })).toHaveTextContent('$51')
+    expect(screen.getByRole('button', { name: /PayNow · 5% off/ })).toHaveTextContent('$48.45')
   })
 
   it('asks the edge function for a card payment intent after the guest picks a rail', async () => {
@@ -647,7 +648,7 @@ describe('ListingDetail booking', () => {
     await user.click(await screen.findByRole('button', { name: 'Book' }))
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
 
-    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
 
     await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
     expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
@@ -665,7 +666,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
 
     expect(await screen.findByTestId('stripe-elements')).toBeInTheDocument()
     expect(screen.getByText('Total: $90')).toBeInTheDocument()
@@ -678,7 +679,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
 
     expect(await screen.findByText('Failed to fetch')).toBeInTheDocument()
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
@@ -698,7 +699,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
 
     expect(await screen.findByText('This host cannot take bookings yet.')).toBeInTheDocument()
   })
@@ -716,8 +717,9 @@ describe('ListingDetail booking', () => {
 
     await user.click(await screen.findByRole('button', { name: /PayNow/ }))
 
-    expect(await screen.findByText('PayNow · 5% off the advertised price')).toBeInTheDocument()
-    expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$48.45')
+    await waitFor(() =>
+      expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$48.45'),
+    )
     expect(document.querySelector('.session-card__price')).toHaveTextContent('$48.45')
     expect(screen.getByRole('button', { name: /PayNow/ })).toHaveAttribute('aria-pressed', 'true')
   })
@@ -728,7 +730,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
 
     expect(await screen.findByText('Not enough spots')).toBeInTheDocument()
   })
@@ -739,7 +741,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
 
     expect(await screen.findByText('Failed to start payment. Please try again.')).toBeInTheDocument()
   })
@@ -796,6 +798,65 @@ describe('ListingDetail booking', () => {
     expect(screen.getByText(/still setting up payouts/)).toBeInTheDocument()
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
   })
+
+  it('updates the live per-person price when more guests are added', async () => {
+    givenListing(makeListing({ price_per_person: 2500 }))
+    givenSessions([makeSession({ id: 'session-7', spots_remaining: 4 })])
+    givenSignedIn()
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    expect(screen.getByText('$25 each')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Card · Credit or debit card/ })).toHaveTextContent('$28')
+
+    await user.click(screen.getByRole('button', { name: 'More guests' }))
+    await user.click(screen.getByRole('button', { name: 'More guests' }))
+    await user.click(screen.getByRole('button', { name: 'More guests' }))
+
+    expect(screen.getByText('$21.25 each, 15% group price')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Card · Credit or debit card/ })).toHaveTextContent('$96')
+    expect(screen.getByRole('button', { name: /PayNow · 5% off/ })).toHaveTextContent('$96')
+    expect(screen.getByRole('button', { name: /PayNow · 5% off/ })).toHaveTextContent('$91.20')
+  })
+
+  it('sends the chosen guest count to create-payment-intent', async () => {
+    givenListing()
+    givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(72), spots_remaining: 3 })])
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 7600 },
+      error: null,
+    })
+    const { user } = renderPage()
+
+    await screen.findByText(/spots left/)
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(screen.getByRole('button', { name: 'More guests' }))
+    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
+
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
+      body: { session_id: 'session-7', guests_count: 2, payment_rail: 'card' },
+      headers: { Authorization: 'Bearer test-access-token' },
+    })
+  })
+
+  it('links the booking terms and cancellation policy above the pay buttons', async () => {
+    givenSignedIn()
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    expect(screen.getByRole('link', { name: 'Booking terms' })).toHaveAttribute(
+      'href',
+      '/terms#part-3-booking',
+    )
+    expect(screen.getByRole('link', { name: 'Cancellation Policy' })).toHaveAttribute(
+      'href',
+      '/cancellation-policy',
+    )
+  })
 })
 
 describe('ListingDetail checkout', () => {
@@ -808,8 +869,9 @@ describe('ListingDetail checkout', () => {
       error: null,
     })
     const utils = renderPage()
+    await screen.findByText(/spots left/)
     await utils.user.click(await screen.findByRole('button', { name: 'Book' }))
-    await utils.user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await utils.user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
     await screen.findByTestId('stripe-elements')
     return utils
   }

@@ -150,6 +150,17 @@ describe('Terms of Service page', () => {
     expect(screen.getByText(/starting from your fourth confirmed booking/)).toBeInTheDocument()
   })
 
+  it('anchors the Host and Booking parts for the listing and checkout checkboxes', () => {
+    expect(screen.getByRole('heading', { name: 'Part 2: Hosting' })).toHaveAttribute(
+      'id',
+      'part-2-hosting',
+    )
+    expect(screen.getByRole('heading', { name: 'Part 3: Booking' })).toHaveAttribute(
+      'id',
+      'part-3-booking',
+    )
+  })
+
   it('links to the privacy, dispute, cancellation and refund policies', () => {
     expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy')
     expect(screen.getByRole('link', { name: 'Dispute Policy' })).toHaveAttribute(

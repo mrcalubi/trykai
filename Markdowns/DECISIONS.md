@@ -113,15 +113,15 @@ The per host version fixes both problems. It starts earning from day one regardl
 All three have to be true together, not just one. A host irritated by the fee with no relationship yet has no way to act on it. A host with a great relationship where going direct saves the guest nothing has no reason to. This is why leakage risk concentrates in Lane 2's repeat, multi session relationships far more than in a one off Lane 1 booking, and worth noting that the per host waiver mechanism above means the fee starts biting a host at roughly the same point a repeat relationship with a guest would start to form. Not a reason to change the mechanism, but worth designing Lane 2's defences with this overlap specifically in mind when that lane is built.
 
 ### Group bookings
-*Decided 16 August 2026.*
+*Decided 10 October 2026. Supersedes the 16 August "hosts set tiers" wording.*
 
-**Host funded, host opt-in, TryKai suggests the tiers.** Hosts set a reduced per person price for larger groups.
+**Automatic platform tiers, host can turn them off per listing.** Guests pick 1 to N people on one booking, N = min(spots remaining, 10). The lesson price per person is discounted 5% for 2, 10% for 3, 15% for 4, and 20% for 5 or more. Never more than 20%. Hosts keep group pricing on by default (`listings.group_pricing`) and can switch it off on Create and Edit listing. They do not set their own tiers.
 
-The economics justify it from both sides. A host at S$25 per person with S$8 of materials over a two hour commitment earns S$17 an hour with two guests and S$29 an hour with four guests at a 10 per cent group discount. Fill rate is worth roughly four times what any fee costs them.
+The lesson total is the discounted per-person price times guests, in integer cents. The card fee (12%, S$2.50 floor, round up) applies once to that total. PayNow is 5% off that card total. The host fee is 10% of the discounted lesson. A group booking is one booking toward a host's first three free.
 
-For TryKai a discounted four person booking nets about S$5.70 against S$5.90 for four separate full price bookings. **The discount costs about twenty cents and brings three new users.** Against Singapore consumer CAC of S$5 to S$20 that is the cheapest acquisition channel available. On card it costs nothing at all, because one larger transaction amortises Stripe's fixed S$0.50.
+Cancellation is the whole booking only, same four refund tiers. Removing one guest from a paid group booking is the first post-launch money item.
 
-**Group discounts are an acquisition mechanic that looks like a discount.** Present the per head price falling live as guests are added at checkout. The message is not "save 10 per cent", it is "the more of you, the cheaper it gets", which is how a group already thinks about a night out.
+The 16 August economics still hold: fill rate is worth more than the discount, and one larger transaction is cheap acquisition. Present the per-head price falling live at checkout.
 
 ### Date Mode, revised
 *Revised 16 August 2026. Supersedes the single paid add-on in the original spec.*
@@ -339,7 +339,7 @@ Full visual identity is in DESIGN.md.
 | Search bar | 100+ active listings. Category filters cover discoverability below that. |
 | Credit bundles, ClassPass style | 500+ bookings, clear repeat behaviour. 5 sessions at 15% off. Creates float on prepaid credits. |
 | Multi session courses | 500+ bookings, or whenever Lane 2 launches. Full payment upfront, released per session completed, pro rata refund if the host cancels mid course. This per session release is what keeps TryKai in the loop and prevents leakage. |
-| Group discounts | Stage 2. 2 to 3 pax 5% off, 4+ pax 10% off. |
+| Group discounts | Live 10 October 2026. Automatic 5 / 10 / 15 / 20. Hosts can turn it off per listing. Partial cancel ("remove a guest") is post-launch. |
 | "This weekend" filter | 50+ active listings with upcoming sessions. High value for the core "nothing to do" use case. |
 | Host listing performance nudges | 50+ listings. View count and conversion per listing, with prompts like "47 views, 0 bookings, consider lowering price or adding photos". Modelled on Carousell seller advice. |
 | In app notifications | Post MVP. Simple unread badge. |
@@ -481,6 +481,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-10-07 — Hosts pick a URA planning area; browse filters by region.** Supersedes the area dropdown built from whatever strings listings already had, and the shorter hardcoded create/edit list that included Katong (a neighbourhood, not a planning area). `planning_areas` (`00016`) is the 55 Master Plan names, each tagged Central, North, North-East, East, or West, with public SELECT. `listings.area` is a FK to that table. Existing values are mapped by case-insensitive exact match; anything else is set to null rather than guessed. Create and edit use a searchable dropdown of those 55 names. Home filters All / the five regions, combinable with category. Cards and listing detail still show the planning area name.
 
 **2026-10-07 — Terms and Privacy published; agreement recorded at signup.** `/terms` and `/privacy` are live policy pages in the same layout as refund, cancellation, and dispute. Footer adds Terms, Privacy, UEN 53526159D, and `privacy@trykai.sg`. Signup requires "I'm 18 or older and agree to the Terms and Privacy Policy" (both linked); Sign up stays disabled until ticked. `users.terms_accepted_at` (`00017`) is set by `handle_new_user` from metadata `terms_accepted`; existing rows stay null; the column is not client-writable or readable. The cancellation page no longer promises rescheduling (not built) and says cancel from "your profile" rather than a dashboard. Create-listing and checkout T&C checkboxes are still not built. The published Privacy Policy commits to 5-year booking and payment retention; that supersedes the open "not decided" retention question as a policy statement (ops still needs to confirm the data layer keeps those rows).
+
+**2026-10-10 — Group bookings use automatic platform tiers.** Supersedes the 16 August "hosts set tiers" wording. Guests pick 1 to min(spots remaining, 10). Lesson price per person is 5 / 10 / 15 / 20 percent off for 2 / 3 / 4 / 5+ guests. Hosts can turn `listings.group_pricing` off (`00020`, default true). Card fee and PayNow 5% apply once to the discounted lesson total. Host fee is 10% of that total; a group booking is one row toward the first three free. Cancellation is the whole booking only. Create listing requires "I agree to the Host terms" (`/terms#part-2-hosting`). Checkout has "By booking, you agree to the Booking terms and Cancellation Policy". Duration displays as hours and minutes. Partial cancel ("remove a guest") is the first post-launch money item.
 
 ---
 

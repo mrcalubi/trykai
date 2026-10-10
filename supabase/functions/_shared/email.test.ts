@@ -198,7 +198,10 @@ describe('cancellation emails', () => {
       sessionDate: '28 Aug 2026, 7:00 pm',
       refundAmountCents: 0,
       cancelledBy: 'guest',
+      guestsCount: 2,
     })
+    expect(none).toContain('Guests:')
+    expect(none).toContain('2')
     expect(none).toContain('Refund amount:')
     expect(none).toContain('$0')
     expect(none).toContain('Latte art')
@@ -208,6 +211,7 @@ describe('cancellation emails', () => {
       sessionDate: '28 Aug 2026, 7:00 pm',
       refundAmountCents: 5100,
       cancelledBy: 'host',
+      guestsCount: 2,
     })
     expect(full).toContain('$51')
     expect(full).toContain('The host cancelled your booking')
@@ -219,6 +223,7 @@ describe('cancellation emails', () => {
       sessionDate: '28 Aug 2026, 7:00 pm',
       refundAmountCents: 0,
       cancelledBy: 'guest',
+      guestsCount: 1,
     })
     expect(html).not.toContain('<script>')
     expect(html).toContain('&lt;script&gt;')
@@ -229,9 +234,12 @@ describe('cancellation emails', () => {
       guestName: 'Sarah',
       listingTitle: 'Latte art',
       sessionDate: '28 Aug 2026, 7:00 pm',
+      guestsCount: 3,
     })
     expect(html).toContain('Sarah')
     expect(html).toContain('Latte art')
+    expect(html).toContain('Guests:')
+    expect(html).toContain('3')
   })
 
   it('emails the guest always, and the host only when the guest cancelled', async () => {
@@ -247,6 +255,7 @@ describe('cancellation emails', () => {
       guestEmail: 'guest@trykai.sg',
       hostEmail: 'host@trykai.sg',
       guestName: 'Sarah',
+      guestsCount: 2,
     })
 
     expect(fetchMock).toHaveBeenCalledOnce()
@@ -268,6 +277,7 @@ describe('cancellation emails', () => {
       guestEmail: 'guest@trykai.sg',
       hostEmail: 'host@trykai.sg',
       guestName: 'Sarah',
+      guestsCount: 2,
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -296,6 +306,7 @@ describe('cancellation emails', () => {
         sessionDate: '28 Aug 2026, 7:00 pm',
         guestEmail: 'guest@trykai.sg',
         hostEmail: 'host@trykai.sg',
+        guestsCount: 1,
       }),
     ).resolves.toBeUndefined()
 

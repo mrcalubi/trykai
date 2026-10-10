@@ -27,6 +27,7 @@ export default function EditListing() {
   const [price, setPrice] = useState('')
   const [maxGuests, setMaxGuests] = useState('')
   const [durationMins, setDurationMins] = useState('')
+  const [groupPricing, setGroupPricing] = useState(true)
   const [area, setArea] = useState('')
   const [fullAddress, setFullAddress] = useState('')
   const [whatsProvided, setWhatsProvided] = useState([])
@@ -63,6 +64,7 @@ export default function EditListing() {
       setPrice(centsToDollars(data.price_per_person))
       setMaxGuests(String(data.max_guests))
       setDurationMins(data.duration_mins != null ? String(data.duration_mins) : '')
+      setGroupPricing(data.group_pricing !== false)
       setArea(data.area ?? '')
       setFullAddress(data.full_address)
       setWhatsProvided(data.whats_provided?.length ? data.whats_provided : [])
@@ -200,6 +202,7 @@ export default function EditListing() {
       price_per_person: priceCents,
       max_guests: guests,
       duration_mins: duration,
+      group_pricing: groupPricing,
       area,
       full_address: fullAddress.trim(),
       whats_provided: provided,
@@ -210,12 +213,13 @@ export default function EditListing() {
       .update(listingPayload)
       .eq('id', id)
       .eq('host_id', userId)
-    if (updateError && /duration_mins/.test(updateError.message ?? '')) {
-      const withoutDuration = { ...listingPayload }
-      delete withoutDuration.duration_mins
+    if (updateError && /duration_mins|group_pricing/.test(updateError.message ?? '')) {
+      const retry = { ...listingPayload }
+      if (/duration_mins/.test(updateError.message ?? '')) delete retry.duration_mins
+      if (/group_pricing/.test(updateError.message ?? '')) delete retry.group_pricing
       ;({ error: updateError } = await supabase
         .from('listings')
-        .update(withoutDuration)
+        .update(retry)
         .eq('id', id)
         .eq('host_id', userId))
     }
@@ -336,6 +340,19 @@ export default function EditListing() {
           </label>
           <span className="hint">
             New sessions use this length. Sessions already added keep theirs.
+          </span>
+
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={groupPricing}
+              onChange={(e) => setGroupPricing(e.target.checked)}
+            />
+            Offer group pricing
+          </label>
+          <span className="hint">
+            5% off for 2 guests, up to 20% for 5 or more. Applies to the lesson
+            price per person.
           </span>
 
           <label className="label">

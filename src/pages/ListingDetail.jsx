@@ -22,9 +22,12 @@ import {
 import {
   checkoutPriceCents,
   formatGuestFacingPrice,
+  groupPriceLabel,
   guestFacingPriceCents,
+  MAX_GUESTS_PER_BOOKING,
   paynowPriceCents,
 } from '../lib/pricing'
+import { formatDuration } from '../lib/duration'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { checkoutCanLeaveForWebhook } from '../lib/paymentReturn'
 import { publicName } from '../lib/publicName'
@@ -130,6 +133,7 @@ export default function ListingDetail() {
   const [error, setError] = useState('')
 
   const [checkoutSessionId, setCheckoutSessionId] = useState(null)
+  const [guestsCount, setGuestsCount] = useState(1)
   const [checkoutRail, setCheckoutRail] = useState(null)
   const [clientSecret, setClientSecret] = useState(null)
   const [bookingId, setBookingId] = useState(null)
@@ -148,16 +152,14 @@ export default function ListingDetail() {
       setVisibleMonth(null)
       setSelectedDateKey(null)
 
-      const { data: listingData, error: listingError } = await supabase
-        .from('listings')
-        .select(
-          `
+      const listingSelect = `
           id,
           title,
           description,
           category,
           area,
           price_per_person,
+          group_pricing,
           photo_urls,
           whats_provided,
           host_id,
@@ -168,10 +170,20 @@ export default function ListingDetail() {
             stripe_payouts_enabled
           )
         `
-        )
+      let { data: listingData, error: listingError } = await supabase
+        .from('listings')
+        .select(listingSelect)
         .eq('id', id)
         .eq('is_active', true)
         .single()
+      if (listingError && /group_pricing/.test(listingError.message ?? '')) {
+        ;({ data: listingData, error: listingError } = await supabase
+          .from('listings')
+          .select(listingSelect.replace(/\s*group_pricing,\n/, '\n'))
+          .eq('id', id)
+          .eq('is_active', true)
+          .single())
+      }
 
       if (listingError) {
         setError(listingError.message)
@@ -295,6 +307,7 @@ export default function ListingDetail() {
   function cancelPayment() {
     const unpaidId = bookingId
     setCheckoutSessionId(null)
+    setGuestsCount(1)
     setCheckoutRail(null)
     setClientSecret(null)
     setBookingId(null)
@@ -346,7 +359,21 @@ export default function ListingDetail() {
     setBookingId(null)
     setTotalAmount(null)
     setCheckoutRail(null)
+    setGuestsCount(1)
     setCheckoutSessionId(sessionId)
+  }
+
+  function changeGuests(next) {
+    if (next === guestsCount) return
+    if (clientSecret) {
+      const unpaidId = bookingId
+      setClientSecret(null)
+      setBookingId(null)
+      setTotalAmount(null)
+      setCheckoutRail(null)
+      void voidUnpaidBooking(unpaidId)
+    }
+    setGuestsCount(next)
   }
 
   async function startPayment(paymentRail) {
@@ -363,7 +390,7 @@ export default function ListingDetail() {
     const { data, error: fnError } = await supabase.functions.invoke('create-payment-intent', {
       body: {
         session_id: checkoutSessionId,
-        guests_count: 1,
+        guests_count: guestsCount,
         payment_rail: paymentRail,
       },
       headers: {
@@ -405,10 +432,11 @@ export default function ListingDetail() {
 
   const host = listing.users
   const photos = listing.photo_urls?.length ? listing.photo_urls : []
-  const cardPrice = guestFacingPriceCents(listing.price_per_person)
-  const paynowPrice = paynowPriceCents(listing.price_per_person)
+  const groupPricing = listing.group_pricing !== false
+  const cardPrice = guestFacingPriceCents(listing.price_per_person, guestsCount, groupPricing)
+  const paynowPrice = paynowPriceCents(listing.price_per_person, guestsCount, groupPricing)
   const checkoutPrice = checkoutRail
-    ? checkoutPriceCents(listing.price_per_person, checkoutRail)
+    ? checkoutPriceCents(listing.price_per_person, checkoutRail, guestsCount, groupPricing)
     : cardPrice
   const canTakePayments = hostCanTakePayments()
   const isOwnListing = viewerIsHost()
@@ -450,7 +478,7 @@ export default function ListingDetail() {
                 {formatSessionTime(session.starts_at)}
               </p>
               <p className="session-card__meta">
-                {session.duration_mins} mins · {session.spots_remaining} spot
+                {formatDuration(session.duration_mins)} · {session.spots_remaining} spot
                 {session.spots_remaining !== 1 ? 's' : ''} left
               </p>
             </div>
@@ -584,12 +612,12 @@ export default function ListingDetail() {
           <div className="detail-booking-card">
             <p className="detail-booking-card__price">
               {formatCents(checkoutPrice)}
-              <span className="detail-booking-card__unit"> / person</span>
+              {!checkoutSessionId && (
+                <span className="detail-booking-card__unit"> / person</span>
+              )}
             </p>
             <p className="detail-booking-card__note">
-              {checkoutRail === 'paynow'
-                ? 'PayNow · 5% off the advertised price'
-                : 'Pick a date, then a time'}
+              {checkoutSessionId ? 'Complete your booking' : 'Pick a date, then a time'}
             </p>
 
             <CancellationPolicyCollapsible />
@@ -609,7 +637,7 @@ export default function ListingDetail() {
                       </p>
                       <p className="session-card__meta">
                         {formatSessionTime(checkoutSession.starts_at)} ·{' '}
-                        {checkoutSession.duration_mins} mins
+                        {formatDuration(checkoutSession.duration_mins)}
                       </p>
                     </div>
                     <span className="session-card__price">{formatCents(checkoutPrice)}</span>
@@ -617,8 +645,51 @@ export default function ListingDetail() {
                 )}
                 {!clientSecret ? (
                   <div className="payment-rails">
-                    <p className="payment-rails__hint">
-                      Card is the price shown everywhere. PayNow is 5% off at checkout only.
+                    {checkoutSession && (
+                      <div className="guest-stepper">
+                        <p className="guest-stepper__label">Guests</p>
+                        <div className="guest-stepper__controls">
+                          <button
+                            type="button"
+                            className="guest-stepper__btn"
+                            aria-label="Fewer guests"
+                            disabled={guestsCount <= 1}
+                            onClick={() => changeGuests(guestsCount - 1)}
+                          >
+                            −
+                          </button>
+                          <span className="guest-stepper__count" aria-live="polite">
+                            {guestsCount}
+                          </span>
+                          <button
+                            type="button"
+                            className="guest-stepper__btn"
+                            aria-label="More guests"
+                            disabled={
+                              guestsCount >=
+                              Math.min(
+                                checkoutSession.spots_remaining,
+                                MAX_GUESTS_PER_BOOKING,
+                              )
+                            }
+                            onClick={() => changeGuests(guestsCount + 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                        <p className="guest-stepper__price">
+                          {groupPriceLabel(
+                            listing.price_per_person,
+                            guestsCount,
+                            groupPricing,
+                          )}
+                        </p>
+                      </div>
+                    )}
+                    <p className="payment-agree">
+                      By booking, you agree to the{' '}
+                      <Link to="/terms#part-3-booking">Booking terms</Link> and{' '}
+                      <Link to="/cancellation-policy">Cancellation Policy</Link>
                     </p>
                     <button
                       type="button"
@@ -627,9 +698,8 @@ export default function ListingDetail() {
                       aria-pressed={checkoutRail === 'card'}
                       onClick={() => startPayment('card')}
                     >
-                      <span>
-                        <span className="payment-rail__label">Pay by card</span>
-                        <span className="payment-rail__hint">The advertised price</span>
+                      <span className="payment-rail__label">
+                        Card · Credit or debit card
                       </span>
                       <span className="payment-rail__price">{formatCents(cardPrice)}</span>
                     </button>
@@ -640,13 +710,11 @@ export default function ListingDetail() {
                       aria-pressed={checkoutRail === 'paynow'}
                       onClick={() => startPayment('paynow')}
                     >
-                      <span>
-                        <span className="payment-rail__label">
-                          PayNow <span className="paynow-badge">5% off</span>
-                        </span>
-                        <span className="payment-rail__hint">Cheaper than the advertised price</span>
+                      <span className="payment-rail__label">PayNow · 5% off</span>
+                      <span className="payment-rail__price">
+                        <s className="payment-rail__was">{formatCents(cardPrice)}</s>
+                        {formatCents(paynowPrice)}
                       </span>
-                      <span className="payment-rail__price">{formatCents(paynowPrice)}</span>
                     </button>
                     <button type="button" onClick={cancelPayment} className="btn btn--ghost">
                       Cancel

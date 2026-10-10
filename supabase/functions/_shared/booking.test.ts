@@ -11,6 +11,10 @@ import {
   calculateHostFee,
   calculateHostPayout,
   confirmRpcErrorKind,
+  discountedLessonCents,
+  discountedPerPersonCents,
+  groupDiscountRate,
+  MAX_GUESTS_PER_BOOKING,
   isPaymentRail,
   isValidGuestsCount,
   nextHostStrikeState,
@@ -207,8 +211,32 @@ describe('prepareBooking', () => {
       ok: true,
       guestsCount: 2,
       paymentRail: 'card',
-      ...calculateGuestCharge(5000, 'card'),
+      ...calculateGuestCharge(discountedLessonCents(2500, 2), 'card'),
     })
+  })
+
+  it('applies no group discount when the host has turned it off', () => {
+    expect(
+      prepareBooking(
+        sessionWith({ listings: { price_per_person: 2500, host_id: 'host-1', group_pricing: false } }),
+        4,
+        'card',
+      ),
+    ).toEqual({
+      ok: true,
+      guestsCount: 4,
+      paymentRail: 'card',
+      ...calculateGuestCharge(10000, 'card'),
+    })
+  })
+
+  it('rejects more than ten guests on one booking', () => {
+    expect(prepareBooking(sessionWith({ spots_remaining: 12 }), 11)).toEqual({
+      ok: false,
+      status: 400,
+      message: 'Invalid guest count',
+    })
+    expect(MAX_GUESTS_PER_BOOKING).toBe(10)
   })
 
   it('uses PayNow amounts when that rail is chosen', () => {
@@ -321,6 +349,42 @@ describe('prepareBooking', () => {
 
   it('checks the session before the guest count', () => {
     expect(prepareBooking(null, 0)).toMatchObject({ status: 404 })
+  })
+})
+
+describe('group discounts', () => {
+  it('caps at 20 percent from five guests up', () => {
+    expect(groupDiscountRate(1)).toBe(0)
+    expect(groupDiscountRate(2)).toBe(0.05)
+    expect(groupDiscountRate(3)).toBe(0.1)
+    expect(groupDiscountRate(4)).toBe(0.15)
+    expect(groupDiscountRate(5)).toBe(0.2)
+    expect(groupDiscountRate(6)).toBe(0.2)
+    expect(groupDiscountRate(10)).toBe(0.2)
+    expect(groupDiscountRate(5, false)).toBe(0)
+  })
+
+  it('rounds the per-person price first, then multiplies by guests', () => {
+    expect(discountedPerPersonCents(2500, 4)).toBe(2125)
+    expect(discountedLessonCents(2500, 4)).toBe(8500)
+    expect(discountedLessonCents(2500, 4, false)).toBe(10000)
+  })
+})
+
+describe('oversell of a group booking', () => {
+  it('refunds the whole charge and restores every guest spot', () => {
+    const charge = calculateGuestCharge(discountedLessonCents(2500, 3), 'card')
+    expect(confirmRpcErrorKind('insufficient spots')).toBe('oversell')
+    expect(
+      refundAmountForCancel({
+        status: 'confirmed',
+        cancelledBy: 'host',
+        totalAmount: charge.totalAmount,
+        platformFee: charge.platformFee,
+        sessionStartsAt: new Date('2099-01-01T00:00:00.000Z').toISOString(),
+      }),
+    ).toBe(charge.totalAmount)
+    expect(spotsToRestore('confirmed', 3)).toBe(3)
   })
 })
 

@@ -192,9 +192,13 @@ Decided 29 September 2026. Remaining: HOST_ONBOARDING, BUSINESS, and HANDOVER st
 
 ## P3: post launch
 
-Identity and social layer, Date Mode, credit bundles, multi session courses, group discounts, "this weekend" filter, search, in app notifications, listing performance nudges, listing video, host Pro subscription, payout clawback.
+### First post-launch money item — Remove a guest
 
-Automated ID verification (Stripe Identity) and auto deletion of rejected verification documents (`purge-verification-docs`) shipped in September. Do not rebuild them.
+Cancellation is the whole booking only. After launch, let a guest drop one person from a paid group booking and refund that share on the same four tiers. Do not build this before launch. It is the first money-path change after warm-contact launch.
+
+Then: identity and social layer, Date Mode, credit bundles, multi session courses, "this weekend" filter, search, in app notifications, listing performance nudges, listing video, host Pro subscription, payout clawback.
+
+Automated ID verification (Stripe Identity) and auto deletion of rejected verification documents (`purge-verification-docs`) shipped in September. Group bookings with automatic pricing shipped 10 October. Do not rebuild them.
 
 All specified in DECISIONS.md. None of the remaining items should be touched before launch, regardless of how much runway appears to be left.
 
@@ -205,7 +209,7 @@ All specified in DECISIONS.md. None of the remaining items should be touched bef
 Working today, and stable enough. Do not rewrite them before launch unless you are closing a P0/P2 item above.
 
 - Guest browses and filters listings (the fetch and the filter memos survived the P2.8 grid rebuild untouched; keep it that way)
-- Guest views listing detail and pays (guest-count picker is additive)
+- Guest views listing detail and pays (guest stepper and group pricing are live; do not add partial cancel here)
 - Signup and login (profile row is the `handle_new_user` trigger)
 - Host verification submission (client UPDATE + guard trigger)
 - Host creates a listing (session is a follow-up `/hosting` action)

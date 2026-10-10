@@ -57,6 +57,7 @@ async function fillValidForm(user, overrides = {}) {
   await choosePlanningArea(user, values.area)
   // The address label also wraps a hint span, so it needs a partial match.
   await user.type(screen.getByLabelText(/^Full address/), values.fullAddress)
+  await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
   return values
 }
 
@@ -185,6 +186,28 @@ describe('CreateListing validation', () => {
 
     expect(await screen.findByText('Max guests must be at least 1.')).toBeInTheDocument()
   })
+
+  it('keeps Create listing disabled until the host agrees to the Host terms', async () => {
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await user.type(screen.getByLabelText('Title'), 'Latte art')
+    await user.type(screen.getByLabelText('Description'), 'Pull a rosetta.')
+    await user.selectOptions(screen.getByLabelText('Category'), 'Food')
+    await user.type(screen.getByLabelText('Price per person (SGD)'), '25')
+    await user.type(screen.getByLabelText('Max guests'), '4')
+    await user.type(screen.getByLabelText('Duration (mins)'), '90')
+    await choosePlanningArea(user, 'Bedok')
+    await user.type(screen.getByLabelText(/^Full address/), '12 Coffee Road')
+
+    expect(screen.getByRole('button', { name: 'Create listing' })).toBeDisabled()
+    expect(screen.getByRole('link', { name: 'Host terms' })).toHaveAttribute(
+      'href',
+      '/terms#part-2-hosting',
+    )
+
+    await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
+    expect(screen.getByRole('button', { name: 'Create listing' })).toBeEnabled()
+  })
 })
 
 describe('CreateListing submission', () => {
@@ -208,6 +231,7 @@ describe('CreateListing submission', () => {
       price_per_person: 4550,
       max_guests: 4,
       duration_mins: 90,
+      group_pricing: true,
       area: 'Bedok',
       full_address: '12 Coffee Road',
       is_active: true,
@@ -223,6 +247,18 @@ describe('CreateListing submission', () => {
 
     await waitFor(() => expect(supabase.__calls('listings', 'insert')).toHaveLength(1))
     expect(supabase.__lastCall('listings', 'insert').payload.price_per_person).toBe(1999)
+  })
+
+  it('lets the host turn group pricing off', async () => {
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await fillValidForm(user)
+    await user.click(screen.getByRole('checkbox', { name: 'Offer group pricing' }))
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'insert')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'insert').payload.group_pricing).toBe(false)
   })
 
   it('promotes the user to a host and lands them on the hosting tab', async () => {

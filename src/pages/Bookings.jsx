@@ -434,6 +434,10 @@ export default function Bookings({ embedded = false }) {
                   {booking.sessions?.starts_at
                     ? formatSessionDateTime(booking.sessions.starts_at)
                     : 'Date TBC'}
+                  {' · '}
+                  {booking.guests_count === 1
+                    ? '1 guest'
+                    : `${booking.guests_count} guests`}
                   {bookingAddresses[booking.id] && (
                     <>
                       {' · '}

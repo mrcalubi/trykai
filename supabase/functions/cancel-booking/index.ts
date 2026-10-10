@@ -127,6 +127,7 @@ async function notifyCancellation(
     hostId: string | null | undefined
     listingTitle: string | null | undefined
     sessionStartsAt: string | null | undefined
+    guestsCount: number
   },
 ) {
   try {
@@ -148,6 +149,7 @@ async function notifyCancellation(
       guestEmail: guestResult.data?.email,
       hostEmail: hostResult.data?.email,
       guestName: guestResult.data?.full_name,
+      guestsCount: options.guestsCount,
     })
   } catch (err) {
     console.error('cancel-booking: email failed', err)
@@ -218,6 +220,7 @@ Deno.serve(async (req) => {
           hostId: listing?.host_id,
           listingTitle: listing?.title,
           sessionStartsAt: session.starts_at,
+          guestsCount: booking.guests_count,
         })
         results.push(result)
       }
@@ -279,6 +282,7 @@ Deno.serve(async (req) => {
         hostId: listing?.host_id,
         listingTitle: listing?.title,
         sessionStartsAt: session.starts_at,
+        guestsCount: booking.guests_count,
       })
     }
     return jsonResponse(result)

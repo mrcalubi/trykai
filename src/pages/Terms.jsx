@@ -165,7 +165,7 @@ export default function Terms() {
         updated terms.
       </p>
 
-      <h2>Part 2: Hosting</h2>
+      <h2 id="part-2-hosting">Part 2: Hosting</h2>
       <p>By creating a listing, you also accept this Part.</p>
 
       <h3>1. Your status</h3>
@@ -255,7 +255,7 @@ export default function Terms() {
         during or in connection with your session.
       </p>
 
-      <h2>Part 3: Booking</h2>
+      <h2 id="part-3-booking">Part 3: Booking</h2>
       <p>You accept this Part when you book.</p>
 
       <h3>1. Booking and payment</h3>
