@@ -143,6 +143,77 @@ export function spotsToRestore(status: string, guestsCount: number): number {
   return guestsCount
 }
 
+/** Checkout created the row before Stripe captured anything. */
+export function isUnpaidCheckout(status: string): boolean {
+  return status === 'pending'
+}
+
+export function unpaidCheckoutCancelPatch(cancelledBy: 'guest' | 'host' = 'guest') {
+  return {
+    status: 'cancelled' as const,
+    cancelled_by: cancelledBy,
+    cancelled_at: new Date().toISOString(),
+    refund_amount: 0,
+  }
+}
+
+/** Guest cancel of a never-paid row is not a booking cancel. */
+export function guestCancelDecision(status: string): {
+  allow: boolean
+  status?: number
+  message?: string
+} {
+  if (isUnpaidCheckout(status)) {
+    return {
+      allow: false,
+      status: 400,
+      message: 'This checkout was never paid',
+    }
+  }
+  if (status !== 'confirmed') {
+    return { allow: false, status: 400, message: 'Booking cannot be cancelled' }
+  }
+  return { allow: true }
+}
+
+export function shouldEmailCancellation(status: string): boolean {
+  return status === 'confirmed'
+}
+
+export function abandonCheckoutAuthorized(
+  callerId: string | null | undefined,
+  guestId: string | null | undefined,
+): boolean {
+  return Boolean(callerId) && Boolean(guestId) && callerId === guestId
+}
+
+export function paymentIntentAlreadyCaptured(status: string | null | undefined): boolean {
+  return status === 'succeeded' || status === 'processing'
+}
+
+export type AbandonCheckoutDecision =
+  | { httpStatus: 403; error: 'Forbidden' }
+  | { abandon: false; reason: 'not_pending' | 'payment_succeeded' }
+  | { abandon: true }
+
+export function decideAbandonCheckout(options: {
+  callerId: string | null | undefined
+  guestId: string | null | undefined
+  bookingStatus: string
+  intentStatus?: string | null
+}): AbandonCheckoutDecision {
+  if (!abandonCheckoutAuthorized(options.callerId, options.guestId)) {
+    return { httpStatus: 403, error: 'Forbidden' }
+  }
+  if (!isUnpaidCheckout(options.bookingStatus)) {
+    return { abandon: false, reason: 'not_pending' }
+  }
+  if (paymentIntentAlreadyCaptured(options.intentStatus)) {
+    return { abandon: false, reason: 'payment_succeeded' }
+  }
+  return { abandon: true }
+}
+
 /**
  * A guest count arrives from the request body, so it has to be treated as
  * untrusted. A fractional value would otherwise pass the spots check and buy a

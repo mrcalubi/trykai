@@ -632,9 +632,14 @@ describe('ListingDetail booking', () => {
     await user.click(await screen.findByRole('button', { name: 'Book' }))
 
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: /Card · Credit or debit card/ })).toHaveTextContent('$51')
-    expect(screen.getByRole('button', { name: /PayNow · 5% off/ })).toHaveTextContent('$51')
-    expect(screen.getByRole('button', { name: /PayNow · 5% off/ })).toHaveTextContent('$48.45')
+    const paynow = screen.getByRole('button', { name: /PayNow/ })
+    const card = screen.getByRole('button', { name: /Card · Credit or debit card/ })
+    expect(paynow.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(paynow).toHaveClass('payment-rail--paynow')
+    expect(paynow).toHaveTextContent('Best price')
+    expect(paynow).toHaveTextContent('$51')
+    expect(paynow).toHaveTextContent('$48.45')
+    expect(card).toHaveTextContent('$51')
   })
 
   it('asks the edge function for a card payment intent after the guest picks a rail', async () => {
@@ -660,7 +665,7 @@ describe('ListingDetail booking', () => {
   it('opens the payment panel with the amount returned by the server', async () => {
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({
-      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 9000 },
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 5100 },
       error: null,
     })
     const { user } = renderPage()
@@ -669,8 +674,33 @@ describe('ListingDetail booking', () => {
     await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
 
     expect(await screen.findByTestId('stripe-elements')).toBeInTheDocument()
-    expect(screen.getByText('Total: $90')).toBeInTheDocument()
+    expect(screen.getByText('Total: $51')).toBeInTheDocument()
     expect(screen.getByTestId('payment-element')).toBeInTheDocument()
+  })
+
+  it('refuses to show the payment form when the server total differs from the page', async () => {
+    givenSignedIn()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 9000 },
+      error: null,
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(await screen.findByRole('button', { name: /Card · Credit or debit card/ }))
+
+    expect(await screen.findByText('The price has changed. Please refresh.')).toBeInTheDocument()
+    expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
+    expect(log).toHaveBeenCalledWith('checkout price mismatch', {
+      shown: 5100,
+      server: 9000,
+    })
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('abandon-checkout', {
+      body: { booking_id: 'booking-1' },
+      headers: { Authorization: 'Bearer test-access-token' },
+    })
+    log.mockRestore()
   })
 
   it('reports a transport failure from the edge function', async () => {
@@ -749,7 +779,7 @@ describe('ListingDetail booking', () => {
   it('asks the edge function for a PayNow intent when that rail is chosen', async () => {
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({
-      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 2660 },
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 4845 },
       error: null,
     })
     const { user } = renderPage()
@@ -807,17 +837,18 @@ describe('ListingDetail booking', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
 
-    expect(screen.getByText('$25 each')).toBeInTheDocument()
+    expect(screen.getByText('$28 per person')).toBeInTheDocument()
+    expect(screen.getByText('Add 1 more for 5% off')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Card · Credit or debit card/ })).toHaveTextContent('$28')
 
     await user.click(screen.getByRole('button', { name: 'More guests' }))
     await user.click(screen.getByRole('button', { name: 'More guests' }))
     await user.click(screen.getByRole('button', { name: 'More guests' }))
 
-    expect(screen.getByText('$21.25 each, 15% group price')).toBeInTheDocument()
+    expect(screen.getByText('$24 each · 15% group discount')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Card · Credit or debit card/ })).toHaveTextContent('$96')
-    expect(screen.getByRole('button', { name: /PayNow · 5% off/ })).toHaveTextContent('$96')
-    expect(screen.getByRole('button', { name: /PayNow · 5% off/ })).toHaveTextContent('$91.20')
+    expect(screen.getByRole('button', { name: /PayNow/ })).toHaveTextContent('$96')
+    expect(screen.getByRole('button', { name: /PayNow/ })).toHaveTextContent('$91.20')
   })
 
   it('sends the chosen guest count to create-payment-intent', async () => {
@@ -825,7 +856,7 @@ describe('ListingDetail booking', () => {
     givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(72), spots_remaining: 3 })])
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({
-      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 7600 },
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 9600 },
       error: null,
     })
     const { user } = renderPage()
@@ -865,7 +896,7 @@ describe('ListingDetail checkout', () => {
     givenSessions([makeSession({ id: 'session-7' })])
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({
-      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 4500 },
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 5100 },
       error: null,
     })
     const utils = renderPage()
@@ -906,10 +937,14 @@ describe('ListingDetail checkout', () => {
 
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
     await waitFor(() =>
-      expect(supabase.functions.invoke).toHaveBeenCalledWith('cancel-booking', {
+      expect(supabase.functions.invoke).toHaveBeenCalledWith('abandon-checkout', {
         body: { booking_id: 'booking-1' },
         headers: { Authorization: 'Bearer test-access-token' },
       }),
+    )
+    expect(supabase.functions.invoke).not.toHaveBeenCalledWith(
+      'cancel-booking',
+      expect.anything(),
     )
   })
 

@@ -35,8 +35,13 @@ export const CANCELLATION_POLICY_ITEMS = [
 ]
 
 export function formatCents(cents) {
-  const dollars = cents / 100
-  return dollars % 1 === 0 ? `$${dollars}` : `$${dollars.toFixed(2)}`
+  const dollars = Number(cents) / 100
+  if (!Number.isFinite(dollars)) return '$0'
+  const formatted = new Intl.NumberFormat('en-SG', {
+    minimumFractionDigits: dollars % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: dollars % 1 === 0 ? 0 : 2,
+  }).format(dollars)
+  return `$${formatted}`
 }
 
 /**

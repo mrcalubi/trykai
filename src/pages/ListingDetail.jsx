@@ -25,6 +25,7 @@ import {
   groupPriceLabel,
   guestFacingPriceCents,
   MAX_GUESTS_PER_BOOKING,
+  nextGroupTierHint,
   paynowPriceCents,
 } from '../lib/pricing'
 import { formatDuration } from '../lib/duration'
@@ -293,12 +294,12 @@ export default function ListingDetail() {
     setActivePhoto(Math.round(scrollLeft / clientWidth))
   }
 
-  async function voidUnpaidBooking(id) {
+  async function abandonUnpaidCheckout(id) {
     if (!id) return
     const {
       data: { session },
     } = await supabase.auth.getSession()
-    await supabase.functions.invoke('cancel-booking', {
+    await supabase.functions.invoke('abandon-checkout', {
       body: { booking_id: id },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     })
@@ -313,7 +314,7 @@ export default function ListingDetail() {
     setBookingId(null)
     setTotalAmount(null)
     setPaymentError('')
-    void voidUnpaidBooking(unpaidId)
+    void abandonUnpaidCheckout(unpaidId)
   }
 
   function showMonth(monthKey) {
@@ -371,7 +372,7 @@ export default function ListingDetail() {
       setBookingId(null)
       setTotalAmount(null)
       setCheckoutRail(null)
-      void voidUnpaidBooking(unpaidId)
+      void abandonUnpaidCheckout(unpaidId)
     }
     setGuestsCount(next)
   }
@@ -382,6 +383,13 @@ export default function ListingDetail() {
     } = await supabase.auth.getSession()
 
     if (!session || !checkoutSessionId) return
+
+    const shownAmount = checkoutPriceCents(
+      listing.price_per_person,
+      paymentRail,
+      guestsCount,
+      groupPricing,
+    )
 
     setCheckoutRail(paymentRail)
     setBookingLoading(true)
@@ -407,6 +415,16 @@ export default function ListingDetail() {
 
     if (!data?.clientSecret || !data?.booking_id) {
       setPaymentError('Failed to start payment. Please try again.')
+      return
+    }
+
+    if (data.total_amount !== shownAmount) {
+      console.error('checkout price mismatch', {
+        shown: shownAmount,
+        server: data.total_amount,
+      })
+      setPaymentError('The price has changed. Please refresh.')
+      void abandonUnpaidCheckout(data.booking_id)
       return
     }
 
@@ -452,6 +470,13 @@ export default function ListingDetail() {
     : (Object.keys(sessionsByDay).sort()[0] ?? null)
   const daySessions = activeDateKey ? sessionsByDay[activeDateKey] : []
   const checkoutSession = daySessions.find((session) => session.id === checkoutSessionId) ?? null
+  const nextHint = checkoutSession
+    ? nextGroupTierHint(
+        guestsCount,
+        groupPricing,
+        Math.min(checkoutSession.spots_remaining, MAX_GUESTS_PER_BOOKING),
+      )
+    : ''
 
   function renderDaySessions() {
     if (!monthSessions) {
@@ -682,8 +707,12 @@ export default function ListingDetail() {
                             listing.price_per_person,
                             guestsCount,
                             groupPricing,
+                            checkoutRail ?? 'card',
                           )}
                         </p>
+                        {nextHint ? (
+                          <p className="guest-stepper__hint">{nextHint}</p>
+                        ) : null}
                       </div>
                     )}
                     <p className="payment-agree">
@@ -691,6 +720,22 @@ export default function ListingDetail() {
                       <Link to="/terms#part-3-booking">Booking terms</Link> and{' '}
                       <Link to="/cancellation-policy">Cancellation Policy</Link>
                     </p>
+                    <button
+                      type="button"
+                      className="payment-rail payment-rail--paynow"
+                      disabled={bookingLoading}
+                      aria-pressed={checkoutRail === 'paynow'}
+                      onClick={() => startPayment('paynow')}
+                    >
+                      <span className="payment-rail__label">
+                        PayNow · <span className="paynow-badge">5% off</span>
+                        <span className="paynow-badge">Best price</span>
+                      </span>
+                      <span className="payment-rail__price">
+                        <s className="payment-rail__was">{formatCents(cardPrice)}</s>
+                        {formatCents(paynowPrice)}
+                      </span>
+                    </button>
                     <button
                       type="button"
                       className="payment-rail"
@@ -703,19 +748,6 @@ export default function ListingDetail() {
                       </span>
                       <span className="payment-rail__price">{formatCents(cardPrice)}</span>
                     </button>
-                    <button
-                      type="button"
-                      className="payment-rail"
-                      disabled={bookingLoading}
-                      aria-pressed={checkoutRail === 'paynow'}
-                      onClick={() => startPayment('paynow')}
-                    >
-                      <span className="payment-rail__label">PayNow · 5% off</span>
-                      <span className="payment-rail__price">
-                        <s className="payment-rail__was">{formatCents(cardPrice)}</s>
-                        {formatCents(paynowPrice)}
-                      </span>
-                    </button>
                     <button type="button" onClick={cancelPayment} className="btn btn--ghost">
                       Cancel
                     </button>
@@ -727,7 +759,7 @@ export default function ListingDetail() {
                       bookingId={bookingId}
                       onSuccess={handlePaymentSuccess}
                       onCancel={cancelPayment}
-                      onPaymentFailed={() => void voidUnpaidBooking(bookingId)}
+                      onPaymentFailed={() => void abandonUnpaidCheckout(bookingId)}
                     />
                   </Elements>
                 )}

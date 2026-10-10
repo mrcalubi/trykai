@@ -6,6 +6,7 @@ import {
   formatGuestFacingPrice,
   groupPriceLabel,
   guestFacingPriceCents,
+  nextGroupTierHint,
   paynowPriceCents,
 } from './pricing'
 import {
@@ -74,9 +75,18 @@ describe('pricing.js matches booking.ts', () => {
     )
   })
 
-  it('labels the live per-person group price', () => {
-    expect(groupPriceLabel(2500, 1)).toBe('$25 each')
-    expect(groupPriceLabel(2500, 4)).toBe('$21.25 each, 15% group price')
+  it('labels the live all-in price per person', () => {
+    expect(groupPriceLabel(2500, 1)).toBe('$28 per person')
+    expect(groupPriceLabel(2500, 2)).toBe('$27 each · 5% group discount')
+    expect(groupPriceLabel(135800, 1)).toBe('$1,521 per person')
     expect(discountedPerPersonCents(2500, 4)).toBe(2125)
+  })
+
+  it('hints the next group tier when one is still available', () => {
+    expect(nextGroupTierHint(1, true, 4)).toBe('Add 1 more for 5% off')
+    expect(nextGroupTierHint(2, true, 4)).toBe('Add 1 more for 10% off')
+    expect(nextGroupTierHint(4, true, 4)).toBe('')
+    expect(nextGroupTierHint(5, true, 10)).toBe('')
+    expect(nextGroupTierHint(2, false, 4)).toBe('')
   })
 })

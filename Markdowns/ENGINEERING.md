@@ -440,6 +440,7 @@ supabase/functions/
 │   ├── payouts.ts               # 24h Transfer eligibility, skip reasons, charge backfill
 │   └── verification.ts          # Status, Identity params, 30-day retention rules
 ├── create-payment-intent/       # Pending booking + PaymentIntent (no emails)
+├── abandon-checkout/            # Guest JWT only; drop unpaid pending; leave if PI succeeded
 ├── stripe-webhook/              # Stripe-Signature → confirm_paid_booking, identity outcomes, emails
 ├── create-connect-account/      # Express account for the signed-in host
 ├── create-account-link/         # Creates account if needed, Account Link to /dashboard?connect=

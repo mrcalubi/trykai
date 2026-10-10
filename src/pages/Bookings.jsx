@@ -216,7 +216,7 @@ export default function Bookings({ embedded = false }) {
             data: { session },
           } = await supabase.auth.getSession()
           if (cancelled) return
-          await supabase.functions.invoke('cancel-booking', {
+          await supabase.functions.invoke('abandon-checkout', {
             body: { booking_id: pendingBookingId },
             headers: { Authorization: `Bearer ${session?.access_token}` },
           })
