@@ -1060,7 +1060,16 @@ a {
 }
 
 .ui-input--with-toggle {
-  padding-right: 44px;
+  padding-right: 84px;
+}
+
+/* The browser's own reveal sits in the same corner and duplicates ours. */
+.ui-input[type='password']::-ms-reveal,
+.ui-input[type='password']::-ms-clear,
+.ui-input[type='password']::-webkit-credentials-auto-fill-button,
+.ui-input[type='password']::-webkit-password-reveal-button {
+  display: none;
+  pointer-events: none;
 }
 
 .ui-field__control,
@@ -1070,21 +1079,31 @@ a {
   width: 100%;
 }
 
-.ui-field__toggle {
+.ui-field__password-actions {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   display: flex;
   align-items: center;
+}
+
+.ui-field__toggle {
+  display: flex;
+  align-items: center;
   justify-content: center;
-  width: 44px;
+  width: 40px;
+  height: 100%;
   padding: 0;
   color: var(--navy-muted);
   background: none;
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
+}
+
+.ui-field__toggle--peek {
+  color: var(--navy);
 }
 
 .ui-field__toggle:hover {
