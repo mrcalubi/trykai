@@ -206,7 +206,10 @@ export async function applyConnectedAccountPayouts(
   account: { id?: string | null; payouts_enabled?: boolean | null } | null,
 ): Promise<void> {
   const accountId = typeof account?.id === 'string' ? account.id : ''
-  if (!accountId) return
+  if (!account || !accountId) {
+    console.error('connect: account could not be read; skipping stripe_payouts_enabled update')
+    return
+  }
   const { error } = await admin
     .from('users')
     .update({ stripe_payouts_enabled: payoutsEnabledFromAccount(account) })

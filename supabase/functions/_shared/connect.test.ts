@@ -194,4 +194,20 @@ describe('applyConnectedAccountPayouts', () => {
     await applyConnectedAccountPayouts(admin, { payouts_enabled: true })
     expect(update).not.toHaveBeenCalled()
   })
+
+  it('does not update stripe_payouts_enabled when the account is null', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { admin, update } = usersWriter()
+
+    try {
+      await applyConnectedAccountPayouts(admin, null)
+      expect(update).not.toHaveBeenCalled()
+      expect(admin.from).not.toHaveBeenCalled()
+      expect(log).toHaveBeenCalledWith(
+        'connect: account could not be read; skipping stripe_payouts_enabled update',
+      )
+    } finally {
+      log.mockRestore()
+    }
+  })
 })
