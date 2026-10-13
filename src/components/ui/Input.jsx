@@ -69,7 +69,8 @@ export default function Input({
   const isControlled = value !== undefined
   const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue ?? '')
   const [focused, setFocused] = useState(false)
-  const [passwordVisible, setPasswordVisible] = useState(false)
+  const [passwordToggled, setPasswordToggled] = useState(false)
+  const [passwordPeeking, setPasswordPeeking] = useState(false)
   const currentValue = isControlled ? value : uncontrolledValue
   const floated = floatingLabel && (focused || String(currentValue ?? '').length > 0)
   const fieldClasses = [
@@ -90,6 +91,7 @@ export default function Input({
     .filter(Boolean)
     .join(' ')
   const inputPlaceholder = floatingLabel ? placeholder || ' ' : placeholder
+  const passwordVisible = passwordToggled || passwordPeeking
   const inputType = isPassword && passwordVisible ? 'text' : type
   const labelEl = label ? (
     <label htmlFor={inputId} className="ui-field__label">
@@ -122,17 +124,54 @@ export default function Input({
   ) : (
     <input type={inputType} {...fieldProps} />
   )
+  function startPeek(event) {
+    event.preventDefault()
+    setPasswordPeeking(true)
+    if (event.pointerId != null) {
+      event.currentTarget.setPointerCapture?.(event.pointerId)
+    }
+  }
+
+  function stopPeek() {
+    setPasswordPeeking(false)
+  }
+
   const passwordToggle = isPassword ? (
-    <button
-      type="button"
-      className="ui-field__toggle"
-      aria-label={passwordVisible ? 'Hide password' : 'Show password'}
-      aria-pressed={passwordVisible}
-      aria-controls={inputId}
-      onClick={() => setPasswordVisible((visible) => !visible)}
-    >
-      {passwordVisible ? <EyeIcon /> : <EyeOffIcon />}
-    </button>
+    <div className="ui-field__password-actions">
+      <button
+        type="button"
+        className="ui-field__toggle ui-field__toggle--peek"
+        aria-label="Hold to peek at password"
+        aria-pressed={passwordPeeking}
+        aria-controls={inputId}
+        onPointerDown={startPeek}
+        onPointerUp={stopPeek}
+        onPointerCancel={stopPeek}
+        onLostPointerCapture={stopPeek}
+        onKeyDown={(event) => {
+          if (event.key === ' ' || event.key === 'Enter') {
+            event.preventDefault()
+            setPasswordPeeking(true)
+          }
+        }}
+        onKeyUp={(event) => {
+          if (event.key === ' ' || event.key === 'Enter') stopPeek()
+        }}
+        onBlur={stopPeek}
+      >
+        <EyeIcon />
+      </button>
+      <button
+        type="button"
+        className="ui-field__toggle"
+        aria-label={passwordToggled ? 'Hide password' : 'Show password'}
+        aria-pressed={passwordToggled}
+        aria-controls={inputId}
+        onClick={() => setPasswordToggled((visible) => !visible)}
+      >
+        {passwordToggled ? <EyeIcon /> : <EyeOffIcon />}
+      </button>
+    </div>
   ) : null
   const inputWithToggle = isPassword ? (
     <div className="ui-field__input-wrap">

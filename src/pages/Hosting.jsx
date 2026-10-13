@@ -3,7 +3,6 @@ import { useLocation, useSearchParams, Link, Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
-import { formatCents } from '../lib/cancellationPolicy'
 import { formatDuration } from '../lib/duration'
 import Button from '../components/ui/Button'
 import OverflowMenu from '../components/ui/OverflowMenu'
@@ -597,11 +596,6 @@ export default function Hosting({ embedded = false }) {
                     <p className="cancel-confirm__warning">
                       Cancelling this session will issue full refunds to all guests and add a
                       strike to your account. Three strikes will deactivate your listing.
-                    </p>
-                    <p className="cancel-confirm__note">
-                      {activeBookings
-                        .map((b) => `Full refund of ${formatCents(b.total_amount)}`)
-                        .join(' · ')}
                     </p>
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <button
