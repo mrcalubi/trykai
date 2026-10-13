@@ -61,7 +61,7 @@ Rule that keeps the docs honest: one fact, one home. When two docs disagree, say
 
 **The two test cancellations still need a Stripe check.** Cancelling from `/bookings` calls `cancel-booking`. That function writes bookings and sessions with the service role, so API logs show `PATCH /rest/v1/bookings` and `PATCH /rest/v1/sessions` 204 even when the function ran. That is not proof of an RLS bypass. `00009` also dropped the leftover 00001 INSERT/UPDATE policies so a restored GRANT cannot come back as a client cancel. Look at Edge Function logs for `cancel-booking invoked`. **Unchecked: whether the two test cancellations were actually refunded on Stripe.** Cancellation emails on those tests were not verified because the PATCH lines were read as a bypass.
 
-**Bug 4, misfiled as UI.** A host who exits Stripe onboarding without completing it still sees "Payout setup submitted." `Hosting.jsx` treats `?connect=return` as success without re-checking `stripe_payouts_enabled`. They cannot be paid. Money path. Ruiheng's.
+**Bug 4, misfiled as UI — fixed 13 October 2026.** `?connect=return` / `refresh` re-read `stripe_payouts_enabled` from Stripe before showing a message. Remaining ops: Connected-accounts webhook + `STRIPE_CONNECT_WEBHOOK_SECRET` (OPERATIONS.md).
 
 **Production vs staging is unconfirmed from this repo.** `00008`, `00009`, `00010`, the Resend from-address, and the Edge Function code are in the tree. Applying those migrations, setting `RESEND_API_KEY` and Vault/`PAYOUT_CRON_SECRET`, and deploying functions are ops per environment. Confirm production has `00008` through `00010`, `RESEND_API_KEY`, and current function deploys before launch. Do not treat staging-only secrets and deploys as production facts.
 

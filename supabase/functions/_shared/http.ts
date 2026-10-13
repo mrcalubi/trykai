@@ -36,6 +36,37 @@ export type StripeEventAction =
   | 'review_identity'
   | 'ignore'
 
+/** Platform first, then the Connected-accounts destination if that secret is set. */
+export function stripeWebhookSecrets(env: {
+  STRIPE_WEBHOOK_SECRET?: string | undefined
+  STRIPE_CONNECT_WEBHOOK_SECRET?: string | undefined
+}): string[] {
+  return [env.STRIPE_WEBHOOK_SECRET, env.STRIPE_CONNECT_WEBHOOK_SECRET]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter((value) => value.length > 0)
+}
+
+export async function constructStripeWebhookEvent<T>(options: {
+  constructEvent: (body: string, signature: string, secret: string) => Promise<T> | T
+  body: string
+  signature: string | null
+  secrets: string[]
+}): Promise<{ ok: true; event: T } | { ok: false; error: string }> {
+  const { constructEvent, body, signature, secrets } = options
+  if (!signature || secrets.length === 0) {
+    return { ok: false, error: 'Missing webhook signature' }
+  }
+  for (const secret of secrets) {
+    try {
+      const event = await constructEvent(body, signature, secret)
+      return { ok: true, event }
+    } catch {
+      // Try the next secret (platform, then Connect destination).
+    }
+  }
+  return { ok: false, error: 'Invalid signature' }
+}
+
 export function stripeEventAction(eventType: string): StripeEventAction {
   if (eventType === 'payment_intent.succeeded') return 'confirm'
   if (eventType === 'payment_intent.payment_failed' || eventType === 'payment_intent.canceled') {

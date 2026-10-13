@@ -143,6 +143,7 @@ export default function Hosting({ embedded = false }) {
   const [payoutsEnabled, setPayoutsEnabled] = useState(true)
   const [payoutSetupLoading, setPayoutSetupLoading] = useState(false)
   const [payoutSetupError, setPayoutSetupError] = useState('')
+  const [payoutSetupIncomplete, setPayoutSetupIncomplete] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
 
@@ -235,29 +236,47 @@ export default function Hosting({ embedded = false }) {
   }, [loadData])
 
   useEffect(() => {
+    if (loading) return
     if (connectStatus !== 'return' && connectStatus !== 'refresh') return
 
     let cancelled = false
-    void Promise.resolve().then(() => {
-      if (cancelled) return
-      if (connectStatus === 'return') {
-        setBookingStatusMessage(
-          'Payout setup submitted. It can take a minute for Stripe to confirm.',
-        )
-      } else {
-        setPayoutSetupError('Please finish payout setup to receive payments.')
-      }
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev)
-        next.delete('connect')
-        return next
-      }, { replace: true })
-    })
 
+    async function refreshPayoutStatus() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const { data, error: fnError } = await supabase.functions.invoke('create-account-link', {
+        body: { refresh: true },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      if (cancelled) return
+
+      if (fnError || data?.error) {
+        setPayoutSetupError(await edgeFunctionErrorMessage(fnError, data))
+      } else if (data?.stripe_payouts_enabled) {
+        setPayoutsEnabled(true)
+        setPayoutSetupIncomplete(false)
+        setBookingStatusMessage('Payouts are set up. Guests can now book you.')
+      } else {
+        setPayoutsEnabled(false)
+        setPayoutSetupIncomplete(true)
+      }
+
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('connect')
+          return next
+        },
+        { replace: true },
+      )
+    }
+
+    void refreshPayoutStatus()
     return () => {
       cancelled = true
     }
-  }, [connectStatus, setSearchParams])
+  }, [loading, connectStatus, setSearchParams])
 
   function openSessionForm(listingId) {
     setActiveFormId(listingId)
@@ -370,7 +389,8 @@ export default function Hosting({ embedded = false }) {
     }
     if (data?.stripe_payouts_enabled) {
       setPayoutsEnabled(true)
-      setBookingStatusMessage('Payouts are set up. You can take bookings.')
+      setPayoutSetupIncomplete(false)
+      setBookingStatusMessage('Payouts are set up. Guests can now book you.')
       return
     }
     if (data?.url) {
@@ -483,7 +503,19 @@ export default function Hosting({ embedded = false }) {
         </p>
       ) : null}
 
-      {listings.length > 0 && !payoutsEnabled && (
+      {payoutSetupIncomplete ? (
+        <div className="payout-setup" role="status">
+          <p className="payout-setup__copy">Your payout setup isn&apos;t finished yet.</p>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={payoutSetupLoading}
+            onClick={handlePayoutSetup}
+          >
+            {payoutSetupLoading ? 'Opening Stripe…' : 'Continue setup'}
+          </Button>
+        </div>
+      ) : listings.length > 0 && !payoutsEnabled ? (
         <div className="payout-setup">
           <h2 className="payout-setup__title">Set up payouts</h2>
           <p className="payout-setup__copy">
@@ -499,7 +531,7 @@ export default function Hosting({ embedded = false }) {
             {payoutSetupLoading ? 'Opening Stripe…' : 'Set up payouts'}
           </button>
         </div>
-      )}
+      ) : null}
 
       <section className="dashboard-section">
         <h2 className="dashboard-section__title">Upcoming Hosted Sessions</h2>

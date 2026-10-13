@@ -53,14 +53,13 @@ Verification approval is now on the platform. Suspension that does not hide list
 Not a calendar. Capacity is 8 hours a week.
 
 1. **Ops (not app code):** confirm `00005`, `00008`, `00009`, `00010`, `00011`, and `00012` on each environment; Vault/GitHub secrets for `release-payout`; Stripe Dashboard webhook + secrets; `RESEND_API_KEY` and current Edge Function deploys on production; platform payouts **manual**; flag eleven `is_founding_host`; one staging test-mode booking; confirm the two test cancellations were refunded on Stripe.
-2. **Bug 4:** Hosting treats `?connect=return` as "Payout setup submitted" without re-checking `stripe_payouts_enabled`. Money path.
-3. **P0.4** app actually filters `is_suspended` on browse and Book. Listing/session INSERT is already gated by `can_create_listing()` (`00008`). One-click admin can wait if Table Editor plus this filter is reliable.
-4. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
-5. Browse card rating: the listings fetch does not supply one and there is no aggregate rating column. The card already shows the all-in card price.
-6. **P2.3** review gating is done (`00011`). Then the rest of P2 in listed order.
-7. JWT "issued at future" on browse: retry once, friendly error, never show raw error text.
-8. Host cancel warning: replace per-guest refund amounts with "Cancelling refunds all N guests in full and adds a strike".
-9. Reword S$10 to S$40 as guidance, not a rule (decided; remaining copy in HOST_ONBOARDING / BUSINESS / HANDOVER).
+2. **P0.4** app actually filters `is_suspended` on browse and Book. Listing/session INSERT is already gated by `can_create_listing()` (`00008`). One-click admin can wait if Table Editor plus this filter is reliable.
+3. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
+4. Browse card rating: the listings fetch does not supply one and there is no aggregate rating column. The card already shows the all-in card price.
+5. **P2.3** review gating is done (`00011`). Then the rest of P2 in listed order.
+6. JWT "issued at future" on browse: retry once, friendly error, never show raw error text.
+7. Host cancel warning: replace per-guest refund amounts with "Cancelling refunds all N guests in full and adds a strike".
+8. Reword S$10 to S$40 as guidance, not a rule (decided; remaining copy in HOST_ONBOARDING / BUSINESS / HANDOVER).
 
 Review reminder email, saved listings, host-to-guest reviews then the review filter, and the `full_name` SELECT revoke are post-launch (P3), not this sequence.
 

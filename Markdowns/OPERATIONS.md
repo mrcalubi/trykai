@@ -48,7 +48,6 @@ Week 8 of the original plan (15–21 September) is ending. The week-by-week sect
 - Confirm the two test cancellations were refunded on Stripe. API PATCH 204s are the expected service-role writes from `cancel-booking`, not proof of a client bypass.
 
 **Open in the app:**
-- Bug 4: Hosting treats `?connect=return` as "Payout setup submitted" without re-checking `stripe_payouts_enabled`.
 - P0.4: browse and Book ignore `is_suspended`. INSERT is already gated by `00008`.
 - P0.7: `listings.full_address` grant still too wide.
 - Forgot password is not built.
@@ -381,6 +380,27 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 | A founder disengages over a longer runway | Low | High | Monthly check ins make this visible early. |
 | Yide day trading listing creates liability | Low | High | Frame as experience sharing only, explicit disclaimer, law student review. |
 | Off platform leakage | Low at this scale | Medium | Reviews only through TryKai, brief hosts during onboarding. |
+
+---
+
+# Connected accounts webhook (`account.updated`)
+
+The platform webhook (`STRIPE_WEBHOOK_SECRET`) receives payment and Identity events on the TryKai account. Connect `account.updated` for Express hosts is sent to a **Connected accounts** destination, which has its own signing secret. Without that destination, Hosting return still re-reads the account via `create-account-link` `{ refresh: true }`, but later payout capability changes never reach the database.
+
+**Do this once per Stripe mode (test, then live) and once per function project (staging, then production).**
+
+1. Open https://dashboard.stripe.com (Test mode on for staging).
+2. **Developers → Webhooks → Add destination** (or **Add endpoint**).
+3. Choose **Connected accounts** (not your account / platform events).
+4. Endpoint URL: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/stripe-webhook` (same URL as the platform webhook).
+5. Listen to **`account.updated`** only. Save.
+6. Copy the destination signing secret (`whsec_…`).
+7. Set it as an Edge Function secret. Dashboard: https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/functions/secrets — add `STRIPE_CONNECT_WEBHOOK_SECRET`. CLI: `supabase secrets set STRIPE_CONNECT_WEBHOOK_SECRET='whsec_…' --project-ref hzgybclfvpuxkmytdoos`
+8. Redeploy `stripe-webhook` so it reads the new secret: `supabase functions deploy stripe-webhook --project-ref hzgybclfvpuxkmytdoos`
+
+`stripe-webhook` tries `STRIPE_WEBHOOK_SECRET` first, then `STRIPE_CONNECT_WEBHOOK_SECRET` if set. A signature that matches neither is rejected. An `account.updated` for an `acct_` that is not in `users.stripe_account_id` is ignored.
+
+Keep the existing platform destination for `payment_intent.*` and Identity events. Do not put those on the Connected-accounts destination.
 
 ---
 

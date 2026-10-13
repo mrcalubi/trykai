@@ -173,3 +173,46 @@ export function payoutsEnabledFromAccount(account: {
 }): boolean {
   return Boolean(account?.payouts_enabled)
 }
+
+export function isAccountLinkRefresh(body: unknown): boolean {
+  return Boolean(body && typeof body === 'object' && (body as { refresh?: unknown }).refresh === true)
+}
+
+/** Prefer data.object.id (the Account). Fall back to event.account on a Connect destination. */
+export function connectedAccountFromEvent(event: {
+  account?: string | null
+  data?: { object?: { id?: string | null; payouts_enabled?: boolean | null } | null }
+}): { id: string; payouts_enabled?: boolean | null } | null {
+  const object = event.data?.object
+  const id =
+    (typeof object?.id === 'string' && object.id) ||
+    (typeof event.account === 'string' && event.account) ||
+    ''
+  if (!id) return null
+  return { id, payouts_enabled: object?.payouts_enabled }
+}
+
+export type UsersPayoutsWriter = {
+  from: (table: string) => {
+    update: (payload: { stripe_payouts_enabled: boolean }) => {
+      eq: (column: string, value: string) => PromiseLike<{ error?: { message?: string } | null }>
+    }
+  }
+}
+
+/** Writes stripe_payouts_enabled for the host whose stripe_account_id matches. Zero rows is fine. */
+export async function applyConnectedAccountPayouts(
+  admin: UsersPayoutsWriter,
+  account: { id?: string | null; payouts_enabled?: boolean | null } | null,
+): Promise<void> {
+  const accountId = typeof account?.id === 'string' ? account.id : ''
+  if (!account || !accountId) {
+    console.error('connect: account could not be read; skipping stripe_payouts_enabled update')
+    return
+  }
+  const { error } = await admin
+    .from('users')
+    .update({ stripe_payouts_enabled: payoutsEnabledFromAccount(account) })
+    .eq('stripe_account_id', accountId)
+  if (error) throw new Error(error.message)
+}

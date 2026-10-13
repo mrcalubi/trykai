@@ -1016,7 +1016,7 @@ describe('Dashboard payout setup', () => {
       body: {},
       headers: { Authorization: 'Bearer test-access-token' },
     })
-    expect(await screen.findByText('Payouts are set up. You can take bookings.')).toBeInTheDocument()
+    expect(await screen.findByText('Payouts are set up. Guests can now book you.')).toBeInTheDocument()
   })
 
   it('shows Stripe’s actual error when payout setup fails', async () => {
@@ -1047,8 +1047,12 @@ describe('Dashboard payout setup', () => {
     ).toBeInTheDocument()
   })
 
-  it('explains a successful return from Stripe onboarding', async () => {
+  it('re-reads Stripe on ?connect=return and confirms when payouts are enabled', async () => {
     givenData({ listings: [makeMyListing()] })
+    supabase.functions.invoke.mockResolvedValue({
+      data: { stripe_payouts_enabled: true, url: null },
+      error: null,
+    })
     renderWithRouter(
       <RequireAuth>
         <Hosting />
@@ -1057,12 +1061,59 @@ describe('Dashboard payout setup', () => {
     )
 
     expect(
-      await screen.findByText('Payout setup submitted. It can take a minute for Stripe to confirm.')
+      await screen.findByText('Payouts are set up. Guests can now book you.')
     ).toBeInTheDocument()
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('create-account-link', {
+      body: { refresh: true },
+      headers: { Authorization: 'Bearer test-access-token' },
+    })
+    expect(screen.queryByText(/Payout setup submitted/)).not.toBeInTheDocument()
   })
 
-  it('asks the host to finish onboarding when Stripe sends them back to refresh', async () => {
+  it('re-reads Stripe on ?connect=return and offers to continue when payouts are not enabled', async () => {
     givenData({ listings: [makeMyListing()] })
+    supabase.functions.invoke.mockResolvedValue({
+      data: { stripe_payouts_enabled: false, url: null },
+      error: null,
+    })
+    const assign = vi.fn()
+    vi.stubGlobal('location', { assign, origin: 'http://localhost:3000', href: 'http://localhost:3000/hosting' })
+
+    try {
+      const { user } = renderWithRouter(
+        <RequireAuth>
+          <Hosting />
+        </RequireAuth>,
+        { route: '/hosting?connect=return', path: '/hosting' }
+      )
+
+      expect(await screen.findByText("Your payout setup isn't finished yet.")).toBeInTheDocument()
+      expect(screen.queryByText(/Payout setup submitted/)).not.toBeInTheDocument()
+
+      supabase.functions.invoke.mockResolvedValue({
+        data: { stripe_payouts_enabled: false, url: 'https://connect.stripe.com/setup/fresh' },
+        error: null,
+      })
+      await user.click(screen.getByRole('button', { name: 'Continue setup' }))
+
+      await waitFor(() =>
+        expect(supabase.functions.invoke).toHaveBeenCalledWith('create-account-link', {
+          body: {},
+          headers: { Authorization: 'Bearer test-access-token' },
+        })
+      )
+      expect(assign).toHaveBeenCalledWith('https://connect.stripe.com/setup/fresh')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('re-reads Stripe on ?connect=refresh instead of assuming setup is done', async () => {
+    givenData({ listings: [makeMyListing()] })
+    supabase.functions.invoke.mockResolvedValue({
+      data: { stripe_payouts_enabled: false, url: null },
+      error: null,
+    })
     renderWithRouter(
       <RequireAuth>
         <Hosting />
@@ -1070,9 +1121,9 @@ describe('Dashboard payout setup', () => {
       { route: '/hosting?connect=refresh', path: '/hosting' }
     )
 
-    expect(
-      await screen.findByText('Please finish payout setup to receive payments.')
-    ).toBeInTheDocument()
+    expect(await screen.findByText("Your payout setup isn't finished yet.")).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue setup' })).toBeInTheDocument()
+    expect(screen.queryByText(/Payout setup submitted/)).not.toBeInTheDocument()
   })
 })
 

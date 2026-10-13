@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   accountLinkParams,
   createConnectedAccount,
+  isAccountLinkRefresh,
   payoutsEnabledFromAccount,
 } from '../_shared/connect.ts'
 import { jsonResponse, textResponse } from '../_shared/http.ts'
@@ -42,8 +43,14 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Profile not found' }, 404)
     }
 
+    const payload = await req.json().catch(() => ({}))
+    const refreshOnly = isAccountLinkRefresh(payload)
+
     let accountId = profile.stripe_account_id
     if (!accountId) {
+      if (refreshOnly) {
+        return jsonResponse({ stripe_payouts_enabled: false, url: null })
+      }
       const created = await createConnectedAccount(Deno.env.get('STRIPE_SECRET_KEY') ?? '', profile)
       accountId = created.id
       await admin
@@ -60,8 +67,8 @@ Deno.serve(async (req) => {
         .from('users')
         .update({ stripe_payouts_enabled: enabled })
         .eq('id', user.id)
-      if (enabled) {
-        return jsonResponse({ stripe_payouts_enabled: true, url: null })
+      if (enabled || refreshOnly) {
+        return jsonResponse({ stripe_payouts_enabled: enabled, url: null })
       }
     }
 

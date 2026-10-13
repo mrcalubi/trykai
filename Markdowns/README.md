@@ -35,7 +35,6 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 
 **Blocked or in flight**
 - Production vs staging is unconfirmed from this repo. Confirm production has `00008` through `00012`, `RESEND_API_KEY`, and current Edge Function deploys
-- Bug 4: Hosting shows "Payout setup submitted" on `?connect=return` without re-checking `stripe_payouts_enabled`
 - Two test cancellations: confirm Stripe refunds and `cancel-booking invoked` in function logs
 - Apply `00010` plus Vault/`PAYOUT_CRON_SECRET` on each environment. Platform payouts must stay manual
 - P0.4: `is_suspended` exists; listing/session INSERT is blocked by `00008`, but browse and Book still ignore the flag
