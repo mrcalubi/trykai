@@ -158,6 +158,36 @@ describe('ListingDetail content', () => {
     expect(screen.queryByText('Mei Ling Tan')).not.toBeInTheDocument()
   })
 
+  it('shows the first two lines of the host bio under Hosted by, even when signed out', async () => {
+    givenListing(
+      makeListing({
+        users: {
+          display_name: 'Mei',
+          full_name: 'Mei Ling',
+          bio: 'I pull rosettas.\nAlso pour-overs.\nAnd cortados.',
+          avatar_url: null,
+        },
+      }),
+    )
+    renderPage()
+
+    await screen.findByRole('link', { name: 'Mei' })
+    expect(document.querySelector('.detail-host__bio').textContent).toBe(
+      'I pull rosettas.\nAlso pour-overs.\nAnd cortados.',
+    )
+    expect(screen.getByRole('link', { name: 'More about Mei' })).toHaveAttribute('href', '/u/host-1')
+    expect(supabase.auth.getSession).toHaveBeenCalled()
+  })
+
+  it('hides the host About when there is no bio', async () => {
+    givenListing()
+    renderPage()
+
+    await screen.findByRole('link', { name: 'Mei' })
+    expect(document.querySelector('.detail-host__bio')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /More about/ })).not.toBeInTheDocument()
+  })
+
   it('falls back to the first name when display_name is missing', async () => {
     givenListing(makeListing({ users: { full_name: 'Mei Ling', avatar_url: null } }))
     renderPage()
@@ -259,8 +289,9 @@ describe('ListingDetail content', () => {
     expect([...css.matchAll(/overflow-wrap:\s*break-word/g)]).toHaveLength(1)
     expect(css).not.toMatch(/overflow-wrap:\s*anywhere/)
     expect(css).toMatch(
-      /\.detail-title,\s*\n\.detail-description,\s*\n\.detail-area,\s*\n\.detail-list li,\s*\n\.review-card__comment,\s*\n\.ui-card__title,\s*\n\.dashboard-card__title,\s*\n\.dashboard-card__meta/
+      /\.detail-title,\s*\n\.detail-description,\s*\n\.detail-area,\s*\n\.detail-list li,\s*\n\.review-card__comment,\s*\n\.ui-card__title,\s*\n\.dashboard-card__title,\s*\n\.dashboard-card__meta,\s*\n\.profile-about__body,\s*\n\.detail-host__bio/
     )
+    expect(css).toMatch(/\.detail-host__bio \{[\s\S]*?-webkit-line-clamp:\s*2/)
   })
 
   it('hides the host rating when the host has no reviews', async () => {

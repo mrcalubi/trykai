@@ -166,6 +166,7 @@ export default function ListingDetail() {
           users!host_id (
             display_name,
             full_name,
+            bio,
             avatar_url,
             stripe_payouts_enabled
           )
@@ -597,6 +598,16 @@ export default function ListingDetail() {
                 )}
               </p>
               <HostRating reviews={hostReviews} />
+              {typeof host?.bio === 'string' && host.bio.trim() ? (
+                <>
+                  <p className="detail-host__bio">{host.bio.trim()}</p>
+                  {listing.host_id ? (
+                    <Link to={`/u/${listing.host_id}`} className="detail-host__more">
+                      More about {publicName(host) || 'Anonymous'}
+                    </Link>
+                  ) : null}
+                </>
+              ) : null}
             </div>
           </div>
 

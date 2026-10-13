@@ -16,6 +16,7 @@ function givenProfile(profile = {
   id: HOST_ID,
   display_name: 'Mei',
   full_name: 'Mei Ling Tan',
+  bio: null,
   avatar_url: null,
   verification_status: 'approved',
   is_host: true,
@@ -260,7 +261,45 @@ describe('Profile public content', () => {
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
 
     expect(supabase.__lastCall('users', 'select').chain[0].args[0]).toBe(
-      'id, display_name, full_name, avatar_url, verification_status, is_host'
+      'id, display_name, full_name, bio, avatar_url, verification_status, is_host'
+    )
+  })
+
+  it('shows About when a bio exists, even when signed out', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      full_name: 'Mei Ling Tan',
+      bio: 'I pull rosettas.\nAlso pour-overs.',
+      avatar_url: null,
+      verification_status: 'approved',
+      is_host: true,
+    })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'About' })).toBeInTheDocument()
+    expect(document.querySelector('.profile-about__body').textContent).toBe(
+      'I pull rosettas.\nAlso pour-overs.',
+    )
+    expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
+  })
+
+  it('hides About for other people when there is no bio', async () => {
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(screen.queryByRole('heading', { name: 'About' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
+  })
+
+  it('keeps typed line breaks and wraps long words in About', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    expect(css).toMatch(
+      /\.profile-about__body,\s*\n\.detail-host__bio \{\s*\n\s*overflow-wrap:\s*break-word/
+    )
+    expect(css).toMatch(
+      /\.detail-description,\s*\n\.profile-about__body,\s*\n\.detail-host__bio \{[\s\S]*?white-space:\s*pre-wrap/
     )
   })
 })
@@ -282,6 +321,10 @@ describe('Profile own tabs', () => {
     expect(screen.getByRole('link', { name: 'Listings' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Reviews' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(screen.getByRole('link', { name: 'Add a short bio' })).toHaveAttribute(
+      'href',
+      '/settings'
+    )
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
   })
@@ -380,6 +423,23 @@ describe('Profile own tabs', () => {
 
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'My Listings' })).not.toBeInTheDocument()
+  })
+
+  it('shows your own About when a bio is saved', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      full_name: 'Mei Ling Tan',
+      bio: 'I pull rosettas.',
+      avatar_url: null,
+      verification_status: 'approved',
+      is_host: true,
+    })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'About' })).toBeInTheDocument()
+    expect(screen.getByText('I pull rosettas.')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
   })
 })
 
