@@ -65,6 +65,7 @@ export default function Input({
   const describedBy =
     [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined
   const isPassword = type === 'password'
+  const isTextarea = type === 'textarea'
   const isControlled = value !== undefined
   const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue ?? '')
   const [focused, setFocused] = useState(false)
@@ -83,6 +84,7 @@ export default function Input({
     'ui-input',
     error ? 'ui-input--error' : '',
     isPassword ? 'ui-input--with-toggle' : '',
+    isTextarea ? 'ui-input--textarea' : '',
     className,
   ]
     .filter(Boolean)
@@ -94,29 +96,31 @@ export default function Input({
       {label}
     </label>
   ) : null
-  const inputEl = (
-    <input
-      id={inputId}
-      type={inputType}
-      className={classes}
-      placeholder={inputPlaceholder}
-      {...(isControlled ? { value } : { defaultValue })}
-      aria-invalid={error ? true : undefined}
-      aria-describedby={describedBy}
-      onChange={(event) => {
-        if (!isControlled) setUncontrolledValue(event.target.value)
-        onChange?.(event)
-      }}
-      onFocus={(event) => {
-        setFocused(true)
-        onFocus?.(event)
-      }}
-      onBlur={(event) => {
-        setFocused(false)
-        onBlur?.(event)
-      }}
-      {...props}
-    />
+  const fieldProps = {
+    id: inputId,
+    className: classes,
+    placeholder: inputPlaceholder,
+    ...(isControlled ? { value } : { defaultValue }),
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby': describedBy,
+    onChange: (event) => {
+      if (!isControlled) setUncontrolledValue(event.target.value)
+      onChange?.(event)
+    },
+    onFocus: (event) => {
+      setFocused(true)
+      onFocus?.(event)
+    },
+    onBlur: (event) => {
+      setFocused(false)
+      onBlur?.(event)
+    },
+    ...props,
+  }
+  const inputEl = isTextarea ? (
+    <textarea rows={4} {...fieldProps} />
+  ) : (
+    <input type={inputType} {...fieldProps} />
   )
   const passwordToggle = isPassword ? (
     <button

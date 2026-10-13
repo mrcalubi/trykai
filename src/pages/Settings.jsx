@@ -12,6 +12,7 @@ export default function Settings() {
 
   const [fullName, setFullName] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [bio, setBio] = useState('')
   const [email, setEmail] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [avatarFile, setAvatarFile] = useState(null)
@@ -26,7 +27,7 @@ export default function Settings() {
   const loadProfile = useCallback(async () => {
     const { data, error: loadError } = await supabase
       .from('users')
-      .select('full_name, display_name, email, avatar_url')
+      .select('full_name, display_name, bio, email, avatar_url')
       .eq('id', userId)
       .single()
 
@@ -38,6 +39,7 @@ export default function Settings() {
 
     setFullName(data?.full_name || '')
     setDisplayName(data?.display_name || '')
+    setBio(data?.bio || '')
     setEmail(data?.email || '')
     setAvatarUrl(data?.avatar_url || '')
     setLoading(false)
@@ -122,7 +124,11 @@ export default function Settings() {
       }
     }
 
-    const payload = { full_name: name, display_name: handle }
+    const payload = {
+      full_name: name,
+      display_name: handle,
+      bio: bio.trim() || null,
+    }
     if (avatarFile) payload.avatar_url = nextAvatarUrl
 
     const { error: updateError } = await supabase
@@ -139,6 +145,7 @@ export default function Settings() {
 
     setFullName(name)
     setDisplayName(handle)
+    setBio(bio.trim())
     setAvatarUrl(nextAvatarUrl)
     setAvatarFile(null)
     setAvatarPreviewUrl((previous) => {
@@ -212,6 +219,22 @@ export default function Settings() {
               hint="Shown on your profile and reviews."
               error={displayNameError}
             />
+
+            <div className="settings-bio">
+              <Input
+                id="settings-bio"
+                label="About you"
+                type="textarea"
+                value={bio}
+                onChange={(event) => setBio(event.target.value)}
+                maxLength={500}
+                rows={4}
+                hint="Tell guests a bit about yourself and what you love sharing."
+              />
+              <p className="settings-bio__count" aria-live="polite">
+                {bio.length}/500
+              </p>
+            </div>
 
             <Input
               id="settings-full-name"

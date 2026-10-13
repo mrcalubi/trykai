@@ -13,6 +13,18 @@ describe('Input', () => {
     expect(field.className).toContain('ui-input')
   })
 
+  it('renders a textarea when type is textarea', () => {
+    render(
+      <Input id="about" label="About you" type="textarea" hint="Tell guests a bit about yourself." />
+    )
+
+    const field = screen.getByLabelText('About you')
+    expect(field.tagName).toBe('TEXTAREA')
+    expect(field).toHaveClass('ui-input--textarea')
+    expect(field).not.toHaveAttribute('type')
+    expect(screen.getByText('Tell guests a bit about yourself.')).toBeInTheDocument()
+  })
+
   it('renders a password field', () => {
     render(<Input id="password" label="Password" type="password" />)
 

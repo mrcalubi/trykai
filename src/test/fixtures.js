@@ -47,6 +47,7 @@ export function makeListing(overrides = {}) {
     users: {
       display_name: 'Mei',
       full_name: 'Mei Ling',
+      bio: null,
       avatar_url: null,
       stripe_payouts_enabled: true,
     },

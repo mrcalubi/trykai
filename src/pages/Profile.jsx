@@ -116,7 +116,7 @@ export default function Profile() {
 
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('id, display_name, full_name, avatar_url, verification_status, is_host')
+        .select('id, display_name, full_name, bio, avatar_url, verification_status, is_host')
         .eq('id', id)
         .single()
 
@@ -182,6 +182,7 @@ export default function Profile() {
   const givenName = publicName(profile) || 'Anonymous'
   const verified = profile.verification_status === 'approved'
   const isOwn = viewerId === id
+  const about = typeof profile.bio === 'string' ? profile.bio.trim() : ''
   const isHost = Boolean(profile.is_host)
   const allowedTabs = isHost ? OWN_TABS : OWN_TABS.filter((tab) => tab !== 'hosting')
   const requestedTab = searchParams.get('tab')
@@ -214,6 +215,19 @@ export default function Profile() {
           </Link>
         ) : null}
       </header>
+
+      {about ? (
+        <section className="profile-about" aria-labelledby="profile-about-heading">
+          <h2 id="profile-about-heading" className="detail-section__title">
+            About
+          </h2>
+          <p className="profile-about__body">{about}</p>
+        </section>
+      ) : isOwn ? (
+        <p className="profile-about__empty">
+          <Link to="/settings">Add a short bio</Link>
+        </p>
+      ) : null}
 
       {isOwn ? (
         <>

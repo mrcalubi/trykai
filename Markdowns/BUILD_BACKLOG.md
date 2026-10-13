@@ -60,9 +60,9 @@ Not a calendar. Capacity is 8 hours a week.
 6. **P2.3** review gating is done (`00011`). Then the rest of P2 in listed order.
 7. JWT "issued at future" on browse: retry once, friendly error, never show raw error text.
 8. Host cancel warning: replace per-guest refund amounts with "Cancelling refunds all N guests in full and adds a strike".
-9. Review reminder email, about 3h after session ends.
-10. `full_name` SELECT for anon can be revoked once nothing public reads it (`display_name` is the public name; pages still fall back to `full_name`).
-11. Reword S$10 to S$40 as guidance, not a rule (decided; remaining copy in HOST_ONBOARDING / BUSINESS / HANDOVER).
+9. Reword S$10 to S$40 as guidance, not a rule (decided; remaining copy in HOST_ONBOARDING / BUSINESS / HANDOVER).
+
+Review reminder email, saved listings, host-to-guest reviews then the review filter, and the `full_name` SELECT revoke are post-launch (P3), not this sequence.
 
 ---
 
@@ -150,7 +150,7 @@ Once per booking, same 48 hour cutoff. Published as available. Recovers bookings
 **Done.** `/bookings` and RLS (`00011` `guest_can_leave_review`) both require a `confirmed` booking after `starts_at + duration_mins`, with `reviewee_id` the listing host. Unique on `(booking_id, role)`. Host→guest reviews are still P2.4.
 
 ### P2.4 — Host to guest reviews
-Two way reviews are promised. Insert policy is guest-only. No host UI.
+**Post launch (P3).** Two way reviews are promised. Insert policy is guest-only. No host UI. After that path exists, the browse rating filter can follow.
 
 ### P2.5 — Session auto complete
 `sessions.status` documents `'completed'`. Nothing ever writes it. Payouts key off `starts_at` + 24h, not this status, so launch can survive without it. Reviews and dispute windows were supposed to key off it.
@@ -180,10 +180,10 @@ Clock skew on the guest JWT can fail the listings fetch. Retry the request once,
 Replace the per-guest refund amounts in the Hosting confirm dialog with: "Cancelling refunds all N guests in full and adds a strike".
 
 ### P2.12 — Review reminder email
-About 3 hours after the session ends, email the guest if they have not left a review.
+**Post launch (P3).** About 3 hours after the session ends, email the guest if they have not left a review.
 
 ### P2.13 — First names are UI-only
-Public surfaces show `display_name` (`00014`). Review RPCs return it in jsonb `users.full_name`. Pages still SELECT `full_name` and fall back to `firstName(full_name)` when `display_name` is empty. The `full_name` column is still granted SELECT to anon and authenticated (`00005`). A crafted query can still read the whole name. Revoke that SELECT for anon once nothing public reads the column.
+**Post launch (P3).** Public surfaces show `display_name` (`00014`). Review RPCs return it in jsonb `users.full_name`. Pages still SELECT `full_name` and fall back to `firstName(full_name)` when `display_name` is empty. The `full_name` column is still granted SELECT to anon and authenticated (`00005`). A crafted query can still read the whole name. Revoke that SELECT for anon once nothing public reads the column.
 
 ### P2.14 — S$10 to S$40 is guidance, not a rule
 Decided 29 September 2026. Remaining: HOST_ONBOARDING, BUSINESS, and HANDOVER still describe it as a hard band. CreateListing already only checks `priceCents > 0`.
@@ -192,13 +192,18 @@ Decided 29 September 2026. Remaining: HOST_ONBOARDING, BUSINESS, and HANDOVER st
 
 ## P3: post launch
 
-### First post-launch money item — Remove a guest
+In this order after warm-contact launch:
 
-Cancellation is the whole booking only. After launch, let a guest drop one person from a paid group booking and refund that share on the same four tiers. Do not build this before launch. It is the first money-path change after warm-contact launch.
+1. **Remove a guest (partial cancel).** Cancellation is the whole booking only. Let a guest drop one person from a paid group booking and refund that share on the same four tiers. First money-path change after launch. Do not build this before launch.
+2. **Recurring sessions.** Hosts repeat a session without re-entering each date.
+3. **Review reminder email.** About 3 hours after the session ends, email the guest if they have not left a review. (Also listed as P2.12; wait until after launch.)
+4. **Saved listings.** Guests bookmark a listing to find it again.
+5. **Host-to-guest reviews, then the review filter.** Two-way reviews are promised (P2.4). After that path exists, guests can filter browse by rating.
+6. **`full_name` database-level fix.** Revoke anon SELECT once nothing public reads the column (P2.13). Public surfaces already show `display_name`.
 
 Then: identity and social layer, Date Mode, credit bundles, multi session courses, "this weekend" filter, search, in app notifications, listing performance nudges, listing video, host Pro subscription, payout clawback.
 
-Automated ID verification (Stripe Identity) and auto deletion of rejected verification documents (`purge-verification-docs`) shipped in September. Group bookings with automatic pricing shipped 10 October. Do not rebuild them.
+Automated ID verification (Stripe Identity) and auto deletion of rejected verification documents (`purge-verification-docs`) shipped in September. Group bookings with automatic pricing shipped 10 October. Profile About (`users.bio`) shipped 12 October. Do not rebuild them.
 
 All specified in DECISIONS.md. None of the remaining items should be touched before launch, regardless of how much runway appears to be left.
 
