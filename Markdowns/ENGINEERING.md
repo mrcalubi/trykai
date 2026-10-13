@@ -89,7 +89,7 @@ phone_verified boolean default false
 avatar_url text
 is_host boolean default false
 stripe_account_id text           -- Stripe Connect Express account id. Not granted to anon/authenticated SELECT.
-stripe_payouts_enabled boolean default false  -- synced from Stripe account.updated; gates Book
+stripe_payouts_enabled boolean default false  -- Stripe account.updated or create-account-link retrieve; gates Book
 is_founding_host boolean default false        -- Table Editor for the eleven; never a host fee. Not client-writable.
 is_admin boolean default false   -- gates the verification review UI. Not client-writable or readable.
 id_photo_url text                -- path in private verification-docs bucket. No client SELECT grant.
@@ -299,7 +299,11 @@ It does **not** check for open disputes. The only money hold besides the 24h tim
 
 **Ops (click-by-click in OPERATIONS.md):** Vault secrets, GitHub secrets, deploy `release-payout`, set platform Stripe payouts to **manual** (or keep a reserve covering outstanding host liability). Automatic platform payouts to Aspire would leave nothing to Transfer.
 
-Under Express accounts, Stripe collects the host's bank details at onboarding. Hosts must finish Connect onboarding (`stripe_payouts_enabled`) before guests can Book. Creating a listing stays allowed. The dashboard calls `create-account-link`, which creates the Express account if the host does not have one yet.
+Under Express accounts, Stripe collects the host's bank details at onboarding. Hosts must finish Connect onboarding (`stripe_payouts_enabled`) before guests can Book. Creating a listing stays allowed. Hosting “Set up payouts” calls `create-account-link`, which creates the Express account if the host does not have one yet.
+
+`stripe_payouts_enabled` is written only from Stripe, never from the query string. `?connect=return` and `?connect=refresh` call `create-account-link` with `{ refresh: true }`, which retrieves the connected account, saves `payouts_enabled`, and does not mint a new Account Link. Hosting then shows “Payouts are set up. Guests can now book you.” or “Your payout setup isn't finished yet.” with Continue setup (a fresh Account Link). It never shows “submitted” without that check.
+
+`account.updated` on `stripe-webhook` matches `users.stripe_account_id` and writes the same flag. The function verifies `Stripe-Signature` against `STRIPE_WEBHOOK_SECRET`, then `STRIPE_CONNECT_WEBHOOK_SECRET` if that secret is set. A Connected-accounts destination (listening to `account.updated`) is required so those events actually arrive; see OPERATIONS.md.
 
 ---
 
@@ -443,9 +447,9 @@ supabase/functions/
 │   └── verification.ts          # Status, Identity params, 30-day retention rules
 ├── create-payment-intent/       # Pending booking + PaymentIntent (no emails)
 ├── abandon-checkout/            # Guest JWT only; drop unpaid pending; leave if PI succeeded
-├── stripe-webhook/              # Stripe-Signature → confirm_paid_booking, identity outcomes, emails
+├── stripe-webhook/              # Platform or Connect webhook secret → confirm, identity, account.updated
 ├── create-connect-account/      # Express account for the signed-in host
-├── create-account-link/         # Creates account if needed, Account Link to /dashboard?connect=
+├── create-account-link/         # Onboard, or { refresh: true } to re-read payouts_enabled
 ├── cancel-booking/              # Guest or host cancel + Stripe refund + strikes + emails
 ├── admin-cancel-booking/        # x-admin-secret full refund; cancelled_by='host'; no UI
 ├── admin-verifications/         # JWT + is_admin; signed-URL queue, review + result email
@@ -528,7 +532,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 **6. Checkout.** Guest picks 1 to N guests, N = min(spots remaining, 10). The per-person lesson price updates live when group pricing is on. Guest then picks Card or PayNow (5% off that card total) *before* `create-payment-intent`. The function recomputes the price from `guests_count` and listing settings and ignores any client total. It creates a pending booking, then a PaymentIntent locked to that rail. No host email is sent here. `confirm_paid_booking` decrements spots by `guests_count`; if not enough remain, the whole booking is refunded. Cancellation is the whole booking only, same four refund tiers.
 
-**7. Payment.** Payment Element `confirmPayment` uses `return_url=/dashboard?booking=<id>`. `stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, freezes host fee/payout, emails guest and host via `_shared/email.ts`. Failed/canceled intents mark the pending row cancelled without touching spots. Oversell refunds immediately, including when confirm finds the session cancelled or otherwise not `open`. `account.updated` syncs `stripe_payouts_enabled`.
+**7. Payment.** Payment Element `confirmPayment` uses `return_url=/dashboard?booking=<id>`. `stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, freezes host fee/payout, emails guest and host via `_shared/email.ts`. Failed/canceled intents mark the pending row cancelled without touching spots. Oversell refunds immediately, including when confirm finds the session cancelled or otherwise not `open`. `account.updated` syncs `stripe_payouts_enabled` (match on `stripe_account_id`; unknown accounts are a no-op). The webhook accepts `STRIPE_WEBHOOK_SECRET` or `STRIPE_CONNECT_WEBHOOK_SECRET`.
 
 **8. Confirmation.** `/dashboard?booking=` redirects to `/bookings?booking=`, then to `/u/:id?booking=&tab=bookings`. `Bookings.jsx` polls until status is `confirmed`. Then `get_listing_address` returns `full_address` to that guest.
 
@@ -550,7 +554,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
    For manual submissions, Caleb reviews at `/admin/verifications`: both documents side by side, approve, or reject with a reason. Both paths call `review_verification` (`00007`, service role only), which writes the decision, the reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record, and `method` records which route decided it. Whichever function made the decision emails the host. A rejected host also sees the reason on `/verify-identity` when they try again.
 5. **Creates the listing.** Title, description, category, price in cents, max guests, duration in minutes, a URA planning area (searchable dropdown), private full address, up to 5 photos, what's provided. Inserts into `listings`, sets `is_host = true`, navigates to `/dashboard` (which redirects to `/bookings`, then the own-profile Bookings tab). **Does not create the first session in the same form.** No photography guidance. No T&C checkbox.
 6. **Adds a session** from the Hosting tab “Add session”. Date, time, and spots. The length shown is the listing's `duration_mins`. The call is `add_listing_session`. The same start time as an existing open or full session of that length adds the spots onto it (and reopens it if it was full). Any other overlap is refused, including a session that starts during another one. A session that starts when another ends is allowed. A new row appears under Upcoming Hosted Sessions even with zero bookings. An empty upcoming session can be removed with Delete, which calls `delete_empty_session` and sets `status = 'cancelled'` (no strike, no refund). A session with pending or confirmed bookings has Cancel instead, not Delete.
-7. **Payout setup.** Hosting “Set up payouts” → `create-account-link` → Stripe Express onboarding. Account Link `return_url`/`refresh_url` still use `/dashboard?connect=`, which redirects to `/hosting?connect=`, then `/u/:id?connect=&tab=hosting`. Book stays disabled for guests until `stripe_payouts_enabled`.
+7. **Payout setup.** Hosting “Set up payouts” → `create-account-link` → Stripe Express onboarding. Account Link `return_url`/`refresh_url` still use `/dashboard?connect=`, which redirects to `/hosting?connect=`, then `/u/:id?connect=&tab=hosting`. That return re-reads the account from Stripe (`{ refresh: true }`) before showing enabled or “isn't finished yet.” Book stays disabled for guests until `stripe_payouts_enabled`.
 8. **Receives bookings.** Email from `stripe-webhook` after confirmation, with guest name, session details, guest count.
 9. **Edits and deletes.** `EditListing.jsx` checks `host_id = current user`. The Hosting listing row opens Edit when tapped. Delete is in the ⋯ menu and goes through `delete_listing`: owner only, refuses if any upcoming session has a pending or confirmed booking, otherwise `is_active = false` and empty upcoming sessions become `cancelled`.
 
@@ -606,7 +610,7 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **Bookings.jsx** — guest: upcoming and past bookings with guest count on each card, Cancel with calculated refund shown (whole booking only), leave review after the session ends on confirmed only. Polls `?booking=` after Payment Element return, then drops only that key so `tab` stays. Mounted on the own-profile Bookings tab; `/bookings` itself is a redirect.
 
-**Hosting.jsx** — host: My Listings heading with “+ New listing”; one card per row below 1024px, two from 1024px. Each card is a thumbnail plus title on one line (opens Edit), a ⋯ menu in the top-right corner (View listing, Edit, Delete), and a full-width Add session button below. Delete confirms through `delete_listing` (blocked copy when upcoming bookings exist). All upcoming non-cancelled sessions show active booking count and guest count (Delete when empty, Cancel with strike warning when there are pending or confirmed bookings); Connect payout setup. Admins with `pending_count > 0` see a one-line “N verifications waiting · Review” banner. Reads `?connect=` then drops only that key. A signed-in user who is not a host is redirected to `/bookings` if this page is mounted directly. Mounted on the own-profile Hosting tab; `/hosting` itself is a redirect.
+**Hosting.jsx** — host: My Listings heading with “+ New listing”; one card per row below 1024px, two from 1024px. Each card is a thumbnail plus title on one line (opens Edit), a ⋯ menu in the top-right corner (View listing, Edit, Delete), and a full-width Add session button below. Delete confirms through `delete_listing` (blocked copy when upcoming bookings exist). All upcoming non-cancelled sessions show active booking count and guest count (Delete when empty, Cancel with strike warning when there are pending or confirmed bookings); Connect payout setup. Admins with `pending_count > 0` see a one-line “N verifications waiting · Review” banner. Reads `?connect=` (return/refresh re-read payouts from Stripe, then drop only that key). A signed-in user who is not a host is redirected to `/bookings` if this page is mounted directly. Mounted on the own-profile Hosting tab; `/hosting` itself is a redirect.
 
 **Settings.jsx** — auth required. Grouped as Profile (photo, display name, About you textarea with a live 0/500 count, full name with hint "Private, never shown publicly.") and Account (email read-only, deletion contact line). Log out is a button at the bottom. `display_name` UPDATE granted in `00014`; `bio` in `00021`; `full_name` and `avatar_url` from `00005` after `00007` revoked verification fields. Linked from the gear on your own profile, not the hamburger or an avatar menu.
 
@@ -634,7 +638,7 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 
 - Host no-show reporting, reschedule, session auto-complete, host→guest reviews: not built. Guest→host insert and uniqueness are in `00011` (P2.3 done).
 - UI kit only partly wired: the nav, the browse `Card`, Settings (`Button`, `Input`), Hosting listing rows (`Button`, `OverflowMenu`), and Login (`Input`) are live, but SelectableCard is still `/style-guide` only. `ListingCard.jsx` and its `.listing-card` CSS are now dead code that only its own test renders; deleting them is a separate cleanup.
-- A host who exits Stripe Connect onboarding without completing it still sees a "Payout setup submitted" success message on the dashboard, because `?connect=return` is treated as success without re-checking `stripe_payouts_enabled`. That host believes they can be paid and cannot. If they take a booking, the guest pays and there is no payout path, discovered after the session.
+- ~~A host who exits Stripe Connect onboarding without completing it still sees a "Payout setup submitted" success message on the dashboard, because `?connect=return` is treated as success without re-checking `stripe_payouts_enabled`.~~ **Bug 4 fixed 13 October 2026.** Return and refresh re-read `payouts_enabled` from Stripe via `create-account-link` `{ refresh: true }` before showing a message. `account.updated` still syncs the same column.
 - Public pages show `display_name`. They still SELECT `full_name` as a fallback when `display_name` is empty. The `full_name` column is still granted SELECT to anon (`00005`). See BUILD_BACKLOG P2.13.
 
 **Not built, decided**
