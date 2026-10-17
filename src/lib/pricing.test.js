@@ -6,7 +6,9 @@ import {
   formatGuestFacingPrice,
   groupPriceLabel,
   guestFacingPriceCents,
+  hostListingPriceHint,
   nextGroupTierHint,
+  parsePriceInputCents,
   paynowPriceCents,
 } from './pricing'
 import {
@@ -80,6 +82,16 @@ describe('pricing.js matches booking.ts', () => {
     expect(groupPriceLabel(2500, 2)).toBe('$27 each · 5% group discount')
     expect(groupPriceLabel(135800, 1)).toBe('$1,521 per person')
     expect(discountedPerPersonCents(2500, 4)).toBe(2125)
+  })
+
+  it('shows hosts the public price and their payout, never a guest total', () => {
+    expect(hostListingPriceHint(2500, true)).toBe('Guests see $28 · You receive $25')
+    expect(hostListingPriceHint(2500, false)).toBe(
+      'Guests see $28 · You receive $25 · $22.50 after your first 3 bookings',
+    )
+    expect(hostListingPriceHint(0)).toBe('')
+    expect(parsePriceInputCents('25')).toBe(2500)
+    expect(parsePriceInputCents('')).toBeNull()
   })
 
   it('hints the next group tier when one is still available', () => {

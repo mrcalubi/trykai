@@ -109,7 +109,7 @@ Still to build:
 
 `notify-verification-pending` requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer). `notify-verification-result` is gone; result emails come from `admin-verifications` and `stripe-webhook`. `release-payout` and `admin-cancel-booking` already require a secret; `stripe-webhook` verifies `Stripe-Signature`.
 
-`cancel-booking` emails the guest the refund amount (including $0) and the host only when the guest cancelled. A Resend failure is logged and cannot fail the refund. A missing `RESEND_API_KEY` logs instead of failing silent. `admin-cancel-booking` still does not email.
+`cancel-booking` emails the guest the refund amount (including $0) and the host only when the guest cancelled. A Resend failure is logged and cannot fail the refund. A missing `RESEND_API_KEY` logs instead of failing silent. `admin-cancel-booking` emails the guest the same receipt (reference, listing, refund amount and method).
 
 ### P0.9 — Build assets that CI and chrome depend on — DONE 9 September
 `StyleGuide.jsx` imports `src/assets/categories/food.png`, `fitness.png`, `arts.png`, and `music.png`. Those four files are in the repo. Language/Other imports stay commented out; uncommenting either without adding the PNG fails `vite build`, because App always imports this page. `public/trykai.png` exists. `Navbar.jsx` is deleted; TopNav still requests `/trykai.png` for the brand mark.

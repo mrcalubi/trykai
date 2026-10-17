@@ -8,7 +8,13 @@ import {
 import {
   bookingConfirmedGuestHtml,
   bookingConfirmedHostHtml,
+  bookingReference,
+  cardDetailsFromCharge,
+  formatDuration,
   formatSessionDate,
+  GUEST_REPLY_TO,
+  paymentMethodFromIntent,
+  publicDisplayName,
   sendResendEmail,
   verificationApprovedHtml,
   verificationRejectedHtml,
@@ -59,16 +65,23 @@ async function confirmSucceededPayment(paymentIntent: {
       guests_count,
       total_amount,
       platform_fee,
+      payment_rail,
       guest_id,
       session_id,
       sessions (
         starts_at,
+        duration_mins,
         listings (
           title,
           host_id,
+          full_address,
+          duration_mins,
+          price_per_person,
+          group_pricing,
           users:host_id (
             email,
             full_name,
+            display_name,
             is_founding_host
           )
         )
@@ -114,10 +127,18 @@ async function confirmSucceededPayment(paymentIntent: {
   })
   const hostPayout = calculateHostPayout(lessonAmount, hostFee)
   let chargeId = chargeIdFromPaymentIntent(paymentIntent)
-  if (!chargeId) {
+  let intentForReceipt: { latest_charge?: unknown } = paymentIntent
+  const chargeCard = cardDetailsFromCharge(
+    typeof paymentIntent.latest_charge === 'object' ? paymentIntent.latest_charge : null,
+  )
+  const needsCardDetails = booking.payment_rail !== 'paynow' && !chargeCard.last4
+  if (!chargeId || needsCardDetails) {
     try {
-      const fresh = await stripe.paymentIntents.retrieve(paymentIntent.id)
-      chargeId = chargeIdFromPaymentIntent(fresh)
+      const fresh = await stripe.paymentIntents.retrieve(paymentIntent.id, {
+        expand: ['latest_charge'],
+      })
+      chargeId = chargeId || chargeIdFromPaymentIntent(fresh)
+      intentForReceipt = fresh
     } catch (err) {
       console.error('webhook: could not load charge id', paymentIntent.id, err)
     }
@@ -153,10 +174,14 @@ async function confirmSucceededPayment(paymentIntent: {
   const sessionDate = session?.starts_at ? formatSessionDate(session.starts_at) : ''
   const listingTitle = listing?.title ?? 'your session'
   const apiKey = Deno.env.get('RESEND_API_KEY')
+  const siteUrl = Deno.env.get('SITE_URL')
+  const reference = bookingReference(booking.id)
+  const duration = formatDuration(session?.duration_mins ?? listing?.duration_mins)
+  const paymentMethod = paymentMethodFromIntent(booking.payment_rail, intentForReceipt)
 
   const { data: guestProfile } = await admin
     .from('users')
-    .select('full_name, email')
+    .select('full_name, display_name, email')
     .eq('id', booking.guest_id)
     .single()
 
@@ -164,10 +189,23 @@ async function confirmSucceededPayment(paymentIntent: {
     apiKey,
     to: guestProfile?.email,
     subject: `Booking confirmed: ${listingTitle}`,
+    replyTo: GUEST_REPLY_TO,
     html: bookingConfirmedGuestHtml({
+      bookingReference: reference,
       listingTitle,
+      hostName: publicDisplayName(host) || 'your host',
       sessionDate,
+      duration,
+      fullAddress: listing?.full_address ?? '',
       guestsCount: booking.guests_count,
+      pricePerPersonCents: listing?.price_per_person ?? 0,
+      groupPricing: listing?.group_pricing !== false,
+      paymentRail: booking.payment_rail,
+      totalPaidCents: booking.total_amount,
+      paymentMethod,
+      sessionStartsAt: session?.starts_at ?? '',
+      guestId: booking.guest_id,
+      siteUrl,
     }),
   })
 
@@ -176,10 +214,13 @@ async function confirmSucceededPayment(paymentIntent: {
     to: host?.email,
     subject: `New booking for "${listingTitle}"`,
     html: bookingConfirmedHostHtml({
-      guestName: guestProfile?.full_name || 'A guest',
+      bookingReference: reference,
+      guestName: publicDisplayName(guestProfile) || 'A guest',
       listingTitle,
       sessionDate,
       guestsCount: booking.guests_count,
+      hostPayoutCents: hostPayout,
+      siteUrl,
     }),
   })
 }

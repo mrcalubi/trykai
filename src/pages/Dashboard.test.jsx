@@ -951,8 +951,11 @@ describe('Dashboard host cancellation', () => {
 
     await user.click(screen.getByRole('button', { name: 'Cancel session' }))
 
-    expect(screen.getByText(/add a strike to your account/)).toBeInTheDocument()
+    expect(
+      screen.getByText('Cancelling refunds all 2 guests in full and adds a strike to your account.')
+    ).toBeInTheDocument()
     expect(screen.queryByText(/Full refund of/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/\$90|\$45|total/i)).not.toBeInTheDocument()
   })
 
   it('asks the cancel-booking function to cancel the whole session', async () => {

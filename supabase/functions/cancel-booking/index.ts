@@ -2,11 +2,18 @@ import Stripe from 'https://esm.sh/stripe@13.3.0?target=deno'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   guestCancelDecision,
+  hostPayoutAfterGuestCancel,
   refundAmountForCancel,
   shouldEmailCancellation,
   spotsToRestore,
 } from '../_shared/booking.ts'
-import { formatSessionDate, sendCancellationEmails } from '../_shared/email.ts'
+import {
+  bookingReference,
+  formatSessionDate,
+  publicDisplayName,
+  resolvePaymentMethod,
+  sendCancellationEmails,
+} from '../_shared/email.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
@@ -128,33 +135,54 @@ async function notifyCancellation(
   options: {
     cancelledBy: 'guest' | 'host'
     refundAmount: number
+    bookingId: string
     guestId: string | null | undefined
     hostId: string | null | undefined
     listingTitle: string | null | undefined
     sessionStartsAt: string | null | undefined
     guestsCount: number
+    paymentRail?: string | null
+    stripePaymentId?: string | null
+    hostPayoutAmount?: number | null
   },
 ) {
   try {
     const [guestResult, hostResult] = await Promise.all([
       options.guestId
-        ? admin.from('users').select('email, full_name').eq('id', options.guestId).maybeSingle()
+        ? admin.from('users').select('email, full_name, display_name').eq('id', options.guestId).maybeSingle()
         : Promise.resolve({ data: null }),
       options.cancelledBy === 'guest' && options.hostId
         ? admin.from('users').select('email').eq('id', options.hostId).maybeSingle()
         : Promise.resolve({ data: null }),
     ])
 
+    const paymentMethod = await resolvePaymentMethod({
+      paymentRail: options.paymentRail,
+      retrieveIntent: options.stripePaymentId
+        ? () =>
+            stripe.paymentIntents.retrieve(options.stripePaymentId as string, {
+              expand: ['latest_charge'],
+            })
+        : undefined,
+    })
+
     await sendCancellationEmails({
       apiKey: Deno.env.get('RESEND_API_KEY'),
       cancelledBy: options.cancelledBy,
       refundAmountCents: options.refundAmount,
+      bookingReference: bookingReference(options.bookingId),
       listingTitle: options.listingTitle || 'your session',
       sessionDate: options.sessionStartsAt ? formatSessionDate(options.sessionStartsAt) : '',
       guestEmail: guestResult.data?.email,
       hostEmail: hostResult.data?.email,
-      guestName: guestResult.data?.full_name,
+      guestName: publicDisplayName(guestResult.data) || guestResult.data?.full_name,
       guestsCount: options.guestsCount,
+      paymentMethod,
+      hostPayoutCents: hostPayoutAfterGuestCancel(
+        options.hostPayoutAmount ?? 0,
+        options.refundAmount,
+      ),
+      siteUrl: Deno.env.get('SITE_URL'),
     })
   } catch (err) {
     console.error('cancel-booking: email failed', err)
@@ -193,7 +221,7 @@ Deno.serve(async (req) => {
           listing_id,
           starts_at,
           listings!inner ( host_id, title ),
-          bookings ( id, status, guests_count, total_amount, platform_fee, stripe_payment_id, session_id, guest_id )
+          bookings ( id, status, guests_count, total_amount, platform_fee, stripe_payment_id, session_id, guest_id, payment_rail, host_payout_amount )
         `,
         )
         .eq('id', body.session_id)
@@ -222,11 +250,15 @@ Deno.serve(async (req) => {
           await notifyCancellation(admin, {
             cancelledBy: 'host',
             refundAmount: result.refund_amount ?? refundAmount,
+            bookingId: booking.id,
             guestId: booking.guest_id,
             hostId: listing?.host_id,
             listingTitle: listing?.title,
             sessionStartsAt: session.starts_at,
             guestsCount: booking.guests_count,
+            paymentRail: booking.payment_rail,
+            stripePaymentId: booking.stripe_payment_id,
+            hostPayoutAmount: booking.host_payout_amount,
           })
         }
         results.push(result)
@@ -254,6 +286,8 @@ Deno.serve(async (req) => {
         stripe_payment_id,
         session_id,
         guest_id,
+        payment_rail,
+        host_payout_amount,
         sessions ( starts_at, spots_remaining, listings ( title, host_id ) )
       `,
       )
@@ -290,11 +324,15 @@ Deno.serve(async (req) => {
       await notifyCancellation(admin, {
         cancelledBy: 'guest',
         refundAmount: result.refund_amount ?? refundAmount,
+        bookingId: booking.id,
         guestId: booking.guest_id,
         hostId: listing?.host_id,
         listingTitle: listing?.title,
         sessionStartsAt: session.starts_at,
         guestsCount: booking.guests_count,
+        paymentRail: booking.payment_rail,
+        stripePaymentId: booking.stripe_payment_id,
+        hostPayoutAmount: booking.host_payout_amount,
       })
     }
     return jsonResponse(result)
