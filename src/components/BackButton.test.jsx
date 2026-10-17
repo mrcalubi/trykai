@@ -47,7 +47,7 @@ describe('BackButton', () => {
 
   it('centres a 36px circled chevron with space under the nav', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
-    expect(css).toMatch(/\.page-back \{[\s\S]*?padding:\s*20px 24px 0/)
+    expect(css).toMatch(/\.page-back \{[\s\S]*?padding:\s*20px var\(--gutter\) 0/)
     expect(css).toMatch(
       /\.page-back__button \{[\s\S]*?display:\s*inline-flex[\s\S]*?align-items:\s*center[\s\S]*?justify-content:\s*center[\s\S]*?width:\s*36px[\s\S]*?height:\s*36px/
     )

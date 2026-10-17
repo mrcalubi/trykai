@@ -1,4 +1,7 @@
 import { Link } from 'react-router-dom'
+import Icon from './Icon'
+import { categoryIconName, categoryTint } from './categoryIcon'
+import { getInitials } from './getInitials'
 
 function hasRating(rating) {
   return typeof rating === 'number' && !Number.isNaN(rating) && rating > 0
@@ -37,6 +40,9 @@ export default function Card({
   rating,
   reviewCount,
   price,
+  metaItems,
+  host,
+  flag,
   to,
   footer,
   className = '',
@@ -61,17 +67,44 @@ export default function Card({
       ? { to, className: classes, ...props }
       : { className: classes, ...props }
 
+  const browseMetaItems = Array.isArray(metaItems) ? metaItems.filter(Boolean) : []
   const browseMetaLine =
-    price || showRating ? (
+    price || showRating || flag ? (
       <p className="ui-card__meta-line">
         {price ? <span className="ui-card__price-text">{price}</span> : null}
         {showRating ? (
           <span className="ui-card__rating">
             <RatingMark rating={rating} reviewCount={reviewCount} />
           </span>
+        ) : flag ? (
+          <span className="ui-card__flag">{flag}</span>
         ) : null}
       </p>
     ) : null
+
+  const hostName = host?.name ?? ''
+  const hostFace =
+    isBrowse && host && (host.avatarUrl || hostName) ? (
+      <span className="ui-card__host" title={hostName || undefined}>
+        {host.avatarUrl ? (
+          <img src={host.avatarUrl} alt="" className="ui-card__host-img" />
+        ) : (
+          <span aria-hidden="true">{getInitials(hostName)}</span>
+        )}
+      </span>
+    ) : null
+
+  const placeholder =
+    isBrowse ? (
+      <div
+        className={`ui-card__placeholder ui-card__placeholder--${categoryTint(badge)}`}
+        aria-hidden="true"
+      >
+        <Icon name={categoryIconName(badge)} size={44} strokeWidth={1.3} />
+      </div>
+    ) : (
+      <div className="ui-card__placeholder" aria-hidden="true" />
+    )
 
   const bookingMetaBlock =
     metaLines.length > 0 || showRating ? (
@@ -99,14 +132,29 @@ export default function Card({
         <div className="ui-card__image-wrap">
           {badge ? <span className="ui-card__badge">{badge}</span> : null}
           {image ? (
-            <img src={image} alt={imageAlt} className="ui-card__image" />
+            <img
+              src={image}
+              alt={imageAlt}
+              className="ui-card__image"
+              loading={isBrowse ? 'lazy' : undefined}
+            />
           ) : (
-            <div className="ui-card__placeholder" aria-hidden="true" />
+            placeholder
           )}
+          {hostFace}
         </div>
       ) : null}
       <div className="ui-card__body">
         {title ? <Title className="ui-card__title">{title}</Title> : null}
+        {isBrowse && browseMetaItems.length > 0 ? (
+          <p className="ui-card__meta-inline">
+            {browseMetaItems.map((item) => (
+              <span key={item} className="ui-card__meta-item">
+                {item}
+              </span>
+            ))}
+          </p>
+        ) : null}
         {isBrowse ? browseMetaLine : bookingMetaBlock}
         {children}
         {!isBrowse && footer ? <div className="ui-card__footer">{footer}</div> : null}

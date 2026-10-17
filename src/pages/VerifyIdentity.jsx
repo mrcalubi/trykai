@@ -251,7 +251,7 @@ export default function VerifyIdentity() {
 
   return (
     <div className="page page--form">
-      <div className="form-card" style={{ maxWidth: '480px' }}>
+      <div className="form-card">
         <h1 className="form-card__title">Verify your identity</h1>
         <p className="form-card__subtitle">
           Hosting on TryKai means meeting people in person, so we verify every host. The check is
@@ -259,18 +259,18 @@ export default function VerifyIdentity() {
         </p>
 
         {location.state?.message && (
-          <p className="error-message" style={{ marginBottom: '20px' }}>
+          <p className="error-message error-message--spaced">
             {location.state.message}
           </p>
         )}
 
         {verificationStatus === 'rejected' && rejectionReason && (
-          <p className="error-message" style={{ marginBottom: '20px' }}>
+          <p className="error-message error-message--spaced">
             Your last submission was not approved: {rejectionReason}
           </p>
         )}
 
-        {error && <p className="error-message" style={{ marginBottom: '20px' }}>{error}</p>}
+        {error && <p className="error-message error-message--spaced">{error}</p>}
 
         <button
           type="button"
@@ -281,7 +281,7 @@ export default function VerifyIdentity() {
           {stripeLoading ? 'Opening Stripe…' : 'Verify with Stripe'}
         </button>
 
-        <p className="hint" style={{ marginTop: '16px' }}>
+        <p className="hint hint--spaced">
           You will need your NRIC or passport and a phone or webcam for the selfie.
         </p>
 
@@ -300,8 +300,7 @@ export default function VerifyIdentity() {
                     type="file"
                     accept="image/*"
                     onChange={(e) => setIdPhoto(e.target.files?.[0] || null)}
-                    className="input"
-                    style={{ padding: '10px' }}
+                    className="input input--file"
                   />
                   <span className="hint">Clear photo of the front of your ID document</span>
                 </label>
@@ -312,8 +311,7 @@ export default function VerifyIdentity() {
                     type="file"
                     accept="image/*"
                     onChange={(e) => setSelfie(e.target.files?.[0] || null)}
-                    className="input"
-                    style={{ padding: '10px' }}
+                    className="input input--file"
                   />
                   <span className="hint">A clear photo of your face, taken recently</span>
                 </label>

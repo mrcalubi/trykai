@@ -178,7 +178,7 @@ describe('ListingDetail content', () => {
     givenListing(makeListing({ price_per_person: 4500 }))
     renderPage()
 
-    expect(await screen.findByText(/\$51/)).toBeInTheDocument()
+    expect((await screen.findAllByText(/\$51/)).length).toBeGreaterThan(0)
     expect(screen.queryByText('$45')).not.toBeInTheDocument()
   })
 
@@ -464,7 +464,13 @@ describe('ListingDetail content', () => {
     const order = [...document.querySelectorAll('.detail-host, .detail-section__title')].map(
       (node) => (node.className.includes('detail-host') ? 'host' : node.textContent)
     )
-    expect(order).toEqual(['host', 'About this experience', "What's provided", 'Reviews (1)'])
+    expect(order).toEqual([
+      'host',
+      'About this experience',
+      "What's provided",
+      "Where you'll be",
+      'Reviews (1)',
+    ])
   })
 })
 
