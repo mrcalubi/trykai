@@ -2827,6 +2827,153 @@ body.lightbox-open {
   width: 100%;
 }
 
+@media (min-width: 1024px) {
+  .dashboard-card.hosting-listing-card:has(.add-sessions) {
+    grid-column: 1 / -1;
+  }
+}
+
+.add-sessions__legend {
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.add-sessions__quickfill {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+}
+
+.add-sessions__weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.add-sessions__chip {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.add-sessions__chip--on,
+.add-sessions__chip--on:hover {
+  color: var(--cream);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.add-sessions__chip:hover {
+  border-color: var(--primary);
+}
+
+.add-sessions__times {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.add-sessions__time-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.add-sessions__time-row .label {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-sessions__preview {
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.add-sessions__preview-title {
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.add-sessions__preview-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.add-sessions__preview-list--skipped {
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.add-sessions__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hosting-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.hosting-session__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.hosting-session__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.hosting-session__select {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.hosting-session__action {
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--error);
+}
+
+.hosting-sessions__more {
+  align-self: flex-start;
+  padding: 6px 0;
+}
+
+.hosting-sessions__confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hosting-sessions__danger {
+  padding: 10px 20px;
+  font-size: 14px;
+  background: var(--error);
+}
+
 .ui-overflow {
   position: relative;
 }

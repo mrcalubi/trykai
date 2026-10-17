@@ -114,6 +114,9 @@ The per host version fixes both problems. It starts earning from day one regardl
 
 All three have to be true together, not just one. A host irritated by the fee with no relationship yet has no way to act on it. A host with a great relationship where going direct saves the guest nothing has no reason to. This is why leakage risk concentrates in Lane 2's repeat, multi session relationships far more than in a one off Lane 1 booking, and worth noting that the per host waiver mechanism above means the fee starts biting a host at roughly the same point a repeat relationship with a guest would start to form. Not a reason to change the mechanism, but worth designing Lane 2's defences with this overlap specifically in mind when that lane is built.
 
+### Recurring sessions
+There is no series object. Recurring is bulk-create: the host picks dates on a calendar (or quick-fills weekdays every 1 / 2 weeks), one or more start times, and each date × time becomes a normal independent session. Max 40 per batch. The calendar matches the PayNow window (tomorrow through today + 80 days). Preview skips past times, clashes with any existing session of that host, and clashes inside the batch. Each keep is created through `add_listing_session` (or the legacy INSERT). The database overlap trigger and `add_listing_session` are per listing; the preview is host-wide. Making the DB check host-wide is a candidate migration. A linked series is post-launch if hosts ask.
+
 ### Group bookings
 *Decided 10 October 2026. Supersedes the 16 August "hosts set tiers" wording.*
 
@@ -212,7 +215,7 @@ Card settlement moved to T+1 in August 2026. A separate S$0.50 in person termina
 
 **PayNow shows a flat 5 per cent off that same total, displayed prominently at checkout, never before.** The price only ever gets cheaper than what was advertised, never more expensive, which is what makes this impossible to read as a bait and switch.
 
-**PayNow is only offered for sessions starting within 80 days.** Stripe cannot refund a PayNow payment more than 90 days after it was taken. 80 days leaves a buffer so a guest who pays today and cancels close to the session still falls inside that window. `create-payment-intent` is the source of truth (`paynow_too_far_ahead`). Checkout disables PayNow and shows card pricing. Card is unaffected. Hosts can still create sessions further out.
+**PayNow is only offered for sessions starting within 80 days.** Stripe cannot refund a PayNow payment more than 90 days after it was taken. 80 days leaves a buffer so a guest who pays today and cancels close to the session still falls inside that window. `create-payment-intent` is the source of truth (`paynow_too_far_ahead`). Checkout disables PayNow and shows card pricing. Card is unaffected. Hosts add sessions on the same 80-day calendar (tomorrow through today + 80 days).
 
 Why 5 per cent and not a smaller or larger figure: tested at 4, 5, 6, and 8 per cent across the S$10 to S$40 band. At 4 per cent the saving is too small to register, as low as $0.52. At 6 and 8 per cent TryKai's margin on PayNow starts collapsing at exactly the price points hosts are told to target, recreating the original dead spot problem in a new place. 5 per cent is the point where the guest saving is real everywhere, roughly $0.65 to $2.25 across the band, and TryKai's net stays healthy throughout, never dropping below $1.25 on card or PayNow.
 
@@ -244,6 +247,8 @@ Published at /cancellation-policy, /refund-policy, /dispute-policy. Finalised 29
 **Safety reports have no time limit, ever.** Credible reports can trigger immediate suspension independent of the strike counter, and severe violations can mean permanent removal without accumulating three strikes. Columns `is_suspended`, `suspended_at`, `suspension_reason` exist as of 22 August. **The app does not query them.** Setting the flag in Table Editor does not hide listings or block booking until listings are also set `is_active = false` by hand. See SAFETY_RESPONSE_PROTOCOL.md and BUILD_BACKLOG P0.4.
 
 **Quality complaints:** 7 day window, 2 business day response target.
+
+**Stripe keeps its processing fee on refunds.** About S$1.45 on a S$28 card booking, about S$0.35 on PayNow. Launch still pays full refunds for guest 48h+ and host cancellations, so TryKai absorbs that fee. Review after the first 100 bookings; leaning towards making the booking fee non-refundable on 48h+ guest cancellations, with notice to users.
 
 **Payout collision:** if a dispute is confirmed after a payout has released, TryKai refunds the guest first, absorbs the cost, and recovers from the host including from future payouts. `release-payout` now exists and Transfers 24h after `starts_at`. It does **not** hold for open disputes; it only skips rows with `stripe_refund_id` set. Clawback after release is still not built.
 
@@ -507,6 +512,12 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-10-17 — Launch polish: empty booking card, host more, profile tabs, password eye, hamburger account.** UI only. A listing with no upcoming sessions shows only "No upcoming sessions yet." — not "Pick a date, then a time". Hosted by drops "More about \<name\>"; a truncated bio preview ends with an inline "… more" to the host profile, and the avatar is a top-aligned link. Own-profile tab switches use `replace` so Back leaves the page. Password fields hide `::-ms-reveal` / `::-ms-clear` globally and keep one kit eye toggle (the hold-to-peek eye was also ours and was removed). Signed-in hamburger adds Profile, Settings, and Log out last with a separator; Settings still has Log out.
 
 **2026-10-17 — PayNow is blocked more than 80 days ahead.** Stripe will not refund PayNow after 90 days from payment. Checkout and `create-payment-intent` refuse PayNow when `starts_at` is more than 80 days from now (`PAYNOW_MAX_DAYS_AHEAD`, error `paynow_too_far_ahead`) so a late cancel can still be refunded automatically. Card is unchanged. Hosts may still create sessions further out; those dates are card-only. Supersedes the same-day note that treated this as post-launch only.
+
+**2026-10-17 — Recurring sessions are bulk-create, not a series.** Hosts pick dates (calendar + optional “every weekday, every 1 / 2 weeks, for N weeks”) and one or more times. Each date × time is a normal independent session. The calendar matches the PayNow window: tomorrow through today + 80 days (`PAYNOW_MAX_DAYS_AHEAD`). Max 40 per batch. Preview skips past, host-wide clashes, and in-batch clashes; `add_listing_session` remains the final overlap guard. Hosting lists booked sessions first, then the next 3 empty ones with “Show all N open sessions”, and empty rows can be tick-selected for `delete_empty_session`. A linked series is post-launch if hosts ask. Supersedes the same-day PayNow note that hosts can still create sessions further out — the add-sessions UI now stops at 80 days.
+
+**2026-10-17 — Refund costs stay with TryKai at launch.** Stripe keeps its processing fee on refunds (~S$1.45 on a S$28 card booking, ~S$0.35 PayNow). Guest 48h+ and host cancellations still get a full refund. Review after the first 100 bookings; leaning towards making the booking fee non-refundable on 48h+ guest cancellations, with notice.
+
+**2026-10-17 — Session overlap is per listing in the database, host-wide in preview.** `sessions_reject_overlap` and `add_listing_session` only look at the same listing. The add-sessions preview checks every upcoming session of this host. Making the DB check host-wide is a candidate migration (BUILD_BACKLOG P3).
 
 ---
 
