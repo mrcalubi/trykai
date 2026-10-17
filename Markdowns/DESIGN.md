@@ -134,8 +134,8 @@ All in plain CSS in `src/index.css` (no Tailwind), previewable at `/style-guide`
 - **Skeletons.** Loading states use shimmering placeholder cards in the real layout, with the old status text kept for screen readers.
 - **Empty states.** An icon, a one-line title, a sentence and an action, centred in a dashed `--border-strong` panel.
 - **Section header.** Optional coral eyebrow, display title, optional muted description, optional "See all" link at the right.
-- **Top nav.** Unchanged pattern (hamburger left, centred mark and wordmark, Log in or avatar right, shrinks on scroll), now with a translucent cream background and backdrop blur, and "Log in" rendered as an outlined pill. Top nav, not bottom nav, until TryKai is a native app.
-- **Hamburger menu.** Unchanged items and stagger; rows gain 52px height and a hover tint.
+- **Top nav.** Mark and wordmark on the left; on the right, "Log in" as an outlined pill (or the avatar, linking to your profile) followed by a round menu button. Translucent cream background with backdrop blur, aligned to the page width, shrinking on scroll as before. Top nav, not bottom nav, until TryKai is a native app.
+- **Main menu (changed 18 October 2026).** A white card that drops down under the menu button, right-aligned to it (Airbnb pattern), replacing the full-height panel that slid in from the left. Rows have a line icon and are grouped by dividers; the host entry ("Become a host" or "Host a session") is a two-line row with the mascot; Log out sits last. Outside click, Escape, or choosing a row closes it. On phones a light scrim sits behind the card. Items are unchanged.
 - **Footer.** A deep-navy band: mark and tagline, three link columns (Explore, Hosting, Policies), then UEN and the DPO email. Cream text, coral dot in the wordmark.
 
 ---
