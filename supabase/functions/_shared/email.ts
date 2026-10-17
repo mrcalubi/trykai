@@ -40,6 +40,86 @@ export function emailSiteUrl(value?: string | null): string {
   return raw || DEFAULT_SITE_URL
 }
 
+export function guestCountLabel(count: number): string {
+  const n = Math.max(1, Number(count) || 1)
+  return n === 1 ? '1 guest' : `${n} guests`
+}
+
+export function formatSessionDay(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('en-SG', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'Asia/Singapore',
+  })
+}
+
+export function bookingConfirmedGuestSubject(listingTitle: string, startsAt: string): string {
+  const day = formatSessionDay(startsAt)
+  return day ? `You're in! ${listingTitle} on ${day}` : `You're in! ${listingTitle}`
+}
+
+export function googleCalendarUrl(options: {
+  title: string
+  startsAt: string
+  durationMins?: number | null
+  address?: string | null
+}): string {
+  const start = new Date(options.startsAt)
+  if (Number.isNaN(start.getTime())) return ''
+  const mins = Number(options.durationMins)
+  const duration = Number.isFinite(mins) && mins > 0 ? mins : 60
+  const end = new Date(start.getTime() + duration * 60 * 1000)
+  const stamp = (value: Date) =>
+    value.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: options.title || 'TryKai session',
+  })
+  if (options.address) params.set('location', options.address)
+  const dates = `${stamp(start)}/${stamp(end)}`
+  return `https://calendar.google.com/calendar/render?${params.toString()}&dates=${dates}`
+}
+
+export function refundTimingCopy(_paymentRail?: string | null): string {
+  return 'Card refunds usually take 5 to 10 business days to appear. PayNow refunds are usually faster.'
+}
+
+export function refundMethodNoun(paymentRail?: string | null): string {
+  return paymentRail === 'paynow' ? 'PayNow' : 'card'
+}
+
+export function hostRefundedGuestsLine(guestCount: number): string {
+  const n = Math.max(1, Number(guestCount) || 1)
+  if (n === 1) return 'Your guest has been refunded in full.'
+  if (n === 2) return 'Both guests have been refunded in full.'
+  return `All ${n} guests have been refunded in full.`
+}
+
+function emailGreeting(name?: string | null): string {
+  const who = (name || '').trim()
+  return who ? `Hi ${escapeHtml(who)},` : 'Hi,'
+}
+
+function emailSignOff(kind: 'see-you' | 'take-care'): string {
+  const line = kind === 'see-you' ? 'See you there,' : 'Take care,'
+  return `<p style="margin:24px 0 0;">${line}<br>The TryKai team</p>`
+}
+
+function primaryButton(href: string, label: string): string {
+  return `<p style="margin:24px 0 8px;">
+      <a href="${href}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:600;">${escapeHtml(label)}</a>
+    </p>`
+}
+
+function whatsProvidedCopy(items?: string[] | null): string {
+  if (!Array.isArray(items)) return ''
+  const clean = items.map((item) => String(item).trim()).filter((item) => item && item !== 'None')
+  return clean.join(', ')
+}
+
 /**
  * Public surfaces show `display_name`. `firstName(full_name)` is only the
  * fallback while a row has no display name yet.
@@ -148,7 +228,7 @@ export function receiptPriceLines(options: {
   const cardListTotal = calculateGuestCharge(listLesson, 'card').totalAmount
   const cardDiscountedTotal = calculateGuestCharge(discountedLesson, 'card').totalAmount
   const rate = groupDiscountRate(guestsCount, groupPricing)
-  const lines = [`${formatCents(unit)} per person x ${guestsCount} guests`]
+  const lines = [`${formatCents(unit)} per person x ${guestCountLabel(guestsCount)}`]
   if (rate > 0 && cardListTotal > cardDiscountedTotal) {
     lines.push(
       `Group discount (${Math.round(rate * 100)}%) −${formatCents(cardListTotal - cardDiscountedTotal)}`,
@@ -205,6 +285,7 @@ export function bookingConfirmedGuestHtml(options: {
   bookingReference: string
   listingTitle: string
   hostName: string
+  guestName?: string | null
   sessionDate: string
   duration?: string
   fullAddress?: string
@@ -215,12 +296,14 @@ export function bookingConfirmedGuestHtml(options: {
   totalPaidCents: number
   paymentMethod: string
   sessionStartsAt: string
+  durationMins?: number | null
+  whatsProvided?: string[] | null
   guestId: string
   siteUrl?: string
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
-  const title = escapeHtml(options.listingTitle)
   const hostName = escapeHtml(options.hostName || 'your host')
+  const provided = whatsProvidedCopy(options.whatsProvided)
   const priceLines = receiptPriceLines({
     pricePerPersonCents: options.pricePerPersonCents,
     guestsCount: options.guestsCount,
@@ -228,27 +311,34 @@ export function bookingConfirmedGuestHtml(options: {
     paymentRail: options.paymentRail,
     totalPaidCents: options.totalPaidCents,
   })
-  const deadlines = refundDeadlineLines(options.sessionStartsAt)
   const duration = options.duration ? escapeHtml(options.duration) : ''
   const address = options.fullAddress ? escapeHtml(options.fullAddress) : ''
+  const calendar = googleCalendarUrl({
+    title: options.listingTitle,
+    startsAt: options.sessionStartsAt,
+    durationMins: options.durationMins,
+    address: options.fullAddress,
+  })
 
   return wrapEmail(
     `
-    <h2 style="margin:0 0 16px;font-size:22px;line-height:1.3;">Your booking is confirmed</h2>
+    <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
+    <p style="margin:0 0 16px;">You're booked with ${hostName}. Here's everything you need.</p>
     <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
-    <p style="margin:0 0 8px;">You are booked for <strong>${title}</strong> with ${hostName}.</p>
     <p style="margin:0 0 8px;"><strong>Date and time:</strong> ${escapeHtml(options.sessionDate)}</p>
     ${duration ? `<p style="margin:0 0 8px;"><strong>Duration:</strong> ${duration}</p>` : ''}
     ${address ? `<p style="margin:0 0 8px;"><strong>Address:</strong> ${address}</p>` : ''}
-    <p style="margin:0 0 16px;"><strong>Guests:</strong> ${options.guestsCount}</p>
+    <p style="margin:0 0 8px;"><strong>Guests:</strong> ${guestCountLabel(options.guestsCount)}</p>
+    ${provided ? `<p style="margin:0 0 8px;"><strong>What's provided:</strong> ${escapeHtml(provided)}</p>` : ''}
     ${priceLines.map((line) => `<p style="margin:0 0 8px;">${escapeHtml(line)}</p>`).join('\n    ')}
     <p style="margin:0 0 16px;"><strong>Payment method:</strong> ${escapeHtml(options.paymentMethod)}</p>
-    ${deadlines.map((line) => `<p style="margin:0 0 8px;">${escapeHtml(line)}</p>`).join('\n    ')}
-    <p style="margin:24px 0;">
-      <a href="${siteUrl}/u/${encodeURIComponent(options.guestId)}?tab=bookings" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:600;">View booking</a>
-    </p>
+    ${options.paymentRail === 'paynow' ? '<p style="margin:0 0 16px;">Your bank will show this payment as Stripe Payments Singapore.</p>' : ''}
+    ${calendar ? `<p style="margin:0 0 8px;"><a href="${escapeHtml(calendar)}" style="color:#111;">Add to Google Calendar</a></p>` : ''}
+    ${primaryButton(`${siteUrl}/u/${encodeURIComponent(options.guestId)}?tab=bookings`, 'View booking')}
     <p style="margin:0 0 8px;">Questions for your host? Reply to this email.</p>
-    <p style="margin:0;"><a href="${siteUrl}" style="color:#111;">Browse more experiences</a></p>
+    <p style="margin:0 0 16px;"><a href="${siteUrl}" style="color:#111;">Browse more experiences</a></p>
+    <p style="margin:0;font-size:13px;color:#666;">Need to change plans? <a href="${siteUrl}/cancellation-policy" style="color:#666;">Cancellation policy</a></p>
+    ${emailSignOff('see-you')}
     `,
     siteUrl,
   )
@@ -256,6 +346,7 @@ export function bookingConfirmedGuestHtml(options: {
 
 export function bookingConfirmedHostHtml(options: {
   bookingReference: string
+  hostName?: string | null
   guestName: string
   listingTitle: string
   sessionDate: string
@@ -266,13 +357,14 @@ export function bookingConfirmedHostHtml(options: {
   const siteUrl = emailSiteUrl(options.siteUrl)
   return wrapEmail(
     `
-    <h2 style="margin:0 0 16px;font-size:22px;line-height:1.3;">You've got a new booking!</h2>
+    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    <p style="margin:0 0 16px;"><strong>${escapeHtml(options.guestName)}</strong> just booked your session.</p>
     <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
-    <p style="margin:0 0 8px;"><strong>${escapeHtml(options.guestName)}</strong> just booked your session.</p>
     <p style="margin:0 0 8px;"><strong>Listing:</strong> ${escapeHtml(options.listingTitle)}</p>
     <p style="margin:0 0 8px;"><strong>Date and time:</strong> ${escapeHtml(options.sessionDate)}</p>
-    <p style="margin:0 0 16px;"><strong>Guests:</strong> ${options.guestsCount}</p>
+    <p style="margin:0 0 16px;"><strong>Guests:</strong> ${guestCountLabel(options.guestsCount)}</p>
     <p style="margin:0;">${hostPayoutLine(options.hostPayoutCents)}</p>
+    ${emailSignOff('see-you')}
     `,
     siteUrl,
   )
@@ -312,22 +404,48 @@ export function bookingCancelledGuestHtml(options: {
   refundAmountCents: number
   cancelledBy: 'guest' | 'host'
   guestsCount: number
+  paymentRail?: string | null
   paymentMethod: string
+  guestName?: string | null
+  hostName?: string | null
+  listingId?: string | null
+  listingCategory?: string | null
+  hasOtherSessions?: boolean
   siteUrl?: string
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
-  const who =
+  const hostName = options.hostName || 'your host'
+  const listingPath = options.listingId ? `${siteUrl}/listings/${encodeURIComponent(options.listingId)}` : siteUrl
+  const similarHref = options.listingCategory
+    ? `${siteUrl}/?category=${encodeURIComponent(options.listingCategory)}`
+    : siteUrl
+  const method = refundMethodNoun(options.paymentRail)
+  const timing = refundTimingCopy(options.paymentRail)
+  const refund = formatCents(options.refundAmountCents)
+
+  const body =
     options.cancelledBy === 'host'
-      ? 'The host cancelled your booking'
-      : 'Your booking has been cancelled'
+      ? `<p style="margin:0 0 16px;">We're sorry. ${escapeHtml(hostName)} had to cancel your session on ${escapeHtml(options.sessionDate)}. You'll get a full refund of ${escapeHtml(refund)}. ${escapeHtml(timing)}</p>`
+      : options.refundAmountCents > 0
+        ? `<p style="margin:0 0 16px;">Sorry you can't make ${escapeHtml(options.listingTitle)}. Your refund of ${escapeHtml(refund)} is on its way to your ${escapeHtml(method)}. ${escapeHtml(timing)}</p>`
+        : `<p style="margin:0 0 16px;">Sorry you can't make ${escapeHtml(options.listingTitle)}. There's no refund for this cancellation.</p>`
+
+  const cta =
+    options.cancelledBy === 'host'
+      ? options.hasOtherSessions
+        ? primaryButton(listingPath, `See ${hostName}'s other sessions`)
+        : primaryButton(similarHref, 'Find something similar')
+      : primaryButton(listingPath, `Find another time with ${hostName}`)
+
   return wrapEmail(
     `
-    <h2 style="margin:0 0 16px;font-size:22px;line-height:1.3;">${who}</h2>
+    <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
+    ${body}
     <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
-    <p style="margin:0 0 8px;">The session was <strong>${escapeHtml(options.listingTitle)}</strong> on ${escapeHtml(options.sessionDate)}.</p>
-    <p style="margin:0 0 16px;"><strong>Guests:</strong> ${options.guestsCount}</p>
-    <p style="margin:0 0 8px;"><strong>Refund amount:</strong> ${escapeHtml(formatCents(options.refundAmountCents))}</p>
-    <p style="margin:0;"><strong>Refund method:</strong> ${escapeHtml(options.paymentMethod)}</p>
+    <p style="margin:0 0 16px;"><strong>Guests:</strong> ${guestCountLabel(options.guestsCount)}</p>
+    ${cta}
+    <p style="margin:0;"><a href="${siteUrl}" style="color:#111;">Browse other experiences</a></p>
+    ${emailSignOff('take-care')}
     `,
     siteUrl,
   )
@@ -335,6 +453,7 @@ export function bookingCancelledGuestHtml(options: {
 
 export function bookingCancelledHostHtml(options: {
   bookingReference: string
+  hostName?: string | null
   guestName: string
   listingTitle: string
   sessionDate: string
@@ -345,16 +464,62 @@ export function bookingCancelledHostHtml(options: {
   const siteUrl = emailSiteUrl(options.siteUrl)
   return wrapEmail(
     `
-    <h2 style="margin:0 0 16px;font-size:22px;line-height:1.3;">A guest cancelled</h2>
+    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    <p style="margin:0 0 16px;"><strong>${escapeHtml(options.guestName)}</strong> cancelled their booking for <strong>${escapeHtml(options.listingTitle)}</strong>.</p>
     <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
-    <p style="margin:0 0 8px;"><strong>${escapeHtml(options.guestName)}</strong> cancelled their booking for <strong>${escapeHtml(options.listingTitle)}</strong>.</p>
     <p style="margin:0 0 8px;"><strong>Date and time:</strong> ${escapeHtml(options.sessionDate)}</p>
-    <p style="margin:0 0 16px;"><strong>Guests:</strong> ${options.guestsCount}</p>
+    <p style="margin:0 0 16px;"><strong>Guests:</strong> ${guestCountLabel(options.guestsCount)}</p>
     <p style="margin:0 0 8px;">${hostPayoutLine(options.hostPayoutCents)}</p>
     <p style="margin:0;">The spot is available again.</p>
+    ${emailSignOff('take-care')}
     `,
     siteUrl,
   )
+}
+
+export function hostSessionCancelledHtml(options: {
+  hostName?: string | null
+  listingTitle: string
+  sessionDate: string
+  guestCount: number
+  strikeCount: number
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    <p style="margin:0 0 16px;">You cancelled ${escapeHtml(options.listingTitle)} on ${escapeHtml(options.sessionDate)}. ${escapeHtml(hostRefundedGuestsLine(options.guestCount))} This is strike ${options.strikeCount} of 3; at 3 your listings are paused.</p>
+    <p style="margin:0;"><a href="${siteUrl}/cancellation-policy#appeals" style="color:#111;">Appeal this strike</a></p>
+    ${emailSignOff('take-care')}
+    `,
+    siteUrl,
+  )
+}
+
+export async function sendHostSessionCancelledEmail(options: {
+  apiKey: string | undefined
+  hostEmail: string | null | undefined
+  hostName?: string | null
+  listingTitle: string
+  sessionDate: string
+  guestCount: number
+  strikeCount: number
+  siteUrl?: string
+}): Promise<void> {
+  await sendResendEmail({
+    apiKey: options.apiKey,
+    to: options.hostEmail,
+    subject: `You cancelled ${options.listingTitle}`,
+    html: hostSessionCancelledHtml({
+      hostName: options.hostName,
+      listingTitle: options.listingTitle,
+      sessionDate: options.sessionDate,
+      guestCount: options.guestCount,
+      strikeCount: options.strikeCount,
+      siteUrl: options.siteUrl,
+    }),
+  })
 }
 
 /** Hosts see only their payout, never a guest's payment or refund. */
@@ -364,8 +529,9 @@ export function hostPayoutLine(cents: number): string {
 }
 
 /**
- * Guest always hears the refund amount, including $0. The host is only told
- * when the guest cancelled — the host already knows about their own cancel.
+ * Guest always hears the refund amount, including $0. A guest-initiated cancel
+ * also emails the host their payout only. Host-initiated session cancel uses
+ * sendHostSessionCancelledEmail instead — never a guest amount.
  * Never throws: a Resend failure must not undo a refund that already happened.
  */
 export async function sendCancellationEmails(options: {
@@ -378,16 +544,26 @@ export async function sendCancellationEmails(options: {
   guestEmail: string | null | undefined
   hostEmail: string | null | undefined
   guestName?: string | null
+  hostName?: string | null
+  listingId?: string | null
+  listingCategory?: string | null
+  hasOtherSessions?: boolean
+  paymentRail?: string | null
   guestsCount: number
   paymentMethod: string
   hostPayoutCents?: number
   siteUrl?: string
 }): Promise<void> {
   try {
+    const guestSubject =
+      options.cancelledBy === 'host'
+        ? `${options.hostName || 'Your host'} had to cancel ${options.listingTitle}`
+        : "Sorry you can't make it"
     await sendResendEmail({
       apiKey: options.apiKey,
       to: options.guestEmail,
-      subject: `Booking cancelled: ${options.listingTitle}`,
+      subject: guestSubject,
+      replyTo: GUEST_REPLY_TO,
       html: bookingCancelledGuestHtml({
         bookingReference: options.bookingReference,
         listingTitle: options.listingTitle,
@@ -395,7 +571,13 @@ export async function sendCancellationEmails(options: {
         refundAmountCents: options.refundAmountCents,
         cancelledBy: options.cancelledBy,
         guestsCount: options.guestsCount,
+        paymentRail: options.paymentRail,
         paymentMethod: options.paymentMethod,
+        guestName: options.guestName,
+        hostName: options.hostName,
+        listingId: options.listingId,
+        listingCategory: options.listingCategory,
+        hasOtherSessions: options.hasOtherSessions,
         siteUrl: options.siteUrl,
       }),
     })
@@ -406,6 +588,7 @@ export async function sendCancellationEmails(options: {
         subject: `A guest cancelled "${options.listingTitle}"`,
         html: bookingCancelledHostHtml({
           bookingReference: options.bookingReference,
+          hostName: options.hostName,
           guestName: options.guestName || 'A guest',
           listingTitle: options.listingTitle,
           sessionDate: options.sessionDate,

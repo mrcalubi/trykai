@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
         session_id,
         guest_id,
         payment_rail,
-        sessions ( starts_at, listings ( title, host_id ) )
+        sessions ( starts_at, listings ( id, title, host_id, category ) )
       `,
       )
       .eq('id', booking_id)
@@ -118,6 +118,24 @@ Deno.serve(async (req) => {
             .maybeSingle()
         : { data: null }
 
+      const { data: hostProfile } = listing?.host_id
+        ? await admin
+            .from('users')
+            .select('full_name, display_name')
+            .eq('id', listing.host_id)
+            .maybeSingle()
+        : { data: null }
+
+      const { data: otherSessions } = listing?.id
+        ? await admin
+            .from('sessions')
+            .select('id')
+            .eq('listing_id', listing.id)
+            .eq('status', 'open')
+            .gt('starts_at', new Date().toISOString())
+            .limit(1)
+        : { data: [] }
+
       const paymentMethod = await resolvePaymentMethod({
         paymentRail: booking.payment_rail,
         retrieveIntent: booking.stripe_payment_id
@@ -137,7 +155,12 @@ Deno.serve(async (req) => {
         sessionDate: session?.starts_at ? formatSessionDate(session.starts_at) : '',
         guestEmail: guestProfile?.email,
         hostEmail: null,
-        guestName: publicDisplayName(guestProfile) || guestProfile?.full_name,
+        guestName: publicDisplayName(guestProfile),
+        hostName: publicDisplayName(hostProfile) || 'your host',
+        listingId: listing?.id,
+        listingCategory: listing?.category,
+        hasOtherSessions: (otherSessions ?? []).length > 0,
+        paymentRail: booking.payment_rail,
         guestsCount: booking.guests_count,
         paymentMethod,
         siteUrl: Deno.env.get('SITE_URL'),

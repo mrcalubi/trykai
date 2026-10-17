@@ -1,6 +1,6 @@
 # Refund Policy
 
-Last updated: 27 August 2026
+Last updated: 17 October 2026
 
 ## How refunds work
 
@@ -10,10 +10,9 @@ Refunds are issued to your original payment method through Stripe, our payment p
 
 ## Processing time
 
-Processing time depends on how you originally paid:
+Card refunds usually take 5 to 10 business days to appear. PayNow refunds are usually faster.
 
-- **Card:** 3 to 5 business days
-- **PayNow:** usually reflects within a few hours, and no more than 1 business day
+PayNow refunds can only be made within 90 days of payment. If an automatic refund can't be completed, we'll contact you and refund you another way.
 
 Business days refer to Singapore business days, and exclude weekends and Singapore public holidays.
 

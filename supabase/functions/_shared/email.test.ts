@@ -3,6 +3,7 @@ import {
   bookingCancelledGuestHtml,
   bookingCancelledHostHtml,
   bookingConfirmedGuestHtml,
+  bookingConfirmedGuestSubject,
   bookingConfirmedHostHtml,
   bookingReference,
   cardDetailsFromCharge,
@@ -12,13 +13,21 @@ import {
   formatDuration,
   formatPaymentMethod,
   formatSessionDate,
+  formatSessionDay,
+  googleCalendarUrl,
+  guestCountLabel,
+  hostPayoutLine,
+  hostRefundedGuestsLine,
+  hostSessionCancelledHtml,
   paymentMethodFromIntent,
   publicDisplayName,
   receiptPriceLines,
   refundDeadlineLines,
+  refundMethodNoun,
+  refundTimingCopy,
   resolvePaymentMethod,
   sendCancellationEmails,
-  hostPayoutLine,
+  sendHostSessionCancelledEmail,
   sendResendEmail,
   verificationApprovedHtml,
   verificationRejectedHtml,
@@ -82,6 +91,7 @@ function guestReceipt(overrides = {}) {
     bookingReference: 'A1B2C3D4',
     listingTitle: 'Latte art',
     hostName: 'Mei Ling',
+    guestName: 'caleb2',
     sessionDate: formatSessionDate(SESSION_STARTS),
     duration: '1 hr 30 min',
     fullAddress: '12 Club Street, Singapore 069410',
@@ -92,7 +102,60 @@ function guestReceipt(overrides = {}) {
     totalPaidCents: 9120,
     paymentMethod: 'PayNow',
     sessionStartsAt: SESSION_STARTS,
+    durationMins: 90,
+    whatsProvided: ['Apron', 'Coffee beans'],
     guestId: 'guest-1',
+    siteUrl: 'https://trykai.sg',
+    ...overrides,
+  })
+}
+
+function guestCancelMail(overrides = {}) {
+  return bookingCancelledGuestHtml({
+    bookingReference: 'A1B2C3D4',
+    listingTitle: 'Latte art',
+    sessionDate: '28 Aug 2026, 7:00 pm',
+    refundAmountCents: 5100,
+    cancelledBy: 'guest',
+    guestsCount: 2,
+    paymentRail: 'paynow',
+    paymentMethod: 'PayNow',
+    guestName: 'caleb2',
+    hostName: 'Mei Ling',
+    listingId: 'listing-1',
+    listingCategory: 'Food',
+    siteUrl: 'https://trykai.sg',
+    ...overrides,
+  })
+}
+
+function hostCancelGuestMail(overrides = {}) {
+  return bookingCancelledGuestHtml({
+    bookingReference: 'A1B2C3D4',
+    listingTitle: 'Latte art',
+    sessionDate: '28 Aug 2026, 7:00 pm',
+    refundAmountCents: 5100,
+    cancelledBy: 'host',
+    guestsCount: 2,
+    paymentRail: 'card',
+    paymentMethod: 'Visa ending in 4242',
+    guestName: 'caleb2',
+    hostName: 'Mei Ling',
+    listingId: 'listing-1',
+    listingCategory: 'Food',
+    hasOtherSessions: true,
+    siteUrl: 'https://trykai.sg',
+    ...overrides,
+  })
+}
+
+function hostSessionCancelMail(overrides = {}) {
+  return hostSessionCancelledHtml({
+    hostName: 'Mei Ling',
+    listingTitle: 'Latte art',
+    sessionDate: '28 Aug 2026, 7:00 pm',
+    guestCount: 3,
+    strikeCount: 2,
     siteUrl: 'https://trykai.sg',
     ...overrides,
   })
@@ -228,7 +291,7 @@ describe('receiptPriceLines', () => {
       paymentRail: 'card',
       totalPaidCents: 2800,
     })
-    expect(lines[0]).toBe('$28 per person x 1 guests')
+    expect(lines[0]).toBe('$28 per person x 1 guest')
     expect(lines.at(-1)).toBe('Total paid $28')
     expect(lines.join('\n')).not.toMatch(/booking fee|platform fee/i)
   })
@@ -275,7 +338,7 @@ describe('receiptPriceLines', () => {
       paymentRail: 'card',
       totalPaidCents: 2800,
     })
-    expect(lines[0]).toBe('$28 per person x 1 guests')
+    expect(lines[0]).toBe('$28 per person x 1 guest')
   })
 })
 
@@ -289,29 +352,108 @@ describe('refundDeadlineLines', () => {
   })
 })
 
+describe('guest count and session day', () => {
+  it('pluralises 1 guest and N guests', () => {
+    expect(guestCountLabel(1)).toBe('1 guest')
+    expect(guestCountLabel(2)).toBe('2 guests')
+    expect(guestCountLabel(0)).toBe('1 guest')
+  })
+
+  it('formats the weekday-first Singapore day used in the subject', () => {
+    expect(formatSessionDay(SESSION_STARTS)).toBe('Fri, 28 Aug')
+    expect(formatSessionDay('not-a-date')).toBe('')
+  })
+
+  it('builds the guest confirmation subject with one exclamation mark', () => {
+    expect(bookingConfirmedGuestSubject('Latte art', SESSION_STARTS)).toBe(
+      "You're in! Latte art on Fri, 28 Aug",
+    )
+    expect(bookingConfirmedGuestSubject('Latte art', 'bad')).toBe("You're in! Latte art")
+    expect((bookingConfirmedGuestSubject('Latte art', SESSION_STARTS).match(/!/g) ?? []).length).toBe(1)
+  })
+})
+
+describe('googleCalendarUrl', () => {
+  it('uses title, UTC start and end, and the address', () => {
+    const url = googleCalendarUrl({
+      title: 'Latte art',
+      startsAt: SESSION_STARTS,
+      durationMins: 90,
+      address: '12 Club Street, Singapore 069410',
+    })
+    const parsed = new URL(url)
+    expect(parsed.origin + parsed.pathname).toBe('https://calendar.google.com/calendar/render')
+    expect(parsed.searchParams.get('action')).toBe('TEMPLATE')
+    expect(parsed.searchParams.get('text')).toBe('Latte art')
+    expect(parsed.searchParams.get('dates')).toBe('20260828T110000Z/20260828T123000Z')
+    expect(parsed.searchParams.get('location')).toBe('12 Club Street, Singapore 069410')
+  })
+
+  it('defaults to one hour and a generic title when those are missing', () => {
+    const url = googleCalendarUrl({ title: '', startsAt: SESSION_STARTS })
+    const parsed = new URL(url)
+    expect(parsed.searchParams.get('text')).toBe('TryKai session')
+    expect(parsed.searchParams.get('dates')).toBe('20260828T110000Z/20260828T120000Z')
+    expect(parsed.searchParams.get('location')).toBeNull()
+  })
+
+  it('returns empty when the start is not a date', () => {
+    expect(googleCalendarUrl({ title: 'Latte art', startsAt: 'nope' })).toBe('')
+  })
+})
+
+describe('refund timing copy', () => {
+  it('uses one published sentence for every rail', () => {
+    const timing =
+      'Card refunds usually take 5 to 10 business days to appear. PayNow refunds are usually faster.'
+    expect(refundTimingCopy('card')).toBe(timing)
+    expect(refundTimingCopy('paynow')).toBe(timing)
+    expect(refundTimingCopy()).toBe(timing)
+    expect(refundMethodNoun('paynow')).toBe('PayNow')
+    expect(refundMethodNoun('card')).toBe('card')
+  })
+
+  it('phrases host-facing guest counts without amounts', () => {
+    expect(hostRefundedGuestsLine(1)).toBe('Your guest has been refunded in full.')
+    expect(hostRefundedGuestsLine(2)).toBe('Both guests have been refunded in full.')
+    expect(hostRefundedGuestsLine(4)).toBe('All 4 guests have been refunded in full.')
+    expect(hostRefundedGuestsLine(Number.NaN)).toBe('Your guest has been refunded in full.')
+  })
+})
+
 describe('booking confirmation emails', () => {
-  it('is a guest receipt: reference, listing, host, time, duration, address, guests, price', () => {
+  it('is a guest receipt: greeting, host opening, reference, details, calendar, quiet policy', () => {
     const html = guestReceipt()
+    expect(html).toContain('Hi caleb2,')
+    expect(html).toContain("You're booked with Mei Ling. Here's everything you need.")
     expect(html).toContain('Booking reference:</strong> A1B2C3D4')
-    expect(html).toContain('Latte art')
-    expect(html).toContain('Mei Ling')
     expect(html).toContain(formatSessionDate(SESSION_STARTS))
     expect(html).toContain('1 hr 30 min')
     expect(html).toContain('12 Club Street, Singapore 069410')
-    expect(html).toContain('Guests:</strong> 4')
+    expect(html).toContain('Guests:</strong> 4 guests')
+    expect(html).toContain("What's provided:</strong> Apron, Coffee beans")
     expect(html).toContain('$28 per person x 4 guests')
     expect(html).toContain('Group discount (15%) −$16')
     expect(html).toContain('PayNow saving $4.80')
     expect(html).toContain('Total paid $91.20')
     expect(html).toContain('Payment method:</strong> PayNow')
+    expect(html).toContain('Your bank will show this payment as Stripe Payments Singapore.')
     expect(html).not.toMatch(/booking fee|platform fee/i)
-    expect(html).toContain(`Full refund if you cancel before ${formatSessionDate('2026-08-26T11:00:00.000Z')}`)
-    expect(html).toContain(`50% refund if you cancel before ${formatSessionDate('2026-08-27T11:00:00.000Z')}`)
-    expect(html).toContain(`25% refund if you cancel before ${formatSessionDate('2026-08-28T05:00:00.000Z')}`)
+    expect(html).not.toMatch(/Full refund if you cancel/)
+    expect(html).not.toMatch(/50% refund if you cancel/)
+    expect(html).not.toMatch(/25% refund if you cancel/)
+    expect(html).toContain('Need to change plans?')
+    expect(html).toContain('href="https://trykai.sg/cancellation-policy"')
+    expect(html).toContain('Cancellation policy')
+    expect(html).toContain('Add to Google Calendar')
+    expect(html).toContain('dates=20260828T110000Z/20260828T123000Z')
+    expect(html.replace('<!DOCTYPE html>', '')).not.toContain('!')
     expect(html).toContain('href="https://trykai.sg/u/guest-1?tab=bookings"')
     expect(html).toContain('View booking')
     expect(html).toContain('Questions for your host? Reply to this email.')
     expect(html).toContain('Browse more experiences')
+    expect(html).toContain('See you there,')
+    expect(html).toContain('The TryKai team')
     expect(html.match(/href="https:\/\/trykai\.sg"/g)?.length).toBe(1)
     expect(html).toContain('TryKai')
     expect(html).toContain('UEN 53526159D')
@@ -320,15 +462,22 @@ describe('booking confirmation emails', () => {
     expect(html).not.toContain('/dashboard')
   })
 
-  it('omits duration, address, and a missing host name', () => {
+  it('omits duration, address, What\'s provided, and a missing host name', () => {
     const html = guestReceipt({
       hostName: '',
       duration: '',
       fullAddress: '',
+      whatsProvided: [],
     })
-    expect(html).toContain('with your host.')
+    expect(html).toContain("You're booked with your host. Here's everything you need.")
     expect(html).not.toContain('Duration:')
     expect(html).not.toContain('Address:')
+    expect(html).not.toContain("What's provided:")
+  })
+
+  it('skips What\'s provided when the only item is None', () => {
+    expect(guestReceipt({ whatsProvided: ['None'] })).not.toContain("What's provided:")
+    expect(guestReceipt({ whatsProvided: null })).not.toContain("What's provided:")
   })
 
   it('names the card brand and last 4 when the guest paid by card', () => {
@@ -338,12 +487,14 @@ describe('booking confirmation emails', () => {
       totalPaidCents: 2800,
       paymentMethod: 'Visa ending in 4242',
     })
-    expect(html).toContain('$28 per person x 1 guests')
+    expect(html).toContain('Guests:</strong> 1 guest')
+    expect(html).toContain('$28 per person x 1 guest')
     expect(html).toContain('Total paid $28')
     expect(html).toContain('Visa ending in 4242')
     expect(html).not.toMatch(/group discount/i)
     expect(html).not.toMatch(/PayNow saving/)
     expect(html).not.toMatch(/booking fee|platform fee/i)
+    expect(html).not.toContain('Stripe Payments Singapore')
   })
 
   it('escapes listing copy a host typed', () => {
@@ -351,27 +502,43 @@ describe('booking confirmation emails', () => {
       listingTitle: '<script>x</script>',
       hostName: '<b>Mei</b>',
       fullAddress: '<img src=x>',
+      whatsProvided: ['<svg>'],
     })
     expect(html).not.toContain('<script>')
-    expect(html).toContain('&lt;script&gt;')
+    expect(html).toContain('%3Cscript%3E')
     expect(html).toContain('&lt;b&gt;Mei&lt;/b&gt;')
+    expect(html).toContain('&lt;svg&gt;')
+  })
+
+  it('falls back to Hi, when the guest has no display name', () => {
+    expect(guestReceipt({ guestName: '' })).toContain('Hi,')
+    expect(guestReceipt({ guestName: '  ' })).toContain('Hi,')
+  })
+
+  it('omits the calendar link when the session start is missing', () => {
+    const html = guestReceipt({ sessionStartsAt: '' })
+    expect(html).not.toContain('Add to Google Calendar')
   })
 
   it('tells the host the reference, guest display name, and payout after any host fee', () => {
     const html = bookingConfirmedHostHtml({
       bookingReference: 'A1B2C3D4',
+      hostName: 'Mei Ling',
       guestName: 'Sarah',
       listingTitle: 'Latte art',
       sessionDate: formatSessionDate(SESSION_STARTS),
-      guestsCount: 4,
+      guestsCount: 1,
       hostPayoutCents: 8500,
     })
+    expect(html).toContain('Hi Mei Ling,')
     expect(html).toContain('Booking reference:</strong> A1B2C3D4')
     expect(html).toContain('Sarah')
     expect(html).toContain('Latte art')
     expect(html).toContain(formatSessionDate(SESSION_STARTS))
-    expect(html).toContain('Guests:</strong> 4')
+    expect(html).toContain('Guests:</strong> 1 guest')
     expect(html).toContain("You'll receive $85")
+    expect(html).toContain('See you there,')
+    expect(html).toContain('The TryKai team')
     expect(html).toContain('UEN 53526159D')
     expect(html).not.toMatch(/booking fee|platform fee|host fee/i)
     expect(html).not.toMatch(/Total paid|Refund amount|Refund method/i)
@@ -508,49 +675,67 @@ describe('formatCents', () => {
 })
 
 describe('cancellation emails', () => {
-  it('always states the guest refund amount, including zero, plus reference and method', () => {
-    const none = bookingCancelledGuestHtml({
-      bookingReference: 'A1B2C3D4',
-      listingTitle: 'Latte art',
-      sessionDate: '28 Aug 2026, 7:00 pm',
-      refundAmountCents: 0,
-      cancelledBy: 'guest',
-      guestsCount: 2,
-      paymentMethod: 'PayNow',
-    })
-    expect(none).toContain('Booking reference:</strong> A1B2C3D4')
-    expect(none).toContain('Guests:')
-    expect(none).toContain('2')
-    expect(none).toContain('Refund amount:')
-    expect(none).toContain('$0')
-    expect(none).toContain('Latte art')
-    expect(none).toContain('Refund method:</strong> PayNow')
-    expect(none).toContain('UEN 53526159D')
+  it('tells a guest who cancelled that the refund is on its way', () => {
+    const html = guestCancelMail()
+    expect(html).toContain('Hi caleb2,')
+    expect(html).toContain("Sorry you can't make Latte art.")
+    expect(html).toContain('Your refund of $51 is on its way to your PayNow.')
+    expect(html).toContain(
+      'Card refunds usually take 5 to 10 business days to appear. PayNow refunds are usually faster.',
+    )
+    expect(html).not.toMatch(/3 to 5 business days|few hours|1 business day/)
+    expect(html).toContain('Booking reference:</strong> A1B2C3D4')
+    expect(html).toContain('Guests:</strong> 2 guests')
+    expect(html).toContain('Find another time with Mei Ling')
+    expect(html).toContain('href="https://trykai.sg/listings/listing-1"')
+    expect(html).toContain('Browse other experiences')
+    expect(html).toContain('Take care,')
+    expect(html).toContain('The TryKai team')
+    expect(html).toContain('UEN 53526159D')
+    expect(html.replace('<!DOCTYPE html>', '')).not.toContain('!')
+  })
 
-    const full = bookingCancelledGuestHtml({
-      bookingReference: 'A1B2C3D4',
-      listingTitle: 'Latte art',
-      sessionDate: '28 Aug 2026, 7:00 pm',
-      refundAmountCents: 5100,
-      cancelledBy: 'host',
-      guestsCount: 2,
-      paymentMethod: 'Visa ending in 4242',
-    })
-    expect(full).toContain('$51')
-    expect(full).toContain('The host cancelled your booking')
-    expect(full).toContain('Visa ending in 4242')
+  it('says there is no refund when the guest cancelled at $0', () => {
+    const html = guestCancelMail({ refundAmountCents: 0, guestsCount: 1 })
+    expect(html).toContain("There's no refund for this cancellation.")
+    expect(html).toContain('Guests:</strong> 1 guest')
+    expect(html).not.toContain('on its way')
+    expect(html).not.toContain('5 to 10 business days')
+  })
+
+  it('uses the same timing sentence when the guest paid by card', () => {
+    const html = guestCancelMail({ paymentRail: 'card', paymentMethod: 'Visa ending in 4242' })
+    expect(html).toContain('on its way to your card.')
+    expect(html).toContain(
+      'Card refunds usually take 5 to 10 business days to appear. PayNow refunds are usually faster.',
+    )
+    expect(html).not.toMatch(/3 to 5 business days|few hours|1 business day/)
+  })
+
+  it('tells a guest the host cancelled, with a full refund and other sessions', () => {
+    const html = hostCancelGuestMail()
+    expect(html).toContain('Hi caleb2,')
+    expect(html).toContain("We're sorry. Mei Ling had to cancel your session on 28 Aug 2026, 7:00 pm.")
+    expect(html).toContain("You'll get a full refund of $51.")
+    expect(html).toContain(
+      'Card refunds usually take 5 to 10 business days to appear. PayNow refunds are usually faster.',
+    )
+    expect(html).toContain("See Mei Ling&#39;s other sessions")
+    expect(html).toContain('href="https://trykai.sg/listings/listing-1"')
+    expect(html).toContain('Browse other experiences')
+    expect(html).toContain('Take care,')
+    expect(html).not.toContain('Find something similar')
+  })
+
+  it('points at a category browse when the host has no other sessions', () => {
+    const html = hostCancelGuestMail({ hasOtherSessions: false })
+    expect(html).toContain('Find something similar')
+    expect(html).toContain('href="https://trykai.sg/?category=Food"')
+    expect(html).not.toContain('other sessions')
   })
 
   it('escapes listing titles that a host typed', () => {
-    const html = bookingCancelledGuestHtml({
-      bookingReference: 'A1B2C3D4',
-      listingTitle: '<script>x</script>',
-      sessionDate: '28 Aug 2026, 7:00 pm',
-      refundAmountCents: 0,
-      cancelledBy: 'guest',
-      guestsCount: 1,
-      paymentMethod: 'Card',
-    })
+    const html = guestCancelMail({ listingTitle: '<script>x</script>' })
     expect(html).not.toContain('<script>')
     expect(html).toContain('&lt;script&gt;')
   })
@@ -558,18 +743,20 @@ describe('cancellation emails', () => {
   it('tells the host what they will receive, never the guest refund', () => {
     const kept = bookingCancelledHostHtml({
       bookingReference: 'A1B2C3D4',
+      hostName: 'Mei Ling',
       guestName: 'Sarah',
       listingTitle: 'Latte art',
       sessionDate: '28 Aug 2026, 7:00 pm',
       guestsCount: 3,
       hostPayoutCents: 4250,
     })
+    expect(kept).toContain('Hi Mei Ling,')
     expect(kept).toContain('Booking reference:</strong> A1B2C3D4')
     expect(kept).toContain('Sarah')
     expect(kept).toContain('Latte art')
-    expect(kept).toContain('Guests:')
-    expect(kept).toContain('3')
+    expect(kept).toContain('Guests:</strong> 3 guests')
     expect(kept).toContain("You'll receive $42.50")
+    expect(kept).toContain('Take care,')
     expect(kept).not.toMatch(/Refund amount|Refund method|Total paid|PayNow|ending in/i)
 
     const none = bookingCancelledHostHtml({
@@ -577,9 +764,10 @@ describe('cancellation emails', () => {
       guestName: 'Sarah',
       listingTitle: 'Latte art',
       sessionDate: '28 Aug 2026, 7:00 pm',
-      guestsCount: 3,
+      guestsCount: 1,
       hostPayoutCents: 0,
     })
+    expect(none).toContain('Guests:</strong> 1 guest')
     expect(none).toContain("You won't receive a payout for this booking")
     expect(none).not.toMatch(/You'll receive \$/)
   })
@@ -602,7 +790,12 @@ describe('cancellation emails', () => {
       sessionDate: '28 Aug 2026, 7:00 pm',
       guestEmail: 'guest@trykai.sg',
       hostEmail: 'host@trykai.sg',
-      guestName: 'Sarah',
+      guestName: 'caleb2',
+      hostName: 'Mei Ling',
+      listingId: 'listing-1',
+      listingCategory: 'Food',
+      hasOtherSessions: false,
+      paymentRail: 'card',
       guestsCount: 2,
       paymentMethod: 'Visa ending in 4242',
     })
@@ -611,12 +804,31 @@ describe('cancellation emails', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
       from: 'TryKai <no-reply@trykai.sg>',
       to: 'guest@trykai.sg',
-      subject: 'Booking cancelled: Latte art',
+      subject: 'Mei Ling had to cancel Latte art',
+      reply_to: 'hello@trykai.sg',
     })
     const hostCancelHtml = JSON.parse(fetchMock.mock.calls[0][1].body).html
     expect(hostCancelHtml).toContain('$51')
     expect(hostCancelHtml).toContain('A1B2C3D4')
-    expect(hostCancelHtml).toContain('Visa ending in 4242')
+    expect(hostCancelHtml).toContain('Find something similar')
+
+    fetchMock.mockClear()
+
+    await sendCancellationEmails({
+      apiKey: 're_test',
+      cancelledBy: 'host',
+      refundAmountCents: 5100,
+      bookingReference: 'A1B2C3D4',
+      listingTitle: 'Latte art',
+      sessionDate: '28 Aug 2026, 7:00 pm',
+      guestEmail: 'guest@trykai.sg',
+      hostEmail: 'host@trykai.sg',
+      guestsCount: 1,
+      paymentMethod: 'Card',
+    })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).subject).toBe(
+      'Your host had to cancel Latte art',
+    )
 
     fetchMock.mockClear()
 
@@ -629,17 +841,28 @@ describe('cancellation emails', () => {
       sessionDate: '28 Aug 2026, 7:00 pm',
       guestEmail: 'guest@trykai.sg',
       hostEmail: 'host@trykai.sg',
-      guestName: 'Sarah',
+      guestName: 'caleb2',
+      hostName: 'Mei Ling',
+      listingId: 'listing-1',
+      paymentRail: 'paynow',
       guestsCount: 2,
       paymentMethod: 'PayNow',
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).html).toContain('$0')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      to: 'guest@trykai.sg',
+      subject: "Sorry you can't make it",
+      reply_to: 'hello@trykai.sg',
+    })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).html).toContain(
+      "There's no refund for this cancellation.",
+    )
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
       to: 'host@trykai.sg',
       subject: 'A guest cancelled "Latte art"',
     })
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).not.toHaveProperty('reply_to')
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).html).toContain('A1B2C3D4')
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).html).toContain(
       "You won't receive a payout for this booking",
@@ -672,5 +895,52 @@ describe('cancellation emails', () => {
     ).resolves.toBeUndefined()
 
     errorMock.mockRestore()
+  })
+})
+
+describe('host session cancelled email', () => {
+  it('tells the host they cancelled, the guest count, and the strike', () => {
+    const html = hostSessionCancelMail()
+    expect(html).toContain('Hi Mei Ling,')
+    expect(html).toContain('You cancelled Latte art on 28 Aug 2026, 7:00 pm.')
+    expect(html).toContain('All 3 guests have been refunded in full.')
+    expect(html).toContain('This is strike 2 of 3; at 3 your listings are paused.')
+    expect(html).toContain('href="https://trykai.sg/cancellation-policy#appeals"')
+    expect(html).toContain('Appeal this strike')
+    expect(html).toContain('Take care,')
+    expect(html).toContain('The TryKai team')
+    expect(html).toContain('UEN 53526159D')
+    expect(html).not.toMatch(/\$\d|refund of|PayNow|ending in/i)
+    expect(html.replace('<!DOCTYPE html>', '')).not.toContain('!')
+  })
+
+  it('uses your guest and both guests for one and two', () => {
+    expect(hostSessionCancelMail({ guestCount: 1 })).toContain('Your guest has been refunded in full.')
+    expect(hostSessionCancelMail({ guestCount: 2 })).toContain('Both guests have been refunded in full.')
+  })
+
+  it('sends the host-only strike mail', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await sendHostSessionCancelledEmail({
+      apiKey: 're_test',
+      hostEmail: 'host@trykai.sg',
+      hostName: 'Mei Ling',
+      listingTitle: 'Latte art',
+      sessionDate: '28 Aug 2026, 7:00 pm',
+      guestCount: 3,
+      strikeCount: 1,
+    })
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      from: 'TryKai <no-reply@trykai.sg>',
+      to: 'host@trykai.sg',
+      subject: 'You cancelled Latte art',
+    })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).not.toHaveProperty('reply_to')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).html).toContain('strike 1 of 3')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).html).not.toMatch(/\$\d/)
   })
 })

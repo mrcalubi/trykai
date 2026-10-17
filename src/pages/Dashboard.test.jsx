@@ -959,7 +959,7 @@ describe('Dashboard host cancellation', () => {
     expect(screen.getByText(/1 guest/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Cancel session' }))
     expect(
-      screen.getByText('Cancelling refunds all 1 guests in full and adds a strike to your account.')
+      screen.getByText('Cancelling refunds your guest in full and adds a strike to your account.')
     ).toBeInTheDocument()
   })
 
@@ -970,7 +970,7 @@ describe('Dashboard host cancellation', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel session' }))
 
     expect(
-      screen.getByText('Cancelling refunds all 2 guests in full and adds a strike to your account.')
+      screen.getByText('Cancelling refunds both guests in full and adds a strike to your account.')
     ).toBeInTheDocument()
     expect(screen.queryByText(/Full refund of/)).not.toBeInTheDocument()
     expect(screen.queryByText(/\$90|\$45|total/i)).not.toBeInTheDocument()

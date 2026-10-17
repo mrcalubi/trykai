@@ -35,6 +35,10 @@ describe('Cancellation Policy page', () => {
 
   it('gives hosts seven days to appeal a strike', () => {
     expect(screen.getByText(/submit an appeal within 7 days of the\s+cancellation/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Appealing a strike' })).toHaveAttribute(
+      'id',
+      'appeals',
+    )
   })
 
   it('links to the refund and dispute policies', () => {
@@ -71,12 +75,25 @@ describe('Refund Policy page', () => {
     renderWithRouter(<RefundPolicy />)
   })
 
-  it('publishes the processing time for every payment method offered', () => {
-    expect(screen.getByText('Card:')).toBeInTheDocument()
-    expect(screen.getByText(/3 to 5 business days/)).toBeInTheDocument()
-    expect(screen.getByText('PayNow:')).toBeInTheDocument()
-    expect(screen.queryByText('GrabPay:')).not.toBeInTheDocument()
+  it('publishes Stripe timing and the PayNow 90-day limit', () => {
+    expect(
+      screen.getByText(
+        /Card refunds usually take 5 to 10 business days to appear\. PayNow\s+refunds are usually faster\./,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        /PayNow refunds can only be made within 90 days of payment/,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/we'll contact you and\s+refund you another way/),
+    ).toBeInTheDocument()
     expect(screen.getByText(/through Stripe/)).toBeInTheDocument()
+    expect(screen.queryByText(/HitPay/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/GrabPay/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/3 to 5 business days/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/few hours/)).not.toBeInTheDocument()
   })
 
   it('promises no fee is charged to receive a refund', () => {

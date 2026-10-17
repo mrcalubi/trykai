@@ -255,6 +255,15 @@ describe('Home filters', () => {
     expect(listingTitles()).toEqual(['Boxing basics'])
   })
 
+  it('honours a category query so an email can land on a filtered browse', async () => {
+    givenListings([LATTE, BOXING, POTTERY])
+    renderWithRouter(<Home />, { route: '/?category=Fitness' })
+    await screen.findByText('Boxing basics')
+
+    expect(listingTitles()).toEqual(['Boxing basics'])
+    expect(screen.queryByText('Latte art')).not.toBeInTheDocument()
+  })
+
   it('narrows the grid to the chosen region', async () => {
     givenListings([LATTE, BOXING, POTTERY])
     const { user } = renderWithRouter(<Home />)
