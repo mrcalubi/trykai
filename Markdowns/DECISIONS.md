@@ -330,7 +330,7 @@ trykai.sg via Vodien, two years, ~$75.98. SGNIC identity verification completed.
 
 Full visual identity is in DESIGN.md.
 
-**Chrome (30 September 2026).** The avatar in the top nav links to your own `/u/:id`. There is no avatar dropdown. Settings is a gear on your own profile header; Log out is on `/settings`. Signed-in hamburger: Browse, Create listing / Become a host, Verification review (admins only, via `my_verification()`). Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
+**Chrome (30 September 2026; launch polish 17 October 2026).** The avatar in the top nav links to your own `/u/:id`. There is no avatar dropdown. Settings is a gear on your own profile header; Log out is on `/settings`. Signed-in hamburger: Browse, Create listing / Become a host, Verification review (admins only, via `my_verification()`). Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links. The hamburger closes on a link tap, a tap outside, Escape, and route change. Every page except Home has a back arrow at the top left of the content (not in the nav): browser history when there is an in-app previous page, otherwise Home. Listing detail, other people's public profiles, and each review card have a muted Report mailto to `hello@trykai.sg`.
 
 ---
 
@@ -499,6 +499,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-10-17 — Refund timing is 5 to 10 business days, PayNow usually faster.** Emails and `/refund-policy` use that one sentence. No hours-or-one-day promise. PayNow refunds cannot be issued more than 90 days after payment; if Stripe cannot complete an automatic refund we contact the guest and refund another way. PayNow guest receipts say the bank descriptor is "Stripe Payments Singapore". `refund.failed` handling and blocking sessions/PayNow beyond 90 days are post-launch (BUILD_BACKLOG P3).
 
 **2026-10-17 — Guest booking detail at `/bookings/:id`.** The confirmation receipt's per-person line is the booking's all-in card total divided by guests (not the 1-guest price), so a $1 lesson for 2 guests on PayNow reads `$2.50 per person x 2 guests` / `PayNow saving $0.25` / `Total paid $4.75`. Group discount is noted only when it changes the card total. View booking and the profile Bookings cards go to this page. Guest only; everyone else is sent to `/bookings`.
+
+**2026-10-17 — Launch polish: Report, back, hamburger, JWT retry, dates.** UI only. Listing detail, other people's profiles, and each review card get a muted Report mailto to `hello@trykai.sg` (subject names the listing, profile, or review; body is the page URL, the item id, and "Tell us what's wrong:"). Every page except Home has a content back arrow: `history.state.idx > 0` goes back, otherwise Home. The hamburger closes on link tap, outside tap, Escape, and route change. First data loads retry a JWT "issued at future" error once after 1 second, then show "Something went wrong loading this page. Please refresh." — never raw error text. Session dates on the booking page, booking cards, and session lists show the year only when it is not the current year (`Sat, 20 Mar 2027`).
 
 ---
 

@@ -71,7 +71,10 @@ describe('Profile loading and failure', () => {
     supabase.__on('users', 'select', { data: null, error: { message: 'not found' } })
     renderPage()
 
-    expect(await screen.findByText('not found')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Something went wrong loading this page. Please refresh.')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('not found')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to listings' })).toHaveAttribute('href', '/')
   })
 })
@@ -85,6 +88,10 @@ describe('Profile public content', () => {
     expect(supabase.auth.getSession).toHaveBeenCalled()
     expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
+    const report = screen.getByRole('link', { name: 'Report' })
+    expect(report).toHaveClass('report-link')
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: profile Mei')
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain(HOST_ID)
   })
 
   it('does not split a multi-word display name', async () => {
@@ -327,6 +334,7 @@ describe('Profile own tabs', () => {
     )
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Report' })).not.toBeInTheDocument()
   })
 
   it('scrolls the tab bar horizontally without showing a scrollbar in any browser', () => {

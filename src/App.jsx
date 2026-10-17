@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import SiteNav from './components/SiteNav'
+import BackButton from './components/BackButton'
 import Footer from './components/Footer'
 import RequireAuth from './components/RequireAuth'
 import RequireAdmin from './components/RequireAdmin'
@@ -28,6 +29,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <SiteNav />
+      <BackButton />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />

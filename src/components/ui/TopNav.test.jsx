@@ -116,6 +116,25 @@ describe('TopNav', () => {
     )
   })
 
+  it('closes the hamburger when the route changes', async () => {
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <TopNav />
+      </MemoryRouter>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).toHaveClass(
+      'ui-hamburger--open'
+    )
+
+    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+    expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).not.toHaveClass(
+      'ui-hamburger--open'
+    )
+  })
+
   it('closes the hamburger when the avatar is pressed', async () => {
     const user = userEvent.setup()
     renderTopNav({ isLoggedIn: true, userId: 'user-77', name: 'Mei Ling' })

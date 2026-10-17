@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import HamburgerMenu from './HamburgerMenu'
 import { getInitials } from './getInitials'
 
@@ -65,6 +65,7 @@ export default function TopNav({
   onMenuClick,
   className = '',
 }) {
+  const location = useLocation()
   const [compact, setCompact] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -77,6 +78,10 @@ export default function TopNav({
     window.addEventListener('scroll', updateCompact, { passive: true })
     return () => window.removeEventListener('scroll', updateCompact)
   }, [])
+
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [location.pathname, location.search])
 
   useEffect(() => {
     if (!menuOpen) return undefined
@@ -129,7 +134,12 @@ export default function TopNav({
             <MenuIcon />
           </button>
 
-          <Link to="/" className="ui-topnav__brand" aria-label="TryKai home">
+          <Link
+            to="/"
+            className="ui-topnav__brand"
+            aria-label="TryKai home"
+            onClick={handleMenuClose}
+          >
             <img
               src="/trykai.png"
               alt=""

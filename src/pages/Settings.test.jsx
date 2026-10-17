@@ -86,7 +86,10 @@ describe('Settings access', () => {
       { route: '/settings', path: '/settings' }
     )
 
-    expect(await screen.findByText('permission denied')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Something went wrong loading this page. Please refresh.')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('permission denied')).not.toBeInTheDocument()
   })
 })
 

@@ -9,19 +9,12 @@ import { guestBookingActions, guestCancellationNote } from '../lib/guestBookings
 import { publicName } from '../lib/publicName'
 import {
   bookingReference,
-  formatSessionDay,
   googleCalendarUrl,
   guestCountLabel,
 } from '../../supabase/functions/_shared/email.ts'
+import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
+import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import Button from '../components/ui/Button'
-
-function formatSessionTime(iso) {
-  return new Intl.DateTimeFormat('en-SG', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'Asia/Singapore',
-  }).format(new Date(iso))
-}
 
 function googleMapsUrl(address) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
@@ -38,16 +31,18 @@ export default function BookingDetail() {
   const [booking, setBooking] = useState(null)
   const [address, setAddress] = useState('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [notGuest, setNotGuest] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [cancelError, setCancelError] = useState('')
 
   const loadBooking = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('bookings')
-      .select(
-        `
+    const { data, error: loadError } = await withIssuedAtRetry(() =>
+      supabase
+        .from('bookings')
+        .select(
+          `
         id,
         status,
         guest_id,
@@ -73,11 +68,19 @@ export default function BookingDetail() {
           )
         )
       `,
-      )
-      .eq('id', bookingId)
-      .maybeSingle()
+        )
+        .eq('id', bookingId)
+        .maybeSingle()
+    )
 
-    if (error || !data) {
+    if (loadError) {
+      setError(PAGE_LOAD_ERROR)
+      setBooking(null)
+      setLoading(false)
+      return
+    }
+
+    if (!data) {
       setNotGuest(true)
       setBooking(null)
       setLoading(false)
@@ -138,6 +141,10 @@ export default function BookingDetail() {
 
   if (loading) {
     return <p className="status-message">Loading…</p>
+  }
+
+  if (error) {
+    return <p className="status-message error-message">{error}</p>
   }
 
   if (notGuest || !booking) {

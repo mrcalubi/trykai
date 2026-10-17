@@ -1,4 +1,6 @@
 import { publicName } from '../lib/publicName'
+import { reviewReportSubject } from '../lib/reportMailto'
+import ReportLink from './ReportLink'
 
 function formatReviewDate(iso) {
   return new Intl.DateTimeFormat('en-SG', {
@@ -21,9 +23,10 @@ function StarDisplay({ rating }) {
   )
 }
 
-export default function ReviewCard({ review }) {
+export default function ReviewCard({ review, listingTitle }) {
   const name = publicName({ display_name: review.users?.full_name }) || 'Guest'
   const initial = name[0]?.toUpperCase() || '?'
+  const listing = listingTitle || review.listing_title || 'listing'
 
   return (
     <div className="review-card">
@@ -41,6 +44,7 @@ export default function ReviewCard({ review }) {
         </div>
       </div>
       {review.comment && <p className="review-card__comment">{review.comment}</p>}
+      <ReportLink subject={reviewReportSubject(listing)} itemId={review.id} />
     </div>
   )
 }

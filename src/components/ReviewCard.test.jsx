@@ -51,6 +51,15 @@ describe('ReviewCard', () => {
     expect(container.querySelector('.review-card__comment')).not.toBeInTheDocument()
   })
 
+  it('offers a muted Report mailto for the review', () => {
+    renderReview({ id: 'review-9', listing_title: 'Latte art' })
+    const report = screen.getByRole('link', { name: 'Report' })
+    expect(report).toHaveClass('report-link')
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: review on Latte art')
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain('review-9')
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain("Tell us what's wrong:")
+  })
+
   it('renders the date in Singapore time', () => {
     renderReview({ created_at: '2026-03-14T02:00:00.000Z' })
     expect(screen.getByText(/14 Mar 2026/)).toBeInTheDocument()

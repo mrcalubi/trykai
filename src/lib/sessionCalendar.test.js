@@ -103,7 +103,8 @@ describe('labels', () => {
   it('formats month titles and day labels in Singapore English', () => {
     expect(formatMonthTitle('2026-10')).toBe('October 2026')
     expect(formatDayLabel('2026-10-09')).toBe('Friday, 9 October')
-    expect(formatDayTitle('2026-10-09')).toBe('Fri, 9 Oct')
+    expect(formatDayTitle('2026-10-09', '2026-10-17T04:00:00.000Z')).toBe('Fri, 9 Oct')
+    expect(formatDayTitle('2027-03-20', '2026-10-17T04:00:00.000Z')).toBe('Sat, 20 Mar 2027')
   })
 
   it('counts sessions in words', () => {

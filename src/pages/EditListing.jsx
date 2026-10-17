@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
 import { hostListingPriceHint, parsePriceInputCents } from '../lib/pricing'
+import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 
 const MAX_PHOTOS = 5
 
@@ -49,12 +50,14 @@ export default function EditListing() {
   useEffect(() => {
     async function fetchListing() {
       const [{ data, error: fetchError }, { data: profile }] = await Promise.all([
-        supabase.from('listings').select('*').eq('id', id).eq('host_id', userId).single(),
+        withIssuedAtRetry(() =>
+          supabase.from('listings').select('*').eq('id', id).eq('host_id', userId).single()
+        ),
         supabase.from('users').select('is_founding_host').eq('id', userId).maybeSingle(),
       ])
 
       if (fetchError || !data) {
-        setError(fetchError?.message || 'Listing not found.')
+        setError(fetchError ? PAGE_LOAD_ERROR : 'Listing not found.')
         setFetching(false)
         return
       }
