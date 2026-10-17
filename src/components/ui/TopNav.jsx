@@ -153,7 +153,7 @@ export default function TopNav({
               height="40"
               className="ui-topnav__mark"
             />
-            <span className="ui-topnav__wordmark">TryKai</span>
+            <span className="ui-topnav__wordmark">TryKai<span className="site-footer__dot">.</span></span>
           </Link>
 
           <div className="ui-topnav__end">
