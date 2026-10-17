@@ -215,7 +215,7 @@ async function confirmSucceededPayment(paymentIntent: {
       sessionStartsAt: session?.starts_at ?? '',
       durationMins,
       whatsProvided: listing?.whats_provided,
-      guestId: booking.guest_id,
+      bookingId: booking.id,
       siteUrl,
     }),
   })
