@@ -23,12 +23,14 @@ import {
   checkoutPriceCents,
   groupPriceLabel,
   guestFacingPriceCents,
+  isPayNowTooFarAhead,
   MAX_GUESTS_PER_BOOKING,
   nextGroupTierHint,
+  PAYNOW_TOO_FAR_AHEAD_MESSAGE,
   paynowPriceCents,
 } from '../lib/pricing'
 import { formatDuration } from '../lib/duration'
-import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
+import { edgeFunctionErrorMessage, isPayNowTooFarAheadError } from '../lib/edgeFunctionError'
 import { checkoutCanLeaveForWebhook } from '../lib/paymentReturn'
 import { publicName } from '../lib/publicName'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
@@ -193,6 +195,7 @@ export default function ListingDetail() {
   const [totalAmount, setTotalAmount] = useState(null)
   const [bookingLoading, setBookingLoading] = useState(false)
   const [paymentError, setPaymentError] = useState('')
+  const [payNowBlockedByServer, setPayNowBlockedByServer] = useState(false)
   const [revealedAddress, setRevealedAddress] = useState(null)
   const [viewerId, setViewerId] = useState(null)
   const [activePhoto, setActivePhoto] = useState(0)
@@ -365,6 +368,7 @@ export default function ListingDetail() {
     setBookingId(null)
     setTotalAmount(null)
     setPaymentError('')
+    setPayNowBlockedByServer(false)
     void abandonUnpaidCheckout(unpaidId)
   }
 
@@ -412,6 +416,7 @@ export default function ListingDetail() {
     setTotalAmount(null)
     setCheckoutRail(null)
     setGuestsCount(1)
+    setPayNowBlockedByServer(false)
     setCheckoutSessionId(sessionId)
   }
 
@@ -428,12 +433,27 @@ export default function ListingDetail() {
     setGuestsCount(next)
   }
 
+  function findCachedSession(sessionId) {
+    if (!sessionId) return null
+    for (const rows of Object.values(sessionsByMonth)) {
+      const found = rows?.find((row) => row.id === sessionId)
+      if (found) return found
+    }
+    return null
+  }
+
   async function startPayment(paymentRail) {
     const {
       data: { session },
     } = await supabase.auth.getSession()
 
     if (!session || !checkoutSessionId) return
+
+    if (paymentRail === 'paynow' && isPayNowTooFarAhead(findCachedSession(checkoutSessionId)?.starts_at)) {
+      setPayNowBlockedByServer(true)
+      setCheckoutRail('card')
+      return
+    }
 
     const shownAmount = checkoutPriceCents(
       listing.price_per_person,
@@ -460,7 +480,14 @@ export default function ListingDetail() {
     setBookingLoading(false)
 
     if (fnError || data?.error) {
-      setPaymentError(await edgeFunctionErrorMessage(fnError, data))
+      const message = await edgeFunctionErrorMessage(fnError, data)
+      if (isPayNowTooFarAheadError(data, message)) {
+        setPayNowBlockedByServer(true)
+        setCheckoutRail('card')
+        setPaymentError('')
+        return
+      }
+      setPaymentError(message)
       return
     }
 
@@ -505,9 +532,6 @@ export default function ListingDetail() {
   const groupPricing = listing.group_pricing !== false
   const cardPrice = guestFacingPriceCents(listing.price_per_person, guestsCount, groupPricing)
   const paynowPrice = paynowPriceCents(listing.price_per_person, guestsCount, groupPricing)
-  const checkoutPrice = checkoutRail
-    ? checkoutPriceCents(listing.price_per_person, checkoutRail, guestsCount, groupPricing)
-    : cardPrice
   const canTakePayments = hostCanTakePayments()
   const isOwnListing = viewerIsHost()
 
@@ -522,6 +546,15 @@ export default function ListingDetail() {
     : (Object.keys(sessionsByDay).sort()[0] ?? null)
   const daySessions = activeDateKey ? sessionsByDay[activeDateKey] : []
   const checkoutSession = daySessions.find((session) => session.id === checkoutSessionId) ?? null
+  const paynowBlocked =
+    payNowBlockedByServer || isPayNowTooFarAhead(checkoutSession?.starts_at)
+  const displayRail = paynowBlocked || checkoutRail !== 'paynow' ? 'card' : 'paynow'
+  const checkoutPrice = checkoutPriceCents(
+    listing.price_per_person,
+    displayRail,
+    guestsCount,
+    groupPricing,
+  )
   const nextHint = checkoutSession
     ? nextGroupTierHint(
         guestsCount,
@@ -783,7 +816,7 @@ export default function ListingDetail() {
                             listing.price_per_person,
                             guestsCount,
                             groupPricing,
-                            checkoutRail ?? 'card',
+                            displayRail,
                           )}
                         </p>
                         {nextHint ? (
@@ -805,8 +838,8 @@ export default function ListingDetail() {
                     <button
                       type="button"
                       className="payment-rail payment-rail--paynow"
-                      disabled={bookingLoading}
-                      aria-pressed={checkoutRail === 'paynow'}
+                      disabled={bookingLoading || paynowBlocked}
+                      aria-pressed={!paynowBlocked && checkoutRail === 'paynow'}
                       onClick={() => startPayment('paynow')}
                     >
                       <span className="payment-rail__row">
@@ -814,19 +847,30 @@ export default function ListingDetail() {
                         <span className="paynow-badge">Save 5%</span>
                       </span>
                       <span className="payment-rail__amounts">
-                        <s className="payment-rail__was">
-                          <FormattedPrice cents={cardPrice} />
-                        </s>
-                        <span className="payment-rail__now">
-                          <FormattedPrice cents={paynowPrice} />
-                        </span>
+                        {paynowBlocked ? (
+                          <span className="payment-rail__now">
+                            <FormattedPrice cents={cardPrice} />
+                          </span>
+                        ) : (
+                          <>
+                            <s className="payment-rail__was">
+                              <FormattedPrice cents={cardPrice} />
+                            </s>
+                            <span className="payment-rail__now">
+                              <FormattedPrice cents={paynowPrice} />
+                            </span>
+                          </>
+                        )}
                       </span>
                     </button>
+                    {paynowBlocked ? (
+                      <p className="payment-rails__hint">{PAYNOW_TOO_FAR_AHEAD_MESSAGE}</p>
+                    ) : null}
                     <button
                       type="button"
                       className="payment-rail"
                       disabled={bookingLoading}
-                      aria-pressed={checkoutRail === 'card'}
+                      aria-pressed={paynowBlocked || checkoutRail === 'card'}
                       onClick={() => startPayment('card')}
                     >
                       <span className="payment-rail__row">

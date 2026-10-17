@@ -8,6 +8,11 @@
 export const CARD_FEE_RATE = 0.12
 export const CARD_FEE_FLOOR_CENTS = 250
 export const PAYNOW_DISCOUNT_RATE = 0.05
+/** Stripe will not refund PayNow after 90 days; 80 leaves a buffer. */
+export const PAYNOW_MAX_DAYS_AHEAD = 80
+export const PAYNOW_TOO_FAR_AHEAD = 'paynow_too_far_ahead'
+export const PAYNOW_TOO_FAR_AHEAD_MESSAGE =
+  `PayNow is available for sessions within ${PAYNOW_MAX_DAYS_AHEAD} days. Please pay by card.`
 export const HOST_FEE_RATE = 0.1
 export const HOST_FEE_FREE_BOOKINGS = 3
 export const MAX_GUESTS_PER_BOOKING = 10
@@ -50,6 +55,7 @@ export type PaymentRail = (typeof PAYMENT_RAILS)[number]
 
 export interface BookingSession {
   spots_remaining: number
+  starts_at?: string | Date | null
   listings?: {
     price_per_person?: number | null
     host_id?: string | null
@@ -67,6 +73,7 @@ export type BookingRejection = {
   ok: false
   status: number
   message: string
+  code?: string
 }
 
 export type BookingAcceptance = GuestCharge & {
@@ -286,6 +293,9 @@ export function prepareBooking(
     return { ok: false, status: 400, message: 'Invalid payment method' }
   }
 
+  const payNowWindow = rejectPayNowIfTooFarAhead(paymentRail, session.starts_at)
+  if (payNowWindow) return payNowWindow
+
   if (session.spots_remaining < guestsCount) {
     return { ok: false, status: 400, message: 'Not enough spots' }
   }
@@ -323,6 +333,34 @@ export const GUEST_REFUND_TIER_RULES = [
 
 export function hoursUntilSession(sessionStartsAt: string | Date, now = Date.now()): number {
   return (new Date(sessionStartsAt).getTime() - now) / (1000 * 60 * 60)
+}
+
+/**
+ * PayNow refunds expire 90 days after payment. Sessions more than 80 days
+ * out can still be booked on card.
+ */
+export function isPayNowTooFarAhead(
+  startsAt: string | Date | null | undefined,
+  now = Date.now(),
+): boolean {
+  if (startsAt == null || startsAt === '') return false
+  const start = new Date(startsAt).getTime()
+  if (!Number.isFinite(start)) return false
+  return hoursUntilSession(startsAt, now) > PAYNOW_MAX_DAYS_AHEAD * 24
+}
+
+export function rejectPayNowIfTooFarAhead(
+  paymentRail: unknown,
+  startsAt: string | Date | null | undefined,
+  now = Date.now(),
+): BookingRejection | null {
+  if (paymentRail !== 'paynow' || !isPayNowTooFarAhead(startsAt, now)) return null
+  return {
+    ok: false,
+    status: 400,
+    message: PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+    code: PAYNOW_TOO_FAR_AHEAD,
+  }
 }
 
 export function guestRefundTierRule(sessionStartsAt: string | Date, now = Date.now()) {

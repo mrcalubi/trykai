@@ -6,6 +6,11 @@ import {
   HOST_FEE_RATE,
   LEGACY_PLATFORM_FEE_RATE,
   PAYNOW_DISCOUNT_RATE,
+  PAYNOW_MAX_DAYS_AHEAD,
+  PAYNOW_TOO_FAR_AHEAD,
+  PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+  isPayNowTooFarAhead,
+  rejectPayNowIfTooFarAhead,
   calculateGuestCharge,
   calculateGuestRefund,
   calculateHostFee,
@@ -174,6 +179,53 @@ describe('spotsToRestore', () => {
     expect(spotsToRestore('confirmed', 2)).toBe(2)
     expect(spotsToRestore('pending', 2)).toBe(0)
     expect(spotsToRestore('cancelled', 1)).toBe(0)
+  })
+})
+
+describe('PayNow 80-day window', () => {
+  const now = Date.parse('2026-10-17T00:00:00.000Z')
+  const daysAhead = (days: number) =>
+    new Date(now + days * 24 * 60 * 60 * 1000).toISOString()
+
+  it('exports the 80-day buffer', () => {
+    expect(PAYNOW_MAX_DAYS_AHEAD).toBe(80)
+  })
+
+  it('allows PayNow at 79 and 80 days and blocks 81', () => {
+    expect(isPayNowTooFarAhead(daysAhead(79), now)).toBe(false)
+    expect(isPayNowTooFarAhead(daysAhead(80), now)).toBe(false)
+    expect(isPayNowTooFarAhead(daysAhead(81), now)).toBe(true)
+  })
+
+  it('does not block when the start time is missing or invalid', () => {
+    expect(isPayNowTooFarAhead(null, now)).toBe(false)
+    expect(isPayNowTooFarAhead('', now)).toBe(false)
+    expect(isPayNowTooFarAhead('not-a-date', now)).toBe(false)
+  })
+
+  it('rejects PayNow on the edge function when the session is 81 days out', () => {
+    expect(rejectPayNowIfTooFarAhead('paynow', daysAhead(81), now)).toEqual({
+      ok: false,
+      status: 400,
+      message: PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+      code: PAYNOW_TOO_FAR_AHEAD,
+    })
+    expect(rejectPayNowIfTooFarAhead('paynow', daysAhead(80), now)).toBeNull()
+    expect(rejectPayNowIfTooFarAhead('card', daysAhead(81), now)).toBeNull()
+  })
+
+  it('lets prepareBooking refuse PayNow past the window and still accept card', () => {
+    const liveAhead = (days: number) =>
+      new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+
+    expect(prepareBooking(sessionWith({ starts_at: liveAhead(81) }), 1, 'paynow')).toEqual({
+      ok: false,
+      status: 400,
+      message: PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+      code: PAYNOW_TOO_FAR_AHEAD,
+    })
+    expect(prepareBooking(sessionWith({ starts_at: liveAhead(80) }), 1, 'paynow').ok).toBe(true)
+    expect(prepareBooking(sessionWith({ starts_at: liveAhead(81) }), 1, 'card').ok).toBe(true)
   })
 })
 

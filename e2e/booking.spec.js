@@ -109,6 +109,34 @@ test.describe('listing detail', () => {
     await expect(page.getByText('Pick a date, then a time')).toHaveCount(0)
   })
 
+  test('disables PayNow when the session is more than 80 days away', async ({ page }) => {
+    await stubAllExternalCalls(
+      page,
+      {
+        listings: [LATTE_ART],
+        sessions: [{ ...OPEN_SESSION, starts_at: hoursFromNow(81 * 24) }],
+        reviews: [],
+        users: [{ id: SIGNED_IN_USER.id, full_name: 'Kai Guest', avatar_url: null, is_host: false }],
+      },
+      { session: makeAuthSession() }
+    )
+
+    await page.goto('/login')
+    await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+    await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+    await expect(page).toHaveURL(/\/$/)
+
+    await page.goto('/listings/listing-latte')
+    await page.getByRole('button', { name: 'Book' }).click()
+
+    await expect(page.getByRole('button', { name: /PayNow/ })).toBeDisabled()
+    await expect(
+      page.getByText('PayNow is available for sessions within 80 days. Please pay by card.')
+    ).toBeVisible()
+    await expect(page.locator('.detail-booking-card__price')).toContainText('$51')
+  })
+
   test('truncates a long host bio with an inline more link', async ({ page }) => {
     await stubAllExternalCalls(page, {
       listings: [

@@ -4,6 +4,7 @@ import {
   isHostBookingOwnListing,
   paymentIntentCreateParams,
   prepareBooking,
+  rejectPayNowIfTooFarAhead,
 } from '../_shared/booking.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
 
@@ -52,6 +53,14 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Session is not available' }, 400)
     }
 
+    const payNowWindow = rejectPayNowIfTooFarAhead(payment_rail ?? 'card', session.starts_at)
+    if (payNowWindow) {
+      return jsonResponse(
+        { error: payNowWindow.message, code: payNowWindow.code },
+        payNowWindow.status,
+      )
+    }
+
     const listing = asRecord(session.listings)
 
     if (isHostBookingOwnListing({ spots_remaining: session.spots_remaining, listings: listing }, user.id)) {
@@ -64,7 +73,11 @@ Deno.serve(async (req) => {
     }
 
     const bookingPrep = prepareBooking(
-      { spots_remaining: session.spots_remaining, listings: listing },
+      {
+        spots_remaining: session.spots_remaining,
+        starts_at: session.starts_at,
+        listings: listing,
+      },
       guests_count,
       payment_rail ?? 'card',
       user.id,

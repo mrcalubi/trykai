@@ -200,7 +200,7 @@ In this order after warm-contact launch:
 5. **Host-to-guest reviews, then the review filter.** Two-way reviews are promised (P2.4). After that path exists, guests can filter browse by rating.
 6. **`full_name` database-level fix.** Revoke anon SELECT once nothing public reads the column (P2.13). Public surfaces already show `display_name`.
 7. **Handle `refund.failed`.** Stripe can fail a refund after we have already written `cancelled` and emailed the guest. Listen for the event, alert `hello@trykai.sg`, and do not leave the booking looking refunded when it is not.
-8. **Stop sessions or PayNow beyond 90 days out.** PayNow refunds cannot be issued more than 90 days after payment. Do not let a host create a session that far ahead, or do not offer PayNow on those dates, so an automatic refund cannot miss the window.
+8. **Stop sessions beyond 90 days out (optional).** PayNow checkout is already blocked more than 80 days ahead (`PAYNOW_MAX_DAYS_AHEAD`). Remaining: whether hosts should also be stopped from creating sessions that far out, so every date can still offer PayNow.
 
 Then: identity and social layer, Date Mode, credit bundles, multi session courses, "this weekend" filter, search, in app notifications, listing performance nudges, listing video, host Pro subscription, payout clawback.
 
