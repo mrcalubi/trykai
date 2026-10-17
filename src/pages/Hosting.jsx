@@ -101,7 +101,7 @@ function ListingDeleteDialog({
   )
 }
 
-export default function Hosting({ embedded = false }) {
+export default function Hosting({ embedded = false, onListingDeleted }) {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const userId = useAuthedUserId()
@@ -454,6 +454,7 @@ export default function Hosting({ embedded = false }) {
     if (activeFormId === listingId) {
       closeSessionForm()
     }
+    onListingDeleted?.(listingId)
     setListings((prev) => prev.filter((l) => l.id !== listingId))
     setHostSessions((prev) => prev.filter((s) => s.listing_id !== listingId))
     setSelectedEmptyIds((prev) => {
