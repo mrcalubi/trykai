@@ -2,42 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
+import PlanningAreaSelect from '../components/PlanningAreaSelect'
+import { foundingHostFromRpc } from '../lib/foundingHost'
+import { hostListingPriceHint, parsePriceInputCents } from '../lib/pricing'
+import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 
 const MAX_PHOTOS = 5
 
 const CATEGORIES = ['Food', 'Fitness', 'Arts', 'Music', 'Language', 'Other']
-
-const SINGAPORE_AREAS = [
-  'Ang Mo Kio',
-  'Bedok',
-  'Bishan',
-  'Bukit Batok',
-  'Bukit Merah',
-  'Bukit Panjang',
-  'Bukit Timah',
-  'Changi',
-  'Choa Chu Kang',
-  'Clementi',
-  'Downtown Core',
-  'Geylang',
-  'Hougang',
-  'Jurong East',
-  'Jurong West',
-  'Katong',
-  'Marine Parade',
-  'Novena',
-  'Orchard',
-  'Pasir Ris',
-  'Punggol',
-  'Queenstown',
-  'Sembawang',
-  'Sengkang',
-  'Serangoon',
-  'Tampines',
-  'Toa Payoh',
-  'Woodlands',
-  'Yishun',
-]
 
 const WHATS_PROVIDED_OPTIONS = ['Materials', 'Equipment', 'Food & drinks', 'None']
 
@@ -57,14 +29,18 @@ export default function EditListing() {
   const [category, setCategory] = useState('')
   const [price, setPrice] = useState('')
   const [maxGuests, setMaxGuests] = useState('')
+  const [durationMins, setDurationMins] = useState('')
+  const [groupPricing, setGroupPricing] = useState(true)
   const [area, setArea] = useState('')
   const [fullAddress, setFullAddress] = useState('')
   const [whatsProvided, setWhatsProvided] = useState([])
   const [existingPhotos, setExistingPhotos] = useState([])
   const [newPhotos, setNewPhotos] = useState([])
   const newPhotosRef = useRef(newPhotos)
+  const [isFoundingHost, setIsFoundingHost] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const priceHint = hostListingPriceHint(parsePriceInputCents(price), isFoundingHost)
 
   const totalPhotos = existingPhotos.length + newPhotos.length
 
@@ -74,25 +50,29 @@ export default function EditListing() {
 
   useEffect(() => {
     async function fetchListing() {
-      const { data, error: fetchError } = await supabase
-        .from('listings')
-        .select('*')
-        .eq('id', id)
-        .eq('host_id', userId)
-        .single()
+      const [{ data, error: fetchError }, founding] = await Promise.all([
+        withIssuedAtRetry(() =>
+          supabase.from('listings').select('*').eq('id', id).eq('host_id', userId).single()
+        ),
+        supabase.rpc('my_is_founding_host'),
+      ])
 
       if (fetchError || !data) {
-        setError(fetchError?.message || 'Listing not found.')
+        setError(fetchError ? PAGE_LOAD_ERROR : 'Listing not found.')
         setFetching(false)
         return
       }
+
+      setIsFoundingHost(foundingHostFromRpc(founding.data, founding.error))
 
       setTitle(data.title)
       setDescription(data.description)
       setCategory(data.category)
       setPrice(centsToDollars(data.price_per_person))
       setMaxGuests(String(data.max_guests))
-      setArea(data.area)
+      setDurationMins(data.duration_mins != null ? String(data.duration_mins) : '')
+      setGroupPricing(data.group_pricing !== false)
+      setArea(data.area ?? '')
       setFullAddress(data.full_address)
       setWhatsProvided(data.whats_provided?.length ? data.whats_provided : [])
       setExistingPhotos(data.photo_urls ?? [])
@@ -181,6 +161,7 @@ export default function EditListing() {
 
     const priceCents = Math.round(parseFloat(price) * 100)
     const guests = parseInt(maxGuests, 10)
+    const duration = parseInt(durationMins, 10)
 
     if (!title.trim() || !description.trim() || !category || !area || !fullAddress.trim()) {
       setError('Please fill in all required fields.')
@@ -194,6 +175,11 @@ export default function EditListing() {
 
     if (Number.isNaN(guests) || guests < 1) {
       setError('Max guests must be at least 1.')
+      return
+    }
+
+    if (Number.isNaN(duration) || duration < 1) {
+      setError('Duration must be at least 1 minute.')
       return
     }
 
@@ -216,21 +202,34 @@ export default function EditListing() {
       return
     }
 
-    const { error: updateError } = await supabase
+    const listingPayload = {
+      title: title.trim(),
+      description: description.trim(),
+      category,
+      price_per_person: priceCents,
+      max_guests: guests,
+      duration_mins: duration,
+      group_pricing: groupPricing,
+      area,
+      full_address: fullAddress.trim(),
+      whats_provided: provided,
+      photo_urls: photoUrls,
+    }
+    let { error: updateError } = await supabase
       .from('listings')
-      .update({
-        title: title.trim(),
-        description: description.trim(),
-        category,
-        price_per_person: priceCents,
-        max_guests: guests,
-        area,
-        full_address: fullAddress.trim(),
-        whats_provided: provided,
-        photo_urls: photoUrls,
-      })
+      .update(listingPayload)
       .eq('id', id)
       .eq('host_id', userId)
+    if (updateError && /duration_mins|group_pricing/.test(updateError.message ?? '')) {
+      const retry = { ...listingPayload }
+      if (/duration_mins/.test(updateError.message ?? '')) delete retry.duration_mins
+      if (/group_pricing/.test(updateError.message ?? '')) delete retry.group_pricing
+      ;({ error: updateError } = await supabase
+        .from('listings')
+        .update(retry)
+        .eq('id', id)
+        .eq('host_id', userId))
+    }
 
     setLoading(false)
 
@@ -306,19 +305,22 @@ export default function EditListing() {
           </label>
 
           <div className="form__row">
-            <label className="label">
-              Price per person (SGD)
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="20"
-                min="1"
-                step="0.01"
-                required
-                className="input"
-              />
-            </label>
+            <div>
+              <label className="label">
+                Price per person (SGD)
+                <input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="20"
+                  min="1"
+                  step="0.01"
+                  required
+                  className="input"
+                />
+              </label>
+              {priceHint ? <span className="hint">{priceHint}</span> : null}
+            </div>
 
             <label className="label">
               Max guests
@@ -335,20 +337,37 @@ export default function EditListing() {
           </div>
 
           <label className="label">
-            Area
-            <select
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
+            Duration (mins)
+            <input
+              type="number"
+              value={durationMins}
+              onChange={(e) => setDurationMins(e.target.value)}
+              placeholder="60"
+              min="1"
               required
               className="input"
-            >
-              <option value="">Select an area</option>
-              {SINGAPORE_AREAS.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
+            />
+          </label>
+          <span className="hint">
+            New sessions use this length. Sessions already added keep theirs.
+          </span>
+
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={groupPricing}
+              onChange={(e) => setGroupPricing(e.target.checked)}
+            />
+            Offer group pricing
+          </label>
+          <span className="hint">
+            5% off for 2 guests, up to 20% for 5 or more. Applies to the lesson
+            price per person.
+          </span>
+
+          <label className="label">
+            Area
+            <PlanningAreaSelect value={area} onChange={setArea} required />
           </label>
 
           <label className="label">

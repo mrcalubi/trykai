@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   asRecord,
   chargeIdFromPaymentIntent,
+  constructStripeWebhookEvent,
   corsHeaders,
   hasValidSecret,
   jsonResponse,
   stripeEventAction,
+  stripeWebhookSecrets,
   textResponse,
 } from './http.ts'
 
@@ -20,6 +22,94 @@ describe('stripeEventAction', () => {
     expect(stripeEventAction('charge.refunded')).toBe('ignore')
     expect(stripeEventAction('identity.verification_session.created')).toBe('ignore')
     expect(stripeEventAction('ping')).toBe('ignore')
+  })
+})
+
+describe('constructStripeWebhookEvent', () => {
+  const platform = 'whsec_platform'
+  const connect = 'whsec_connect'
+  const event = { id: 'evt_1', type: 'account.updated' }
+
+  it('accepts a signature that matches STRIPE_WEBHOOK_SECRET', async () => {
+    const constructEvent = vi.fn(async (_body, _signature, secret) => {
+      if (secret !== platform) throw new Error('bad sig')
+      return event
+    })
+
+    const verified = await constructStripeWebhookEvent({
+      constructEvent,
+      body: '{}',
+      signature: 't=1,v1=abc',
+      secrets: stripeWebhookSecrets({
+        STRIPE_WEBHOOK_SECRET: platform,
+        STRIPE_CONNECT_WEBHOOK_SECRET: connect,
+      }),
+    })
+
+    expect(verified).toEqual({ ok: true, event })
+    expect(constructEvent).toHaveBeenCalledWith('{}', 't=1,v1=abc', platform)
+  })
+
+  it('falls back to STRIPE_CONNECT_WEBHOOK_SECRET when the platform secret does not match', async () => {
+    const constructEvent = vi.fn(async (_body, _signature, secret) => {
+      if (secret !== connect) throw new Error('bad sig')
+      return event
+    })
+
+    const verified = await constructStripeWebhookEvent({
+      constructEvent,
+      body: '{}',
+      signature: 't=1,v1=connect',
+      secrets: stripeWebhookSecrets({
+        STRIPE_WEBHOOK_SECRET: platform,
+        STRIPE_CONNECT_WEBHOOK_SECRET: connect,
+      }),
+    })
+
+    expect(verified).toEqual({ ok: true, event })
+    expect(constructEvent).toHaveBeenNthCalledWith(1, '{}', 't=1,v1=connect', platform)
+    expect(constructEvent).toHaveBeenNthCalledWith(2, '{}', 't=1,v1=connect', connect)
+  })
+
+  it('rejects a signature that matches neither secret', async () => {
+    const constructEvent = vi.fn(async () => {
+      throw new Error('bad sig')
+    })
+
+    await expect(
+      constructStripeWebhookEvent({
+        constructEvent,
+        body: '{}',
+        signature: 't=1,v1=nope',
+        secrets: stripeWebhookSecrets({
+          STRIPE_WEBHOOK_SECRET: platform,
+          STRIPE_CONNECT_WEBHOOK_SECRET: connect,
+        }),
+      }),
+    ).resolves.toEqual({ ok: false, error: 'Invalid signature' })
+  })
+
+  it('rejects when no signature or no secrets are configured', async () => {
+    const constructEvent = vi.fn()
+    await expect(
+      constructStripeWebhookEvent({
+        constructEvent,
+        body: '{}',
+        signature: null,
+        secrets: stripeWebhookSecrets({
+          STRIPE_WEBHOOK_SECRET: platform,
+        }),
+      }),
+    ).resolves.toEqual({ ok: false, error: 'Missing webhook signature' })
+    await expect(
+      constructStripeWebhookEvent({
+        constructEvent,
+        body: '{}',
+        signature: 't=1,v1=abc',
+        secrets: stripeWebhookSecrets({}),
+      }),
+    ).resolves.toEqual({ ok: false, error: 'Missing webhook signature' })
+    expect(constructEvent).not.toHaveBeenCalled()
   })
 })
 

@@ -37,37 +37,55 @@ describe('HamburgerMenu', () => {
   })
 
   it('shows navigation-only links for a signed-in guest', () => {
-    renderMenu({ open: true, isLoggedIn: true })
+    renderMenu({ open: true, isLoggedIn: true, userId: 'user-77' })
 
     expect(screen.getByRole('link', { name: 'Browse' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
       'href',
-      '/create-listing'
+      '/verify-identity'
     )
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/u/user-77')
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Create listing' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Log out' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Log in or sign up' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Verification review' })).not.toBeInTheDocument()
+    const labels = [...document.querySelectorAll('.ui-hamburger__link')].map((el) => el.textContent)
+    expect(labels.at(-1)).toBe('Log out')
+    expect(document.querySelector('.ui-hamburger__item--logout')).toHaveTextContent('Log out')
   })
 
-  it('labels Create listing for a host and does not add Hosting', () => {
-    renderMenu({ open: true, isLoggedIn: true, isHost: true })
+  it('labels Host a session for a verified host and does not add Hosting', () => {
+    renderMenu({
+      open: true,
+      isLoggedIn: true,
+      verificationStatus: 'approved',
+      userId: 'user-77',
+    })
 
     expect(screen.getByRole('link', { name: 'Browse' })).toHaveAttribute('href', '/')
-    expect(screen.getByRole('link', { name: 'Create listing' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Host a session' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/u/user-77')
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Become a host' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Log out' })).not.toBeInTheDocument()
+  })
+
+  it('sends a pending host to the verification status page', () => {
+    renderMenu({ open: true, isLoggedIn: true, verificationStatus: 'pending' })
+
+    expect(screen.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
+      'href',
+      '/verify-identity'
+    )
+    expect(screen.queryByRole('link', { name: 'Host a session' })).not.toBeInTheDocument()
   })
 
   it('offers verification review only to an admin', () => {
@@ -108,5 +126,16 @@ describe('HamburgerMenu', () => {
 
     await user.click(screen.getByRole('link', { name: 'Browse' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('logs out with the existing sign-out handler and closes', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    const onLogOut = vi.fn()
+    renderMenu({ open: true, isLoggedIn: true, userId: 'user-77', onClose, onLogOut })
+
+    await user.click(screen.getByRole('button', { name: 'Log out' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onLogOut).toHaveBeenCalledTimes(1)
   })
 })

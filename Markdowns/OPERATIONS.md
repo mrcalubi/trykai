@@ -33,7 +33,7 @@ Week 8 of the original plan (15–21 September) is ending. The week-by-week sect
 
 **In the tree now (not true of the 31 August snapshot):**
 - Schema is `00001`–`00012`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` hourly via pg_cron. `00011` is `reviews_for_listing` plus guest review INSERT (confirmed, session ended, one per booking per role). `00012` is `delete_empty_session` (soft-delete empty upcoming sessions) and `confirm_paid_booking` requiring `status = 'open'`. Not yet applied on staging.
-- `Navbar.jsx` is deleted. `SiteNav` mounts `TopNav` once in `App.jsx`. Signed-in hamburger is Browse, Create listing / Become a host, Verification review for admins. Avatar goes to your own profile.
+- `Navbar.jsx` is deleted. `SiteNav` mounts `TopNav` once in `App.jsx`. Signed-in hamburger is Browse, Host a session (verified) / Become a host (not yet verified), Verification review for admins. Avatar goes to your own profile.
 - Browse uses the kit `Card` and shows the card all-in price. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only.
 - Guest bookings and host tools live as tabs on your own `/u/:id`. `/bookings` and `/hosting` redirect there. `/settings` is the account page. `/dashboard` redirects.
 - trykai.sg is verified in Resend. From-address is `TryKai <no-reply@trykai.sg>`. `notify-verification-pending` is secret-gated. `notify-verification-result` is gone. Staging booking confirmation emails confirmed arriving.
@@ -48,7 +48,6 @@ Week 8 of the original plan (15–21 September) is ending. The week-by-week sect
 - Confirm the two test cancellations were refunded on Stripe. API PATCH 204s are the expected service-role writes from `cancel-booking`, not proof of a client bypass.
 
 **Open in the app:**
-- Bug 4: Hosting treats `?connect=return` as "Payout setup submitted" without re-checking `stripe_payouts_enabled`.
 - P0.4: browse and Book ignore `is_suspended`. INSERT is already gated by `00008`.
 - P0.7: `listings.full_address` grant still too wide.
 - Forgot password is not built.
@@ -384,6 +383,27 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 
 ---
 
+# Connected accounts webhook (`account.updated`)
+
+The platform webhook (`STRIPE_WEBHOOK_SECRET`) receives payment and Identity events on the TryKai account. Connect `account.updated` for Express hosts is sent to a **Connected accounts** destination, which has its own signing secret. Without that destination, Hosting return still re-reads the account via `create-account-link` `{ refresh: true }`, but later payout capability changes never reach the database.
+
+**Do this once per Stripe mode (test, then live) and once per function project (staging, then production).**
+
+1. Open https://dashboard.stripe.com (Test mode on for staging).
+2. **Developers → Webhooks → Add destination** (or **Add endpoint**).
+3. Choose **Connected accounts** (not your account / platform events).
+4. Endpoint URL: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/stripe-webhook` (same URL as the platform webhook).
+5. Listen to **`account.updated`** only. Save.
+6. Copy the destination signing secret (`whsec_…`).
+7. Set it as an Edge Function secret. Dashboard: https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/functions/secrets — add `STRIPE_CONNECT_WEBHOOK_SECRET`. CLI: `supabase secrets set STRIPE_CONNECT_WEBHOOK_SECRET='whsec_…' --project-ref hzgybclfvpuxkmytdoos`
+8. Redeploy `stripe-webhook` so it reads the new secret: `supabase functions deploy stripe-webhook --project-ref hzgybclfvpuxkmytdoos`
+
+`stripe-webhook` tries `STRIPE_WEBHOOK_SECRET` first, then `STRIPE_CONNECT_WEBHOOK_SECRET` if set. A signature that matches neither is rejected. An `account.updated` for an `acct_` that is not in `users.stripe_account_id` is ignored.
+
+Keep the existing platform destination for `payment_intent.*` and Identity events. Do not put those on the Connected-accounts destination.
+
+---
+
 # Host Transfers (`release-payout`)
 
 Stripe logs a Transfer (`tr_`) only when `release-payout` creates one. The function was in the repo but nothing called it, which is why Overview showed platform **STRIPE PAYOUT** (`po_` to Aspire) and refunds, but no host Transfers.
@@ -417,6 +437,8 @@ The function checks header `x-cron-secret` against the Edge Function secret `PAY
 2. If the left nav says **Edge Functions**, click **Secrets**.
 3. Add key `PAYOUT_CRON_SECRET` and paste the string from your password note. Save.
 4. You do not need to redeploy just for the secret. You **do** need to deploy for the new code.
+
+A push to `staging` or `main` deploys every function in `supabase/functions/` through `.github/workflows/ci.yml` (`scripts/deploy-edge-functions.mjs`). That needs the `SUPABASE_ACCESS_TOKEN` GitHub secret, created at https://supabase.com/dashboard/account/tokens for an account that can deploy Edge Functions. Do not commit the token. Production also needs `PRODUCTION_SUPABASE_PROJECT_REF`. Pull requests only check that each function directory matches `config.toml`. The commands below are the manual path for one function.
 
 **Deploy the function (CLI; this function imports `_shared`, so do not paste it into the Dashboard editor):**
 
@@ -624,17 +646,17 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Avatar or initial in navbar when logged in (`SiteNav` / `TopNav`; `Navbar.jsx` is deleted)
 
 ## Legal, required before any real money moves
-- [ ] Terms of Service live at /terms
-- [ ] Privacy Policy live at /privacy
+- [x] Terms of Service live at /terms
+- [x] Privacy Policy live at /privacy
 - [x] Refund Policy live
 - [x] Cancellation Policy live
 - [x] Dispute Policy live
-- [ ] DPO contact, privacy@trykai.sg, visible in the Privacy Policy and site footer
-- [ ] UEN 53526159D visible in the footer or About page
-- [ ] T&C checkbox at signup
+- [x] DPO contact, privacy@trykai.sg, visible in the Privacy Policy and site footer
+- [x] UEN 53526159D visible in the footer or About page
+- [x] T&C checkbox at signup
 - [ ] T&C checkbox at create listing
 - [ ] T&C acknowledgment at checkout
-- [ ] Age 18+ gate in signup terms
+- [x] Age 18+ gate in signup terms
 - [ ] Founders' agreement signed by all three
 
 ## Email

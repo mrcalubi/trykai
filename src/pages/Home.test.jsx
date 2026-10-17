@@ -2,8 +2,9 @@ import { screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Home from './Home'
 import { supabase } from '../lib/supabase'
+import { PAGE_LOAD_ERROR } from '../lib/pageLoad'
 import { renderWithRouter } from '../test/render'
-import { makeListing } from '../test/fixtures'
+import { makeListing, makeSession } from '../test/fixtures'
 
 vi.mock('../lib/supabase')
 
@@ -50,12 +51,37 @@ describe('Home loading and error states', () => {
     expect(screen.getByText('Loading listings…')).toBeInTheDocument()
   })
 
-  it('surfaces a fetch failure to the user', async () => {
+  it('surfaces a fetch failure to the user without the raw error', async () => {
     supabase.__on('listings', 'select', { data: null, error: { message: 'network down' } })
     renderWithRouter(<Home />)
 
-    expect(await screen.findByText('network down')).toBeInTheDocument()
+    expect(await screen.findByText(PAGE_LOAD_ERROR)).toBeInTheDocument()
+    expect(screen.queryByText('network down')).not.toBeInTheDocument()
     expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('retries a JWT issued-at-future error once after a second', async () => {
+    supabase.__once('listings', 'select', {
+      data: null,
+      error: { message: 'JWT issued at future' },
+    })
+    givenListings([LATTE])
+    renderWithRouter(<Home />)
+
+    expect(screen.getByText('Loading listings…')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Latte art' }, { timeout: 2500 })).toBeInTheDocument()
+    expect(screen.queryByText(/issued at future/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the friendly message when the JWT retry still fails', async () => {
+    supabase.__on('listings', 'select', {
+      data: null,
+      error: { message: 'JWT issued at future' },
+    })
+    renderWithRouter(<Home />)
+
+    expect(await screen.findByText(PAGE_LOAD_ERROR, {}, { timeout: 2500 })).toBeInTheDocument()
+    expect(screen.queryByText(/issued at future/i)).not.toBeInTheDocument()
   })
 
   it('invites the user back when there is nothing to browse', async () => {
@@ -165,6 +191,72 @@ describe('Home listing grid', () => {
     expect(select).not.toMatch(/full_name/)
     expect(select).not.toMatch(/host:users/)
   })
+
+  it('embeds only open sessions that have not started yet', async () => {
+    const before = Date.now()
+    givenListings([LATTE])
+    renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    const call = supabase.__lastCall('listings', 'select')
+    const select = call.chain.find((step) => step.method === 'select')?.args[0]
+    expect(select).toMatch(/sessions\s*\(\s*starts_at,\s*status\s*\)/)
+    expect(call.filters).toContainEqual({ method: 'eq', column: 'sessions.status', value: 'open' })
+    const startsAfter = call.filters.find(
+      (filter) => filter.method === 'gt' && filter.column === 'sessions.starts_at'
+    )
+    expect(new Date(startsAfter.value).getTime()).toBeGreaterThanOrEqual(before)
+  })
+})
+
+describe('Home listing order', () => {
+  const KNIFE_SKILLS = makeListing({
+    id: 'l-4',
+    title: 'Knife skills',
+    category: 'Food',
+    area: 'Bedok',
+    sessions: [],
+  })
+  const LATTE_NEXT_WEEK = {
+    ...LATTE,
+    sessions: [makeSession({ starts_at: '2099-03-17T02:00:00.000Z' })],
+  }
+  const BOXING_TUESDAY_MORNING = {
+    ...BOXING,
+    sessions: [makeSession({ starts_at: '2099-03-10T01:00:00.000Z' })],
+  }
+  const POTTERY_TUESDAY_EVENING_WEEKLY = {
+    ...POTTERY,
+    sessions: [
+      makeSession({ starts_at: '2099-03-10T11:00:00.000Z' }),
+      makeSession({ starts_at: '2099-03-17T11:00:00.000Z' }),
+      makeSession({ starts_at: '2099-03-24T11:00:00.000Z' }),
+    ],
+  }
+  const NEWEST_FIRST = [
+    KNIFE_SKILLS,
+    LATTE_NEXT_WEEK,
+    BOXING_TUESDAY_MORNING,
+    POTTERY_TUESDAY_EVENING_WEEKLY,
+  ]
+
+  it('leads with the soonest session date, then the most sessions, then listings with none', async () => {
+    givenListings(NEWEST_FIRST)
+    renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    expect(listingTitles()).toEqual(['Pottery hour', 'Boxing basics', 'Latte art', 'Knife skills'])
+  })
+
+  it('keeps that order inside a filtered grid', async () => {
+    givenListings(NEWEST_FIRST)
+    const { user } = renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
+
+    expect(listingTitles()).toEqual(['Pottery hour', 'Boxing basics', 'Knife skills'])
+  })
 })
 
 describe('Home filters', () => {
@@ -189,23 +281,42 @@ describe('Home filters', () => {
     expect(listingTitles()).toEqual(['Boxing basics'])
   })
 
-  it('narrows the grid to the chosen area', async () => {
+  it('honours a category query so an email can land on a filtered browse', async () => {
+    givenListings([LATTE, BOXING, POTTERY])
+    renderWithRouter(<Home />, { route: '/?category=Fitness' })
+    await screen.findByText('Boxing basics')
+
+    expect(listingTitles()).toEqual(['Boxing basics'])
+    expect(screen.queryByText('Latte art')).not.toBeInTheDocument()
+  })
+
+  it('narrows the grid to the chosen region', async () => {
     givenListings([LATTE, BOXING, POTTERY])
     const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
-    await user.selectOptions(screen.getByLabelText('Filter by area'), 'Bedok')
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
 
     expect(listingTitles()).toEqual(['Boxing basics', 'Pottery hour'])
   })
 
-  it('combines the category and area filters', async () => {
+  it('keeps a neighbourhood that is not a planning area off every region filter', async () => {
+    givenListings([LATTE, BOXING])
+    const { user } = renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'Central')
+
+    expect(screen.getByText('No listings match your filters.')).toBeInTheDocument()
+  })
+
+  it('combines the category and region filters', async () => {
     givenListings([LATTE, BOXING, POTTERY])
     const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
     await user.click(screen.getByRole('button', { name: 'Arts' }))
-    await user.selectOptions(screen.getByLabelText('Filter by area'), 'Bedok')
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
 
     expect(listingTitles()).toEqual(['Pottery hour'])
   })
@@ -216,7 +327,7 @@ describe('Home filters', () => {
     await screen.findByText('Latte art')
 
     await user.click(screen.getByRole('button', { name: 'Food' }))
-    await user.selectOptions(screen.getByLabelText('Filter by area'), 'Bedok')
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
 
     expect(screen.getByText('No listings match your filters.')).toBeInTheDocument()
   })
@@ -232,15 +343,15 @@ describe('Home filters', () => {
     expect(listingTitles()).toEqual(['Latte art', 'Boxing basics'])
   })
 
-  it('lists each area once even when several listings share it', async () => {
+  it('always offers All plus the five regions', async () => {
     givenListings([LATTE, BOXING, POTTERY])
     renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
-    const options = within(screen.getByLabelText('Filter by area'))
+    const options = within(screen.getByLabelText('Filter by region'))
       .getAllByRole('option')
       .map((option) => option.textContent)
-    expect(options).toEqual(['All areas', 'Bedok', 'Tiong Bahru'])
+    expect(options).toEqual(['All regions', 'Central', 'North', 'North-East', 'East', 'West'])
   })
 
   it('ignores listings with no category when building the pills', async () => {

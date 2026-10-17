@@ -39,6 +39,7 @@ export function makeListing(overrides = {}) {
     category: 'Food',
     area: 'Tiong Bahru',
     price_per_person: 4500,
+    duration_mins: 90,
     photo_urls: ['https://cdn.test/listing-photos/one.jpg'],
     whats_provided: ['Materials'],
     host_id: 'host-1',
@@ -46,6 +47,7 @@ export function makeListing(overrides = {}) {
     users: {
       display_name: 'Mei',
       full_name: 'Mei Ling',
+      bio: null,
       avatar_url: null,
       stripe_payouts_enabled: true,
     },

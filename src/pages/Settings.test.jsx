@@ -20,12 +20,26 @@ function givenSignedIn(userId = USER_ID) {
 function givenProfile({
   full_name: fullName = 'Mei Ling',
   display_name: displayName = 'Mei',
+  bio = '',
   email = 'mei@example.com',
   avatar_url: avatarUrl = null,
 } = {}) {
-  supabase.__on('users', 'select', {
-    data: { full_name: fullName, display_name: displayName, email, avatar_url: avatarUrl },
-    error: null,
+  supabase.rpc.mockImplementation(async (fn) => {
+    if (fn === 'my_account') {
+      return {
+        data: [
+          {
+            full_name: fullName,
+            display_name: displayName,
+            bio,
+            email,
+            avatar_url: avatarUrl,
+          },
+        ],
+        error: null,
+      }
+    }
+    return { data: null, error: null }
   })
 }
 
@@ -54,14 +68,12 @@ describe('Settings access', () => {
   it('loads the signed-in user own profile', async () => {
     await renderSettings()
 
-    expect(supabase.__lastCall('users', 'select').filters).toContainEqual({
-      method: 'eq',
-      column: 'id',
-      value: USER_ID,
-    })
-    expect(supabase.__lastCall('users', 'select').chain[0].args[0]).toBe(
-      'full_name, display_name, email, avatar_url'
-    )
+    expect(supabase.rpc).toHaveBeenCalledWith('my_account')
+    expect(screen.getByLabelText('About you')).toHaveValue('')
+    expect(screen.getByText('0/500')).toBeInTheDocument()
+    expect(
+      screen.getByText('Tell guests a bit about yourself and what you love sharing.')
+    ).toBeInTheDocument()
     expect(screen.getByLabelText('Full name')).toHaveValue('Mei Ling')
     expect(screen.getByText('Private, never shown publicly.')).toBeInTheDocument()
     expect(screen.getByLabelText('Display name')).toHaveValue('Mei')
@@ -72,7 +84,7 @@ describe('Settings access', () => {
   })
 
   it('reports a load failure', async () => {
-    supabase.__on('users', 'select', { data: null, error: { message: 'permission denied' } })
+    supabase.rpc.mockResolvedValue({ data: null, error: { message: 'permission denied' } })
     renderWithRouter(
       <RequireAuth>
         <Settings />
@@ -80,7 +92,10 @@ describe('Settings access', () => {
       { route: '/settings', path: '/settings' }
     )
 
-    expect(await screen.findByText('permission denied')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Something went wrong loading this page. Please refresh.')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('permission denied')).not.toBeInTheDocument()
   })
 })
 
@@ -148,8 +163,13 @@ describe('Settings profile form', () => {
 
     await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
     const call = supabase.__lastCall('users', 'update')
-    expect(call.payload).toEqual({ full_name: 'Mei Ling Tan', display_name: 'Latte Queen' })
+    expect(call.payload).toEqual({
+      full_name: 'Mei Ling Tan',
+      display_name: 'Latte Queen',
+      bio: null,
+    })
     expect(call.filters).toContainEqual({ method: 'eq', column: 'id', value: USER_ID })
+    expect(call.chain.some((step) => step.method === 'select')).toBe(false)
     expect(await screen.findByText('Your profile has been saved.')).toBeInTheDocument()
   })
 
@@ -168,6 +188,7 @@ describe('Settings profile form', () => {
     expect(supabase.__lastCall('users', 'update').payload).toEqual({
       full_name: 'Mei Ling',
       display_name: 'Mei',
+      bio: null,
       avatar_url: `https://cdn.test/listing-photos/${uploadedPath}`,
     })
   })
@@ -182,6 +203,7 @@ describe('Settings profile form', () => {
     expect(supabase.__lastCall('users', 'update').payload).toEqual({
       full_name: 'Mei Ling',
       display_name: 'Mei',
+      bio: null,
     })
     expect(supabase.__bucket('listing-photos').upload).not.toHaveBeenCalled()
   })
@@ -199,6 +221,35 @@ describe('Settings profile form', () => {
 
     expect(await screen.findByText('storage full')).toBeInTheDocument()
     expect(supabase.__calls('users', 'update')).toHaveLength(0)
+  })
+
+  it('counts About you live and saves a trimmed bio', async () => {
+    const { user } = await renderSettings()
+    const about = screen.getByLabelText('About you')
+
+    await user.type(about, '  Line one{enter}Line two  ')
+    expect(screen.getByText(`${about.value.length}/500`)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('users', 'update').payload.bio).toBe('Line one\nLine two')
+  })
+
+  it('stores an empty About as null', async () => {
+    givenProfile({ bio: 'Old bio' })
+    const { user } = await renderSettings()
+
+    await user.clear(screen.getByLabelText('About you'))
+    expect(screen.getByText('0/500')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('users', 'update').payload.bio).toBeNull()
+  })
+
+  it('caps About you at 500 characters', async () => {
+    await renderSettings()
+    expect(screen.getByLabelText('About you')).toHaveAttribute('maxLength', '500')
   })
 
   it('shows an update error from the database', async () => {

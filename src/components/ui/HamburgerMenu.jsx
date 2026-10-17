@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { hostEntry } from '../../lib/hostEntry'
 
 const LOGGED_OUT_LINKS = [
   { label: 'Log in or sign up', to: '/login' },
@@ -8,14 +9,14 @@ const LOGGED_OUT_LINKS = [
   { label: 'Dispute policy', to: '/dispute-policy' },
 ]
 
-function loggedInLinks({ isAdmin, isHost }) {
+function loggedInItems({ isAdmin, verificationStatus, userId }) {
   return [
     { label: 'Browse', to: '/' },
-    {
-      label: isHost ? 'Create listing' : 'Become a host',
-      to: '/create-listing',
-    },
+    hostEntry(verificationStatus),
     ...(isAdmin ? [{ label: 'Verification review', to: '/admin/verifications' }] : []),
+    ...(userId ? [{ label: 'Profile', to: `/u/${userId}` }] : []),
+    { label: 'Settings', to: '/settings' },
+    { label: 'Log out', action: 'logout' },
   ]
 }
 
@@ -24,16 +25,26 @@ const STAGGER_MS = 45
 export default function HamburgerMenu({
   open = false,
   onClose,
+  onLogOut,
   isLoggedIn = false,
   isAdmin = false,
-  isHost = false,
+  verificationStatus,
+  userId,
   className = '',
 }) {
-  const links = isLoggedIn ? loggedInLinks({ isAdmin, isHost }) : LOGGED_OUT_LINKS
+  const items = isLoggedIn
+    ? loggedInItems({ isAdmin, verificationStatus, userId })
+    : LOGGED_OUT_LINKS
 
   function handleLinkClick() {
     onClose?.()
   }
+
+  async function handleLogOut() {
+    onClose?.()
+    await onLogOut?.()
+  }
+
   const classes = [
     'ui-hamburger',
     open ? 'ui-hamburger--open' : '',
@@ -57,25 +68,42 @@ export default function HamburgerMenu({
         aria-label="Main menu"
       >
         <ul className="ui-hamburger__list">
-          {links.map((link, index) => {
+          {items.map((item, index) => {
             const delayMs = open
               ? index * STAGGER_MS
-              : (links.length - 1 - index) * STAGGER_MS
+              : (items.length - 1 - index) * STAGGER_MS
+            const itemClasses = [
+              'ui-hamburger__item',
+              item.action === 'logout' ? 'ui-hamburger__item--logout' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')
 
             return (
               <li
-                key={link.label}
-                className="ui-hamburger__item"
+                key={item.label}
+                className={itemClasses}
                 style={{ transitionDelay: `${delayMs}ms` }}
               >
-                <Link
-                  to={link.to}
-                  className="ui-hamburger__link"
-                  tabIndex={open ? 0 : -1}
-                  onClick={handleLinkClick}
-                >
-                  {link.label}
-                </Link>
+                {item.action === 'logout' ? (
+                  <button
+                    type="button"
+                    className="ui-hamburger__link"
+                    tabIndex={open ? 0 : -1}
+                    onClick={handleLogOut}
+                  >
+                    {item.label}
+                  </button>
+                ) : (
+                  <Link
+                    to={item.to}
+                    className="ui-hamburger__link"
+                    tabIndex={open ? 0 : -1}
+                    onClick={handleLinkClick}
+                  >
+                    {item.label}
+                  </Link>
+                )}
               </li>
             )
           })}

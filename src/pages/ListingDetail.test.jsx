@@ -3,9 +3,11 @@ import { resolve } from 'node:path'
 import { screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ListingDetail from './ListingDetail'
+import BackButton, { BackSlotProvider } from '../components/BackButton'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { hoursFromNow, makeAuthSession, makeListing, makeReview, makeSession } from '../test/fixtures'
+import { monthBounds } from '../lib/sessionCalendar'
 
 vi.mock('../lib/supabase')
 
@@ -32,7 +34,29 @@ function givenListing(listing = makeListing()) {
 }
 
 function givenSessions(sessions) {
-  supabase.__on('sessions', 'select', { data: sessions, error: null })
+  supabase.__on('sessions', 'select', (call) => {
+    let rows = sessions.filter((session) =>
+      call.filters.every((filter) => {
+        const value = session[filter.column]
+        if (filter.method === 'eq') return value === filter.value
+        if (filter.method === 'gt') return value > filter.value
+        if (filter.method === 'gte') return value >= filter.value
+        if (filter.method === 'lt') return value < filter.value
+        return true
+      })
+    )
+
+    const order = call.chain.findLast((step) => step.method === 'order')
+    if (order) {
+      const [column, options] = order.args
+      const direction = options?.ascending === false ? -1 : 1
+      rows.sort((a, b) => (a[column] < b[column] ? -1 : a[column] > b[column] ? 1 : 0) * direction)
+    }
+
+    const limit = call.chain.findLast((step) => step.method === 'limit')
+    if (limit) rows = rows.slice(0, limit.args[0])
+    return { data: rows, error: null }
+  })
 }
 
 function givenReviews(reviews) {
@@ -58,16 +82,25 @@ function givenSignedIn(session = makeAuthSession()) {
 }
 
 function renderPage() {
-  return renderWithRouter(<ListingDetail />, {
-    route: '/listings/listing-1',
-    path: '/listings/:id',
-  })
+  return renderWithRouter(
+    <BackSlotProvider>
+      <BackButton />
+      <ListingDetail />
+    </BackSlotProvider>,
+    {
+      route: '/listings/listing-1',
+      path: '/listings/:id',
+    }
+  )
 }
 
 beforeEach(() => {
   supabase.__reset()
   stripe.instance.confirmPayment.mockReset()
-  stripe.instance.confirmPayment.mockResolvedValue({ error: null })
+  stripe.instance.confirmPayment.mockResolvedValue({
+    error: null,
+    paymentIntent: { status: 'succeeded' },
+  })
 })
 
 describe('ListingDetail loading and failure', () => {
@@ -81,7 +114,7 @@ describe('ListingDetail loading and failure', () => {
     supabase.__on('listings', 'select', { data: null, error: { message: 'No rows found' } })
     renderPage()
 
-    expect(await screen.findByText('No rows found')).toBeInTheDocument()
+    expect(await screen.findByText('Something went wrong loading this page. Please refresh.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Back to browse/ })).toHaveAttribute('href', '/')
   })
 
@@ -95,18 +128,50 @@ describe('ListingDetail loading and failure', () => {
       column: 'is_active',
       value: true,
     })
+    const listingSelect = supabase.__lastCall('listings', 'select').chain[0].args[0]
+    expect(listingSelect).toMatch(/users!host_id/)
+    expect(listingSelect).toMatch(/display_name/)
+    expect(listingSelect).not.toMatch(/full_name/)
   })
 })
 
 describe('ListingDetail content', () => {
   it('renders the listing headline details', async () => {
     givenListing(makeListing({ title: 'Latte art', category: 'Food', area: 'Tiong Bahru' }))
-    renderPage()
+    const { user } = renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Latte art', level: 1 })).toBeInTheDocument()
     expect(screen.getByText('Food')).toBeInTheDocument()
     expect(screen.getByText('Tiong Bahru')).toBeInTheDocument()
     expect(screen.getByText('Pull your first rosetta in ninety minutes.')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
+    const more = screen.getByRole('button', { name: 'More actions' })
+    expect(document.querySelector('.page-back__actions')).toContainElement(more)
+    await user.click(more)
+    const report = screen.getByRole('menuitem', { name: 'Report listing' })
+    expect(report.getAttribute('href')).toContain('mailto:hello@trykai.sg')
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: listing Latte art')
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain('listing-1')
+  })
+
+  it('does not render a bare 0 in place of the planning area', async () => {
+    givenListing(makeListing({ area: 0 }))
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
+    expect(document.querySelector('.detail-area')).not.toBeInTheDocument()
+    expect(screen.queryByText('0')).not.toBeInTheDocument()
+  })
+
+  it('hides Report on your own listing', async () => {
+    givenListing()
+    givenSignedIn(makeAuthSession({ user: { id: 'host-1' } }))
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
+    expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
+    expect(document.querySelector('.page-back__actions .ui-overflow')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
   })
 
   it('shows the card all-in total, not the raw lesson price', async () => {
@@ -132,12 +197,65 @@ describe('ListingDetail content', () => {
     expect(screen.queryByText('Mei Ling Tan')).not.toBeInTheDocument()
   })
 
-  it('falls back to the first name when display_name is missing', async () => {
-    givenListing(makeListing({ users: { full_name: 'Mei Ling', avatar_url: null } }))
+  it('shows the first two lines of the host bio under Hosted by, even when signed out', async () => {
+    givenListing(
+      makeListing({
+        users: {
+          display_name: 'Mei',
+          full_name: 'Mei Ling',
+          bio: 'I pull rosettas.\nAlso pour-overs.\nAnd cortados.',
+          avatar_url: null,
+        },
+      }),
+    )
     renderPage()
 
-    expect(await screen.findByRole('link', { name: 'Mei' })).toHaveAttribute('href', '/u/host-1')
-    expect(screen.queryByText('Mei Ling')).not.toBeInTheDocument()
+    await screen.findByRole('link', { name: 'Mei' })
+    expect(document.querySelector('.detail-host__bio').textContent).toBe(
+      'I pull rosettas.\nAlso pour-overs.… more',
+    )
+    expect(screen.getByRole('link', { name: '… more' })).toHaveAttribute('href', '/u/host-1')
+    expect(screen.getByRole('link', { name: "Mei's profile" })).toHaveAttribute('href', '/u/host-1')
+    expect(screen.queryByRole('link', { name: /More about/ })).not.toBeInTheDocument()
+    expect(supabase.auth.getSession).toHaveBeenCalled()
+  })
+
+  it('keeps a short host bio without a more link', async () => {
+    givenListing(
+      makeListing({
+        users: {
+          display_name: 'Mei',
+          full_name: 'Mei Ling',
+          bio: 'I pull rosettas.',
+          avatar_url: null,
+        },
+      }),
+    )
+    renderPage()
+
+    await screen.findByRole('link', { name: 'Mei' })
+    expect(document.querySelector('.detail-host__bio').textContent).toBe('I pull rosettas.')
+    expect(screen.queryByRole('link', { name: '… more' })).not.toBeInTheDocument()
+  })
+
+  it('hides the host About when there is no bio', async () => {
+    givenListing()
+    renderPage()
+
+    await screen.findByRole('link', { name: 'Mei' })
+    expect(document.querySelector('.detail-host__bio')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '… more' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /More about/ })).not.toBeInTheDocument()
+  })
+
+  it('shows Anonymous when display_name is missing', async () => {
+    givenListing(makeListing({ users: { avatar_url: null } }))
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: 'Anonymous' })).toHaveAttribute(
+      'href',
+      '/u/host-1'
+    )
   })
 
   it('falls back to Anonymous when the host profile is missing', async () => {
@@ -184,13 +302,16 @@ describe('ListingDetail content', () => {
 
     await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
     expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_listing', { p_listing_id: 'listing-1' })
-    expect(supabase.__lastCall('reviews', 'select').filters).toEqual(
+    const hostRatingCall = supabase
+      .__calls('reviews', 'select')
+      .find((call) => call.filters.some((filter) => filter.column === 'reviewee_id'))
+    expect(hostRatingCall.filters).toEqual(
       expect.arrayContaining([
         { method: 'eq', column: 'reviewee_id', value: 'host-1' },
         { method: 'eq', column: 'role', value: 'guest' },
       ])
     )
-    expect(supabase.__lastCall('reviews', 'select').filters).not.toContainEqual({
+    expect(hostRatingCall.filters).not.toContainEqual({
       method: 'eq',
       column: 'bookings.sessions.listing_id',
       value: 'listing-1',
@@ -233,8 +354,10 @@ describe('ListingDetail content', () => {
     expect([...css.matchAll(/overflow-wrap:\s*break-word/g)]).toHaveLength(1)
     expect(css).not.toMatch(/overflow-wrap:\s*anywhere/)
     expect(css).toMatch(
-      /\.detail-title,\s*\n\.detail-description,\s*\n\.detail-area,\s*\n\.detail-list li,\s*\n\.review-card__comment,\s*\n\.ui-card__title,\s*\n\.dashboard-card__title,\s*\n\.dashboard-card__meta/
+      /\.detail-title,\s*\n\.detail-description,\s*\n\.detail-area,\s*\n\.detail-list li,\s*\n\.review-card__comment,\s*\n\.ui-card__title,\s*\n\.dashboard-card__title,\s*\n\.dashboard-card__meta,\s*\n\.profile-about__body,\s*\n\.detail-host__bio/
     )
+    expect(css).toMatch(/\.detail-host__more \{[\s\S]*?display:\s*inline/)
+    expect(css).toMatch(/\.detail-host \{[\s\S]*?align-items:\s*flex-start/)
   })
 
   it('hides the host rating when the host has no reviews', async () => {
@@ -346,12 +469,39 @@ describe('ListingDetail content', () => {
 })
 
 describe('ListingDetail sessions', () => {
+  it('shows the listing error when the session range cannot be loaded', async () => {
+    givenListing()
+    supabase.__on('sessions', 'select', { data: null, error: { message: 'range failed' } })
+    renderPage()
+
+    expect(await screen.findByText('Something went wrong loading this page. Please refresh.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Back to browse/ })).toBeInTheDocument()
+  })
+
   it('says when there is nothing to book', async () => {
     givenListing()
     givenSessions([])
     renderPage()
 
-    expect(await screen.findByText('No upcoming sessions available.')).toBeInTheDocument()
+    expect(await screen.findByText('No upcoming sessions yet.')).toBeInTheDocument()
+    expect(screen.queryByText('Pick a date, then a time')).not.toBeInTheDocument()
+  })
+
+  it('opens guest cancellation rules from a muted line under the book area', async () => {
+    givenListing()
+    givenSessions([makeSession()])
+    const { user } = renderPage()
+
+    await screen.findByRole('button', { name: 'Book' })
+    expect(screen.queryByRole('button', { name: /Cancellation Policy/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/Full refund if you cancel 48\+ hours before/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Cancellation policy' }))
+
+    expect(screen.getByText(/Guest cancels 48\+ hours before session:/)).toBeInTheDocument()
+    expect(screen.getByText('If the host cancels, you get a full refund')).toBeInTheDocument()
+    expect(screen.queryByText(/host receives a strike/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Listing is automatically deactivated/)).not.toBeInTheDocument()
   })
 
   it('shows the duration and remaining spots for each session', async () => {
@@ -359,7 +509,8 @@ describe('ListingDetail sessions', () => {
     givenSessions([makeSession({ duration_mins: 90, spots_remaining: 3 })])
     renderPage()
 
-    expect(await screen.findByText(/90 mins · 3 spots left/)).toBeInTheDocument()
+    expect(await screen.findByText(/1 hr 30 min · 3 spots left/)).toBeInTheDocument()
+    expect(screen.getByText('Pick a date, then a time')).toBeInTheDocument()
   })
 
   it('uses the singular when only one spot is left', async () => {
@@ -389,6 +540,189 @@ describe('ListingDetail sessions', () => {
     expect(call.filters.some((filter) => filter.method === 'gt' && filter.column === 'starts_at'))
       .toBe(true)
   })
+
+  it('opens on the soonest day and lists only that day’s times', async () => {
+    givenListing()
+    givenSessions([
+      makeSession({
+        id: 'late',
+        starts_at: '2099-10-09T15:00:00.000Z',
+        duration_mins: 45,
+        spots_remaining: 1,
+      }),
+      makeSession({
+        id: 'morning',
+        starts_at: '2099-10-09T03:00:00.000Z',
+        duration_mins: 33,
+        spots_remaining: 2,
+      }),
+      makeSession({
+        id: 'other-day',
+        starts_at: '2099-10-27T03:00:00.000Z',
+        duration_mins: 111,
+        spots_remaining: 4,
+      }),
+      makeSession({ id: 'past', starts_at: '2000-01-01T00:00:00.000Z' }),
+      makeSession({ id: 'full', starts_at: '2099-10-09T05:00:00.000Z', status: 'full' }),
+    ])
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: /9 Oct · 2 sessions/ })).toBeInTheDocument()
+    expect(screen.getByText('11:00 am')).toBeInTheDocument()
+    expect(screen.getByText(/33 min · 2 spots left/)).toBeInTheDocument()
+    expect(screen.getByText('11:00 pm')).toBeInTheDocument()
+    expect(screen.queryByText(/1 hr 51 min/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /9 October, 2 sessions/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(screen.getByRole('button', { name: 'Previous month' })).toBeDisabled()
+  })
+
+  it('shows another day’s times when that date is chosen', async () => {
+    givenListing()
+    givenSessions([
+      makeSession({ id: 'ninth', starts_at: '2099-10-09T03:00:00.000Z', duration_mins: 33 }),
+      makeSession({ id: 'twenty-seventh', starts_at: '2099-10-27T03:00:00.000Z', duration_mins: 111 }),
+    ])
+    const { user } = renderPage()
+    await screen.findByRole('heading', { name: /9 Oct · 1 session/ })
+
+    await user.click(screen.getByRole('button', { name: /27 October, 1 session/ }))
+
+    expect(screen.getByRole('heading', { name: /27 Oct · 1 session/ })).toBeInTheDocument()
+    expect(screen.getByText(/1 hr 51 min/)).toBeInTheDocument()
+    expect(screen.queryByText(/33 min/)).not.toBeInTheDocument()
+  })
+
+  it('loads each month once, bounded by Singapore midnights', async () => {
+    givenListing()
+    givenSessions([
+      makeSession({ id: 'october', starts_at: '2099-10-09T03:00:00.000Z', duration_mins: 33 }),
+      makeSession({ id: 'november', starts_at: '2099-11-02T03:00:00.000Z', duration_mins: 60 }),
+    ])
+    const { user } = renderPage()
+    await screen.findByRole('heading', { name: /9 Oct · 1 session/ })
+
+    const october = monthBounds('2099-10')
+    const firstMonth = supabase.__calls('sessions', 'select').find((call) =>
+      call.filters.some((filter) => filter.method === 'gte')
+    )
+    expect(firstMonth.filters).toContainEqual({
+      method: 'gte',
+      column: 'starts_at',
+      value: october.startIso,
+    })
+    expect(firstMonth.filters).toContainEqual({
+      method: 'lt',
+      column: 'starts_at',
+      value: october.endIso,
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Next month' }))
+    expect(await screen.findByRole('heading', { name: /2 Nov · 1 session/ })).toBeInTheDocument()
+    expect(screen.getByText(/1 hr · 3 spots left/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Previous month' }))
+    expect(await screen.findByRole('heading', { name: /9 Oct · 1 session/ })).toBeInTheDocument()
+
+    const ranged = supabase
+      .__calls('sessions', 'select')
+      .filter((call) => call.filters.some((filter) => filter.method === 'gte'))
+    expect(ranged.map((call) => call.filters.find((filter) => filter.method === 'gte').value)).toEqual([
+      october.startIso,
+      monthBounds('2099-11').startIso,
+    ])
+  })
+
+  it('asks for one month even when a listing has a thousand sessions', async () => {
+    const sessions = []
+    for (let i = 0; i < 1000; i += 1) {
+      const month = i < 500 ? 9 : 10
+      sessions.push(
+        makeSession({
+          id: `bulk-${i}`,
+          starts_at: new Date(Date.UTC(2099, month, (i % 28) + 1, i % 12)).toISOString(),
+        })
+      )
+    }
+    givenListing()
+    givenSessions(sessions)
+    renderPage()
+
+    const books = await screen.findAllByRole('button', { name: 'Book' })
+    expect(books.length).toBeLessThan(40)
+    expect(screen.getByRole('heading', { name: /1 Oct · \d+ sessions/ })).toBeInTheDocument()
+
+    const ranged = supabase
+      .__calls('sessions', 'select')
+      .filter((call) => call.filters.some((filter) => filter.method === 'gte'))
+    expect(ranged).toHaveLength(1)
+    expect(ranged[0].filters).toContainEqual({
+      method: 'gte',
+      column: 'starts_at',
+      value: monthBounds('2099-10').startIso,
+    })
+    const bounded = supabase.__calls('sessions', 'select').filter((call) =>
+      call.chain.some((step) => step.method === 'limit')
+    )
+    expect(bounded).toHaveLength(2)
+  })
+
+  it('says when a month between the first and last session has nothing', async () => {
+    givenListing()
+    givenSessions([
+      makeSession({ id: 'october', starts_at: '2099-10-09T03:00:00.000Z' }),
+      makeSession({ id: 'december', starts_at: '2099-12-02T03:00:00.000Z', duration_mins: 40 }),
+    ])
+    const { user } = renderPage()
+    await screen.findByRole('heading', { name: /9 Oct · 1 session/ })
+
+    await user.click(screen.getByRole('button', { name: 'Next month' }))
+
+    expect(await screen.findByText('No sessions in November 2099.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Book' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Next month' }))
+
+    expect(await screen.findByRole('heading', { name: /2 Dec · 1 session/ })).toBeInTheDocument()
+    expect(screen.getByText(/40 min · 3 spots left/)).toBeInTheDocument()
+  })
+
+  it('keeps the listing on screen when a month fails to load', async () => {
+    givenListing()
+    supabase.__on('sessions', 'select', (call) => {
+      if (call.filters.some((filter) => filter.method === 'gte')) {
+        return { data: null, error: { message: 'sessions unavailable' } }
+      }
+      return {
+        data: [makeSession({ starts_at: '2099-10-09T03:00:00.000Z' })],
+        error: null,
+      }
+    })
+    renderPage()
+
+    expect(await screen.findByText('Something went wrong loading this page. Please refresh.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Learn latte art with me' })).toBeInTheDocument()
+  })
+
+  it('hides the calendar while checking out and brings it back on cancel', async () => {
+    givenListing()
+    givenSessions([makeSession({ id: 'session-7', starts_at: '2099-10-09T03:00:00.000Z' })])
+    givenSignedIn()
+    const { user } = renderPage()
+
+    expect(await screen.findByRole('group', { name: 'October 2099' })).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    expect(screen.queryByRole('group', { name: 'October 2099' })).not.toBeInTheDocument()
+    expect(screen.getByText(/9 Oct/)).toBeInTheDocument()
+    expect(screen.getByText(/11:00 am · 1 hr 30 min/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByRole('group', { name: 'October 2099' })).toBeInTheDocument()
+  })
 })
 
 describe('ListingDetail booking', () => {
@@ -414,8 +748,75 @@ describe('ListingDetail booking', () => {
     await user.click(await screen.findByRole('button', { name: 'Book' }))
 
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: /Pay by card/ })).toHaveTextContent('$51')
-    expect(screen.getByRole('button', { name: /PayNow/ })).toHaveTextContent('$48.45')
+    const paynow = screen.getByRole('button', { name: /PayNow/ })
+    const card = screen.getByRole('button', { name: /^Card/ })
+    expect(paynow.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(paynow).toHaveClass('payment-rail--paynow')
+    expect(paynow).toHaveTextContent('Save 5%')
+    expect(paynow).not.toHaveTextContent('Best price')
+    expect(paynow).not.toHaveTextContent('·')
+    expect(paynow).toHaveTextContent('$51')
+    expect(paynow).toHaveTextContent('$48.45')
+    expect(card).toHaveTextContent('$51')
+    expect(card).not.toHaveTextContent('Credit or debit card')
+    expect(screen.getAllByRole('heading', { name: 'Complete your booking' })).toHaveLength(1)
+    expect(screen.queryByText('Pick a date, then a time')).not.toBeInTheDocument()
+    expect(document.querySelector('.detail-booking-card__note')).not.toBeInTheDocument()
+  })
+
+  it('disables PayNow when the session is more than 80 days away', async () => {
+    givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(81 * 24) })])
+    givenSignedIn()
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    const paynow = screen.getByRole('button', { name: /PayNow/ })
+    expect(paynow).toBeDisabled()
+    expect(
+      screen.getByText('PayNow is available for sessions within 80 days. Please pay by card.')
+    ).toBeInTheDocument()
+    expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$51')
+    expect(paynow).toHaveTextContent('$51')
+    expect(paynow).not.toHaveTextContent('$48.45')
+    expect(screen.getByRole('button', { name: /^Card/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(supabase.functions.invoke).not.toHaveBeenCalled()
+  })
+
+  it('keeps PayNow available on the 80-day boundary', async () => {
+    givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(80 * 24) })])
+    givenSignedIn()
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    expect(screen.getByRole('button', { name: /PayNow/ })).toBeEnabled()
+    expect(
+      screen.queryByText('PayNow is available for sessions within 80 days. Please pay by card.')
+    ).not.toBeInTheDocument()
+  })
+
+  it('switches to card when the server rejects PayNow as too far ahead', async () => {
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: {
+        error: 'PayNow is available for sessions within 80 days. Please pay by card.',
+        code: 'paynow_too_far_ahead',
+      },
+      error: { message: 'Edge Function returned a non-2xx status code' },
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(screen.getByRole('button', { name: /PayNow/ }))
+
+    expect(
+      await screen.findByText('PayNow is available for sessions within 80 days. Please pay by card.')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Edge Function returned a non-2xx status code')).not.toBeInTheDocument()
+    expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$51')
+    expect(screen.getByRole('button', { name: /^Card/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /PayNow/ })).toBeDisabled()
   })
 
   it('asks the edge function for a card payment intent after the guest picks a rail', async () => {
@@ -429,7 +830,7 @@ describe('ListingDetail booking', () => {
     await user.click(await screen.findByRole('button', { name: 'Book' }))
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
 
-    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
     expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
@@ -441,17 +842,42 @@ describe('ListingDetail booking', () => {
   it('opens the payment panel with the amount returned by the server', async () => {
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 5100 },
+      error: null,
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
+
+    expect(await screen.findByTestId('stripe-elements')).toBeInTheDocument()
+    expect(screen.getByText('Total: $51')).toBeInTheDocument()
+    expect(screen.getByTestId('payment-element')).toBeInTheDocument()
+  })
+
+  it('refuses to show the payment form when the server total differs from the page', async () => {
+    givenSignedIn()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    supabase.functions.invoke.mockResolvedValue({
       data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 9000 },
       error: null,
     })
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
-    expect(await screen.findByTestId('stripe-elements')).toBeInTheDocument()
-    expect(screen.getByText('Total: $90')).toBeInTheDocument()
-    expect(screen.getByTestId('payment-element')).toBeInTheDocument()
+    expect(await screen.findByText('The price has changed. Please refresh.')).toBeInTheDocument()
+    expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
+    expect(log).toHaveBeenCalledWith('checkout price mismatch', {
+      shown: 5100,
+      server: 9000,
+    })
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('abandon-checkout', {
+      body: { booking_id: 'booking-1' },
+      headers: { Authorization: 'Bearer test-access-token' },
+    })
+    log.mockRestore()
   })
 
   it('reports a transport failure from the edge function', async () => {
@@ -460,7 +886,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     expect(await screen.findByText('Failed to fetch')).toBeInTheDocument()
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
@@ -480,7 +906,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     expect(await screen.findByText('This host cannot take bookings yet.')).toBeInTheDocument()
   })
@@ -498,8 +924,9 @@ describe('ListingDetail booking', () => {
 
     await user.click(await screen.findByRole('button', { name: /PayNow/ }))
 
-    expect(await screen.findByText('PayNow · 5% off the advertised price')).toBeInTheDocument()
-    expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$48.45')
+    await waitFor(() =>
+      expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$48.45'),
+    )
     expect(document.querySelector('.session-card__price')).toHaveTextContent('$48.45')
     expect(screen.getByRole('button', { name: /PayNow/ })).toHaveAttribute('aria-pressed', 'true')
   })
@@ -510,7 +937,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     expect(await screen.findByText('Not enough spots')).toBeInTheDocument()
   })
@@ -521,7 +948,7 @@ describe('ListingDetail booking', () => {
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
 
     expect(await screen.findByText('Failed to start payment. Please try again.')).toBeInTheDocument()
   })
@@ -529,7 +956,7 @@ describe('ListingDetail booking', () => {
   it('asks the edge function for a PayNow intent when that rail is chosen', async () => {
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({
-      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 2660 },
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 4845 },
       error: null,
     })
     const { user } = renderPage()
@@ -568,7 +995,7 @@ describe('ListingDetail booking', () => {
   it('does not start payment when the host cannot receive payouts', async () => {
     givenListing(
       makeListing({
-        users: { full_name: 'Mei Ling', avatar_url: null, stripe_payouts_enabled: false },
+        users: { display_name: 'Mei', avatar_url: null, stripe_payouts_enabled: false },
       }),
     )
     givenSignedIn()
@@ -578,6 +1005,107 @@ describe('ListingDetail booking', () => {
     expect(screen.getByText(/still setting up payouts/)).toBeInTheDocument()
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
   })
+
+  it('shows an $8 rail total without a thousands separator', async () => {
+    givenListing(makeListing({ price_per_person: 550 }))
+    givenSignedIn()
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.getByRole('button', { name: /^Card/ })).toHaveTextContent('$8')
+    expect(screen.getByRole('button', { name: /PayNow/ })).toHaveTextContent('$8')
+    expect(screen.getByRole('button', { name: /PayNow/ }).querySelector('.price__group')).toBeNull()
+  })
+
+  it('renders a $9,999 rail total with the comma in the body font', async () => {
+    givenListing(makeListing({ price_per_person: 892768 }))
+    givenSignedIn()
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.getByRole('button', { name: /^Card/ })).toHaveTextContent('$9,999')
+    expect(screen.getByRole('button', { name: /PayNow/ }).querySelector('.price__group')).toHaveTextContent(',')
+  })
+
+  it('hides the next-tier button when group pricing is off', async () => {
+    givenListing(makeListing({ price_per_person: 2500, group_pricing: false }))
+    givenSessions([makeSession({ id: 'session-7', spots_remaining: 4 })])
+    givenSignedIn()
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.queryByRole('button', { name: /Add 1 more/ })).not.toBeInTheDocument()
+  })
+
+  it('hides the next-tier button when only one seat remains', async () => {
+    givenListing(makeListing({ price_per_person: 2500 }))
+    givenSessions([makeSession({ id: 'session-7', spots_remaining: 1 })])
+    givenSignedIn()
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.queryByRole('button', { name: /Add 1 more/ })).not.toBeInTheDocument()
+  })
+
+  it('updates the live per-person price when more guests are added', async () => {
+    givenListing(makeListing({ price_per_person: 2500 }))
+    givenSessions([makeSession({ id: 'session-7', spots_remaining: 4 })])
+    givenSignedIn()
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    expect(screen.getByText('$28 per person')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add 1 more for 5% off' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Card/ })).toHaveTextContent('$28')
+
+    await user.click(screen.getByRole('button', { name: 'Add 1 more for 5% off' }))
+    expect(screen.getByText('$27 each · 5% group discount')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add 1 more for 10% off' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Add 1 more for 10% off' }))
+    await user.click(screen.getByRole('button', { name: 'Add 1 more for 15% off' }))
+
+    expect(screen.getByText('$24 each · 15% group discount')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Add 1 more/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Card/ })).toHaveTextContent('$96')
+    expect(screen.getByRole('button', { name: /PayNow/ })).toHaveTextContent('$96')
+    expect(screen.getByRole('button', { name: /PayNow/ })).toHaveTextContent('$91.20')
+  })
+
+  it('sends the chosen guest count to create-payment-intent', async () => {
+    givenListing()
+    givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(72), spots_remaining: 3 })])
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 9600 },
+      error: null,
+    })
+    const { user } = renderPage()
+
+    await screen.findByText(/spots left/)
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(screen.getByRole('button', { name: 'More guests' }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
+
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
+      body: { session_id: 'session-7', guests_count: 2, payment_rail: 'card' },
+      headers: { Authorization: 'Bearer test-access-token' },
+    })
+  })
+
+  it('links the booking terms and cancellation policy above the pay buttons', async () => {
+    givenSignedIn()
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    expect(screen.getByRole('link', { name: 'Booking terms' })).toHaveAttribute(
+      'href',
+      '/terms#part-3-booking',
+    )
+    expect(screen.getByRole('link', { name: 'Cancellation Policy' })).toHaveAttribute(
+      'href',
+      '/cancellation-policy',
+    )
+  })
 })
 
 describe('ListingDetail checkout', () => {
@@ -586,12 +1114,13 @@ describe('ListingDetail checkout', () => {
     givenSessions([makeSession({ id: 'session-7' })])
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({
-      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 4500 },
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 5100 },
       error: null,
     })
     const utils = renderPage()
+    await screen.findByText(/spots left/)
     await utils.user.click(await screen.findByRole('button', { name: 'Book' }))
-    await utils.user.click(await screen.findByRole('button', { name: /Pay by card/ }))
+    await utils.user.click(await screen.findByRole('button', { name: /^Card/ }))
     await screen.findByTestId('stripe-elements')
     return utils
   }
@@ -616,7 +1145,40 @@ describe('ListingDetail checkout', () => {
     await user.click(screen.getByRole('button', { name: 'Pay now' }))
 
     await waitFor(() => expect(currentPath()).toBe('/dashboard'))
-    expect(currentSearch()).toBe('?booking=booking-1')
+    expect(currentSearch()).toBe('?booking=booking-1&payment=succeeded')
+  })
+
+  it('closes the unpaid checkout when the guest backs out', async () => {
+    const { user } = await openCheckout()
+
+    await user.click(within(screen.getByTestId('stripe-elements')).getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(supabase.functions.invoke).toHaveBeenCalledWith('abandon-checkout', {
+        body: { booking_id: 'booking-1' },
+        headers: { Authorization: 'Bearer test-access-token' },
+      }),
+    )
+    expect(supabase.functions.invoke).not.toHaveBeenCalledWith(
+      'cancel-booking',
+      expect.anything(),
+    )
+  })
+
+  it('stays on the listing when the guest cancels the payment', async () => {
+    stripe.instance.confirmPayment.mockResolvedValue({
+      error: null,
+      paymentIntent: { status: 'canceled' },
+    })
+    const { user, currentPath } = await openCheckout()
+
+    await user.click(screen.getByRole('button', { name: 'Pay now' }))
+
+    expect(
+      await screen.findByText('Payment was not completed. You have not been charged.')
+    ).toBeInTheDocument()
+    expect(currentPath()).toBe('/listings/listing-1')
   })
 
   it('keeps the guest on the page and shows why the card was declined', async () => {

@@ -26,7 +26,7 @@ Rule that keeps the docs honest: one fact, one home. When two docs disagree, say
 
 **UI**
 - Global nav: `Navbar.jsx` deleted. `SiteNav` mounted once in `App.jsx` feeds real auth into `TopNav`.
-- Hamburger is navigation only: Browse, Create listing / Become a host (always, so non hosts have a route to hosting), Verification review (admins only, gated via `my_verification()`). Bookings and Hosting are tabs on your own `/u/:id`, not hamburger links.
+- Hamburger is navigation only: Browse, Host a session (verified) / Become a host (not yet verified), Verification review (admins only, gated via `my_verification()`). Bookings and Hosting are tabs on your own `/u/:id`, not hamburger links.
 - Avatar links to your own profile. Settings is the gear on that page; Log out is on `/settings`. There is no avatar dropdown.
 - Colour token set at `:root` in `index.css`, including `--scrim`. Status colours use a strong token for text and a tint for backgrounds. Coral stays functional only.
 - Browse grid uses the UI kit `Card`. Square images, 2 line title clamp, one line meta. Hero removed. The price on that card is the card all-in total from `formatGuestFacingPrice`, not the raw lesson price.
@@ -61,7 +61,7 @@ Rule that keeps the docs honest: one fact, one home. When two docs disagree, say
 
 **The two test cancellations still need a Stripe check.** Cancelling from `/bookings` calls `cancel-booking`. That function writes bookings and sessions with the service role, so API logs show `PATCH /rest/v1/bookings` and `PATCH /rest/v1/sessions` 204 even when the function ran. That is not proof of an RLS bypass. `00009` also dropped the leftover 00001 INSERT/UPDATE policies so a restored GRANT cannot come back as a client cancel. Look at Edge Function logs for `cancel-booking invoked`. **Unchecked: whether the two test cancellations were actually refunded on Stripe.** Cancellation emails on those tests were not verified because the PATCH lines were read as a bypass.
 
-**Bug 4, misfiled as UI.** A host who exits Stripe onboarding without completing it still sees "Payout setup submitted." `Hosting.jsx` treats `?connect=return` as success without re-checking `stripe_payouts_enabled`. They cannot be paid. Money path. Ruiheng's.
+**Bug 4, misfiled as UI — fixed 13 October 2026.** `?connect=return` / `refresh` re-read `stripe_payouts_enabled` from Stripe before showing a message. Remaining ops: Connected-accounts webhook + `STRIPE_CONNECT_WEBHOOK_SECRET` (OPERATIONS.md).
 
 **Production vs staging is unconfirmed from this repo.** `00008`, `00009`, `00010`, the Resend from-address, and the Edge Function code are in the tree. Applying those migrations, setting `RESEND_API_KEY` and Vault/`PAYOUT_CRON_SECRET`, and deploying functions are ops per environment. Confirm production has `00008` through `00010`, `RESEND_API_KEY`, and current function deploys before launch. Do not treat staging-only secrets and deploys as production facts.
 
@@ -88,9 +88,9 @@ These cost real hours. Treat them as rules.
 
 1. **Verify the branch every time.** Run `git branch --show-current` after every checkout and read the output. Work was stranded on the wrong branch twice this session.
 2. **Commit as soon as something looks right on localhost.** Uncommitted work is work that can vanish.
-3. **Merging does not deploy Edge Functions.** CI only lints, tests and builds. After any merge touching `supabase/functions/`, deploy manually from an up to date `staging` checkout: `npx supabase functions deploy <name> --project-ref hzgybclfvpuxkmytdoos`. Each function bundles `_shared/` at deploy time, so a shared fix needs every dependent function redeployed.
+3. **A push to `staging` or `main` deploys every Edge Function.** CI runs `scripts/deploy-edge-functions.mjs` after the other checks pass. Staging goes to project `hzgybclfvpuxkmytdoos` unless `STAGING_SUPABASE_PROJECT_REF` is set. Production requires `PRODUCTION_SUPABASE_PROJECT_REF`. Both need GitHub secret `SUPABASE_ACCESS_TOKEN`. Pull requests do not deploy. Each function bundles `_shared/` at deploy time, so the script always deploys the full set.
 4. **Deploy from `staging` after merge, never from a feature branch.**
-5. **Never give Cursor a Supabase access token.** Run deploys yourself.
+5. **Never give Cursor a Supabase access token.** Store `SUPABASE_ACCESS_TOKEN` in GitHub Actions secrets.
 6. **Check that secrets actually exist** before debugging code. A missing `RESEND_API_KEY` failed silently for an hour.
 7. **`00005` revoke breakages share a shape:** a policy or write touching a column that was not re granted. Signup, verification, listing creation and sessions all hit it. Worth one systematic sweep rather than finding the next at launch.
 

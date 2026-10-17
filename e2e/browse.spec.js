@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { stubAllExternalCalls } from './support/network'
-import { BOXING, LATTE_ART } from './support/fixtures'
+import { BOXING, LATTE_ART, hoursFromNow } from './support/fixtures'
 
 test.describe('browsing listings', () => {
   test('shows the landing headline above the grid of every active listing', async ({ page }) => {
@@ -44,6 +44,24 @@ test.describe('browsing listings', () => {
     expect(second.x).toBeGreaterThan(first.x)
   })
 
+  test('lists the listing with the soonest session first', async ({ page }) => {
+    const latteNextWeek = {
+      ...LATTE_ART,
+      sessions: [{ starts_at: hoursFromNow(24 * 7), status: 'open' }],
+    }
+    const boxingTomorrow = {
+      ...BOXING,
+      sessions: [{ starts_at: hoursFromNow(24), status: 'open' }],
+    }
+    await stubAllExternalCalls(page, { listings: [latteNextWeek, boxingTomorrow] })
+    await page.goto('/')
+
+    await expect(page.locator('.listings-grid h2')).toHaveText([
+      'Boxing basics',
+      'Learn latte art with me',
+    ])
+  })
+
   test('filters by category', async ({ page }) => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART, BOXING] })
     await page.goto('/')
@@ -55,12 +73,12 @@ test.describe('browsing listings', () => {
     await expect(page.getByRole('heading', { name: 'Learn latte art with me' })).toBeHidden()
   })
 
-  test('filters by area', async ({ page }) => {
+  test('filters by region', async ({ page }) => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART, BOXING] })
     await page.goto('/')
     await expect(page.getByRole('heading', { name: 'Boxing basics' })).toBeVisible()
 
-    await page.getByLabel('Filter by area').selectOption('Bedok')
+    await page.getByLabel('Filter by region').selectOption('East')
 
     await expect(page.getByRole('heading', { name: 'Boxing basics' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Learn latte art with me' })).toBeHidden()
@@ -72,7 +90,7 @@ test.describe('browsing listings', () => {
     await expect(page.getByRole('heading', { name: 'Boxing basics' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Food', exact: true }).click()
-    await page.getByLabel('Filter by area').selectOption('Bedok')
+    await page.getByLabel('Filter by region').selectOption('East')
 
     await expect(page.getByText('No listings match your filters.')).toBeVisible()
   })

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import ReviewCard from './ReviewCard'
 import { makeReview } from '../test/fixtures'
@@ -49,6 +50,30 @@ describe('ReviewCard', () => {
   it('omits the comment paragraph for a rating-only review', () => {
     const { container } = renderReview({ comment: null })
     expect(container.querySelector('.review-card__comment')).not.toBeInTheDocument()
+  })
+
+  it('keeps Report review inside a ⋮ menu', async () => {
+    const user = userEvent.setup()
+    renderReview({ id: 'review-9', listing_title: 'Latte art' })
+
+    expect(screen.queryByRole('link', { name: /Report/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Report review' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    const report = screen.getByRole('menuitem', { name: 'Report review' })
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: review on Latte art')
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain('review-9')
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain("Tell us what's wrong:")
+  })
+
+  it('hides the report menu on your own review', () => {
+    render(
+      <ReviewCard
+        review={makeReview({ id: 'review-9', reviewer_id: 'user-1' })}
+        viewerId="user-1"
+      />
+    )
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
   })
 
   it('renders the date in Singapore time', () => {

@@ -12,10 +12,10 @@ describe('publicName', () => {
     expect(publicName({ display_name: '  Arun  ', full_name: 'Arun Kumar' })).toBe('Arun')
   })
 
-  it('falls back to the first word of full_name when display_name is empty', () => {
-    expect(publicName({ display_name: '', full_name: 'Mei Ling Tan' })).toBe('Mei')
-    expect(publicName({ display_name: '   ', full_name: 'Mei Ling Tan' })).toBe('Mei')
-    expect(publicName({ full_name: 'Mei Ling Tan' })).toBe('Mei')
+  it('does not fall back to full_name', () => {
+    expect(publicName({ display_name: '', full_name: 'Mei Ling Tan' })).toBe('')
+    expect(publicName({ display_name: '   ', full_name: 'Mei Ling Tan' })).toBe('')
+    expect(publicName({ full_name: 'Mei Ling Tan' })).toBe('')
   })
 
   it('returns an empty string when there is no name', () => {

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { supabase } from './lib/supabase'
@@ -58,6 +59,48 @@ describe('App routes', () => {
         name: "Singapore's not boring. You just haven't found your thing yet.",
       })
     ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+  })
+
+  it('puts a back control on inner pages, not in the top nav', async () => {
+    renderAt('/login')
+
+    const back = await screen.findByRole('button', { name: 'Back' })
+    expect(back.closest('.page-back')).toBeInTheDocument()
+    expect(screen.getByRole('banner').contains(back)).toBe(false)
+  })
+
+  it('goes Home from back when there is no in-app previous page', async () => {
+    const user = userEvent.setup()
+    renderAt('/login')
+
+    await user.click(await screen.findByRole('button', { name: 'Back' }))
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: "Singapore's not boring. You just haven't found your thing yet.",
+      })
+    ).toBeInTheDocument()
+  })
+
+  it('uses in-app history for back after navigating inside the app', async () => {
+    const user = userEvent.setup()
+    renderAt('/')
+    await screen.findByRole('heading', {
+      level: 1,
+      name: "Singapore's not boring. You just haven't found your thing yet.",
+    })
+
+    await user.click(screen.getByRole('link', { name: 'Refund Policy' }))
+    expect(await screen.findByRole('heading', { name: 'Refund Policy' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: "Singapore's not boring. You just haven't found your thing yet.",
+      })
+    ).toBeInTheDocument()
   })
 
   it('serves the login page', async () => {
@@ -84,6 +127,8 @@ describe('App routes', () => {
     ['/refund-policy', 'Refund Policy'],
     ['/cancellation-policy', 'Cancellation Policy'],
     ['/dispute-policy', 'Dispute Policy'],
+    ['/terms', 'Terms of Service'],
+    ['/privacy', 'Privacy Policy'],
     ['/style-guide', 'Component preview'],
   ])('serves %s', async (path, heading) => {
     renderAt(path)
@@ -95,9 +140,9 @@ describe('App routes', () => {
     supabase.__on('users', 'select', {
       data: {
         id: 'host-1',
-        full_name: 'Mei Ling',
+        display_name: 'Mei',
         avatar_url: null,
-        verification_status: 'approved',
+        is_id_verified: true,
       },
       error: null,
     })
@@ -133,6 +178,13 @@ describe('App routes', () => {
 
   it('sends a signed-out visitor from bookings to login', async () => {
     renderAt('/bookings')
+
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/login')
+  })
+
+  it('sends a signed-out visitor from a booking detail to login', async () => {
+    renderAt('/bookings/booking-1')
 
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/login')

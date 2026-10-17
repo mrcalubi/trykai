@@ -1,44 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { CancellationPolicyInfo } from '../components/CancellationPolicy'
+import PlanningAreaSelect from '../components/PlanningAreaSelect'
+import { foundingHostFromRpc } from '../lib/foundingHost'
+import { hostListingPriceHint, parsePriceInputCents } from '../lib/pricing'
 
 const MAX_PHOTOS = 5
 
 const CATEGORIES = ['Food', 'Fitness', 'Arts', 'Music', 'Language', 'Other']
-
-const SINGAPORE_AREAS = [
-  'Ang Mo Kio',
-  'Bedok',
-  'Bishan',
-  'Bukit Batok',
-  'Bukit Merah',
-  'Bukit Panjang',
-  'Bukit Timah',
-  'Changi',
-  'Choa Chu Kang',
-  'Clementi',
-  'Downtown Core',
-  'Geylang',
-  'Hougang',
-  'Jurong East',
-  'Jurong West',
-  'Katong',
-  'Marine Parade',
-  'Novena',
-  'Orchard',
-  'Pasir Ris',
-  'Punggol',
-  'Queenstown',
-  'Sembawang',
-  'Sengkang',
-  'Serangoon',
-  'Tampines',
-  'Toa Payoh',
-  'Woodlands',
-  'Yishun',
-]
 
 const WHATS_PROVIDED_OPTIONS = ['Materials', 'Equipment', 'Food & drinks', 'None']
 
@@ -53,13 +24,18 @@ export default function CreateListing() {
   const [category, setCategory] = useState('')
   const [price, setPrice] = useState('')
   const [maxGuests, setMaxGuests] = useState('')
+  const [durationMins, setDurationMins] = useState('')
   const [area, setArea] = useState('')
   const [fullAddress, setFullAddress] = useState('')
   const [whatsProvided, setWhatsProvided] = useState([])
   const [photos, setPhotos] = useState([])
   const photosRef = useRef(photos)
+  const [groupPricing, setGroupPricing] = useState(true)
+  const [acceptedHostTerms, setAcceptedHostTerms] = useState(false)
+  const [isFoundingHost, setIsFoundingHost] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const priceHint = hostListingPriceHint(parsePriceInputCents(price), isFoundingHost)
 
   useEffect(() => {
     photosRef.current = photos
@@ -67,24 +43,29 @@ export default function CreateListing() {
 
   useEffect(() => {
     async function checkVerification() {
-      const { data } = await supabase
-        .from('users')
-        .select('verification_status')
-        .eq('id', userId)
-        .single()
-
-      const status = data?.verification_status || 'unverified'
+      // Gate on `my_verification()`. Founding-host status is a separate
+      // caller-scoped RPC — `users.is_founding_host` has no client SELECT grant.
+      const { data } = await supabase.rpc('my_verification')
+      const row = Array.isArray(data) ? data[0] : data
+      const status = row?.verification_status || 'unverified'
       setVerificationStatus(status)
       setVerificationChecked(true)
 
-      if (status === 'unverified' || status === 'rejected') {
+      if (status !== 'approved') {
         navigate('/verify-identity', {
-          state: {
-            message: 'You need to verify your identity before you can host on TryKai.',
-          },
+          state:
+            status === 'pending'
+              ? undefined
+              : {
+                  message: 'You need to verify your identity before you can host on TryKai.',
+                },
           replace: true,
         })
+        return
       }
+
+      const founding = await supabase.rpc('my_is_founding_host')
+      setIsFoundingHost(foundingHostFromRpc(founding.data, founding.error))
     }
 
     checkVerification()
@@ -165,6 +146,7 @@ export default function CreateListing() {
 
     const priceCents = Math.round(parseFloat(price) * 100)
     const guests = parseInt(maxGuests, 10)
+    const duration = parseInt(durationMins, 10)
 
     if (!title.trim() || !description.trim() || !category || !area || !fullAddress.trim()) {
       setError('Please fill in all required fields.')
@@ -178,6 +160,16 @@ export default function CreateListing() {
 
     if (Number.isNaN(guests) || guests < 1) {
       setError('Max guests must be at least 1.')
+      return
+    }
+
+    if (Number.isNaN(duration) || duration < 1) {
+      setError('Duration must be at least 1 minute.')
+      return
+    }
+
+    if (!acceptedHostTerms) {
+      setError('Please agree to the Host terms.')
       return
     }
 
@@ -199,19 +191,28 @@ export default function CreateListing() {
       return
     }
 
-    const { error: listingError } = await supabase.from('listings').insert({
+    const listingPayload = {
       host_id: userId,
       title: title.trim(),
       description: description.trim(),
       category,
       price_per_person: priceCents,
       max_guests: guests,
+      duration_mins: duration,
+      group_pricing: groupPricing,
       area,
       full_address: fullAddress.trim(),
       whats_provided: provided,
       photo_urls: photoUrls,
       is_active: true,
-    })
+    }
+    let { error: listingError } = await supabase.from('listings').insert(listingPayload)
+    if (listingError && /duration_mins|group_pricing/.test(listingError.message ?? '')) {
+      const retry = { ...listingPayload }
+      if (/duration_mins/.test(listingError.message ?? '')) delete retry.duration_mins
+      if (/group_pricing/.test(listingError.message ?? '')) delete retry.group_pricing
+      ;({ error: listingError } = await supabase.from('listings').insert(retry))
+    }
 
     if (listingError) {
       setLoading(false)
@@ -231,25 +232,11 @@ export default function CreateListing() {
       return
     }
 
-    navigate('/dashboard', { replace: true })
+    navigate('/hosting', { replace: true })
   }
 
   if (!verificationChecked) {
     return <p className="status-message">Loading…</p>
-  }
-
-  if (verificationStatus === 'pending') {
-    return (
-      <div className="page page--form">
-        <div className="form-card">
-          <h1 className="form-card__title">Verification under review</h1>
-          <p className="form-card__subtitle">
-            Your identity verification is being reviewed. You&apos;ll be able to create
-            listings once you&apos;re approved — usually within 1–2 business days.
-          </p>
-        </div>
-      </div>
-    )
   }
 
   if (verificationStatus !== 'approved') {
@@ -307,19 +294,22 @@ export default function CreateListing() {
           </label>
 
           <div className="form__row">
-            <label className="label">
-              Price per person (SGD)
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="20"
-                min="1"
-                step="0.01"
-                required
-                className="input"
-              />
-            </label>
+            <div>
+              <label className="label">
+                Price per person (SGD)
+                <input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="20"
+                  min="1"
+                  step="0.01"
+                  required
+                  className="input"
+                />
+              </label>
+              {priceHint ? <span className="hint">{priceHint}</span> : null}
+            </div>
 
             <label className="label">
               Max guests
@@ -336,20 +326,35 @@ export default function CreateListing() {
           </div>
 
           <label className="label">
-            Area
-            <select
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
+            Duration (mins)
+            <input
+              type="number"
+              value={durationMins}
+              onChange={(e) => setDurationMins(e.target.value)}
+              placeholder="60"
+              min="1"
               required
               className="input"
-            >
-              <option value="">Select an area</option>
-              {SINGAPORE_AREAS.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
+            />
+          </label>
+          <span className="hint">How long every session of this listing lasts.</span>
+
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={groupPricing}
+              onChange={(e) => setGroupPricing(e.target.checked)}
+            />
+            Offer group pricing
+          </label>
+          <span className="hint">
+            5% off for 2 guests, up to 20% for 5 or more. Applies to the lesson
+            price per person.
+          </span>
+
+          <label className="label">
+            Area
+            <PlanningAreaSelect value={area} onChange={setArea} required />
           </label>
 
           <label className="label">
@@ -421,7 +426,19 @@ export default function CreateListing() {
 
           <CancellationPolicyInfo />
 
-          <button type="submit" disabled={loading} className="btn btn--primary">
+          <label className="checkbox-label checkbox-label--agree">
+            <input
+              type="checkbox"
+              checked={acceptedHostTerms}
+              onChange={(e) => setAcceptedHostTerms(e.target.checked)}
+              required
+            />
+            <span>
+              I agree to the <Link to="/terms#part-2-hosting">Host terms</Link>
+            </span>
+          </label>
+
+          <button type="submit" disabled={loading || !acceptedHostTerms} className="btn btn--primary">
             {loading ? (photos.length > 0 ? 'Uploading…' : 'Creating…') : 'Create listing'}
           </button>
         </form>

@@ -65,10 +65,11 @@ export default function Input({
   const describedBy =
     [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined
   const isPassword = type === 'password'
+  const isTextarea = type === 'textarea'
   const isControlled = value !== undefined
   const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue ?? '')
   const [focused, setFocused] = useState(false)
-  const [passwordVisible, setPasswordVisible] = useState(false)
+  const [passwordToggled, setPasswordToggled] = useState(false)
   const currentValue = isControlled ? value : uncontrolledValue
   const floated = floatingLabel && (focused || String(currentValue ?? '').length > 0)
   const fieldClasses = [
@@ -83,52 +84,57 @@ export default function Input({
     'ui-input',
     error ? 'ui-input--error' : '',
     isPassword ? 'ui-input--with-toggle' : '',
+    isTextarea ? 'ui-input--textarea' : '',
     className,
   ]
     .filter(Boolean)
     .join(' ')
   const inputPlaceholder = floatingLabel ? placeholder || ' ' : placeholder
-  const inputType = isPassword && passwordVisible ? 'text' : type
+  const inputType = isPassword && passwordToggled ? 'text' : type
   const labelEl = label ? (
     <label htmlFor={inputId} className="ui-field__label">
       {label}
     </label>
   ) : null
-  const inputEl = (
-    <input
-      id={inputId}
-      type={inputType}
-      className={classes}
-      placeholder={inputPlaceholder}
-      {...(isControlled ? { value } : { defaultValue })}
-      aria-invalid={error ? true : undefined}
-      aria-describedby={describedBy}
-      onChange={(event) => {
-        if (!isControlled) setUncontrolledValue(event.target.value)
-        onChange?.(event)
-      }}
-      onFocus={(event) => {
-        setFocused(true)
-        onFocus?.(event)
-      }}
-      onBlur={(event) => {
-        setFocused(false)
-        onBlur?.(event)
-      }}
-      {...props}
-    />
+  const fieldProps = {
+    id: inputId,
+    className: classes,
+    placeholder: inputPlaceholder,
+    ...(isControlled ? { value } : { defaultValue }),
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby': describedBy,
+    onChange: (event) => {
+      if (!isControlled) setUncontrolledValue(event.target.value)
+      onChange?.(event)
+    },
+    onFocus: (event) => {
+      setFocused(true)
+      onFocus?.(event)
+    },
+    onBlur: (event) => {
+      setFocused(false)
+      onBlur?.(event)
+    },
+    ...props,
+  }
+  const inputEl = isTextarea ? (
+    <textarea rows={4} {...fieldProps} />
+  ) : (
+    <input type={inputType} {...fieldProps} />
   )
   const passwordToggle = isPassword ? (
-    <button
-      type="button"
-      className="ui-field__toggle"
-      aria-label={passwordVisible ? 'Hide password' : 'Show password'}
-      aria-pressed={passwordVisible}
-      aria-controls={inputId}
-      onClick={() => setPasswordVisible((visible) => !visible)}
-    >
-      {passwordVisible ? <EyeIcon /> : <EyeOffIcon />}
-    </button>
+    <div className="ui-field__password-actions">
+      <button
+        type="button"
+        className="ui-field__toggle"
+        aria-label={passwordToggled ? 'Hide password' : 'Show password'}
+        aria-pressed={passwordToggled}
+        aria-controls={inputId}
+        onClick={() => setPasswordToggled((visible) => !visible)}
+      >
+        {passwordToggled ? <EyeIcon /> : <EyeOffIcon />}
+      </button>
+    </div>
   ) : null
   const inputWithToggle = isPassword ? (
     <div className="ui-field__input-wrap">

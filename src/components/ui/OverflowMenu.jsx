@@ -1,12 +1,18 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-export default function OverflowMenu({ label = 'More actions', items, className = '' }) {
+export default function OverflowMenu({
+  label = 'More actions',
+  items,
+  className = '',
+  icon = '⋯',
+}) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
   const itemRefs = useRef([])
   const triggerRef = useRef(null)
   const menuId = useId()
+  const hasItems = Boolean(items?.length)
 
   useEffect(() => {
     if (!open) return undefined
@@ -67,6 +73,8 @@ export default function OverflowMenu({ label = 'More actions', items, className 
     select?.()
   }
 
+  if (!hasItems) return null
+
   return (
     <div className={['ui-overflow', className].filter(Boolean).join(' ')} ref={rootRef}>
       <button
@@ -85,7 +93,7 @@ export default function OverflowMenu({ label = 'More actions', items, className 
           }
         }}
       >
-        ⋯
+        {icon}
       </button>
       {open ? (
         <ul
@@ -104,7 +112,19 @@ export default function OverflowMenu({ label = 'More actions', items, className 
 
             return (
               <li key={item.label} role="none">
-                {item.to ? (
+                {item.href ? (
+                  <a
+                    ref={(node) => {
+                      itemRefs.current[index] = node
+                    }}
+                    role="menuitem"
+                    className={classes}
+                    href={item.href}
+                    onClick={() => closeAnd(item.onSelect)}
+                  >
+                    {item.label}
+                  </a>
+                ) : item.to ? (
                   <Link
                     ref={(node) => {
                       itemRefs.current[index] = node

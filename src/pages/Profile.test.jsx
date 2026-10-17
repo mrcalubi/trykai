@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Profile from './Profile'
 import { supabase } from '../lib/supabase'
@@ -12,14 +14,17 @@ vi.mock('../lib/supabase')
 const HOST_ID = 'host-1'
 const OTHER_ID = 'user-99'
 
+let lastProfile = null
+
 function givenProfile(profile = {
   id: HOST_ID,
   display_name: 'Mei',
-  full_name: 'Mei Ling Tan',
+  bio: null,
   avatar_url: null,
-  verification_status: 'approved',
+  is_id_verified: true,
   is_host: true,
 }) {
+  lastProfile = profile
   supabase.__on('users', 'select', { data: profile, error: null })
 }
 
@@ -27,10 +32,26 @@ function givenListings(listings) {
   supabase.__on('listings', 'select', { data: listings, error: null })
 }
 
-function givenRpcs({ hostReviews = [], listingRatings = [] } = {}) {
+function givenRpcs({ hostReviews = [], listingRatings = [], account } = {}) {
+  const fallbackAccount = lastProfile
+    ? {
+        display_name: lastProfile.display_name,
+        bio: lastProfile.bio,
+        avatar_url: lastProfile.avatar_url,
+        is_host: lastProfile.is_host,
+        verification_status:
+          lastProfile.verification_status ??
+          (lastProfile.is_id_verified ? 'approved' : 'unverified'),
+        stripe_payouts_enabled: lastProfile.stripe_payouts_enabled ?? true,
+      }
+    : null
   supabase.rpc.mockImplementation(async (name) => {
     if (name === 'reviews_for_host') return { data: hostReviews, error: null }
     if (name === 'listing_ratings') return { data: listingRatings, error: null }
+    if (name === 'my_account') {
+      const row = account === undefined ? fallbackAccount : account
+      return { data: row ? [row] : [], error: null }
+    }
     return { data: null, error: null }
   })
 }
@@ -70,29 +91,138 @@ describe('Profile loading and failure', () => {
     supabase.__on('users', 'select', { data: null, error: { message: 'not found' } })
     renderPage()
 
-    expect(await screen.findByText('not found')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Something went wrong loading this page. Please refresh.')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('not found')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to listings' })).toHaveAttribute('href', '/')
+  })
+
+  it('loads the profile when is_id_verified is not in the database yet', async () => {
+    supabase.__on('users', 'select', (call) => {
+      const columns = call.chain.find((step) => step.method === 'select')?.args[0] ?? ''
+      if (String(columns).includes('is_id_verified')) {
+        return {
+          data: null,
+          error: { code: '42703', message: 'column users.is_id_verified does not exist' },
+        }
+      }
+      return {
+        data: {
+          id: HOST_ID,
+          display_name: 'Mei',
+          bio: null,
+          avatar_url: null,
+          is_host: true,
+        },
+        error: null,
+      }
+    })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Mei', level: 1 })).toBeInTheDocument()
+    expect(
+      screen.queryByText('Something went wrong loading this page. Please refresh.')
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('ID verified')).not.toBeInTheDocument()
+    const selects = supabase.__calls('users', 'select').map((call) => call.chain[0].args[0])
+    expect(selects).toEqual([
+      'id, display_name, bio, avatar_url, is_host, is_id_verified',
+      'id, display_name, bio, avatar_url, is_host',
+    ])
+  })
+
+  it('retries without the badge column when the grant is missing', async () => {
+    supabase.__on('users', 'select', (call) => {
+      const columns = call.chain.find((step) => step.method === 'select')?.args[0] ?? ''
+      if (String(columns).includes('is_id_verified')) {
+        return {
+          data: null,
+          error: { code: '42501', message: 'permission denied for table users' },
+        }
+      }
+      return {
+        data: {
+          id: HOST_ID,
+          display_name: 'Mei',
+          bio: 'I pull rosettas.',
+          avatar_url: null,
+          is_host: true,
+        },
+        error: null,
+      }
+    })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'About' })).toBeInTheDocument()
+    expect(screen.getByText('I pull rosettas.')).toBeInTheDocument()
+    expect(
+      screen.queryByText('Something went wrong loading this page. Please refresh.')
+    ).not.toBeInTheDocument()
+  })
+
+  it('keeps the ID verified badge from my_account when the public column is missing', async () => {
+    givenSignedIn(HOST_ID)
+    supabase.__on('users', 'select', (call) => {
+      const columns = call.chain.find((step) => step.method === 'select')?.args[0] ?? ''
+      if (String(columns).includes('is_id_verified')) {
+        return {
+          data: null,
+          error: { message: "Could not find the 'is_id_verified' column of 'users' in the schema cache" },
+        }
+      }
+      return {
+        data: {
+          id: HOST_ID,
+          display_name: 'Mei',
+          bio: null,
+          avatar_url: null,
+          is_host: false,
+        },
+        error: null,
+      }
+    })
+    givenRpcs({
+      account: {
+        display_name: 'Mei',
+        bio: null,
+        avatar_url: null,
+        is_host: false,
+        verification_status: 'approved',
+        stripe_payouts_enabled: false,
+      },
+    })
+    renderPage()
+
+    expect(await screen.findByText('ID verified')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Profile' })).toBeInTheDocument()
   })
 })
 
 describe('Profile public content', () => {
   it('shows the display name, even when signed out', async () => {
-    renderPage()
+    const { user } = renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Mei', level: 1 })).toBeInTheDocument()
     expect(screen.queryByText('Mei Ling Tan')).not.toBeInTheDocument()
     expect(supabase.auth.getSession).toHaveBeenCalled()
     expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
+    const more = screen.getByRole('button', { name: 'More actions' })
+    expect(more.closest('.profile-header__name-row')).toBeInTheDocument()
+    await user.click(more)
+    const report = screen.getByRole('menuitem', { name: 'Report profile' })
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: profile Mei')
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain(HOST_ID)
   })
 
   it('does not split a multi-word display name', async () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Latte Queen',
-      full_name: 'Mei Ling Tan',
       avatar_url: null,
-      verification_status: 'approved',
+      is_id_verified: true,
       is_host: true,
     })
     renderPage()
@@ -101,18 +231,17 @@ describe('Profile public content', () => {
     expect(screen.queryByText('Mei')).not.toBeInTheDocument()
   })
 
-  it('falls back to the first name when display_name is empty', async () => {
+  it('shows Anonymous when display_name is empty', async () => {
     givenProfile({
       id: HOST_ID,
       display_name: '',
-      full_name: 'Mei Ling Tan',
       avatar_url: null,
-      verification_status: 'approved',
+      is_id_verified: true,
       is_host: true,
     })
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Mei', level: 1 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Anonymous', level: 1 })).toBeInTheDocument()
   })
 
   it('shows the ID verified badge only when the host is approved', async () => {
@@ -124,9 +253,8 @@ describe('Profile public content', () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
-      full_name: 'Mei Ling',
       avatar_url: null,
-      verification_status: 'pending',
+      is_id_verified: false,
       is_host: true,
     })
     renderPage()
@@ -164,7 +292,13 @@ describe('Profile public content', () => {
 
     await screen.findByText('Wonderful host.')
     expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_host', { p_host_id: HOST_ID })
-    expect(supabase.__calls('reviews', 'select')).toHaveLength(0)
+    expect(supabase.__calls('reviews', 'select')).toEqual([
+      expect.objectContaining({
+        filters: expect.arrayContaining([
+          expect.objectContaining({ method: 'in', column: 'id' }),
+        ]),
+      }),
+    ])
     expect(supabase.__calls('bookings', 'select')).toHaveLength(0)
   })
 
@@ -260,7 +394,44 @@ describe('Profile public content', () => {
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
 
     expect(supabase.__lastCall('users', 'select').chain[0].args[0]).toBe(
-      'id, display_name, full_name, avatar_url, verification_status, is_host'
+      'id, display_name, bio, avatar_url, is_host, is_id_verified'
+    )
+  })
+
+  it('shows About when a bio exists, even when signed out', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      bio: 'I pull rosettas.\nAlso pour-overs.',
+      avatar_url: null,
+      is_id_verified: true,
+      is_host: true,
+    })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'About' })).toBeInTheDocument()
+    expect(document.querySelector('.profile-about__body').textContent).toBe(
+      'I pull rosettas.\nAlso pour-overs.',
+    )
+    expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
+  })
+
+  it('hides About for other people when there is no bio', async () => {
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(screen.queryByRole('heading', { name: 'About' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
+  })
+
+  it('keeps typed line breaks and wraps long words in About', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    expect(css).toMatch(
+      /\.profile-about__body,\s*\n\.detail-host__bio \{\s*\n\s*overflow-wrap:\s*break-word/
+    )
+    expect(css).toMatch(
+      /\.detail-description,\s*\n\.profile-about__body,\s*\n\.detail-host__bio \{[\s\S]*?white-space:\s*pre-wrap/
     )
   })
 })
@@ -274,6 +445,7 @@ describe('Profile own tabs', () => {
     renderPage()
 
     expect(await screen.findByRole('navigation', { name: 'Profile' })).toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('my_account')
     expect(screen.getByRole('link', { name: 'Bookings' })).toHaveAttribute(
       'aria-current',
       'page'
@@ -282,8 +454,14 @@ describe('Profile own tabs', () => {
     expect(screen.getByRole('link', { name: 'Listings' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Reviews' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(screen.getByRole('link', { name: 'Add a short bio' })).toHaveAttribute(
+      'href',
+      '/settings'
+    )
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
   })
 
   it('scrolls the tab bar horizontally without showing a scrollbar in any browser', () => {
@@ -324,6 +502,30 @@ describe('Profile own tabs', () => {
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
   })
 
+  it('replaces the current history entry when switching tabs', async () => {
+    givenSignedIn()
+    const router = createMemoryRouter(
+      [
+        { path: '/', element: <p>Home page</p> },
+        { path: '/u/:id', element: <Profile /> },
+      ],
+      { initialEntries: ['/', `/u/${HOST_ID}?tab=bookings`], initialIndex: 1 }
+    )
+    const user = userEvent.setup({ delay: null })
+    render(<RouterProvider router={router} />)
+
+    await screen.findByRole('link', { name: 'Listings' })
+    await user.click(screen.getByRole('link', { name: 'Listings' }))
+
+    expect(router.state.location.pathname).toBe(`/u/${HOST_ID}`)
+    expect(router.state.location.search).toBe('?tab=listings')
+    expect(screen.getByRole('link', { name: 'Listings' })).toHaveAttribute('aria-current', 'page')
+
+    await router.navigate(-1)
+    expect(router.state.location.pathname).toBe('/')
+    expect(router.state.location.search).toBe('')
+  })
+
   it('keeps other query keys when switching tabs', async () => {
     renderPage({ search: '?booking=booking-1&tab=bookings' })
 
@@ -344,20 +546,20 @@ describe('Profile own tabs', () => {
     )
   })
 
-  it('hides Hosting and prompts Become a host on a non-host own Listings tab', async () => {
+  it('hides Hosting and prompts Host a session on a verified non-host Listings tab', async () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
-      full_name: 'Mei Ling Tan',
       avatar_url: null,
-      verification_status: 'approved',
+      is_id_verified: true,
       is_host: false,
     })
+    givenHostReviews([])
     const { user } = renderPage({ search: '?tab=listings' })
 
     await screen.findByRole('navigation', { name: 'Profile' })
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Host a session' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
@@ -371,15 +573,31 @@ describe('Profile own tabs', () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
-      full_name: 'Mei Ling Tan',
       avatar_url: null,
-      verification_status: 'approved',
+      is_id_verified: true,
       is_host: false,
     })
+    givenHostReviews([])
     renderPage({ search: '?tab=hosting' })
 
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'My Listings' })).not.toBeInTheDocument()
+  })
+
+  it('shows your own About when a bio is saved', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      bio: 'I pull rosettas.',
+      avatar_url: null,
+      is_id_verified: true,
+      is_host: true,
+    })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'About' })).toBeInTheDocument()
+    expect(screen.getByText('I pull rosettas.')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
   })
 })
 

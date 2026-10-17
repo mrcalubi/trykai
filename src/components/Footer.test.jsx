@@ -8,13 +8,19 @@ describe('Footer', () => {
     ['Refund Policy', '/refund-policy'],
     ['Cancellation Policy', '/cancellation-policy'],
     ['Dispute Policy', '/dispute-policy'],
+    ['Terms', '/terms'],
+    ['Privacy', '/privacy'],
   ])('links to the %s page', (name, href) => {
     renderWithRouter(<Footer />)
     expect(screen.getByRole('link', { name })).toHaveAttribute('href', href)
   })
 
-  it('exposes the policy links every listing page is required to carry', () => {
+  it('shows the UEN and DPO contact', () => {
     renderWithRouter(<Footer />)
-    expect(screen.getAllByRole('link')).toHaveLength(3)
+    expect(screen.getByText('UEN 53526159D')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'privacy@trykai.sg' })).toHaveAttribute(
+      'href',
+      'mailto:privacy@trykai.sg'
+    )
   })
 })

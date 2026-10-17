@@ -1,26 +1,35 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useLocation, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import StarPicker from '../components/StarPicker'
 import Button from '../components/ui/Button'
-import { guestRefundDescription } from '../lib/cancellationPolicy'
-import { canLeaveGuestReview } from '../lib/reviewGate'
+import {
+  awaitingPaidBookingId,
+  guestBookingActions,
+  guestCancellationNote,
+  showGuestBooking,
+} from '../lib/guestBookings'
+import {
+  bookingStatusMessage,
+  paymentStatusFromIntent,
+  paymentWasDeclined,
+} from '../lib/paymentReturn'
+import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
+import { formatSessionDateTime } from '../lib/sessionDate'
 
-function formatSessionDateTime(iso) {
-  const date = new Intl.DateTimeFormat('en-SG', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'Asia/Singapore',
-  }).format(new Date(iso))
-  const time = new Intl.DateTimeFormat('en-SG', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'Asia/Singapore',
-  }).format(new Date(iso))
-  return `${date} at ${time}`
+const POLL_ATTEMPTS = 20
+const POLL_INTERVAL_MS = 2000
+
+let stripePromise
+function getStripe() {
+  const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+  if (!key) return Promise.resolve(null)
+  if (!stripePromise) {
+    stripePromise = import('@stripe/stripe-js').then(({ loadStripe }) => loadStripe(key))
+  }
+  return stripePromise
 }
 
 export default function Bookings({ embedded = false }) {
@@ -33,7 +42,13 @@ export default function Bookings({ embedded = false }) {
   const [error, setError] = useState('')
 
   const pendingBookingId = searchParams.get('booking')
-  const [bookingStatusMessage, setBookingStatusMessage] = useState('')
+  const redirectStatus = searchParams.get('redirect_status')
+  const clientPaymentStatus = searchParams.get('payment')
+  const stripeClientSecret = searchParams.get('payment_intent_client_secret')
+  const [bookingNotice, setBookingNotice] = useState(null)
+  // The bookings list can still say pending after the guest cancels checkout.
+  // Once we know the real outcome, keep showing it even if a slower read lands.
+  const [settledBooking, setSettledBooking] = useState(null)
 
   const [reviewedBookingIds, setReviewedBookingIds] = useState(new Set())
   const [activeReviewBookingId, setActiveReviewBookingId] = useState(null)
@@ -49,7 +64,8 @@ export default function Bookings({ embedded = false }) {
 
   const loadData = useCallback(async () => {
     const [bookingsResult, reviewsResult] = await Promise.all([
-      supabase
+      withIssuedAtRetry(() =>
+        supabase
         .from('bookings')
         .select(
           `
@@ -59,6 +75,9 @@ export default function Bookings({ embedded = false }) {
           guests_count,
           total_amount,
           platform_fee,
+          stripe_charge_id,
+          stripe_refund_id,
+          refund_amount,
           sessions (
             starts_at,
             duration_mins,
@@ -66,13 +85,15 @@ export default function Bookings({ embedded = false }) {
             listings (
               id,
               title,
-              host_id
+              host_id,
+              duration_mins
             )
           )
         `
         )
         .eq('guest_id', userId)
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+      ),
       supabase
         .from('reviews')
         .select('booking_id')
@@ -81,7 +102,7 @@ export default function Bookings({ embedded = false }) {
     ])
 
     if (bookingsResult.error) {
-      setError(bookingsResult.error.message)
+      setError(PAGE_LOAD_ERROR)
     } else {
       setBookings(bookingsResult.data)
 
@@ -127,13 +148,74 @@ export default function Bookings({ embedded = false }) {
     if (!pendingBookingId) return
 
     let cancelled = false
-    let attempts = 0
-    const maxAttempts = 15
+    let timer
+    let wake
+
+    function wait(ms) {
+      return new Promise((resolve) => {
+        wake = resolve
+        timer = setTimeout(resolve, ms)
+      })
+    }
+
+    function clearPaymentQuery() {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('booking')
+        next.delete('payment')
+        next.delete('payment_intent')
+        next.delete('payment_intent_client_secret')
+        next.delete('redirect_status')
+        return next
+      }, { replace: true })
+    }
+
+    function remember(status) {
+      setSettledBooking((prev) => {
+        if (prev?.id === pendingBookingId && prev.status === status) return prev
+        if (prev?.id === pendingBookingId && prev.status === 'confirmed' && status !== 'confirmed') {
+          return prev
+        }
+        return { id: pendingBookingId, status }
+      })
+    }
 
     async function pollBookingStatus() {
-      setBookingStatusMessage('Processing your booking…')
+      let paymentStatus = clientPaymentStatus
+      if (!paymentStatus && !redirectStatus && stripeClientSecret) {
+        const stripe = await getStripe()
+        if (cancelled) return
+        if (stripe) {
+          try {
+            const { paymentIntent } = await stripe.retrievePaymentIntent(stripeClientSecret)
+            paymentStatus = paymentStatusFromIntent(paymentIntent?.status)
+          } catch {
+            paymentStatus = null
+          }
+        }
+      }
 
-      while (!cancelled && attempts < maxAttempts) {
+      if (cancelled) return
+
+      const signals = { redirectStatus, paymentStatus }
+      if (paymentWasDeclined(signals)) {
+        remember('cancelled')
+        void (async () => {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession()
+          if (cancelled) return
+          await supabase.functions.invoke('abandon-checkout', {
+            body: { booking_id: pendingBookingId },
+            headers: { Authorization: `Bearer ${session?.access_token}` },
+          })
+        })()
+      }
+
+      setBookingNotice(bookingStatusMessage({ ...signals, timedOut: false }))
+
+      let attempts = 0
+      while (!cancelled && attempts < POLL_ATTEMPTS) {
         const { data, error: fetchError } = await supabase
           .from('bookings')
           .select('status')
@@ -144,76 +226,70 @@ export default function Bookings({ embedded = false }) {
         if (cancelled) return
 
         if (fetchError || !data) {
-          setBookingStatusMessage('Could not verify your booking. Check My Bookings below.')
-          setSearchParams((prev) => {
-            const next = new URLSearchParams(prev)
-            next.delete('booking')
-            return next
-          }, { replace: true })
+          setBookingNotice({
+            tone: 'error',
+            text: 'Could not verify your booking. Check My Bookings below.',
+          })
+          clearPaymentQuery()
           return
         }
 
-        if (data.status === 'confirmed') {
-          setBookingStatusMessage('Booking confirmed! Your payment was successful.')
-          setSearchParams((prev) => {
-            const next = new URLSearchParams(prev)
-            next.delete('booking')
-            return next
-          }, { replace: true })
+        if (data.status === 'confirmed' || data.status === 'cancelled') {
+          remember(data.status)
+          setBookingNotice(bookingStatusMessage({ bookingStatus: data.status, ...signals }))
           await loadData()
-          return
-        }
-
-        if (data.status === 'cancelled') {
-          setBookingStatusMessage('This booking was not completed. You can try booking again.')
-          setSearchParams((prev) => {
-            const next = new URLSearchParams(prev)
-            next.delete('booking')
-            return next
-          }, { replace: true })
+          if (!cancelled) clearPaymentQuery()
           return
         }
 
         attempts += 1
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+        const timedOut = attempts >= POLL_ATTEMPTS
+        setBookingNotice(
+          bookingStatusMessage({ bookingStatus: data.status, ...signals, timedOut })
+        )
+        if (timedOut) break
+        await wait(POLL_INTERVAL_MS)
       }
 
-      if (!cancelled) {
-        setBookingStatusMessage(
-          'Payment received — your booking should appear shortly. Refresh if it does not update.'
-        )
-        setSearchParams((prev) => {
-          const next = new URLSearchParams(prev)
-          next.delete('booking')
-          return next
-        }, { replace: true })
-      }
+      if (!cancelled) clearPaymentQuery()
     }
 
-    void Promise.resolve().then(() => {
-      if (!cancelled) void pollBookingStatus()
-    })
+    void pollBookingStatus()
 
     return () => {
       cancelled = true
+      clearTimeout(timer)
+      wake?.()
     }
-  }, [pendingBookingId, userId, loadData, setSearchParams])
+  }, [
+    pendingBookingId,
+    redirectStatus,
+    clientPaymentStatus,
+    stripeClientSecret,
+    userId,
+    loadData,
+    setSearchParams,
+  ])
 
-  function isUpcoming(startsAt) {
-    return startsAt && new Date(startsAt) > new Date()
+  function presentBooking(booking) {
+    if (booking.status !== 'pending') return booking
+    if (settledBooking?.id === booking.id && settledBooking.status !== 'pending') {
+      return { ...booking, status: settledBooking.status }
+    }
+    if (redirectStatus === 'failed' && booking.id === pendingBookingId) {
+      return { ...booking, status: 'cancelled' }
+    }
+    return booking
   }
 
-  function canCancelBooking(booking) {
-    return (
-      isUpcoming(booking.sessions?.starts_at) &&
-      (booking.status === 'pending' || booking.status === 'confirmed')
-    )
+  function actionsFor(booking) {
+    return guestBookingActions(booking, {
+      alreadyReviewed: reviewedBookingIds.has(booking.id),
+    })
   }
 
   function canLeaveReview(booking) {
-    return canLeaveGuestReview(booking, {
-      alreadyReviewed: reviewedBookingIds.has(booking.id),
-    })
+    return actionsFor(booking).review
   }
 
   function openReviewForm(bookingId) {
@@ -303,6 +379,15 @@ export default function Bookings({ embedded = false }) {
     return <p className="status-message">Loading…</p>
   }
 
+  const awaitingBookingId = awaitingPaidBookingId({
+    bookingId: pendingBookingId,
+    redirectStatus,
+    paymentStatus: clientPaymentStatus,
+  })
+  const visibleBookings = bookings
+    .map((booking) => presentBooking(booking))
+    .filter((booking) => showGuestBooking(booking, { awaitingBookingId }))
+
   return (
     <div className="page page--narrow">
       {embedded ? null : <h1 className="dashboard-heading">Dashboard</h1>}
@@ -311,8 +396,10 @@ export default function Bookings({ embedded = false }) {
         <p className="success-message">{location.state.message}</p>
       )}
 
-      {bookingStatusMessage && (
-        <p className="success-message">{bookingStatusMessage}</p>
+      {bookingNotice && (
+        <p className={bookingNotice.tone === 'error' ? 'status-banner--error' : 'success-message'}>
+          {bookingNotice.text}
+        </p>
       )}
 
       {error && <p className="error-message" style={{ marginBottom: '20px' }}>{error}</p>}
@@ -321,19 +408,27 @@ export default function Bookings({ embedded = false }) {
       <section className="dashboard-section">
         <h2 className="dashboard-section__title">My Bookings</h2>
 
-        {bookings.length === 0 ? (
+        {visibleBookings.length === 0 ? (
           <p className="empty-state">No bookings yet.</p>
         ) : (
           <div className="dashboard-list">
-            {bookings.map((booking) => (
+            {visibleBookings.map((booking) => {
+              const actions = actionsFor(booking)
+              return (
               <div key={booking.id} className="dashboard-card">
                 <p className="dashboard-card__title">
-                  {booking.sessions?.listings?.title || 'Unknown listing'}
+                  <Link to={`/bookings/${booking.id}`}>
+                    {booking.sessions?.listings?.title || 'Unknown listing'}
+                  </Link>
                 </p>
                 <p className="dashboard-card__meta">
                   {booking.sessions?.starts_at
                     ? formatSessionDateTime(booking.sessions.starts_at)
                     : 'Date TBC'}
+                  {' · '}
+                  {booking.guests_count === 1
+                    ? '1 guest'
+                    : `${booking.guests_count} guests`}
                   {bookingAddresses[booking.id] && (
                     <>
                       {' · '}
@@ -345,7 +440,7 @@ export default function Bookings({ embedded = false }) {
                   <span className={`badge badge--${booking.status}`}>
                     {booking.status}
                   </span>
-                  {canLeaveReview(booking) && activeReviewBookingId !== booking.id && (
+                  {actions.review && activeReviewBookingId !== booking.id && (
                     <Button
                       type="button"
                       variant="secondary"
@@ -354,7 +449,7 @@ export default function Bookings({ embedded = false }) {
                       Leave a review
                     </Button>
                   )}
-                  {canCancelBooking(booking) && confirmCancelBookingId !== booking.id && (
+                  {actions.cancel && confirmCancelBookingId !== booking.id && (
                     <button
                       type="button"
                       onClick={() => {
@@ -375,11 +470,7 @@ export default function Bookings({ embedded = false }) {
                 {confirmCancelBookingId === booking.id && (
                   <div className="cancel-confirm">
                     <p className="cancel-confirm__note">
-                      {guestRefundDescription(
-                        booking.total_amount,
-                        booking.sessions.starts_at,
-                        booking.platform_fee
-                      )}
+                      {guestCancellationNote(booking)}
                     </p>
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <button
@@ -444,7 +535,8 @@ export default function Bookings({ embedded = false }) {
                   </form>
                 )}
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>

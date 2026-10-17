@@ -3,30 +3,35 @@ import { stubAllExternalCalls } from './support/network'
 import { LATTE_ART, SIGNED_IN_USER, makeAuthSession } from './support/fixtures'
 
 const POLICY_PAGES = [
-  ['Refund Policy', '/refund-policy'],
-  ['Cancellation Policy', '/cancellation-policy'],
-  ['Dispute Policy', '/dispute-policy'],
+  ['Refund Policy', '/refund-policy', 'Refund Policy'],
+  ['Cancellation Policy', '/cancellation-policy', 'Cancellation Policy'],
+  ['Dispute Policy', '/dispute-policy', 'Dispute Policy'],
+  ['Terms', '/terms', 'Terms of Service'],
+  ['Privacy', '/privacy', 'Privacy Policy'],
 ]
 
 test.describe('policy pages', () => {
-  for (const [name, path] of POLICY_PAGES) {
-    test(`reaches the ${name} from the footer`, async ({ page }) => {
+  for (const [linkName, path, heading] of POLICY_PAGES) {
+    test(`reaches the ${heading} from the footer`, async ({ page }) => {
       await stubAllExternalCalls(page, { listings: [LATTE_ART] })
       await page.goto('/')
 
-      await page.getByRole('contentinfo').getByRole('link', { name }).click()
+      await page
+        .getByRole('contentinfo')
+        .getByRole('link', { name: linkName, exact: true })
+        .click()
 
       await expect(page).toHaveURL(new RegExp(`${path}$`))
-      await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
     })
 
     // Guests arrive on these pages from emails and search results, so the SPA
     // rewrite has to serve them on a cold load, not only via client routing.
-    test(`serves the ${name} on a direct load`, async ({ page }) => {
+    test(`serves the ${heading} on a direct load`, async ({ page }) => {
       await stubAllExternalCalls(page, {})
       await page.goto(path)
 
-      await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
     })
   }
 
@@ -61,6 +66,7 @@ test.describe('signed-out navigation', () => {
     await expect(page.getByLabel('Email')).toBeVisible()
     await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Show password' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Hold to peek at password' })).toHaveCount(0)
   })
 
   // The published terms have to be reachable from the nav while signed out, not
@@ -73,9 +79,9 @@ test.describe('signed-out navigation', () => {
     await page.getByRole('button', { name: 'Open menu' }).click()
     const menu = page.getByRole('navigation', { name: 'Main menu' })
 
-    await expect(menu.getByRole('link', { name: 'Refund policy' })).toBeVisible()
-    await expect(menu.getByRole('link', { name: 'Dispute policy' })).toBeVisible()
-    await menu.getByRole('link', { name: 'Cancellation policy' }).click()
+    await expect(menu.getByRole('link', { name: 'Refund policy', exact: true })).toBeVisible()
+    await expect(menu.getByRole('link', { name: 'Dispute policy', exact: true })).toBeVisible()
+    await menu.getByRole('link', { name: 'Cancellation policy', exact: true }).click()
 
     await expect(page).toHaveURL(/\/cancellation-policy$/)
     await expect(
@@ -96,6 +102,8 @@ test.describe('signed-out navigation', () => {
     await expect(page.getByLabel('Email')).toBeVisible()
     await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Show password' })).toBeVisible()
+    await expect(page.getByRole('checkbox', { name: /18 or older/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign up' })).toBeDisabled()
   })
 
   test('redirects the dashboard to login', async ({ page }) => {
@@ -143,7 +151,10 @@ test.describe('signed-out navigation', () => {
   test('returns the visitor to where they were headed after logging in', async ({ page }) => {
     await stubAllExternalCalls(
       page,
-      { users: [{ id: SIGNED_IN_USER.id, verification_status: 'approved' }] },
+      {
+        users: [{ id: SIGNED_IN_USER.id, verification_status: 'approved' }],
+        'rpc/my_verification': [{ verification_status: 'approved' }],
+      },
       { session: makeAuthSession() }
     )
     await page.goto('/create-listing')
@@ -157,6 +168,8 @@ test.describe('signed-out navigation', () => {
     // form they asked for, not on the home page.
     await expect(page).toHaveURL(/\/create-listing$/)
     await expect(page.getByLabel('Title')).toBeVisible()
+    await expect(page.getByLabel('Duration (mins)')).toBeVisible()
+    await expect(page.getByText('How long every session of this listing lasts.')).toBeVisible()
   })
 
   test('renders the home page without console errors', async ({ page }) => {
@@ -178,7 +191,28 @@ test.describe('signed-in navigation', () => {
   test('the avatar goes to your own profile, not an account menu', async ({ page }) => {
     await stubAllExternalCalls(
       page,
-      { users: [{ id: SIGNED_IN_USER.id, full_name: 'Mei Ling', avatar_url: null, is_host: false }] },
+      {
+        users: [
+          {
+            id: SIGNED_IN_USER.id,
+            display_name: 'Mei',
+            avatar_url: null,
+            is_host: false,
+            is_id_verified: false,
+          },
+        ],
+        'rpc/my_account': [
+          {
+            email: SIGNED_IN_USER.email,
+            full_name: 'Mei Ling',
+            display_name: 'Mei',
+            avatar_url: null,
+            is_host: false,
+            verification_status: 'unverified',
+            stripe_payouts_enabled: false,
+          },
+        ],
+      },
       { session: makeAuthSession() }
     )
 
@@ -195,10 +229,31 @@ test.describe('signed-in navigation', () => {
     await expect(page.getByRole('menu')).toHaveCount(0)
   })
 
-  test('the hamburger is Browse, Become a host, and admin review only', async ({ page }) => {
+  test('the hamburger adds Profile, Settings, and Log out when signed in', async ({ page }) => {
     await stubAllExternalCalls(
       page,
-      { users: [{ id: SIGNED_IN_USER.id, full_name: 'Mei Ling', avatar_url: null, is_host: false }] },
+      {
+        users: [
+          {
+            id: SIGNED_IN_USER.id,
+            display_name: 'Mei',
+            avatar_url: null,
+            is_host: false,
+            is_id_verified: false,
+          },
+        ],
+        'rpc/my_account': [
+          {
+            email: SIGNED_IN_USER.email,
+            full_name: 'Mei Ling',
+            display_name: 'Mei',
+            avatar_url: null,
+            is_host: false,
+            verification_status: 'unverified',
+            stripe_payouts_enabled: false,
+          },
+        ],
+      },
       { session: makeAuthSession() }
     )
 
@@ -214,13 +269,59 @@ test.describe('signed-in navigation', () => {
     await expect(menu.getByRole('link', { name: 'Browse' })).toBeVisible()
     await expect(menu.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
       'href',
-      '/create-listing'
+      '/verify-identity'
     )
+    await expect(menu.getByRole('link', { name: 'Profile' })).toHaveAttribute(
+      'href',
+      `/u/${SIGNED_IN_USER.id}`
+    )
+    await expect(menu.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    await expect(menu.getByRole('button', { name: 'Log out' })).toBeVisible()
     await expect(menu.getByRole('link', { name: 'My bookings' })).toHaveCount(0)
     await expect(menu.getByRole('link', { name: 'Hosting' })).toHaveCount(0)
-    await expect(menu.getByRole('link', { name: 'Settings' })).toHaveCount(0)
-    await expect(menu.getByRole('link', { name: 'Log out' })).toHaveCount(0)
-    await expect(menu.getByRole('link', { name: 'Profile' })).toHaveCount(0)
+  })
+
+  test('profile tabs replace history so back leaves the profile', async ({ page }) => {
+    await stubAllExternalCalls(
+      page,
+      {
+        users: [
+          {
+            id: SIGNED_IN_USER.id,
+            display_name: 'Mei',
+            avatar_url: null,
+            is_host: false,
+            is_id_verified: false,
+          },
+        ],
+        'rpc/my_account': [
+          {
+            email: SIGNED_IN_USER.email,
+            full_name: 'Mei Ling',
+            display_name: 'Mei',
+            avatar_url: null,
+            is_host: false,
+            verification_status: 'unverified',
+            stripe_payouts_enabled: false,
+          },
+        ],
+      },
+      { session: makeAuthSession() }
+    )
+
+    await page.goto('/login')
+    await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+    await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+    await expect(page).toHaveURL(/\/$/)
+
+    await page.getByRole('link', { name: 'Your profile' }).click()
+    await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}`))
+    await page.getByRole('navigation', { name: 'Profile' }).getByRole('link', { name: 'Listings' }).click()
+    await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}\\?tab=listings`))
+
+    await page.goBack()
+    await expect(page).toHaveURL(/\/$/)
   })
 })
 
@@ -229,7 +330,26 @@ test.describe('verification review', () => {
     await stubAllExternalCalls(
       page,
       {
-        users: [{ id: SIGNED_IN_USER.id, full_name: 'Caleb', avatar_url: null }],
+        users: [
+          {
+            id: SIGNED_IN_USER.id,
+            display_name: 'Caleb',
+            avatar_url: null,
+            is_host: false,
+            is_id_verified: false,
+          },
+        ],
+        'rpc/my_account': [
+          {
+            email: SIGNED_IN_USER.email,
+            full_name: 'Caleb',
+            display_name: 'Caleb',
+            avatar_url: null,
+            is_host: false,
+            verification_status: 'unverified',
+            stripe_payouts_enabled: false,
+          },
+        ],
         'rpc/my_verification': [{ is_admin: true }],
       },
       {

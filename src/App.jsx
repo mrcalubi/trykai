@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import SiteNav from './components/SiteNav'
+import BackButton, { BackSlotProvider } from './components/BackButton'
 import Footer from './components/Footer'
 import RequireAuth from './components/RequireAuth'
 import RequireAdmin from './components/RequireAdmin'
@@ -14,18 +15,23 @@ import EditListing from './pages/EditListing'
 import VerifyIdentity from './pages/VerifyIdentity'
 import Dashboard from './pages/Dashboard'
 import RedirectToOwnProfile from './pages/RedirectToOwnProfile'
+import BookingDetail from './pages/BookingDetail'
 import Settings from './pages/Settings'
 import AdminVerifications from './pages/AdminVerifications'
 import RefundPolicy from './pages/RefundPolicy'
 import CancellationPolicy from './pages/CancellationPolicy'
 import DisputePolicy from './pages/DisputePolicy'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
 import StyleGuide from './pages/StyleGuide'
 
 export default function App() {
   return (
     <BrowserRouter>
       <SiteNav />
-      <Routes>
+      <BackSlotProvider>
+        <BackButton />
+        <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -53,6 +59,14 @@ export default function App() {
           element={
             <RequireAuth>
               <EditListing />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/bookings/:bookingId"
+          element={
+            <RequireAuth>
+              <BookingDetail />
             </RequireAuth>
           }
         />
@@ -101,8 +115,11 @@ export default function App() {
         <Route path="/refund-policy" element={<RefundPolicy />} />
         <Route path="/cancellation-policy" element={<CancellationPolicy />} />
         <Route path="/dispute-policy" element={<DisputePolicy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/style-guide" element={<StyleGuide />} />
-      </Routes>
+        </Routes>
+      </BackSlotProvider>
       <Footer />
     </BrowserRouter>
   )

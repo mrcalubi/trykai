@@ -17,6 +17,15 @@ function givenSignedIn(userId = HOST_ID) {
   })
 }
 
+function givenFoundingHost(value, error = null) {
+  supabase.rpc.mockImplementation(async (fn) => {
+    if (fn === 'my_is_founding_host') {
+      return error ? { data: null, error } : { data: value, error: null }
+    }
+    return { data: null, error: null }
+  })
+}
+
 function givenListing(overrides = {}) {
   supabase.__on('listings', 'select', {
     data: makeListing({
@@ -60,6 +69,7 @@ beforeEach(() => {
   supabase.__reset()
   givenSignedIn()
   givenListing()
+  givenFoundingHost(false)
 })
 
 describe('EditListing access control', () => {
@@ -83,7 +93,10 @@ describe('EditListing access control', () => {
     supabase.__on('listings', 'select', { data: null, error: { message: 'permission denied' } })
     renderPage()
 
-    expect(await screen.findByText('permission denied')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Something went wrong loading this page. Please refresh.')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('permission denied')).not.toBeInTheDocument()
   })
 })
 
@@ -97,6 +110,7 @@ describe('EditListing prefill', () => {
     expect(screen.getByLabelText('Max guests')).toHaveValue(4)
     expect(screen.getByLabelText('Area')).toHaveValue('Bedok')
     expect(screen.getByLabelText(/^Full address/)).toHaveValue('12 Coffee Road')
+    expect(screen.getByRole('checkbox', { name: 'Offer group pricing' })).toBeChecked()
   })
 
   it('converts the stored cents back into dollars', async () => {
@@ -104,6 +118,36 @@ describe('EditListing prefill', () => {
     await renderLoaded()
 
     expect(screen.getByLabelText('Price per person (SGD)')).toHaveValue(45)
+    expect(
+      screen.getByText('Guests see $51 · You receive $45 · $40.50 after your first 3 bookings')
+    ).toBeInTheDocument()
+  })
+
+  it('clears duration and group pricing when the saved listing has none', async () => {
+    givenListing({ duration_mins: null, group_pricing: false })
+    await renderLoaded()
+
+    expect(screen.getByLabelText('Duration (mins)')).toHaveValue(null)
+    expect(screen.getByRole('checkbox', { name: 'Offer group pricing' })).not.toBeChecked()
+  })
+
+  it('shows a founding host only the public price and their payout', async () => {
+    givenFoundingHost(true)
+    givenListing({ price_per_person: 2500 })
+    await renderLoaded()
+
+    expect(screen.getByText('Guests see $28 · You receive $25')).toBeInTheDocument()
+    expect(screen.queryByText(/after your first 3 bookings/)).not.toBeInTheDocument()
+  })
+
+  it('hides the price hint when founding-host status is unknown', async () => {
+    givenFoundingHost(null, { message: 'function my_is_founding_host does not exist' })
+    givenListing({ price_per_person: 2500 })
+    await renderLoaded()
+
+    expect(screen.getByLabelText('Price per person (SGD)')).toHaveValue(25)
+    expect(screen.queryByText(/Guests see/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/after your first 3 bookings/)).not.toBeInTheDocument()
   })
 
   it('keeps the cents when the stored price is not a whole dollar', async () => {
@@ -179,6 +223,17 @@ describe('EditListing validation', () => {
     expect(await screen.findByText('Please enter a valid price.')).toBeInTheDocument()
   })
 
+  it('rejects a duration below one minute', async () => {
+    const { user } = await renderLoaded()
+    await user.clear(screen.getByLabelText('Duration (mins)'))
+    await user.type(screen.getByLabelText('Duration (mins)'), '0')
+
+    submitForm()
+
+    expect(await screen.findByText('Duration must be at least 1 minute.')).toBeInTheDocument()
+    expect(supabase.__calls('listings', 'update')).toHaveLength(0)
+  })
+
   it('rejects a guest count below one', async () => {
     const { user } = await renderLoaded()
     await user.clear(screen.getByLabelText('Max guests'))
@@ -206,6 +261,8 @@ describe('EditListing saving', () => {
       title: 'Latte art, level two',
       price_per_person: 5525,
       max_guests: 4,
+      duration_mins: 90,
+      group_pricing: true,
       area: 'Bedok',
       full_address: '12 Coffee Road',
     })
@@ -214,7 +271,9 @@ describe('EditListing saving', () => {
 
   it('saves a listing that has moved to a new address', async () => {
     const { user } = await renderLoaded()
-    await user.selectOptions(screen.getByLabelText('Area'), 'Tampines')
+    await user.clear(screen.getByLabelText('Area'))
+    await user.type(screen.getByLabelText('Area'), 'Tampines')
+    await user.click(screen.getByRole('option', { name: 'Tampines' }))
     await user.clear(screen.getByLabelText(/^Full address/))
     await user.type(screen.getByLabelText(/^Full address/), '5 Espresso Lane')
 

@@ -8,15 +8,59 @@
 export const CARD_FEE_RATE = 0.12
 export const CARD_FEE_FLOOR_CENTS = 250
 export const PAYNOW_DISCOUNT_RATE = 0.05
+/** Stripe will not refund PayNow after 90 days; 80 leaves a buffer. */
+export const PAYNOW_MAX_DAYS_AHEAD = 80
+export const PAYNOW_TOO_FAR_AHEAD = 'paynow_too_far_ahead'
+export const PAYNOW_TOO_FAR_AHEAD_MESSAGE =
+  `PayNow is available for sessions within ${PAYNOW_MAX_DAYS_AHEAD} days. Please pay by card.`
 export const HOST_FEE_RATE = 0.1
 export const HOST_FEE_FREE_BOOKINGS = 3
+export const MAX_GUESTS_PER_BOOKING = 10
+
+/** 0 / 5 / 10 / 15 / 20 percent. Never more than 20. */
+export function groupDiscountRate(
+  guestsCount: number,
+  groupPricing = true,
+): number {
+  if (!groupPricing || guestsCount <= 1) return 0
+  if (guestsCount === 2) return 0.05
+  if (guestsCount === 3) return 0.1
+  if (guestsCount === 4) return 0.15
+  return 0.2
+}
+
+export function discountedPerPersonCents(
+  pricePerPerson: number,
+  guestsCount: number,
+  groupPricing = true,
+): number {
+  const rate = groupDiscountRate(guestsCount, groupPricing)
+  return Math.round(pricePerPerson * (1 - rate))
+}
+
+/** Per-person after discount, times guests, in integer cents. */
+export function discountedLessonCents(
+  pricePerPerson: number,
+  guestsCount: number,
+  groupPricing = true,
+): number {
+  return (
+    discountedPerPersonCents(pricePerPerson, guestsCount, groupPricing) *
+    guestsCount
+  )
+}
 
 export const PAYMENT_RAILS = ['card', 'paynow'] as const
 export type PaymentRail = (typeof PAYMENT_RAILS)[number]
 
 export interface BookingSession {
   spots_remaining: number
-  listings?: { price_per_person?: number | null; host_id?: string | null } | null
+  starts_at?: string | Date | null
+  listings?: {
+    price_per_person?: number | null
+    host_id?: string | null
+    group_pricing?: boolean | null
+  } | null
 }
 
 export interface GuestCharge {
@@ -29,6 +73,7 @@ export type BookingRejection = {
   ok: false
   status: number
   message: string
+  code?: string
 }
 
 export type BookingAcceptance = GuestCharge & {
@@ -91,6 +136,23 @@ export function calculateHostPayout(lessonAmount: number, hostFee: number): numb
   return lessonAmount - hostFee
 }
 
+/**
+ * What the host still receives after a guest cancel. The guest refund is taken
+ * out of the frozen payout; a full refund (or any refund larger than the
+ * payout) leaves nothing. Hosts are shown only this remainder, never the
+ * guest's payment or refund.
+ */
+export function hostPayoutAfterGuestCancel(
+  originalHostPayoutCents: number,
+  guestRefundCents: number,
+): number {
+  const payout = Number(originalHostPayoutCents)
+  const refund = Number(guestRefundCents)
+  if (!Number.isFinite(payout) || payout <= 0) return 0
+  if (!Number.isFinite(refund) || refund <= 0) return Math.round(payout)
+  return Math.max(0, Math.round(payout) - Math.round(refund))
+}
+
 export function nextHostStrikeState(currentStrikes: number | null | undefined): {
   hostStrikes: number
   deactivateListings: boolean
@@ -105,13 +167,89 @@ export function spotsToRestore(status: string, guestsCount: number): number {
   return guestsCount
 }
 
+/** Checkout created the row before Stripe captured anything. */
+export function isUnpaidCheckout(status: string): boolean {
+  return status === 'pending'
+}
+
+export function unpaidCheckoutCancelPatch(cancelledBy: 'guest' | 'host' = 'guest') {
+  return {
+    status: 'cancelled' as const,
+    cancelled_by: cancelledBy,
+    cancelled_at: new Date().toISOString(),
+    refund_amount: 0,
+  }
+}
+
+/** Guest cancel of a never-paid row is not a booking cancel. */
+export function guestCancelDecision(status: string): {
+  allow: boolean
+  status?: number
+  message?: string
+} {
+  if (isUnpaidCheckout(status)) {
+    return {
+      allow: false,
+      status: 400,
+      message: 'This checkout was never paid',
+    }
+  }
+  if (status !== 'confirmed') {
+    return { allow: false, status: 400, message: 'Booking cannot be cancelled' }
+  }
+  return { allow: true }
+}
+
+export function shouldEmailCancellation(status: string): boolean {
+  return status === 'confirmed'
+}
+
+export function abandonCheckoutAuthorized(
+  callerId: string | null | undefined,
+  guestId: string | null | undefined,
+): boolean {
+  return Boolean(callerId) && Boolean(guestId) && callerId === guestId
+}
+
+export function paymentIntentAlreadyCaptured(status: string | null | undefined): boolean {
+  return status === 'succeeded' || status === 'processing'
+}
+
+export type AbandonCheckoutDecision =
+  | { httpStatus: 403; error: 'Forbidden' }
+  | { abandon: false; reason: 'not_pending' | 'payment_succeeded' }
+  | { abandon: true }
+
+export function decideAbandonCheckout(options: {
+  callerId: string | null | undefined
+  guestId: string | null | undefined
+  bookingStatus: string
+  intentStatus?: string | null
+}): AbandonCheckoutDecision {
+  if (!abandonCheckoutAuthorized(options.callerId, options.guestId)) {
+    return { httpStatus: 403, error: 'Forbidden' }
+  }
+  if (!isUnpaidCheckout(options.bookingStatus)) {
+    return { abandon: false, reason: 'not_pending' }
+  }
+  if (paymentIntentAlreadyCaptured(options.intentStatus)) {
+    return { abandon: false, reason: 'payment_succeeded' }
+  }
+  return { abandon: true }
+}
+
 /**
  * A guest count arrives from the request body, so it has to be treated as
  * untrusted. A fractional value would otherwise pass the spots check and buy a
  * session at a fraction of its price.
  */
 export function isValidGuestsCount(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+  return (
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value >= 1 &&
+    value <= MAX_GUESTS_PER_BOOKING
+  )
 }
 
 /**
@@ -155,6 +293,9 @@ export function prepareBooking(
     return { ok: false, status: 400, message: 'Invalid payment method' }
   }
 
+  const payNowWindow = rejectPayNowIfTooFarAhead(paymentRail, session.starts_at)
+  if (payNowWindow) return payNowWindow
+
   if (session.spots_remaining < guestsCount) {
     return { ok: false, status: 400, message: 'Not enough spots' }
   }
@@ -168,7 +309,8 @@ export function prepareBooking(
     return { ok: false, status: 400, message: 'Listing price unavailable' }
   }
 
-  const lessonAmount = pricePerPerson * guestsCount
+  const groupPricing = session.listings?.group_pricing !== false
+  const lessonAmount = discountedLessonCents(pricePerPerson, guestsCount, groupPricing)
   const charge = calculateGuestCharge(lessonAmount, paymentRail)
 
   return {
@@ -191,6 +333,34 @@ export const GUEST_REFUND_TIER_RULES = [
 
 export function hoursUntilSession(sessionStartsAt: string | Date, now = Date.now()): number {
   return (new Date(sessionStartsAt).getTime() - now) / (1000 * 60 * 60)
+}
+
+/**
+ * PayNow refunds expire 90 days after payment. Sessions more than 80 days
+ * out can still be booked on card.
+ */
+export function isPayNowTooFarAhead(
+  startsAt: string | Date | null | undefined,
+  now = Date.now(),
+): boolean {
+  if (startsAt == null || startsAt === '') return false
+  const start = new Date(startsAt).getTime()
+  if (!Number.isFinite(start)) return false
+  return hoursUntilSession(startsAt, now) > PAYNOW_MAX_DAYS_AHEAD * 24
+}
+
+export function rejectPayNowIfTooFarAhead(
+  paymentRail: unknown,
+  startsAt: string | Date | null | undefined,
+  now = Date.now(),
+): BookingRejection | null {
+  if (paymentRail !== 'paynow' || !isPayNowTooFarAhead(startsAt, now)) return null
+  return {
+    ok: false,
+    status: 400,
+    message: PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+    code: PAYNOW_TOO_FAR_AHEAD,
+  }
 }
 
 export function guestRefundTierRule(sessionStartsAt: string | Date, now = Date.now()) {

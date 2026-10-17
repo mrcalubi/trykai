@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
@@ -13,11 +15,25 @@ describe('Input', () => {
     expect(field.className).toContain('ui-input')
   })
 
+  it('renders a textarea when type is textarea', () => {
+    render(
+      <Input id="about" label="About you" type="textarea" hint="Tell guests a bit about yourself." />
+    )
+
+    const field = screen.getByLabelText('About you')
+    expect(field.tagName).toBe('TEXTAREA')
+    expect(field).toHaveClass('ui-input--textarea')
+    expect(field).not.toHaveAttribute('type')
+    expect(screen.getByText('Tell guests a bit about yourself.')).toBeInTheDocument()
+  })
+
   it('renders a password field', () => {
     render(<Input id="password" label="Password" type="password" />)
 
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
     expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Hold to peek at password' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button')).toHaveLength(1)
   })
 
   it('toggles a password field between masked and plain text', async () => {
@@ -33,6 +49,12 @@ describe('Input', () => {
 
     await user.click(screen.getByRole('button', { name: 'Hide password' }))
     expect(field).toHaveAttribute('type', 'password')
+  })
+
+  it('hides the browser password reveal so only the kit toggle shows', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../../index.css'), 'utf8')
+    expect(css).toMatch(/input\[type=['"]password['"]\]::-ms-reveal/)
+    expect(css).toMatch(/input\[type=['"]password['"]\]::-ms-clear/)
   })
 
   it('does not show a visibility toggle on text fields', () => {

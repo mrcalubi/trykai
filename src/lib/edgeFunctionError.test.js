@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { edgeFunctionErrorMessage } from './edgeFunctionError'
+import { edgeFunctionErrorMessage, isPayNowTooFarAheadError } from './edgeFunctionError'
+import {
+  PAYNOW_TOO_FAR_AHEAD,
+  PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+} from '../../supabase/functions/_shared/booking.ts'
 
 describe('edgeFunctionErrorMessage', () => {
   it('prefers a JSON error already parsed into data', async () => {
@@ -42,5 +46,17 @@ describe('edgeFunctionErrorMessage', () => {
 
   it('returns empty when there is no error', async () => {
     await expect(edgeFunctionErrorMessage(null, null)).resolves.toBe('')
+  })
+
+  it('recognises a PayNow-too-far code without treating it as a generic error', () => {
+    expect(
+      isPayNowTooFarAheadError(
+        { error: PAYNOW_TOO_FAR_AHEAD_MESSAGE, code: PAYNOW_TOO_FAR_AHEAD },
+        PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+      )
+    ).toBe(true)
+    expect(isPayNowTooFarAheadError({ error: PAYNOW_TOO_FAR_AHEAD }, '')).toBe(true)
+    expect(isPayNowTooFarAheadError(null, PAYNOW_TOO_FAR_AHEAD_MESSAGE)).toBe(true)
+    expect(isPayNowTooFarAheadError({ error: 'Not enough spots' }, 'Not enough spots')).toBe(false)
   })
 })

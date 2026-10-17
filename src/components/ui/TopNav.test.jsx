@@ -76,6 +76,7 @@ describe('TopNav', () => {
     expect(onMenuClick).toHaveBeenCalledTimes(1)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(toggle).toHaveAccessibleName('Close menu')
+    expect(toggle).toHaveTextContent('✕')
     expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).toHaveClass(
       'ui-hamburger--open'
     )
@@ -84,6 +85,7 @@ describe('TopNav', () => {
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(toggle).toHaveAccessibleName('Open menu')
+    expect(toggle).not.toHaveTextContent('✕')
     expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).not.toHaveClass(
       'ui-hamburger--open'
     )
@@ -111,6 +113,25 @@ describe('TopNav', () => {
     )
 
     await user.keyboard('{Escape}')
+    expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).not.toHaveClass(
+      'ui-hamburger--open'
+    )
+  })
+
+  it('closes the hamburger when the route changes', async () => {
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <TopNav />
+      </MemoryRouter>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).toHaveClass(
+      'ui-hamburger--open'
+    )
+
+    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
     expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).not.toHaveClass(
       'ui-hamburger--open'
     )

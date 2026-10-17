@@ -7,8 +7,15 @@ import {
 } from '../_shared/booking.ts'
 import {
   bookingConfirmedGuestHtml,
+  bookingConfirmedGuestSubject,
   bookingConfirmedHostHtml,
+  bookingReference,
+  cardDetailsFromCharge,
+  formatDuration,
   formatSessionDate,
+  GUEST_REPLY_TO,
+  paymentMethodFromIntent,
+  publicDisplayName,
   sendResendEmail,
   verificationApprovedHtml,
   verificationRejectedHtml,
@@ -17,11 +24,16 @@ import { identityEventOutcome } from '../_shared/verification.ts'
 import {
   asRecord,
   chargeIdFromPaymentIntent,
+  constructStripeWebhookEvent,
   jsonResponse,
   stripeEventAction,
+  stripeWebhookSecrets,
   textResponse,
 } from '../_shared/http.ts'
-import { payoutsEnabledFromAccount } from '../_shared/connect.ts'
+import {
+  applyConnectedAccountPayouts,
+  connectedAccountFromEvent,
+} from '../_shared/connect.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
   apiVersion: '2023-10-16',
@@ -54,16 +66,26 @@ async function confirmSucceededPayment(paymentIntent: {
       guests_count,
       total_amount,
       platform_fee,
+      payment_rail,
       guest_id,
       session_id,
       sessions (
         starts_at,
+        duration_mins,
         listings (
+          id,
           title,
           host_id,
+          full_address,
+          duration_mins,
+          price_per_person,
+          group_pricing,
+          category,
+          whats_provided,
           users:host_id (
             email,
             full_name,
+            display_name,
             is_founding_host
           )
         )
@@ -109,10 +131,18 @@ async function confirmSucceededPayment(paymentIntent: {
   })
   const hostPayout = calculateHostPayout(lessonAmount, hostFee)
   let chargeId = chargeIdFromPaymentIntent(paymentIntent)
-  if (!chargeId) {
+  let intentForReceipt: { latest_charge?: unknown } = paymentIntent
+  const chargeCard = cardDetailsFromCharge(
+    typeof paymentIntent.latest_charge === 'object' ? paymentIntent.latest_charge : null,
+  )
+  const needsCardDetails = booking.payment_rail !== 'paynow' && !chargeCard.last4
+  if (!chargeId || needsCardDetails) {
     try {
-      const fresh = await stripe.paymentIntents.retrieve(paymentIntent.id)
-      chargeId = chargeIdFromPaymentIntent(fresh)
+      const fresh = await stripe.paymentIntents.retrieve(paymentIntent.id, {
+        expand: ['latest_charge'],
+      })
+      chargeId = chargeId || chargeIdFromPaymentIntent(fresh)
+      intentForReceipt = fresh
     } catch (err) {
       console.error('webhook: could not load charge id', paymentIntent.id, err)
     }
@@ -148,21 +178,45 @@ async function confirmSucceededPayment(paymentIntent: {
   const sessionDate = session?.starts_at ? formatSessionDate(session.starts_at) : ''
   const listingTitle = listing?.title ?? 'your session'
   const apiKey = Deno.env.get('RESEND_API_KEY')
+  const siteUrl = Deno.env.get('SITE_URL')
+  const reference = bookingReference(booking.id)
+  const duration = formatDuration(session?.duration_mins ?? listing?.duration_mins)
+  const paymentMethod = paymentMethodFromIntent(booking.payment_rail, intentForReceipt)
 
   const { data: guestProfile } = await admin
     .from('users')
-    .select('full_name, email')
+    .select('full_name, display_name, email')
     .eq('id', booking.guest_id)
     .single()
+
+  const guestName = publicDisplayName(guestProfile)
+  const hostName = publicDisplayName(host) || 'your host'
+  const durationMins = session?.duration_mins ?? listing?.duration_mins
 
   await sendResendEmail({
     apiKey,
     to: guestProfile?.email,
-    subject: `Booking confirmed: ${listingTitle}`,
+    subject: bookingConfirmedGuestSubject(listingTitle, session?.starts_at ?? ''),
+    replyTo: GUEST_REPLY_TO,
     html: bookingConfirmedGuestHtml({
+      bookingReference: reference,
       listingTitle,
+      hostName,
+      guestName,
       sessionDate,
+      duration,
+      fullAddress: listing?.full_address ?? '',
       guestsCount: booking.guests_count,
+      pricePerPersonCents: listing?.price_per_person ?? 0,
+      groupPricing: listing?.group_pricing !== false,
+      paymentRail: booking.payment_rail,
+      totalPaidCents: booking.total_amount,
+      paymentMethod,
+      sessionStartsAt: session?.starts_at ?? '',
+      durationMins,
+      whatsProvided: listing?.whats_provided,
+      bookingId: booking.id,
+      siteUrl,
     }),
   })
 
@@ -171,10 +225,14 @@ async function confirmSucceededPayment(paymentIntent: {
     to: host?.email,
     subject: `New booking for "${listingTitle}"`,
     html: bookingConfirmedHostHtml({
-      guestName: guestProfile?.full_name || 'A guest',
+      bookingReference: reference,
+      hostName: publicDisplayName(host),
+      guestName: guestName || 'A guest',
       listingTitle,
       sessionDate,
       guestsCount: booking.guests_count,
+      hostPayoutCents: hostPayout,
+      siteUrl,
     }),
   })
 }
@@ -198,12 +256,11 @@ async function cancelPendingPayment(paymentIntent: { id: string; metadata?: Reco
   await query
 }
 
-async function syncConnectedAccount(account: { id: string; payouts_enabled?: boolean }) {
-  const admin = adminClient()
-  await admin
-    .from('users')
-    .update({ stripe_payouts_enabled: payoutsEnabledFromAccount(account) })
-    .eq('stripe_account_id', account.id)
+async function syncConnectedAccount(event: {
+  account?: string | null
+  data?: { object?: { id?: string | null; payouts_enabled?: boolean | null } | null }
+}) {
+  await applyConnectedAccountPayouts(adminClient(), connectedAccountFromEvent(event))
 }
 
 /**
@@ -279,25 +336,23 @@ Deno.serve(async (req) => {
   }
 
   const signature = req.headers.get('Stripe-Signature')
-  const secret = Deno.env.get('STRIPE_WEBHOOK_SECRET')
-  if (!signature || !secret) {
-    return jsonResponse({ error: 'Missing webhook signature' }, 400)
-  }
-
+  const secrets = stripeWebhookSecrets({
+    STRIPE_WEBHOOK_SECRET: Deno.env.get('STRIPE_WEBHOOK_SECRET'),
+    STRIPE_CONNECT_WEBHOOK_SECRET: Deno.env.get('STRIPE_CONNECT_WEBHOOK_SECRET'),
+  })
   const body = await req.text()
-  let event
-  try {
-    event = await stripe.webhooks.constructEventAsync(
-      body,
-      signature,
-      secret,
-      undefined,
-      cryptoProvider,
-    )
-  } catch (err) {
-    console.error('webhook signature failed', err instanceof Error ? err.message : err)
-    return jsonResponse({ error: 'Invalid signature' }, 400)
+  const verified = await constructStripeWebhookEvent({
+    constructEvent: (payload, sig, secret) =>
+      stripe.webhooks.constructEventAsync(payload, sig, secret, undefined, cryptoProvider),
+    body,
+    signature,
+    secrets,
+  })
+  if (!verified.ok) {
+    console.error('webhook signature failed', verified.error)
+    return jsonResponse({ error: verified.error }, 400)
   }
+  const event = verified.event
 
   try {
     const action = stripeEventAction(event.type)
@@ -306,7 +361,7 @@ Deno.serve(async (req) => {
     } else if (action === 'cancel_pending') {
       await cancelPendingPayment(event.data.object)
     } else if (action === 'sync_account') {
-      await syncConnectedAccount(event.data.object)
+      await syncConnectedAccount(event)
     } else if (action === 'review_identity') {
       await reviewIdentitySession(event.type, event.data.object)
     }

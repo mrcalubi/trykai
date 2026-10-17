@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { firstAccountRow } from '../lib/myAccount'
 import TopNav from './ui/TopNav'
 
 /**
@@ -9,21 +11,27 @@ import TopNav from './ui/TopNav'
  * TopNav directly with made-up props; this is the only place it reads auth.
  */
 export default function SiteNav() {
+  const navigate = useNavigate()
   const [user, setUser] = useState(null)
-  const [fullName, setFullName] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
-  const [isHost, setIsHost] = useState(false)
+  const [verificationStatus, setVerificationStatus] = useState(null)
+
+  async function handleLogOut() {
+    await supabase.auth.signOut()
+    navigate('/')
+  }
 
   useEffect(() => {
     function applySession(session) {
       const nextUser = session?.user ?? null
       setUser(nextUser)
       if (!nextUser) {
-        setFullName('')
+        setDisplayName('')
         setAvatarUrl('')
         setIsAdmin(false)
-        setIsHost(false)
+        setVerificationStatus(null)
       }
     }
 
@@ -43,23 +51,20 @@ export default function SiteNav() {
   useEffect(() => {
     if (!user) return
 
-    supabase
-      .from('users')
-      .select('full_name, avatar_url, is_host')
-      .eq('id', user.id)
-      .single()
-      .then(({ data }) => {
-        setFullName(data?.full_name || '')
-        setAvatarUrl(data?.avatar_url || '')
-        setIsHost(Boolean(data?.is_host))
-      })
+    supabase.rpc('my_account').then(({ data, error }) => {
+      const row = firstAccountRow(data)
+      setDisplayName(!error && row?.display_name ? row.display_name : '')
+      setAvatarUrl(!error && row?.avatar_url ? row.avatar_url : '')
+    })
 
     // `is_admin` has no client SELECT grant, so the menu asks the same
     // caller-scoped function RequireAdmin uses. The review function checks
     // again server-side; this only decides whether to show the link.
+    // `verification_status` here picks Host a session vs Become a host.
     supabase.rpc('my_verification').then(({ data, error }) => {
       const row = Array.isArray(data) ? data[0] : data
       setIsAdmin(!error && Boolean(row?.is_admin))
+      setVerificationStatus(error ? null : row?.verification_status ?? null)
     })
   }, [user])
 
@@ -67,10 +72,11 @@ export default function SiteNav() {
     <TopNav
       isLoggedIn={Boolean(user)}
       isAdmin={isAdmin}
-      isHost={isHost}
+      verificationStatus={verificationStatus}
       userId={user?.id}
       avatarUrl={avatarUrl || undefined}
-      name={fullName || user?.email || ''}
+      name={displayName || user?.email || ''}
+      onLogOut={handleLogOut}
     />
   )
 }

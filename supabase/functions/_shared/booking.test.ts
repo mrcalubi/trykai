@@ -6,11 +6,23 @@ import {
   HOST_FEE_RATE,
   LEGACY_PLATFORM_FEE_RATE,
   PAYNOW_DISCOUNT_RATE,
+  PAYNOW_MAX_DAYS_AHEAD,
+  PAYNOW_TOO_FAR_AHEAD,
+  PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+  isPayNowTooFarAhead,
+  rejectPayNowIfTooFarAhead,
   calculateGuestCharge,
   calculateGuestRefund,
   calculateHostFee,
   calculateHostPayout,
+  hostPayoutAfterGuestCancel,
   confirmRpcErrorKind,
+  decideAbandonCheckout,
+  guestCancelDecision,
+  discountedLessonCents,
+  discountedPerPersonCents,
+  groupDiscountRate,
+  MAX_GUESTS_PER_BOOKING,
   isPaymentRail,
   isValidGuestsCount,
   nextHostStrikeState,
@@ -18,6 +30,8 @@ import {
   isHostBookingOwnListing,
   prepareBooking,
   refundAmountForCancel,
+  shouldEmailCancellation,
+  unpaidCheckoutCancelPatch,
   roundUpToDollar,
   spotsToRestore,
 } from './booking.ts'
@@ -137,6 +151,14 @@ describe('calculateHostFee', () => {
     expect(calculateHostPayout(lesson, fee)).toBe(2250)
     expect(calculateHostPayout(lesson, 0)).toBe(2500)
   })
+
+  it('cuts the host payout by the guest refund and never below zero', () => {
+    expect(hostPayoutAfterGuestCancel(8500, 0)).toBe(8500)
+    expect(hostPayoutAfterGuestCancel(8500, 4250)).toBe(4250)
+    expect(hostPayoutAfterGuestCancel(8500, 9600)).toBe(0)
+    expect(hostPayoutAfterGuestCancel(0, 2800)).toBe(0)
+    expect(hostPayoutAfterGuestCancel(Number.NaN, 100)).toBe(0)
+  })
 })
 
 describe('nextHostStrikeState', () => {
@@ -157,6 +179,53 @@ describe('spotsToRestore', () => {
     expect(spotsToRestore('confirmed', 2)).toBe(2)
     expect(spotsToRestore('pending', 2)).toBe(0)
     expect(spotsToRestore('cancelled', 1)).toBe(0)
+  })
+})
+
+describe('PayNow 80-day window', () => {
+  const now = Date.parse('2026-10-17T00:00:00.000Z')
+  const daysAhead = (days: number) =>
+    new Date(now + days * 24 * 60 * 60 * 1000).toISOString()
+
+  it('exports the 80-day buffer', () => {
+    expect(PAYNOW_MAX_DAYS_AHEAD).toBe(80)
+  })
+
+  it('allows PayNow at 79 and 80 days and blocks 81', () => {
+    expect(isPayNowTooFarAhead(daysAhead(79), now)).toBe(false)
+    expect(isPayNowTooFarAhead(daysAhead(80), now)).toBe(false)
+    expect(isPayNowTooFarAhead(daysAhead(81), now)).toBe(true)
+  })
+
+  it('does not block when the start time is missing or invalid', () => {
+    expect(isPayNowTooFarAhead(null, now)).toBe(false)
+    expect(isPayNowTooFarAhead('', now)).toBe(false)
+    expect(isPayNowTooFarAhead('not-a-date', now)).toBe(false)
+  })
+
+  it('rejects PayNow on the edge function when the session is 81 days out', () => {
+    expect(rejectPayNowIfTooFarAhead('paynow', daysAhead(81), now)).toEqual({
+      ok: false,
+      status: 400,
+      message: PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+      code: PAYNOW_TOO_FAR_AHEAD,
+    })
+    expect(rejectPayNowIfTooFarAhead('paynow', daysAhead(80), now)).toBeNull()
+    expect(rejectPayNowIfTooFarAhead('card', daysAhead(81), now)).toBeNull()
+  })
+
+  it('lets prepareBooking refuse PayNow past the window and still accept card', () => {
+    const liveAhead = (days: number) =>
+      new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+
+    expect(prepareBooking(sessionWith({ starts_at: liveAhead(81) }), 1, 'paynow')).toEqual({
+      ok: false,
+      status: 400,
+      message: PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+      code: PAYNOW_TOO_FAR_AHEAD,
+    })
+    expect(prepareBooking(sessionWith({ starts_at: liveAhead(80) }), 1, 'paynow').ok).toBe(true)
+    expect(prepareBooking(sessionWith({ starts_at: liveAhead(81) }), 1, 'card').ok).toBe(true)
   })
 })
 
@@ -207,8 +276,32 @@ describe('prepareBooking', () => {
       ok: true,
       guestsCount: 2,
       paymentRail: 'card',
-      ...calculateGuestCharge(5000, 'card'),
+      ...calculateGuestCharge(discountedLessonCents(2500, 2), 'card'),
     })
+  })
+
+  it('applies no group discount when the host has turned it off', () => {
+    expect(
+      prepareBooking(
+        sessionWith({ listings: { price_per_person: 2500, host_id: 'host-1', group_pricing: false } }),
+        4,
+        'card',
+      ),
+    ).toEqual({
+      ok: true,
+      guestsCount: 4,
+      paymentRail: 'card',
+      ...calculateGuestCharge(10000, 'card'),
+    })
+  })
+
+  it('rejects more than ten guests on one booking', () => {
+    expect(prepareBooking(sessionWith({ spots_remaining: 12 }), 11)).toEqual({
+      ok: false,
+      status: 400,
+      message: 'Invalid guest count',
+    })
+    expect(MAX_GUESTS_PER_BOOKING).toBe(10)
   })
 
   it('uses PayNow amounts when that rail is chosen', () => {
@@ -321,6 +414,141 @@ describe('prepareBooking', () => {
 
   it('checks the session before the guest count', () => {
     expect(prepareBooking(null, 0)).toMatchObject({ status: 404 })
+  })
+})
+
+describe('group discounts', () => {
+  it('caps at 20 percent from five guests up', () => {
+    expect(groupDiscountRate(1)).toBe(0)
+    expect(groupDiscountRate(2)).toBe(0.05)
+    expect(groupDiscountRate(3)).toBe(0.1)
+    expect(groupDiscountRate(4)).toBe(0.15)
+    expect(groupDiscountRate(5)).toBe(0.2)
+    expect(groupDiscountRate(6)).toBe(0.2)
+    expect(groupDiscountRate(10)).toBe(0.2)
+    expect(groupDiscountRate(5, false)).toBe(0)
+  })
+
+  it('rounds the per-person price first, then multiplies by guests', () => {
+    expect(discountedPerPersonCents(2500, 4)).toBe(2125)
+    expect(discountedLessonCents(2500, 4)).toBe(8500)
+    expect(discountedLessonCents(2500, 4, false)).toBe(10000)
+  })
+})
+
+describe('oversell of a group booking', () => {
+  it('refunds the whole charge and restores every guest spot', () => {
+    const charge = calculateGuestCharge(discountedLessonCents(2500, 3), 'card')
+    expect(confirmRpcErrorKind('insufficient spots')).toBe('oversell')
+    expect(
+      refundAmountForCancel({
+        status: 'confirmed',
+        cancelledBy: 'host',
+        totalAmount: charge.totalAmount,
+        platformFee: charge.platformFee,
+        sessionStartsAt: new Date('2099-01-01T00:00:00.000Z').toISOString(),
+      }),
+    ).toBe(charge.totalAmount)
+    expect(spotsToRestore('confirmed', 3)).toBe(3)
+  })
+})
+
+describe('unpaid checkout cancel', () => {
+  it('refuses a guest cancel of a booking that was never paid', () => {
+    expect(guestCancelDecision('pending')).toEqual({
+      allow: false,
+      status: 400,
+      message: 'This checkout was never paid',
+    })
+    expect(guestCancelDecision('confirmed')).toEqual({ allow: true })
+  })
+
+  it('refuses a guest cancel of a row that is no longer cancellable', () => {
+    expect(guestCancelDecision('cancelled')).toEqual({
+      allow: false,
+      status: 400,
+      message: 'Booking cannot be cancelled',
+    })
+  })
+
+  it('marks an unpaid checkout cancelled with a zero refund', () => {
+    const guest = unpaidCheckoutCancelPatch()
+    expect(guest).toMatchObject({
+      status: 'cancelled',
+      cancelled_by: 'guest',
+      refund_amount: 0,
+    })
+    expect(Number.isNaN(Date.parse(guest.cancelled_at))).toBe(false)
+
+    expect(unpaidCheckoutCancelPatch('host')).toMatchObject({
+      status: 'cancelled',
+      cancelled_by: 'host',
+      refund_amount: 0,
+    })
+  })
+
+  it('does not email a cancellation for a never-paid row', () => {
+    expect(shouldEmailCancellation('pending')).toBe(false)
+    expect(shouldEmailCancellation('confirmed')).toBe(true)
+  })
+})
+
+describe('abandon-checkout', () => {
+  it('is 403 unless the caller JWT is the booking guest', () => {
+    expect(
+      decideAbandonCheckout({
+        callerId: null,
+        guestId: 'guest-1',
+        bookingStatus: 'pending',
+      }),
+    ).toEqual({ httpStatus: 403, error: 'Forbidden' })
+    expect(
+      decideAbandonCheckout({
+        callerId: 'other-guest',
+        guestId: 'guest-1',
+        bookingStatus: 'pending',
+      }),
+    ).toEqual({ httpStatus: 403, error: 'Forbidden' })
+    expect(
+      decideAbandonCheckout({
+        callerId: 'guest-1',
+        guestId: null,
+        bookingStatus: 'pending',
+      }),
+    ).toEqual({ httpStatus: 403, error: 'Forbidden' })
+    expect(
+      decideAbandonCheckout({
+        callerId: 'guest-1',
+        guestId: 'guest-1',
+        bookingStatus: 'pending',
+      }),
+    ).toEqual({ abandon: true })
+  })
+
+  it('leaves the booking untouched when the PaymentIntent has already succeeded', () => {
+    expect(
+      decideAbandonCheckout({
+        callerId: 'guest-1',
+        guestId: 'guest-1',
+        bookingStatus: 'pending',
+        intentStatus: 'succeeded',
+      }),
+    ).toEqual({ abandon: false, reason: 'payment_succeeded' })
+    expect(
+      decideAbandonCheckout({
+        callerId: 'guest-1',
+        guestId: 'guest-1',
+        bookingStatus: 'pending',
+        intentStatus: 'processing',
+      }),
+    ).toEqual({ abandon: false, reason: 'payment_succeeded' })
+    expect(
+      decideAbandonCheckout({
+        callerId: 'guest-1',
+        guestId: 'guest-1',
+        bookingStatus: 'confirmed',
+      }),
+    ).toEqual({ abandon: false, reason: 'not_pending' })
   })
 })
 

@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
   checkoutPriceCents,
+  discountedLessonCents,
   formatCheckoutPrice,
   formatGuestFacingPrice,
+  groupPriceLabel,
   guestFacingPriceCents,
+  hostListingPriceHint,
+  nextGroupTierHint,
+  parsePriceInputCents,
   paynowPriceCents,
 } from './pricing'
-import { calculateGuestCharge } from '../../supabase/functions/_shared/booking.ts'
+import {
+  calculateGuestCharge,
+  discountedLessonCents as bookingLessonCents,
+  discountedPerPersonCents,
+} from '../../supabase/functions/_shared/booking.ts'
 
 describe('guestFacingPriceCents', () => {
   it('is the card all-in total, not the raw lesson price', () => {
@@ -36,5 +45,68 @@ describe('checkoutPriceCents', () => {
     expect(checkoutPriceCents(2500, 'paynow')).toBe(2660)
     expect(checkoutPriceCents(2500)).toBe(2800)
     expect(formatCheckoutPrice(2500, 'paynow')).toBe('$26.60')
+  })
+})
+
+describe('pricing.js matches booking.ts', () => {
+  const prices = [1000, 2500, 4000]
+  const guests = [1, 2, 3, 4, 5, 6]
+
+  it('agrees on lesson and all-in totals for 1–6 guests at S$10, S$25 and S$40', () => {
+    for (const price of prices) {
+      for (const count of guests) {
+        const lesson = discountedLessonCents(price, count)
+        expect(lesson).toBe(bookingLessonCents(price, count))
+        expect(guestFacingPriceCents(price, count)).toBe(
+          calculateGuestCharge(lesson, 'card').totalAmount,
+        )
+        expect(paynowPriceCents(price, count)).toBe(
+          calculateGuestCharge(lesson, 'paynow').totalAmount,
+        )
+      }
+    }
+  })
+
+  it('agrees when group pricing is off', () => {
+    expect(discountedLessonCents(2500, 4, false)).toBe(10000)
+    expect(guestFacingPriceCents(2500, 4, false)).toBe(
+      calculateGuestCharge(10000, 'card').totalAmount,
+    )
+    expect(paynowPriceCents(2500, 4, false)).toBe(
+      calculateGuestCharge(10000, 'paynow').totalAmount,
+    )
+  })
+
+  it('labels the live all-in price per person', () => {
+    expect(groupPriceLabel(2500, 1)).toBe('$28 per person')
+    expect(groupPriceLabel(2500, 2)).toBe('$27 each · 5% group discount')
+    expect(groupPriceLabel(2500, 4, false)).toBe('$28 each')
+    expect(groupPriceLabel(135800, 1)).toBe('$1,521 per person')
+    expect(discountedPerPersonCents(2500, 4)).toBe(2125)
+  })
+
+  it('shows hosts the public price and their payout, never a guest total', () => {
+    expect(hostListingPriceHint(2500, true)).toBe('Guests see $28 · You receive $25')
+    expect(hostListingPriceHint(2500, false)).toBe(
+      'Guests see $28 · You receive $25 · $22.50 after your first 3 bookings',
+    )
+    expect(hostListingPriceHint(2500, null)).toBe('')
+    expect(hostListingPriceHint(2500)).toBe('')
+    expect(hostListingPriceHint(0)).toBe('')
+    expect(parsePriceInputCents('25')).toBe(2500)
+    expect(parsePriceInputCents('')).toBeNull()
+    expect(parsePriceInputCents(null)).toBeNull()
+    expect(parsePriceInputCents('   ')).toBeNull()
+    expect(parsePriceInputCents('0')).toBeNull()
+    expect(parsePriceInputCents('abc')).toBeNull()
+    expect(hostListingPriceHint(Number.NaN)).toBe('')
+  })
+
+  it('hints the next group tier when one is still available', () => {
+    expect(nextGroupTierHint(1, true, 4)).toBe('Add 1 more for 5% off')
+    expect(nextGroupTierHint(2, true, 4)).toBe('Add 1 more for 10% off')
+    expect(nextGroupTierHint(4, true, 4)).toBe('')
+    expect(nextGroupTierHint(5, true, 10)).toBe('')
+    expect(nextGroupTierHint(2, false, 4)).toBe('')
   })
 })

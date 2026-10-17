@@ -11,6 +11,7 @@ export default defineConfig({
     include: [
       'src/**/*.{test,spec}.{js,jsx}',
       'supabase/functions/**/*.{test,spec}.{js,ts}',
+      'scripts/**/*.{test,spec}.js',
     ],
     exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
     env: {

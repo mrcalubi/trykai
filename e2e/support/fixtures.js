@@ -8,6 +8,22 @@ export const SIGNED_IN_USER = {
   password: 'hunter22',
 }
 
+export function makeMyAccount(overrides = {}) {
+  return {
+    email: SIGNED_IN_USER.email,
+    full_name: 'Kai Host',
+    phone: null,
+    display_name: 'Kai',
+    bio: null,
+    avatar_url: null,
+    is_host: false,
+    verification_status: 'unverified',
+    stripe_payouts_enabled: false,
+    host_strikes: 0,
+    ...overrides,
+  }
+}
+
 /**
  * What Supabase returns from the password grant. The client stores this and
  * answers `getSession()` from it, so the shape has to be complete enough that

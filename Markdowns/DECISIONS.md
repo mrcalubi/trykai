@@ -16,9 +16,11 @@ Two host types on the same browse page. **Peer hosts**, everyday people monetisi
 ### Unified accounts
 One account type, both host and guest. Guest by default, becomes a host on first listing. `is_host` flag handles the distinction. Hosts get a visible badge.
 
-Guest bookings and host tools live as private tabs on your own `/u/:id` profile (Bookings, Hosting for hosts, Listings, Reviews). `/bookings` and `/hosting` redirect there with `?tab=` and keep every other query key, so `?booking=` polling and `?connect=` from Stripe still work. `/dashboard` remains as a first hop so emails and Stripe `return_url`s keep working (`?connect=` still goes to `/hosting` first). Payouts stay in the host area, not account settings. A signed-in user who is not a host does not see a Hosting tab; `/hosting` still lands on their profile and the unknown tab falls back to Bookings. Anyone's public profile is `/u/:id` (display name, listings, reviews received) with no private tabs and no settings gear.
+Guest bookings and host tools live as private tabs on your own `/u/:id` profile (Bookings, Hosting for hosts, Listings, Reviews). `/bookings` and `/hosting` redirect there with `?tab=` and keep every other query key, so `?booking=` polling and `?connect=` from Stripe still work. `/dashboard` remains as a first hop so emails and Stripe `return_url`s keep working (`?connect=` still goes to `/hosting` first). Payouts stay in the host area, not account settings. After Stripe Connect return, Hosting re-reads `stripe_payouts_enabled` from Stripe before showing a message. A signed-in user who is not a host does not see a Hosting tab; `/hosting` still lands on their profile and the unknown tab falls back to Bookings. Anyone's public profile is `/u/:id` (display name, listings, reviews received) with no private tabs and no settings gear.
 
-Profile name, display name, and photo are edited at `/settings` (Profile group). Full name is labelled private, never shown publicly. Email is shown in Account but not changed in-app. Account deletion is contact-support only until the retain-transactions / remove-personal-data split is designed. Log out is on Settings. The avatar in the top nav goes to your own profile.
+Profile name, display name, About (`users.bio`, max 500 characters), and photo are edited at `/settings` (Profile group). Full name is labelled private, never shown publicly. Email is shown in Account but not changed in-app. Account deletion is contact-support only until the retain-transactions / remove-personal-data split is designed. Log out is on Settings and last in the signed-in hamburger. The avatar in the top nav goes to your own profile.
+
+Public profiles and listing-detail Hosted by show that About when it exists. On your own empty profile, "Add a short bio" links to Settings. Listing detail shows the first two lines; when that preview is truncated, an inline "… more" goes to `/u/:id`. The host avatar is a link and is top-aligned with Hosted by. Typed line breaks are kept; long words wrap.
 
 ### Host price band
 S$10 to S$40 is **guidance** for hosts, not a hard rule. CreateListing does not enforce it. The band is where zero-fixed-cost supply sits and where the guest fee was tuned; it is not a CHECK constraint.
@@ -29,9 +31,10 @@ Ask for information when it becomes relevant, not upfront.
 - Booking: phone OTP
 - Creating a listing: ID and selfie verification
 - Do not ask for date of birth or address at signup
+- Age 18+ at signup is a required self-declaration checkbox (Terms and Privacy), not a date of birth
 
 ### Location handling
-Public listings show general area only, e.g. "Tampines". Full address is revealed only after a confirmed booking, and must never appear in a browse or search query. Mirrors Airbnb, protects host privacy.
+Hosts pick a URA planning area (55 names, FK to `planning_areas`). Public listings show that name, e.g. "Tampines". Browse filters by the five regions (Central, North, North-East, East, West), not by planning area. Full address is revealed only after a confirmed booking, and must never appear in a browse or search query. Mirrors Airbnb, protects host privacy.
 
 **Implementation, 31 August:** guests get the address via `get_listing_address` (confirmed booking only). Public pages do not SELECT `full_address`. The column is still granted on `listings` from `00001`, so a crafted query can still read it. Hosts edit the address via listings SELECT; the RPC does not return it to the owning host.
 
@@ -46,7 +49,7 @@ Reviews are the core trust mechanism, not vetting.
 **Stripe Identity is the default path**, decided 10 September 2026: a hosted document plus live-selfie check, USD 1.50 per completed verification, and **TryKai never stores the images**. Manual upload to the private `verification-docs` bucket is the fallback, reviewed by Caleb at **`/admin/verifications`** (not the Table Editor). Consent is explicit and recorded. Status flow: unverified → pending → approved → rejected, now with a CHECK constraint, and **only approved, unsuspended hosts can insert a listing or a session**, enforced in RLS rather than in the page. Every decision writes a `verification_reviews` audit row.
 
 ### Browse
-Live now: category pills (built from listing data, not a fixed six-item list) and an area dropdown, both combinable. Order is newest (`created_at` desc). **Sort by price or most reviewed is not built.** Browse and profile listing cards put price on the left of the meta line and `★ average (count)` on the right from `listing_ratings` when that listing has guest reviews; a listing with none is price only, never an empty star.
+Live now: category pills (built from listing data, not a fixed six-item list) and a region filter (All, Central, North, North-East, East, West), both combinable. Listing detail and hosting rows still show the planning area name. Order is newest (`created_at` desc). **Sort by price or most reviewed is not built.** Browse and profile listing cards put price on the left of the meta line and `★ average (count)` on the right from `listing_ratings` when that listing has guest reviews; a listing with none is price only, never an empty star.
 Stage 2: "This weekend" filter, price range slider.
 Stage 3: personalisation from booking history.
 
@@ -68,7 +71,7 @@ An optional layer hosts enable on Lane 1 listings only. Host specifies what is d
 ### Identity and social layer
 *Decided direction, to build post MVP, except the thin public profile below.*
 
-**Public profile (30 September 2026).** `/u/:id` is public. Avatar, display name, ID-verified badge if approved, host rating and count (hidden when none), active listings, reviews received as a host. Reviews they wrote as a guest are not shown. Your own profile adds Bookings (default), Hosting (hosts only), Listings, and Reviews tabs, with a gear to `/settings`. Other people's profiles stay listings + reviews only. Public surfaces (this page, Hosted by, review cards) show `display_name`, falling back to the first word of `full_name`. Review RPCs return the reviewer's `display_name` in jsonb `users.full_name`. `full_name` is still SELECT-able through the API.
+**Public profile (30 September 2026; About 12 October 2026; PII lock 17 October 2026).** `/u/:id` is public. Avatar, display name, ID-verified badge if `is_id_verified`, host rating and count (hidden when none), optional About (`users.bio`), active listings, reviews received as a host. Reviews they wrote as a guest are not shown. Your own profile adds Bookings (default), Hosting (hosts only), Listings, and Reviews tabs, with a gear to `/settings`. Other people's profiles stay listings + reviews only, plus About when a bio exists. Public surfaces (this page, Hosted by, review cards) show `display_name` only — no `full_name` fallback. Review RPCs return the reviewer's `display_name` in jsonb `users.full_name`. Own email, legal name, phone, and verification status are read through `my_account()`, not `/rest/v1/users`. RLS `"Anyone can view host profiles" USING (true)` stays; the sensitive columns are no longer granted.
 
 The rest of the guest profile as a public artefact that accumulates remains post MVP. Every completed session adds to a visible log. Lane 2 progress shown explicitly with a progress indicator toward a stated goal.
 
@@ -111,16 +114,19 @@ The per host version fixes both problems. It starts earning from day one regardl
 
 All three have to be true together, not just one. A host irritated by the fee with no relationship yet has no way to act on it. A host with a great relationship where going direct saves the guest nothing has no reason to. This is why leakage risk concentrates in Lane 2's repeat, multi session relationships far more than in a one off Lane 1 booking, and worth noting that the per host waiver mechanism above means the fee starts biting a host at roughly the same point a repeat relationship with a guest would start to form. Not a reason to change the mechanism, but worth designing Lane 2's defences with this overlap specifically in mind when that lane is built.
 
+### Recurring sessions
+There is no series object. Recurring is bulk-create: the host picks dates on a calendar (or quick-fills weekdays every 1 / 2 weeks), one or more start times, and each date × time becomes a normal independent session. Max 40 per batch. The calendar matches the PayNow window (tomorrow through today + 80 days). Preview skips past times, clashes with any existing session of that host, and clashes inside the batch. Each keep is created through `add_listing_session` (or the legacy INSERT). The database overlap trigger and `add_listing_session` are per listing; the preview is host-wide. Making the DB check host-wide is a candidate migration. A linked series is post-launch if hosts ask.
+
 ### Group bookings
-*Decided 16 August 2026.*
+*Decided 10 October 2026. Supersedes the 16 August "hosts set tiers" wording.*
 
-**Host funded, host opt-in, TryKai suggests the tiers.** Hosts set a reduced per person price for larger groups.
+**Automatic platform tiers, host can turn them off per listing.** Guests pick 1 to N people on one booking, N = min(spots remaining, 10). The lesson price per person is discounted 5% for 2, 10% for 3, 15% for 4, and 20% for 5 or more. Never more than 20%. Hosts keep group pricing on by default (`listings.group_pricing`) and can switch it off on Create and Edit listing. They do not set their own tiers.
 
-The economics justify it from both sides. A host at S$25 per person with S$8 of materials over a two hour commitment earns S$17 an hour with two guests and S$29 an hour with four guests at a 10 per cent group discount. Fill rate is worth roughly four times what any fee costs them.
+The lesson total is the discounted per-person price times guests, in integer cents. The card fee (12%, S$2.50 floor, round up) applies once to that total. PayNow is 5% off that card total. The host fee is 10% of the discounted lesson. A group booking is one booking toward a host's first three free.
 
-For TryKai a discounted four person booking nets about S$5.70 against S$5.90 for four separate full price bookings. **The discount costs about twenty cents and brings three new users.** Against Singapore consumer CAC of S$5 to S$20 that is the cheapest acquisition channel available. On card it costs nothing at all, because one larger transaction amortises Stripe's fixed S$0.50.
+Cancellation is the whole booking only, same four refund tiers. Removing one guest from a paid group booking is the first post-launch money item.
 
-**Group discounts are an acquisition mechanic that looks like a discount.** Present the per head price falling live as guests are added at checkout. The message is not "save 10 per cent", it is "the more of you, the cheaper it gets", which is how a group already thinks about a night out.
+The 16 August economics still hold: fill rate is worth more than the discount, and one larger transaction is cheap acquisition. Present the per-head price falling live at checkout.
 
 ### Date Mode, revised
 *Revised 16 August 2026. Supersedes the single paid add-on in the original spec.*
@@ -209,6 +215,8 @@ Card settlement moved to T+1 in August 2026. A separate S$0.50 in person termina
 
 **PayNow shows a flat 5 per cent off that same total, displayed prominently at checkout, never before.** The price only ever gets cheaper than what was advertised, never more expensive, which is what makes this impossible to read as a bait and switch.
 
+**PayNow is only offered for sessions starting within 80 days.** Stripe cannot refund a PayNow payment more than 90 days after it was taken. 80 days leaves a buffer so a guest who pays today and cancels close to the session still falls inside that window. `create-payment-intent` is the source of truth (`paynow_too_far_ahead`). Checkout disables PayNow and shows card pricing. Card is unaffected. Hosts add sessions on the same 80-day calendar (tomorrow through today + 80 days).
+
 Why 5 per cent and not a smaller or larger figure: tested at 4, 5, 6, and 8 per cent across the S$10 to S$40 band. At 4 per cent the saving is too small to register, as low as $0.52. At 6 and 8 per cent TryKai's margin on PayNow starts collapsing at exactly the price points hosts are told to target, recreating the original dead spot problem in a new place. 5 per cent is the point where the guest saving is real everywhere, roughly $0.65 to $2.25 across the band, and TryKai's net stays healthy throughout, never dropping below $1.25 on card or PayNow.
 
 Worked example at the target $25 host price: guest sees $28 everywhere. Choosing PayNow drops it to $26.60 at the final step, shown as a bold percentage saving rather than a dollar amount, since the percentage registers far more strongly than the underlying few dollars.
@@ -240,6 +248,8 @@ Published at /cancellation-policy, /refund-policy, /dispute-policy. Finalised 29
 
 **Quality complaints:** 7 day window, 2 business day response target.
 
+**Stripe keeps its processing fee on refunds.** About S$1.45 on a S$28 card booking, about S$0.35 on PayNow. Launch still pays full refunds for guest 48h+ and host cancellations, so TryKai absorbs that fee. Review after the first 100 bookings; leaning towards making the booking fee non-refundable on 48h+ guest cancellations, with notice to users.
+
 **Payout collision:** if a dispute is confirmed after a payout has released, TryKai refunds the guest first, absorbs the cost, and recovers from the host including from future payouts. `release-payout` now exists and Transfers 24h after `starts_at`. It does **not** hold for open disputes; it only skips rows with `stripe_refund_id` set. Clawback after release is still not built.
 
 ---
@@ -252,13 +262,13 @@ Sole proprietorship, TRYKAI, UEN 53526159D, SSIC 63209. Registered address is ho
 **No legal separation between Caleb and the business.** All liabilities are personal. Given real money, strangers meeting in person, and physical activity, this is a meaningful exposure. Full detail in BUSINESS.md section 11.
 
 ### Terms of Service and Privacy Policy
-Full draft exists as `TryKai_Terms_Privacy_DRAFT.docx`, covering platform terms, host terms, guest booking terms, and privacy policy. **Not lawyer reviewed. Not published.**
+Published at `/terms` and `/privacy` (7 October 2026). Source copies live in `Markdowns/Policies/`. **Not lawyer reviewed.**
 
 **Layered acceptance**, not one blanket checkbox:
-- Signup: platform terms and privacy policy, age 18+ gate
-- Create listing: host terms, liability, fees, payouts, indemnity
-- Checkout: guest booking terms and cancellation policy
-- Verification: privacy policy linked specifically re NRIC and selfie handling
+- Signup: **live.** Required checkbox "I'm 18 or older and agree to the Terms and Privacy Policy", both linked. Sign up is disabled until ticked. `users.terms_accepted_at` is set by `handle_new_user` from signup metadata (`00017`). Existing accounts are not backfilled. Not client-writable.
+- Create listing: host terms, liability, fees, payouts, indemnity — **not built**
+- Checkout: guest booking terms and cancellation policy — **not built**
+- Verification: privacy policy linked specifically re NRIC and selfie handling (manual consent checkbox exists; not a second acknowledge of the published policy)
 
 Each acknowledgment ties to the specific risky action, which is better UX than a wall of text at signup and more defensible than a single upfront agreement.
 
@@ -276,9 +286,9 @@ DPO is Caleb. Contact is **privacy@trykai.sg**, an alias on his individual mailb
 ### Data retention
 - **Rejected verification documents:** deleted after 30 days by `purge-verification-docs`, scheduled daily. Long enough for resubmission confusion, short enough to limit exposure. Stripe Identity rejections store no images, so there is nothing to delete.
 - **Approved host verification documents:** retained while the account is active.
-- **Closed accounts:** core records, not ID images, retained 6 months, then purged.
+- **Closed accounts:** published Privacy Policy (7 October 2026): profile data deleted within 6 months of closure; booking and payment records kept for 5 years after the transaction.
 
-**Open gap:** five year transaction record retention is the normal expectation for anything payments adjacent, and TryKai does not currently meet it. Aspire was told this honestly during onboarding. Needs a decision.
+**Open gap:** five year booking/payment retention is now the published policy. Confirm the data layer actually retains those rows that long (there is no purge of bookings, and no separate archive job). Aspire was told this honestly during onboarding.
 
 ### Benchmarking against SmileTutor
 An existing Singapore middleman platform with comparable real world meetup liability. Their T&C uses the same "not liable for disputes between the parties" framing, confirming ours is industry standard rather than unusually weak. They explicitly disclaim guaranteeing tutor qualifications since they rely on user submitted information, which makes **TryKai's ID verification stronger vetting than theirs**. They also control first contact, sharing personal details only after confirmation, which validates our delayed address disclosure. Takeaway: there is no cleverer legal trick being used by comparable platforms.
@@ -312,7 +322,7 @@ Onboarding required a business plan with three year projections, since there is 
 **Access control:** do not share the login. If Aakash needs spending ability, issue an Aspire card with a set limit instead.
 
 ### Transactional email
-Three flows live via Resend: new booking to host and guest (from `stripe-webhook`), new manual verification submission to Caleb (from `notify-verification-pending`, gated by `NOTIFY_FUNCTION_SECRET`), verification result to host (from `admin-verifications` or `stripe-webhook`, whichever decided), and cancellation (from `cancel-booking`: guest always, with the refund amount including $0; host only when `cancelled_by = 'guest'`). **All send from `TryKai <no-reply@trykai.sg>`.** trykai.sg is verified in Resend (14 September 2026). A missing `RESEND_API_KEY` is logged. `notify-verification-result` was removed once those result emails moved.
+Four flows live via Resend: new booking to host and guest (from `stripe-webhook`), new manual verification submission to Caleb (from `notify-verification-pending`, gated by `NOTIFY_FUNCTION_SECRET`), verification result to host (from `admin-verifications` or `stripe-webhook`, whichever decided), and cancellation (from `cancel-booking` and `admin-cancel-booking`). Booking emails greet by `display_name` ("Hi caleb2,"), use short sentences, and sign off "See you there," or "Take care," then "The TryKai team". At most one exclamation mark per email. Guest confirmation subject is `You're in! <listing> on <Sat, 20 Mar>`; the body opens "You're booked with <host>. Here's everything you need.", includes What's provided when the listing has any, an Add to Google Calendar link, all-in price lines with no separate booking-fee row, and one quiet "Need to change plans? Cancellation policy" line — not the three refund-tier dates. Guest cancel subject is `Booking cancelled: <listing> · $X refund` (or without the amount when $0); the body opens "Sorry you can't make it" and includes the session date and time. Timing is one line for the method used (card 5–10 business days, or PayNow usually faster than card). Host cancel emails the guest "<host> had to cancel <listing>" and a full refund; the CTA is the host's other upcoming sessions of that listing, or `/?category=` when there are none. The host then gets their own strike email (guest count phrasing, no amounts, appeal link `/cancellation-policy#appeals`). Guest mail reply-to is `hello@trykai.sg`. **All send from `TryKai <no-reply@trykai.sg>`.** trykai.sg is verified in Resend (14 September 2026). A missing `RESEND_API_KEY` is logged. `notify-verification-result` was removed once those result emails moved.
 
 ### Domain
 trykai.sg via Vodien, two years, ~$75.98. SGNIC identity verification completed.
@@ -327,7 +337,7 @@ trykai.sg via Vodien, two years, ~$75.98. SGNIC identity verification completed.
 
 Full visual identity is in DESIGN.md.
 
-**Chrome (30 September 2026).** The avatar in the top nav links to your own `/u/:id`. There is no avatar dropdown. Settings is a gear on your own profile header; Log out is on `/settings`. Signed-in hamburger: Browse, Create listing / Become a host, Verification review (admins only, via `my_verification()`). Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links.
+**Chrome (30 September 2026; host entry 17 October 2026).** The avatar in the top nav links to your own `/u/:id`. There is no avatar dropdown. Settings is a gear on your own profile header; Log out is on `/settings` and last in the signed-in hamburger, visually separated. Signed-in hamburger: Browse, **Host a session** (verified) or **Become a host** (not yet verified), Verification review (admins only, via `my_verification()`), Profile, Settings, Log out. Own-profile tabs replace the current history entry (`?tab=` stays deep-linkable). Signed-out hamburger is unchanged: Log in or sign up, Browse, three policy links. The hamburger toggle is ✕ while the menu is open, and the menu closes on a link tap, a tap outside, Escape, and route change. Every page except Home has a shared back row under the nav (circled SVG chevron, 16–24px below the bar): browser history when there is an in-app previous page, otherwise Home. Listing detail puts a ⋮ in that row's right slot (Report listing). Other people's profiles put a ⋮ on the display-name row (Report profile). Review cards keep Report review in the same OverflowMenu. Report is hidden when the listing, profile, or review belongs to the signed-in user; an empty menu is not rendered. The listing booking card hides "Pick a date, then a time" when there are no upcoming sessions and shows only "No upcoming sessions yet." Password fields hide the browser's native reveal so only the kit eye toggle shows.
 
 ---
 
@@ -338,7 +348,7 @@ Full visual identity is in DESIGN.md.
 | Search bar | 100+ active listings. Category filters cover discoverability below that. |
 | Credit bundles, ClassPass style | 500+ bookings, clear repeat behaviour. 5 sessions at 15% off. Creates float on prepaid credits. |
 | Multi session courses | 500+ bookings, or whenever Lane 2 launches. Full payment upfront, released per session completed, pro rata refund if the host cancels mid course. This per session release is what keeps TryKai in the loop and prevents leakage. |
-| Group discounts | Stage 2. 2 to 3 pax 5% off, 4+ pax 10% off. |
+| Group discounts | Live 10 October 2026. Automatic 5 / 10 / 15 / 20. Hosts can turn it off per listing. Partial cancel ("remove a guest") is post-launch. |
 | "This weekend" filter | 50+ active listings with upcoming sessions. High value for the core "nothing to do" use case. |
 | Host listing performance nudges | 50+ listings. View count and conversion per listing, with prompts like "47 views, 0 bookings, consider lowering price or adding photos". Modelled on Carousell seller advice. |
 | In app notifications | Post MVP. Simple unread badge. |
@@ -448,7 +458,7 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-09-11 — Rejected verification documents are deleted after 30 days, and the notify functions are no longer open relays.** Implementation of the retention rule already in Part A. `purge-verification-docs` is secret-gated (`VERIFICATION_PURGE_SECRET` or `CRON_SECRET`) and scheduled daily, not hourly: it only needs to run once the window has passed. Storage objects are removed before the URL columns are cleared, so a failed delete is retried rather than orphaned. A later resubmission is left alone because the job only touches rows that are still `rejected`.
 
-`notify-verification-pending` now requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer) and links to `/admin/verifications` instead of the Table Editor. `notify-verification-result` is deleted; hosts already hear about the decision from `admin-verifications` and `stripe-webhook`. **2026-09-14 — trykai.sg is verified in Resend.** From-address is `TryKai <no-reply@trykai.sg>`. **2026-09-14 — cancellation emails.** `cancel-booking` emails the guest the refund amount (including $0) and the host only when the guest cancelled. A send failure cannot fail the refund.
+`notify-verification-pending` now requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer) and links to `/admin/verifications` instead of the Table Editor. `notify-verification-result` is deleted; hosts already hear about the decision from `admin-verifications` and `stripe-webhook`. **2026-09-14 — trykai.sg is verified in Resend.** From-address is `TryKai <no-reply@trykai.sg>`. **2026-09-14 — cancellation emails.** `cancel-booking` emails the guest the refund amount (including $0) and the host only when the guest cancelled. A send failure cannot fail the refund. **2026-10-17 — those emails are receipts** (reference, listing, method); `admin-cancel-booking` emails the guest too. **Same day — warmth and personalisation:** greet by display name; host session cancel now emails the host a strike notice.
 
 **2026-09-19 — Dashboard split into `/bookings` and `/hosting`.** One account is still both guest and host; the mixed dashboard page is not. Guest view is `/bookings`. Host view (listings, hosted sessions, Connect payouts) is `/hosting`. `/dashboard` redirects to `/bookings`, except `?connect=` which goes to `/hosting`. Non-hosts hitting `/hosting` go to `/bookings`. Emails and Stripe return URLs still use `/dashboard`.
 
@@ -477,6 +487,42 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-09-30 — Host rating star, hidden profile-tab scrollbars, My Listings grid, browse meta.** Profile header and listing-detail Hosted by show `★ average · N reviews` with the glyph in `--star` (`HostRating`). Own-profile tabs still scroll sideways on a narrow screen but never show a scrollbar. My Listings is one card per row below 1024px and two from 1024px; each card keeps thumbnail and title on one line, the ⋯ menu in the top-right corner, and Add session as a full-width secondary button below, with tighter phone padding. Browse cards put price on the left of the meta line and `★ average (count)` on the right in the body font (text colour, count `--muted`); no rating still means price only.
 
+**2026-10-07 — Hosts pick a URA planning area; browse filters by region.** Supersedes the area dropdown built from whatever strings listings already had, and the shorter hardcoded create/edit list that included Katong (a neighbourhood, not a planning area). `planning_areas` (`00016`) is the 55 Master Plan names, each tagged Central, North, North-East, East, or West, with public SELECT. `listings.area` is a FK to that table. Existing values are mapped by case-insensitive exact match; anything else is set to null rather than guessed. Create and edit use a searchable dropdown of those 55 names. Home filters All / the five regions, combinable with category. Cards and listing detail still show the planning area name.
+
+**2026-10-07 — Terms and Privacy published; agreement recorded at signup.** `/terms` and `/privacy` are live policy pages in the same layout as refund, cancellation, and dispute. Footer adds Terms, Privacy, UEN 53526159D, and `privacy@trykai.sg`. Signup requires "I'm 18 or older and agree to the Terms and Privacy Policy" (both linked); Sign up stays disabled until ticked. `users.terms_accepted_at` (`00017`) is set by `handle_new_user` from metadata `terms_accepted`; existing rows stay null; the column is not client-writable or readable. The cancellation page no longer promises rescheduling (not built) and says cancel from "your profile" rather than a dashboard. Create-listing and checkout T&C checkboxes are still not built. The published Privacy Policy commits to 5-year booking and payment retention; that supersedes the open "not decided" retention question as a policy statement (ops still needs to confirm the data layer keeps those rows).
+
+**2026-10-10 — Group bookings use automatic platform tiers.** Supersedes the 16 August "hosts set tiers" wording. Guests pick 1 to min(spots remaining, 10). Lesson price per person is 5 / 10 / 15 / 20 percent off for 2 / 3 / 4 / 5+ guests. Hosts can turn `listings.group_pricing` off (`00020`, default true). Card fee and PayNow 5% apply once to the discounted lesson total. Host fee is 10% of that total; a group booking is one row toward the first three free. Cancellation is the whole booking only. Create listing requires "I agree to the Host terms" (`/terms#part-2-hosting`). Checkout has "By booking, you agree to the Booking terms and Cancellation Policy". Duration displays as hours and minutes. Partial cancel ("remove a guest") is the first post-launch money item.
+
+**2026-10-12 — Every user can write a short About.** `users.bio` (`00021`) is public, trimmed, max 500 characters, nullable. SELECT to anon and authenticated, UPDATE to authenticated. `guard_user_self_update` does not inspect it. Settings Profile has "About you" with a live 0/500 count. `/u/:id` shows an About section under the header when a bio exists; your own empty profile shows "Add a short bio" to Settings. Listing-detail Hosted by shows the first two lines plus "More about \<display name\>", or nothing. Typed line breaks are kept; long words wrap.
+
+**2026-10-13 — Hosting re-reads Connect status after Stripe return (bug 4).** `?connect=return` and `?connect=refresh` call `create-account-link` `{ refresh: true }`, which retrieves the connected account and saves `stripe_payouts_enabled`. Hosting then shows “Payouts are set up. Guests can now book you.” or “Your payout setup isn't finished yet.” plus Continue setup. It never shows “submitted” without that check. `stripe-webhook` accepts `STRIPE_WEBHOOK_SECRET` or `STRIPE_CONNECT_WEBHOOK_SECRET`; `account.updated` still matches `stripe_account_id`.
+
+**2026-10-17 — Booking emails are receipts.** Confirmation and cancellation mail from `stripe-webhook`, `cancel-booking`, and `admin-cancel-booking` use a short booking reference (first 8 characters of the id, uppercase), listing details, and Singapore times. Guest confirmation shows the all-in price (`$X per person x 1 guest` / `N guests`), a group-discount line when that rate applies, a PayNow saving when that rail was used, total paid, and the payment method — never a separate booking-fee line. Reply-to is `hello@trykai.sg`. View booking goes to `/bookings/:id`. The host mail states the payout after any host fee. Guest cancellation mail includes the same reference plus refund amount and method; the host mail states only the host payout under that refund tier.
+
+**2026-10-17 — Hosts never see an individual guest's payment or refund.** Hosts see only what they will receive. The Hosting cancel warning is "Cancelling refunds your guest / both guests / all N guests in full and adds a strike to your account" — no per-guest amounts. The guest-cancel host email says `You'll receive $Z` or `You won't receive a payout for this booking`. The public listing price may still be shown to hosts, including on Create and Edit listing as "Guests see $28 · You receive $25" (plus "$22.50 after your first 3 bookings" for non-founding hosts).
+
+**2026-10-17 — Booking emails are warm and personal.** Supersedes the receipt-only tone from earlier today. Always greet by display name. Guest confirmation drops the three refund-tier lines for one footer Cancellation policy link, adds What's provided and Add to Google Calendar, and uses subject `You're in! <listing> on <weekday, day month>`. Guest-cancel and host-cancel guest mail state refund timing from the refund policy and point back to the listing or a category-filtered Home. Hosts who cancel a session now get a strike email with no guest amounts and a link to `/cancellation-policy#appeals`. Voice: short sentences, at most one exclamation mark.
+
+**2026-10-17 — Refund timing is 5 to 10 business days, PayNow usually faster.** Emails and `/refund-policy` use that one sentence. No hours-or-one-day promise. PayNow refunds cannot be issued more than 90 days after payment; if Stripe cannot complete an automatic refund we contact the guest and refund another way. PayNow guest receipts say the bank descriptor is "Stripe Payments Singapore". Checkout now blocks PayNow when the session is more than 80 days away (see same-day entry). `refund.failed` handling remains post-launch (BUILD_BACKLOG P3).
+
+**2026-10-17 — Guest booking detail at `/bookings/:id`.** The confirmation receipt's per-person line is the booking's all-in card total divided by guests (not the 1-guest price), so a $1 lesson for 2 guests on PayNow reads `$2.50 per person x 2 guests` / `PayNow saving $0.25` / `Total paid $4.75`. Group discount is noted only when it changes the card total. View booking and the profile Bookings cards go to this page. Guest only; everyone else is sent to `/bookings`.
+
+**2026-10-17 — Launch polish: Report, back, hamburger, JWT retry, dates.** UI only. Listing detail puts Report listing in a ⋮ on the back row; other people's profiles put Report profile in a ⋮ on the display-name row; review cards keep Report review in the same OverflowMenu (subject names the listing, profile, or review; body is the page URL, the item id, and "Tell us what's wrong:"). Report is hidden on your own listing, profile, or review, and a ⋮ with no items is not rendered. Every page except Home has a shared back row: circled SVG chevron, `history.state.idx > 0` goes back, otherwise Home. The hamburger toggle is ✕ while open, and the menu closes on link tap, outside tap, Escape, and route change. The listing booking card has a muted guest cancellation line under the Book area (four refund tiers plus host-cancel full refund; no host-strike rows). First data loads retry a JWT "issued at future" error once after 1 second, then show "Something went wrong loading this page. Please refresh." — never raw error text. Session dates on the booking page, booking cards, and session lists show the year only when it is not the current year (`Sat, 20 Mar 2027`).
+
+**2026-10-17 — Launch polish: empty booking card, host more, profile tabs, password eye, hamburger account.** UI only. A listing with no upcoming sessions shows only "No upcoming sessions yet." — not "Pick a date, then a time". Hosted by drops "More about \<name\>"; a truncated bio preview ends with an inline "… more" to the host profile, and the avatar is a top-aligned link. Own-profile tab switches use `replace` so Back leaves the page. Password fields hide `::-ms-reveal` / `::-ms-clear` globally and keep one kit eye toggle (the hold-to-peek eye was also ours and was removed). Signed-in hamburger adds Profile, Settings, and Log out last with a separator; Settings still has Log out.
+
+**2026-10-17 — PayNow is blocked more than 80 days ahead.** Stripe will not refund PayNow after 90 days from payment. Checkout and `create-payment-intent` refuse PayNow when `starts_at` is more than 80 days from now (`PAYNOW_MAX_DAYS_AHEAD`, error `paynow_too_far_ahead`) so a late cancel can still be refunded automatically. Card is unchanged. Hosts may still create sessions further out; those dates are card-only. Supersedes the same-day note that treated this as post-launch only.
+
+**2026-10-17 — Recurring sessions are bulk-create, not a series.** Hosts pick dates (calendar + optional “every weekday, every 1 / 2 weeks, for N weeks”) and one or more times. Each date × time is a normal independent session. The calendar matches the PayNow window: tomorrow through today + 80 days (`PAYNOW_MAX_DAYS_AHEAD`). Max 40 per batch. Preview skips past, host-wide clashes, and in-batch clashes; `add_listing_session` remains the final overlap guard. Hosting lists booked sessions first, then the next 3 empty ones with “Show all N open sessions”, and empty rows can be tick-selected for `delete_empty_session`. A linked series is post-launch if hosts ask. Supersedes the same-day PayNow note that hosts can still create sessions further out — the add-sessions UI now stops at 80 days.
+
+**2026-10-17 — Refund costs stay with TryKai at launch.** Stripe keeps its processing fee on refunds (~S$1.45 on a S$28 card booking, ~S$0.35 PayNow). Guest 48h+ and host cancellations still get a full refund. Review after the first 100 bookings; leaning towards making the booking fee non-refundable on 48h+ guest cancellations, with notice.
+
+**2026-10-17 — Session overlap is per listing in the database, host-wide in preview.** `sessions_reject_overlap` and `add_listing_session` only look at the same listing. The add-sessions preview checks every upcoming session of this host. Making the DB check host-wide is a candidate migration (BUILD_BACKLOG P3).
+
+**2026-10-17 — Host entry is Host a session or Become a host.** Verified hosts get **Host a session** → `/create-listing`. Pending, unverified, and rejected get **Become a host** → `/verify-identity`. The Identity verified page is only for the moment verification lands; later visits redirect to create listing. Founding-host status for the create/edit price hint is `my_is_founding_host()` (`00022`); `users.is_founding_host` stays ungranted. If that RPC errors, the hint is hidden rather than showing the 10% line.
+
+**2026-10-17 — `/rest/v1/users` was dumping every user's PII.** RLS `"Anyone can view host profiles" USING (true)` plus the `00005` SELECT grant meant anon and authenticated could read `email`, `full_name`, `phone`, `phone_verified`, `host_strikes`, `created_at`, and `verification_status` for every row. Column grants are table-wide, so own-row-only access cannot be a GRANT. `00023` revokes those columns, adds generated `is_id_verified` for the public badge, and adds security-definer `my_account()` (`auth.uid()` only) for the caller's own email, legal name, phone, display name, bio, avatar, host flag, verification status, payouts flag, and strikes. Public SELECT kept: `id`, `display_name`, `bio`, `avatar_url`, `is_host`, `stripe_payouts_enabled`, `is_id_verified`. RLS is unchanged.
+
 ---
 
 # Analysed but not decided
@@ -487,6 +533,6 @@ Live questions with work already done. Each needs a call.
 
 **Which axis drives top level navigation.** Casual versus professional is orthogonal to one-off versus progression. The documents currently assume Lane 1 and Lane 2 drive the top level. A business tab would quietly introduce a second axis and a two by two. Needs a deliberate decision before either is built.
 
-**Five year transaction retention.** Standard expectation for anything payments adjacent. TryKai does not currently meet it and Aspire was told so honestly. Not decided.
+**Five year transaction retention.** Standard expectation for anything payments adjacent. **Superseded 7 October 2026 as a policy statement:** the published Privacy Policy keeps booking and payment records for 5 years. Whether the data layer needs an explicit archive job is ops, not an open product decision.
 
 **Gamified, shareable dashboard.** Parked until there is usage data to build it on. Not decided.

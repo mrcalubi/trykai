@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import CancellationPolicy from './CancellationPolicy'
 import DisputePolicy from './DisputePolicy'
 import RefundPolicy from './RefundPolicy'
+import Terms from './Terms'
+import Privacy from './Privacy'
 import { renderWithRouter } from '../test/render'
 
 /**
@@ -33,6 +35,10 @@ describe('Cancellation Policy page', () => {
 
   it('gives hosts seven days to appeal a strike', () => {
     expect(screen.getByText(/submit an appeal within 7 days of the\s+cancellation/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Appealing a strike' })).toHaveAttribute(
+      'id',
+      'appeals',
+    )
   })
 
   it('links to the refund and dispute policies', () => {
@@ -52,6 +58,16 @@ describe('Cancellation Policy page', () => {
       'mailto:hello@trykai.sg'
     )
   })
+
+  it('tells guests to cancel from their profile, not a dashboard', () => {
+    expect(screen.getByText(/Cancel anytime from your profile/)).toBeInTheDocument()
+    expect(screen.queryByText(/Dashboard/)).not.toBeInTheDocument()
+  })
+
+  it('does not promise a reschedule that is not built', () => {
+    expect(screen.queryByRole('heading', { name: 'Rescheduling instead of cancelling' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/reschedule your booking/)).not.toBeInTheDocument()
+  })
 })
 
 describe('Refund Policy page', () => {
@@ -59,12 +75,25 @@ describe('Refund Policy page', () => {
     renderWithRouter(<RefundPolicy />)
   })
 
-  it('publishes the processing time for every payment method offered', () => {
-    expect(screen.getByText('Card:')).toBeInTheDocument()
-    expect(screen.getByText(/3 to 5 business days/)).toBeInTheDocument()
-    expect(screen.getByText('PayNow:')).toBeInTheDocument()
-    expect(screen.queryByText('GrabPay:')).not.toBeInTheDocument()
+  it('publishes Stripe timing and the PayNow 90-day limit', () => {
+    expect(
+      screen.getByText(
+        /Card refunds usually take 5 to 10 business days to appear\. PayNow\s+refunds are usually faster\./,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        /PayNow refunds can only be made within 90 days of payment/,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/we'll contact you and\s+refund you another way/),
+    ).toBeInTheDocument()
     expect(screen.getByText(/through Stripe/)).toBeInTheDocument()
+    expect(screen.queryByText(/HitPay/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/GrabPay/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/3 to 5 business days/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/few hours/)).not.toBeInTheDocument()
   })
 
   it('promises no fee is charged to receive a refund', () => {
@@ -111,5 +140,81 @@ describe('Dispute Policy page', () => {
       'href',
       'mailto:hello@trykai.sg'
     )
+  })
+
+  it('links to the published terms', () => {
+    expect(screen.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute('href', '/terms')
+  })
+})
+
+describe('Terms of Service page', () => {
+  beforeEach(() => {
+    renderWithRouter(<Terms />)
+  })
+
+  it('requires users to be 18 and names the UEN', () => {
+    expect(screen.getByText(/You must be 18 or older/)).toBeInTheDocument()
+    expect(screen.getByText(/UEN 53526159D/)).toBeInTheDocument()
+  })
+
+  it('caps TryKai liability at the booking fee for that booking', () => {
+    expect(
+      screen.getByText(/limited to the booking fee TryKai received for the booking/)
+    ).toBeInTheDocument()
+  })
+
+  it('states the host fee starts on the fourth confirmed booking', () => {
+    expect(screen.getByText(/starting from your fourth confirmed booking/)).toBeInTheDocument()
+  })
+
+  it('anchors the Host and Booking parts for the listing and checkout checkboxes', () => {
+    expect(screen.getByRole('heading', { name: 'Part 2: Hosting' })).toHaveAttribute(
+      'id',
+      'part-2-hosting',
+    )
+    expect(screen.getByRole('heading', { name: 'Part 3: Booking' })).toHaveAttribute(
+      'id',
+      'part-3-booking',
+    )
+  })
+
+  it('links to the privacy, dispute, cancellation and refund policies', () => {
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy')
+    expect(screen.getByRole('link', { name: 'Dispute Policy' })).toHaveAttribute(
+      'href',
+      '/dispute-policy'
+    )
+    expect(screen.getAllByRole('link', { name: 'Cancellation Policy' })[0]).toHaveAttribute(
+      'href',
+      '/cancellation-policy'
+    )
+    expect(screen.getByRole('link', { name: 'Refund Policy' })).toHaveAttribute(
+      'href',
+      '/refund-policy'
+    )
+  })
+})
+
+describe('Privacy Policy page', () => {
+  beforeEach(() => {
+    renderWithRouter(<Privacy />)
+  })
+
+  it('names the DPO and the PDPA', () => {
+    expect(screen.getByText(/Personal Data Protection Act 2012/)).toBeInTheDocument()
+    expect(screen.getByText(/Caleb Ong/)).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'privacy@trykai.sg' })[0]).toHaveAttribute(
+      'href',
+      'mailto:privacy@trykai.sg'
+    )
+  })
+
+  it('does not claim TryKai stores Stripe Identity images', () => {
+    expect(screen.getByText(/TryKai does not receive or store those images/)).toBeInTheDocument()
+  })
+
+  it('keeps booking records for five years and does not sell personal data', () => {
+    expect(screen.getByText(/kept for 5 years/)).toBeInTheDocument()
+    expect(screen.getByText(/We do not sell personal data/)).toBeInTheDocument()
   })
 })

@@ -26,16 +26,15 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 - Atomic `spots_remaining` decrement via `confirm_paid_booking` (service role only)
 - Guest address reveal via `get_listing_address` (confirmed guest only). `listings.full_address` is still granted SELECT
 - Four tier cancellation refunds via `cancel-booking` (guest emailed the refund amount, including $0). `/bookings` and `/hosting` invoke that function; they do not PATCH bookings from the browser
-- CI: Vitest coverage floors 92% / 90% / 87%, money files 100%, Playwright desktop + phone, Deno type-check of shared Edge modules
+- CI: Vitest coverage floors 92% / 90% / 87%, money files 100%, Playwright desktop + phone, Deno type-check of shared Edge modules. A push to `staging` or `main` deploys every Edge Function after those checks pass. Pull requests do not deploy.
 - Global chrome is `SiteNav` → `TopNav`. `Navbar.jsx` is deleted. Browse uses the kit `Card`. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only
-- Avatar goes to your own `/u/:id`. Signed-in hamburger is Browse, Create listing / Become a host, Verification review for admins. `/bookings` and `/hosting` redirect to profile tabs. `/settings` is Profile + Account, with Log out. `/dashboard` still redirects. Login uses the kit Input with floating labels
+- Avatar goes to your own `/u/:id`. Signed-in hamburger is Browse, Host a session (verified) / Become a host (not yet verified), Verification review for admins. `/bookings` and `/hosting` redirect to profile tabs. `/settings` is Profile + Account, with Log out. `/dashboard` still redirects. Login uses the kit Input with floating labels
 - Resend from-address is `TryKai <no-reply@trykai.sg>`. trykai.sg is verified. Staging booking confirmation emails confirmed arriving
 - StyleGuide category PNGs (`food`, `fitness`, `arts`, `music`) are in `src/assets/categories/`. `public/trykai.png` exists
 - Edge Functions: `create-payment-intent`, `stripe-webhook`, `create-connect-account`, `create-account-link`, `cancel-booking`, `admin-cancel-booking`, `admin-verifications`, `create-identity-session`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`. `notify-verification-result` is gone
 
 **Blocked or in flight**
 - Production vs staging is unconfirmed from this repo. Confirm production has `00008` through `00012`, `RESEND_API_KEY`, and current Edge Function deploys
-- Bug 4: Hosting shows "Payout setup submitted" on `?connect=return` without re-checking `stripe_payouts_enabled`
 - Two test cancellations: confirm Stripe refunds and `cancel-booking invoked` in function logs
 - Apply `00010` plus Vault/`PAYOUT_CRON_SECRET` on each environment. Platform payouts must stay manual
 - P0.4: `is_suspended` exists; listing/session INSERT is blocked by `00008`, but browse and Book still ignore the flag

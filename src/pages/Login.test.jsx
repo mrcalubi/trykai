@@ -26,6 +26,7 @@ async function fillSignup(
   await user.type(screen.getByLabelText('Full name'), name)
   await user.type(screen.getByLabelText('What should we call you?'), displayName)
   await fillCredentials(user, { email, password })
+  await user.click(screen.getByRole('checkbox', { name: /18 or older/ }))
 }
 
 async function switchToSignup(user) {
@@ -51,6 +52,7 @@ describe('Login form', () => {
     expect(password.closest('.ui-field')).toHaveClass('ui-field--floating')
     expect(password).toHaveAttribute('type', 'password')
     expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Hold to peek at password' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute(
       'href',
       '/forgot-password'
@@ -105,6 +107,24 @@ describe('Login form', () => {
     expect(screen.getByLabelText('Full name')).toBeRequired()
     expect(screen.getByLabelText('What should we call you?')).toBeRequired()
     expect(screen.getByLabelText('What should we call you?')).toHaveAttribute('maxLength', '40')
+  })
+
+  it('keeps Sign up disabled until the terms checkbox is ticked', async () => {
+    const { user } = renderLogin()
+    await switchToSignup(user)
+
+    expect(screen.getByRole('button', { name: 'Sign up' })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: /18 or older/ })).toBeRequired()
+    await user.click(screen.getByRole('checkbox', { name: /18 or older/ }))
+    expect(screen.getByRole('button', { name: 'Sign up' })).toBeEnabled()
+  })
+
+  it('links Terms and Privacy Policy from the signup checkbox', async () => {
+    const { user } = renderLogin()
+    await switchToSignup(user)
+
+    expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms')
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy')
   })
 })
 
@@ -182,7 +202,9 @@ describe('Signing up', () => {
     expect(supabase.auth.signUp).toHaveBeenCalledWith({
       email: 'mei@example.com',
       password: 'hunter22',
-      options: { data: { full_name: 'Mei Ling', display_name: 'Mei' } },
+      options: {
+        data: { full_name: 'Mei Ling', display_name: 'Mei', terms_accepted: true },
+      },
     })
     expect(supabase.__calls('users', 'insert')).toHaveLength(0)
   })
@@ -194,6 +216,7 @@ describe('Signing up', () => {
     await user.type(screen.getByLabelText('Full name'), '   ')
     await user.type(screen.getByLabelText('What should we call you?'), 'Mei')
     await fillCredentials(user)
+    await user.click(screen.getByRole('checkbox', { name: /18 or older/ }))
 
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
 
@@ -208,6 +231,7 @@ describe('Signing up', () => {
     await user.type(screen.getByLabelText('Full name'), 'Mei Ling')
     await user.type(screen.getByLabelText('What should we call you?'), '   ')
     await fillCredentials(user)
+    await user.click(screen.getByRole('checkbox', { name: /18 or older/ }))
 
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
 

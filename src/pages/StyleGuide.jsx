@@ -149,7 +149,7 @@ export default function StyleGuide() {
           <article className="style-guide-card">
             <p className="style-guide-card__label">Password</p>
             <p className="style-guide-card__usage">
-              Used for login and signup. Eye sits inside the field and toggles masked and plain text
+              Used for login and signup. Tap the eye to show or hide the password.
             </p>
             <Input
               id="style-guide-password"

@@ -15,8 +15,18 @@ function givenSignedIn(userId = 'host-1') {
   })
 }
 
-function givenVerification(status) {
-  supabase.__on('users', 'select', { data: { verification_status: status }, error: null })
+function givenVerification(status, { foundingHost = false, foundingError = null } = {}) {
+  supabase.rpc.mockImplementation(async (fn) => {
+    if (fn === 'my_verification') {
+      return { data: [{ verification_status: status }], error: null }
+    }
+    if (fn === 'my_is_founding_host') {
+      return foundingError
+        ? { data: null, error: foundingError }
+        : { data: foundingHost, error: null }
+    }
+    return { data: null, error: null }
+  })
 }
 
 // Mounted behind the same guard App.jsx puts it behind, so the page always has
@@ -41,6 +51,7 @@ async function fillValidForm(user, overrides = {}) {
     category: 'Food',
     price: '45',
     maxGuests: '4',
+    duration: '90',
     area: 'Bedok',
     fullAddress: '12 Coffee Road',
     ...overrides,
@@ -52,10 +63,19 @@ async function fillValidForm(user, overrides = {}) {
   await user.selectOptions(screen.getByLabelText('Category'), values.category)
   await user.type(screen.getByLabelText('Price per person (SGD)'), values.price)
   await user.type(screen.getByLabelText('Max guests'), values.maxGuests)
-  await user.selectOptions(screen.getByLabelText('Area'), values.area)
+  await user.type(screen.getByLabelText('Duration (mins)'), values.duration)
+  await choosePlanningArea(user, values.area)
   // The address label also wraps a hint span, so it needs a partial match.
   await user.type(screen.getByLabelText(/^Full address/), values.fullAddress)
+  await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
   return values
+}
+
+async function choosePlanningArea(user, name) {
+  const input = screen.getByLabelText('Area')
+  await user.clear(input)
+  await user.type(input, name)
+  await user.click(screen.getByRole('option', { name }))
 }
 
 function imageFile(name = 'photo.png') {
@@ -88,24 +108,34 @@ describe('CreateListing access control', () => {
 
   it('treats a missing verification record as unverified', async () => {
     givenSignedIn()
-    supabase.__on('users', 'select', { data: null, error: null })
+    supabase.rpc.mockResolvedValue({ data: [], error: null })
     const { currentPath } = renderPage()
 
     await waitFor(() => expect(currentPath()).toBe('/verify-identity'))
   })
 
-  it('holds hosts whose verification is still under review', async () => {
+  it('sends pending hosts to the verification status page', async () => {
     givenSignedIn()
     givenVerification('pending')
-    renderPage()
+    const { currentPath } = renderPage()
 
-    expect(await screen.findByText('Verification under review')).toBeInTheDocument()
+    await waitFor(() => expect(currentPath()).toBe('/verify-identity'))
     expect(screen.queryByLabelText('Title')).not.toBeInTheDocument()
   })
 
   it('shows the form to an approved host', async () => {
     givenSignedIn()
     givenVerification('approved')
+    renderPage()
+
+    expect(await screen.findByLabelText('Title')).toBeInTheDocument()
+  })
+
+  it('still shows the form when founding-host status cannot be read', async () => {
+    givenSignedIn()
+    givenVerification('approved', {
+      foundingError: { message: 'permission denied for column is_founding_host' },
+    })
     renderPage()
 
     expect(await screen.findByLabelText('Title')).toBeInTheDocument()
@@ -156,6 +186,17 @@ describe('CreateListing validation', () => {
     expect(supabase.__calls('listings', 'insert')).toHaveLength(0)
   })
 
+  it('rejects a duration below one minute', async () => {
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await fillValidForm(user, { duration: '0' })
+
+    submitForm()
+
+    expect(await screen.findByText('Duration must be at least 1 minute.')).toBeInTheDocument()
+    expect(supabase.__calls('listings', 'insert')).toHaveLength(0)
+  })
+
   it('rejects a guest count below one', async () => {
     const { user } = renderPage()
     await screen.findByLabelText('Title')
@@ -164,6 +205,72 @@ describe('CreateListing validation', () => {
     submitForm()
 
     expect(await screen.findByText('Max guests must be at least 1.')).toBeInTheDocument()
+  })
+
+  it('keeps Create listing disabled until the host agrees to the Host terms', async () => {
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await user.type(screen.getByLabelText('Title'), 'Latte art')
+    await user.type(screen.getByLabelText('Description'), 'Pull a rosetta.')
+    await user.selectOptions(screen.getByLabelText('Category'), 'Food')
+    await user.type(screen.getByLabelText('Price per person (SGD)'), '25')
+    await user.type(screen.getByLabelText('Max guests'), '4')
+    await user.type(screen.getByLabelText('Duration (mins)'), '90')
+    await choosePlanningArea(user, 'Bedok')
+    await user.type(screen.getByLabelText(/^Full address/), '12 Coffee Road')
+
+    expect(screen.getByRole('button', { name: 'Create listing' })).toBeDisabled()
+    expect(screen.getByRole('link', { name: 'Host terms' })).toHaveAttribute(
+      'href',
+      '/terms#part-2-hosting',
+    )
+
+    await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
+    expect(screen.getByRole('button', { name: 'Create listing' })).toBeEnabled()
+  })
+
+  it('hides the guest-vs-host line until a price is entered', async () => {
+    givenSignedIn()
+    givenVerification('approved')
+    renderPage()
+    await screen.findByLabelText('Title')
+    expect(screen.queryByText(/Guests see/)).not.toBeInTheDocument()
+  })
+
+  it('shows the public guest price and host payout under the price field', async () => {
+    givenSignedIn()
+    givenVerification('approved')
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await user.type(screen.getByLabelText('Price per person (SGD)'), '25')
+
+    expect(
+      screen.getByText('Guests see $28 · You receive $25 · $22.50 after your first 3 bookings')
+    ).toBeInTheDocument()
+  })
+
+  it('omits the later-booking cut for a founding host', async () => {
+    givenSignedIn()
+    givenVerification('approved', { foundingHost: true })
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await user.type(screen.getByLabelText('Price per person (SGD)'), '25')
+
+    expect(screen.getByText('Guests see $28 · You receive $25')).toBeInTheDocument()
+    expect(screen.queryByText(/after your first 3 bookings/)).not.toBeInTheDocument()
+  })
+
+  it('hides the price hint when founding-host status is unknown', async () => {
+    givenSignedIn()
+    givenVerification('approved', {
+      foundingError: { message: 'function my_is_founding_host does not exist' },
+    })
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await user.type(screen.getByLabelText('Price per person (SGD)'), '25')
+
+    expect(screen.queryByText(/Guests see/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/after your first 3 bookings/)).not.toBeInTheDocument()
   })
 })
 
@@ -187,6 +294,8 @@ describe('CreateListing submission', () => {
       category: 'Food',
       price_per_person: 4550,
       max_guests: 4,
+      duration_mins: 90,
+      group_pricing: true,
       area: 'Bedok',
       full_address: '12 Coffee Road',
       is_active: true,
@@ -204,7 +313,19 @@ describe('CreateListing submission', () => {
     expect(supabase.__lastCall('listings', 'insert').payload.price_per_person).toBe(1999)
   })
 
-  it('promotes the user to a host and lands them on the dashboard', async () => {
+  it('lets the host turn group pricing off', async () => {
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await fillValidForm(user)
+    await user.click(screen.getByRole('checkbox', { name: 'Offer group pricing' }))
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'insert')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'insert').payload.group_pricing).toBe(false)
+  })
+
+  it('promotes the user to a host and lands them on the hosting tab', async () => {
     const { user, currentPath } = renderPage()
     await screen.findByLabelText('Title')
     await fillValidForm(user)
@@ -213,7 +334,7 @@ describe('CreateListing submission', () => {
 
     await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
     expect(supabase.__lastCall('users', 'update').payload).toEqual({ is_host: true })
-    await waitFor(() => expect(currentPath()).toBe('/dashboard'))
+    await waitFor(() => expect(currentPath()).toBe('/hosting'))
   })
 
   it('stops and reports a failed insert without promoting the user', async () => {

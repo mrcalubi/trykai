@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   accountLinkParams,
+  applyConnectedAccountPayouts,
   connectAccountCreateParams,
+  connectedAccountFromEvent,
   createConnectedAccount,
+  isAccountLinkRefresh,
   payoutsEnabledFromAccount,
   siteUrlForAccountLinks,
   STRIPE_ACCOUNTS_V2_URL,
@@ -135,5 +138,76 @@ describe('payoutsEnabledFromAccount', () => {
     expect(payoutsEnabledFromAccount({ payouts_enabled: true })).toBe(true)
     expect(payoutsEnabledFromAccount({ payouts_enabled: false })).toBe(false)
     expect(payoutsEnabledFromAccount({})).toBe(false)
+  })
+})
+
+describe('isAccountLinkRefresh', () => {
+  it('is only true for an explicit refresh body', () => {
+    expect(isAccountLinkRefresh({ refresh: true })).toBe(true)
+    expect(isAccountLinkRefresh({})).toBe(false)
+    expect(isAccountLinkRefresh(null)).toBe(false)
+  })
+})
+
+describe('connectedAccountFromEvent', () => {
+  it('reads the Account on data.object and falls back to event.account', () => {
+    expect(
+      connectedAccountFromEvent({
+        data: { object: { id: 'acct_host', payouts_enabled: true } },
+      }),
+    ).toEqual({ id: 'acct_host', payouts_enabled: true })
+    expect(
+      connectedAccountFromEvent({
+        account: 'acct_connect',
+        data: { object: { payouts_enabled: false } },
+      }),
+    ).toEqual({ id: 'acct_connect', payouts_enabled: false })
+    expect(connectedAccountFromEvent({ data: { object: {} } })).toBeNull()
+  })
+})
+
+describe('applyConnectedAccountPayouts', () => {
+  function usersWriter(result: { error?: { message?: string } | null } = { error: null }) {
+    const eq = vi.fn(async () => result)
+    const update = vi.fn(() => ({ eq }))
+    return { admin: { from: vi.fn(() => ({ update })) }, update, eq }
+  }
+
+  it('writes stripe_payouts_enabled for the matching stripe_account_id', async () => {
+    const { admin, update, eq } = usersWriter()
+    await applyConnectedAccountPayouts(admin, { id: 'acct_host', payouts_enabled: true })
+    expect(admin.from).toHaveBeenCalledWith('users')
+    expect(update).toHaveBeenCalledWith({ stripe_payouts_enabled: true })
+    expect(eq).toHaveBeenCalledWith('stripe_account_id', 'acct_host')
+  })
+
+  it('ignores account.updated for an unknown account without throwing', async () => {
+    const { admin, eq } = usersWriter({ error: null })
+    await expect(
+      applyConnectedAccountPayouts(admin, { id: 'acct_unknown', payouts_enabled: true }),
+    ).resolves.toBeUndefined()
+    expect(eq).toHaveBeenCalledWith('stripe_account_id', 'acct_unknown')
+  })
+
+  it('does nothing when the event has no account id', async () => {
+    const { admin, update } = usersWriter()
+    await applyConnectedAccountPayouts(admin, { payouts_enabled: true })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('does not update stripe_payouts_enabled when the account is null', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { admin, update } = usersWriter()
+
+    try {
+      await applyConnectedAccountPayouts(admin, null)
+      expect(update).not.toHaveBeenCalled()
+      expect(admin.from).not.toHaveBeenCalled()
+      expect(log).toHaveBeenCalledWith(
+        'connect: account could not be read; skipping stripe_payouts_enabled update',
+      )
+    } finally {
+      log.mockRestore()
+    }
   })
 })

@@ -19,11 +19,20 @@ test.describe('listing detail', () => {
     await page.goto('/listings/listing-latte')
 
     await expect(page.getByText('Hosted by Mei')).toBeVisible()
+    await expect(page.getByRole('link', { name: "Mei's profile" })).toHaveAttribute(
+      'href',
+      '/u/host-1'
+    )
+    await expect(page.getByText('Pick a date, then a time')).toBeVisible()
+    await expect(page.locator('.detail-area')).toHaveText('Tiong Bahru')
     await expect(page.getByText('$51').first()).toBeVisible()
     await expect(page.getByText('No reviews yet.')).toBeVisible()
     await expect(page.locator('.detail-host__rating')).toHaveCount(0)
     await expect(page.getByText('Pull your first rosetta in ninety minutes.')).toBeVisible()
     await expect(page.getByRole('listitem').filter({ hasText: 'Materials' })).toBeVisible()
+    await expect(page.getByRole('link', { name: '⚑ Report' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'More actions' }).click()
+    await expect(page.getByRole('menuitem', { name: 'Report listing' })).toBeVisible()
   })
 
   test('lists a bookable session with its remaining spots', async ({ page }) => {
@@ -34,7 +43,7 @@ test.describe('listing detail', () => {
     })
     await page.goto('/listings/listing-latte')
 
-    await expect(page.getByText(/90 mins · 3 spots left/)).toBeVisible()
+    await expect(page.getByText(/1 hr 30 min · 3 spots left/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Book' })).toBeEnabled()
   })
 
@@ -49,19 +58,113 @@ test.describe('listing detail', () => {
     await expect(page.getByRole('button', { name: 'Book' })).toBeDisabled()
   })
 
+  test('picks a date on the calendar, then books one of that day’s times', async ({ page }) => {
+    const tenth = {
+      ...OPEN_SESSION,
+      id: 'session-tenth',
+      starts_at: '2099-06-10T03:00:00.000Z',
+      duration_mins: 90,
+      spots_remaining: 3,
+      status: 'open',
+    }
+    const twentieth = {
+      ...OPEN_SESSION,
+      id: 'session-twentieth',
+      starts_at: '2099-06-20T11:00:00.000Z',
+      duration_mins: 45,
+      spots_remaining: 2,
+      status: 'open',
+    }
+    await stubAllExternalCalls(page, {
+      listings: [LATTE_ART],
+      sessions: [tenth, twentieth],
+      reviews: [],
+    })
+    await page.goto('/listings/listing-latte')
+
+    const card = page.locator('.detail-booking-card')
+    const calendar = page.locator('.session-calendar')
+    await expect(calendar).toBeVisible()
+    await expect(page.getByRole('heading', { name: /10 Jun · 1 session/ })).toBeVisible()
+
+    const cardBox = await card.boundingBox()
+    const calendarBox = await calendar.boundingBox()
+    expect(calendarBox.width).toBeLessThanOrEqual(cardBox.width + 1)
+    expect(await calendar.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+
+    await page.getByRole('button', { name: /20 June, 1 session/ }).click()
+    await expect(page.getByRole('heading', { name: /20 Jun · 1 session/ })).toBeVisible()
+    await expect(page.getByText(/45 min · 2 spots left/)).toBeVisible()
+    await expect(page.getByText(/1 hr 30 min · 3 spots left/)).toBeHidden()
+
+    await page.getByRole('button', { name: 'Book' }).click()
+    await expect(page).toHaveURL(/\/login$/)
+  })
+
   test('says when there is nothing available to book', async ({ page }) => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART], sessions: [], reviews: [] })
     await page.goto('/listings/listing-latte')
 
-    await expect(page.getByText('No upcoming sessions available.')).toBeVisible()
+    await expect(page.getByText('No upcoming sessions yet.')).toBeVisible()
+    await expect(page.getByText('Pick a date, then a time')).toHaveCount(0)
   })
 
-  test('reveals the cancellation policy on request', async ({ page }) => {
+  test('disables PayNow when the session is more than 80 days away', async ({ page }) => {
+    await stubAllExternalCalls(
+      page,
+      {
+        listings: [LATTE_ART],
+        sessions: [{ ...OPEN_SESSION, starts_at: hoursFromNow(81 * 24) }],
+        reviews: [],
+        users: [{ id: SIGNED_IN_USER.id, full_name: 'Kai Guest', avatar_url: null, is_host: false }],
+      },
+      { session: makeAuthSession() }
+    )
+
+    await page.goto('/login')
+    await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+    await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+    await expect(page).toHaveURL(/\/$/)
+
+    await page.goto('/listings/listing-latte')
+    await page.getByRole('button', { name: 'Book' }).click()
+
+    await expect(page.getByRole('button', { name: /PayNow/ })).toBeDisabled()
+    await expect(
+      page.getByText('PayNow is available for sessions within 80 days. Please pay by card.')
+    ).toBeVisible()
+    await expect(page.locator('.detail-booking-card__price')).toContainText('$51')
+  })
+
+  test('truncates a long host bio with an inline more link', async ({ page }) => {
+    await stubAllExternalCalls(page, {
+      listings: [
+        {
+          ...LATTE_ART,
+          users: {
+            ...LATTE_ART.users,
+            bio: 'I pull rosettas.\nAlso pour-overs.\nAnd cortados.',
+          },
+        },
+      ],
+      sessions: [OPEN_SESSION],
+      reviews: [],
+    })
+    await page.goto('/listings/listing-latte')
+
+    await expect(page.getByText(/I pull rosettas/)).toBeVisible()
+    await expect(page.getByRole('link', { name: '… more' })).toHaveAttribute('href', '/u/host-1')
+    await expect(page.getByRole('link', { name: /More about/ })).toHaveCount(0)
+  })
+
+  test('reveals the guest cancellation policy on request', async ({ page }) => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART], sessions: [], reviews: [] })
     await page.goto('/listings/listing-latte')
 
+    await expect(page.getByText(/Full refund if you cancel 48\+ hours before/)).toBeVisible()
     await expect(page.getByText('Guest cancels 48+ hours before session:')).toBeHidden()
-    await page.getByRole('button', { name: /Cancellation Policy/ }).click()
+    await page.getByRole('button', { name: 'Cancellation policy' }).click()
 
     await expect(page.getByText('Guest cancels 48+ hours before session:')).toBeVisible()
     await expect(page.getByText('Guest cancels 24–48 hours before session:')).toBeVisible()
@@ -69,6 +172,8 @@ test.describe('listing detail', () => {
     await expect(
       page.getByText('Guest cancels under 6 hours before session, or does not show up:')
     ).toBeVisible()
+    await expect(page.getByText('If the host cancels, you get a full refund')).toBeVisible()
+    await expect(page.getByText(/host receives a strike/)).toHaveCount(0)
   })
 
   test('a signed-out visitor still sees reviews for this listing', async ({ page }) => {

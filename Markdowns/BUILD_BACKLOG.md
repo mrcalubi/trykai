@@ -53,16 +53,15 @@ Verification approval is now on the platform. Suspension that does not hide list
 Not a calendar. Capacity is 8 hours a week.
 
 1. **Ops (not app code):** confirm `00005`, `00008`, `00009`, `00010`, `00011`, and `00012` on each environment; Vault/GitHub secrets for `release-payout`; Stripe Dashboard webhook + secrets; `RESEND_API_KEY` and current Edge Function deploys on production; platform payouts **manual**; flag eleven `is_founding_host`; one staging test-mode booking; confirm the two test cancellations were refunded on Stripe.
-2. **Bug 4:** Hosting treats `?connect=return` as "Payout setup submitted" without re-checking `stripe_payouts_enabled`. Money path.
-3. **P0.4** app actually filters `is_suspended` on browse and Book. Listing/session INSERT is already gated by `can_create_listing()` (`00008`). One-click admin can wait if Table Editor plus this filter is reliable.
-4. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
-5. Browse card rating: the listings fetch does not supply one and there is no aggregate rating column. The card already shows the all-in card price.
-6. **P2.3** review gating is done (`00011`). Then the rest of P2 in listed order.
-7. JWT "issued at future" on browse: retry once, friendly error, never show raw error text.
-8. Host cancel warning: replace per-guest refund amounts with "Cancelling refunds all N guests in full and adds a strike".
-9. Review reminder email, about 3h after session ends.
-10. `full_name` SELECT for anon can be revoked once nothing public reads it (`display_name` is the public name; pages still fall back to `full_name`).
-11. Reword S$10 to S$40 as guidance, not a rule (decided; remaining copy in HOST_ONBOARDING / BUSINESS / HANDOVER).
+2. **P0.4** app actually filters `is_suspended` on browse and Book. Listing/session INSERT is already gated by `can_create_listing()` (`00008`). One-click admin can wait if Table Editor plus this filter is reliable.
+3. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
+4. Browse card rating: the listings fetch does not supply one and there is no aggregate rating column. The card already shows the all-in card price.
+5. **P2.3** review gating is done (`00011`). Then the rest of P2 in listed order.
+6. JWT "issued at future" on browse: retry once, friendly error, never show raw error text.
+7. Host cancel warning: replace per-guest refund amounts with "Cancelling refunds all N guests in full and adds a strike".
+8. Reword S$10 to S$40 as guidance, not a rule (decided; remaining copy in HOST_ONBOARDING / BUSINESS / HANDOVER).
+
+Review reminder email, saved listings, host-to-guest reviews then the review filter, and the `full_name` SELECT revoke are post-launch (P3), not this sequence.
 
 ---
 
@@ -110,7 +109,7 @@ Still to build:
 
 `notify-verification-pending` requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer). `notify-verification-result` is gone; result emails come from `admin-verifications` and `stripe-webhook`. `release-payout` and `admin-cancel-booking` already require a secret; `stripe-webhook` verifies `Stripe-Signature`.
 
-`cancel-booking` emails the guest the refund amount (including $0) and the host only when the guest cancelled. A Resend failure is logged and cannot fail the refund. A missing `RESEND_API_KEY` logs instead of failing silent. `admin-cancel-booking` still does not email.
+`cancel-booking` emails the guest the refund amount (including $0) and the host only when the guest cancelled. A Resend failure is logged and cannot fail the refund. A missing `RESEND_API_KEY` logs instead of failing silent. `admin-cancel-booking` emails the guest the same receipt (reference, listing, refund amount and method).
 
 ### P0.9 — Build assets that CI and chrome depend on — DONE 9 September
 `StyleGuide.jsx` imports `src/assets/categories/food.png`, `fitness.png`, `arts.png`, and `music.png`. Those four files are in the repo. Language/Other imports stay commented out; uncommenting either without adding the PNG fails `vite build`, because App always imports this page. `public/trykai.png` exists. `Navbar.jsx` is deleted; TopNav still requests `/trykai.png` for the brand mark.
@@ -150,7 +149,7 @@ Once per booking, same 48 hour cutoff. Published as available. Recovers bookings
 **Done.** `/bookings` and RLS (`00011` `guest_can_leave_review`) both require a `confirmed` booking after `starts_at + duration_mins`, with `reviewee_id` the listing host. Unique on `(booking_id, role)`. Host→guest reviews are still P2.4.
 
 ### P2.4 — Host to guest reviews
-Two way reviews are promised. Insert policy is guest-only. No host UI.
+**Post launch (P3).** Two way reviews are promised. Insert policy is guest-only. No host UI. After that path exists, the browse rating filter can follow.
 
 ### P2.5 — Session auto complete
 `sessions.status` documents `'completed'`. Nothing ever writes it. Payouts key off `starts_at` + 24h, not this status, so launch can survive without it. Reviews and dispute windows were supposed to key off it.
@@ -180,10 +179,10 @@ Clock skew on the guest JWT can fail the listings fetch. Retry the request once,
 Replace the per-guest refund amounts in the Hosting confirm dialog with: "Cancelling refunds all N guests in full and adds a strike".
 
 ### P2.12 — Review reminder email
-About 3 hours after the session ends, email the guest if they have not left a review.
+**Post launch (P3).** About 3 hours after the session ends, email the guest if they have not left a review.
 
 ### P2.13 — First names are UI-only
-Public surfaces show `display_name` (`00014`). Review RPCs return it in jsonb `users.full_name`. Pages still SELECT `full_name` and fall back to `firstName(full_name)` when `display_name` is empty. The `full_name` column is still granted SELECT to anon and authenticated (`00005`). A crafted query can still read the whole name. Revoke that SELECT for anon once nothing public reads the column.
+**Post launch (P3).** Public surfaces show `display_name` (`00014`). Review RPCs return it in jsonb `users.full_name`. Pages still SELECT `full_name` and fall back to `firstName(full_name)` when `display_name` is empty. The `full_name` column is still granted SELECT to anon and authenticated (`00005`). A crafted query can still read the whole name. Revoke that SELECT for anon once nothing public reads the column.
 
 ### P2.14 — S$10 to S$40 is guidance, not a rule
 Decided 29 September 2026. Remaining: HOST_ONBOARDING, BUSINESS, and HANDOVER still describe it as a hard band. CreateListing already only checks `priceCents > 0`.
@@ -192,9 +191,22 @@ Decided 29 September 2026. Remaining: HOST_ONBOARDING, BUSINESS, and HANDOVER st
 
 ## P3: post launch
 
-Identity and social layer, Date Mode, credit bundles, multi session courses, group discounts, "this weekend" filter, search, in app notifications, listing performance nudges, listing video, host Pro subscription, payout clawback.
+In this order after warm-contact launch:
 
-Automated ID verification (Stripe Identity) and auto deletion of rejected verification documents (`purge-verification-docs`) shipped in September. Do not rebuild them.
+1. **Remove a guest (partial cancel).** Cancellation is the whole booking only. Let a guest drop one person from a paid group booking and refund that share on the same four tiers. First money-path change after launch. Do not build this before launch.
+2. **Linked session series (optional).** Bulk-create of independent sessions is live. Remaining: a real series object if hosts ask to edit or cancel a run as one.
+3. **Review reminder email.** About 3 hours after the session ends, email the guest if they have not left a review. (Also listed as P2.12; wait until after launch.)
+4. **Saved listings.** Guests bookmark a listing to find it again.
+5. **Host-to-guest reviews, then the review filter.** Two-way reviews are promised (P2.4). After that path exists, guests can filter browse by rating.
+6. **`full_name` database-level fix.** Revoke anon SELECT once nothing public reads the column (P2.13). Public surfaces already show `display_name`.
+7. **Handle `refund.failed`.** Stripe can fail a refund after we have already written `cancelled` and emailed the guest. Listen for the event, alert `hello@trykai.sg`, and do not leave the booking looking refunded when it is not.
+8. **Sessions beyond 80 days (closed).** PayNow checkout and the host add-sessions calendar both stop at `PAYNOW_MAX_DAYS_AHEAD` (80). Direct INSERT could still write a later row; no product path does.
+9. **Refund Stripe fees after 100 bookings.** Launch absorbs Stripe’s kept processing fee on full refunds (~S$1.45 card / ~S$0.35 PayNow). Review then; leaning towards making the booking fee non-refundable on 48h+ guest cancellations, with notice.
+10. **Host-wide session overlap in the database.** Preview already refuses a clash with any of this host’s sessions. The trigger and `add_listing_session` are still per listing. Candidate migration if hosts double-book themselves across listings.
+
+Then: identity and social layer, Date Mode, credit bundles, multi session courses, "this weekend" filter, search, in app notifications, listing performance nudges, listing video, host Pro subscription, payout clawback.
+
+Automated ID verification (Stripe Identity) and auto deletion of rejected verification documents (`purge-verification-docs`) shipped in September. Group bookings with automatic pricing shipped 10 October. Profile About (`users.bio`) shipped 12 October. Do not rebuild them.
 
 All specified in DECISIONS.md. None of the remaining items should be touched before launch, regardless of how much runway appears to be left.
 
@@ -205,7 +217,7 @@ All specified in DECISIONS.md. None of the remaining items should be touched bef
 Working today, and stable enough. Do not rewrite them before launch unless you are closing a P0/P2 item above.
 
 - Guest browses and filters listings (the fetch and the filter memos survived the P2.8 grid rebuild untouched; keep it that way)
-- Guest views listing detail and pays (guest-count picker is additive)
+- Guest views listing detail and pays (guest stepper and group pricing are live; do not add partial cancel here)
 - Signup and login (profile row is the `handle_new_user` trigger)
 - Host verification submission (client UPDATE + guard trigger)
 - Host creates a listing (session is a follow-up `/hosting` action)

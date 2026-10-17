@@ -1,43 +1,56 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Card from '../components/ui/Card'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { formatGuestFacingPrice } from '../lib/pricing'
+import { sortListingsForBrowse } from '../lib/listingSort'
+import { REGIONS, regionForPlanningArea } from '../lib/planningAreas'
+import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 
 export default function Home() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [listings, setListings] = useState([])
   const [ratings, setRatings] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('All')
-  const [areaFilter, setAreaFilter] = useState('All')
+  const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || 'All')
+  const [regionFilter, setRegionFilter] = useState('All')
 
   useEffect(() => {
     async function fetchListings() {
-      const { data, error: fetchError } = await supabase
-        .from('listings')
-        .select(
-          `
+      const { data, error: fetchError } = await withIssuedAtRetry(() =>
+        supabase
+          .from('listings')
+          .select(
+            `
           id,
           title,
           area,
           price_per_person,
           category,
-          photo_urls
+          photo_urls,
+          sessions (
+            starts_at,
+            status
+          )
         `
-        )
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
+          )
+          .eq('is_active', true)
+          .eq('sessions.status', 'open')
+          .gt('sessions.starts_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+      )
 
       if (fetchError) {
-        setError(fetchError.message)
+        setError(PAGE_LOAD_ERROR)
         setListings([])
         setRatings({})
         setLoading(false)
         return
       }
 
-      const rows = data ?? []
+      const rows = sortListingsForBrowse(data ?? [])
       const listingIds = rows.map((listing) => listing.id)
       let ratingRows = []
       if (listingIds.length > 0) {
@@ -55,11 +68,6 @@ export default function Home() {
     fetchListings()
   }, [])
 
-  const areas = useMemo(() => {
-    const unique = [...new Set(listings.map((l) => l.area).filter(Boolean))]
-    return unique.sort()
-  }, [listings])
-
   const categories = useMemo(() => {
     const unique = [...new Set(listings.map((l) => l.category).filter(Boolean))]
     return ['All', ...unique.sort()]
@@ -74,10 +82,11 @@ export default function Home() {
     return listings.filter((listing) => {
       const matchesCategory =
         activeCategory === 'All' || listing.category === activeCategory
-      const matchesArea = areaFilter === 'All' || listing.area === areaFilter
-      return matchesCategory && matchesArea
+      const matchesRegion =
+        regionFilter === 'All' || regionForPlanningArea(listing.area) === regionFilter
+      return matchesCategory && matchesRegion
     })
-  }, [listings, activeCategory, areaFilter])
+  }, [listings, activeCategory, regionFilter])
 
   return (
     <div className="page page--browse">
@@ -105,7 +114,13 @@ export default function Home() {
                 <button
                   key={category}
                   type="button"
-                  onClick={() => setCategoryFilter(category)}
+                  onClick={() => {
+                    setCategoryFilter(category)
+                    const params = new URLSearchParams(searchParams)
+                    if (category === 'All') params.delete('category')
+                    else params.set('category', category)
+                    setSearchParams(params, { replace: true })
+                  }}
                   className={`filter-pill${activeCategory === category ? ' filter-pill--active' : ''}`}
                 >
                   {category}
@@ -113,15 +128,15 @@ export default function Home() {
               ))}
             </div>
             <select
-              value={areaFilter}
-              onChange={(e) => setAreaFilter(e.target.value)}
+              value={regionFilter}
+              onChange={(e) => setRegionFilter(e.target.value)}
               className="filter-area"
-              aria-label="Filter by area"
+              aria-label="Filter by region"
             >
-              <option value="All">All areas</option>
-              {areas.map((area) => (
-                <option key={area} value={area}>
-                  {area}
+              <option value="All">All regions</option>
+              {REGIONS.map((region) => (
+                <option key={region} value={region}>
+                  {region}
                 </option>
               ))}
             </select>

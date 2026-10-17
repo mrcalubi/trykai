@@ -8,10 +8,37 @@ import ReviewCard from '../components/ReviewCard'
 import Card from '../components/ui/Card'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { ratingsByListingId } from '../lib/listingRatings'
+import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
+import { hostEntry } from '../lib/hostEntry'
+import { firstAccountRow } from '../lib/myAccount'
+import { profileReportSubject, reportMailto } from '../lib/reportMailto'
+import OverflowMenu from '../components/ui/OverflowMenu'
 import Bookings from './Bookings'
 import Hosting from './Hosting'
 
 const OWN_TABS = ['bookings', 'hosting', 'listings', 'reviews']
+const PROFILE_COLUMNS = 'id, display_name, bio, avatar_url, is_host, is_id_verified'
+const PROFILE_COLUMNS_WITHOUT_BADGE = 'id, display_name, bio, avatar_url, is_host'
+
+/**
+ * 00023 adds generated `is_id_verified`. Until that migration is applied,
+ * selecting the column fails the whole profile read. Checkout never asks
+ * for it, so a guest can book and only then hit this page.
+ */
+function verifiedColumnUnavailable(error) {
+  const message = String(error?.message ?? '')
+  const code = String(error?.code ?? '')
+  return (
+    code === '42703' ||
+    code === 'PGRST204' ||
+    code === '42501' ||
+    /is_id_verified|schema cache|does not exist|permission denied/i.test(message)
+  )
+}
+
+function loadPublicProfile(userId, columns) {
+  return supabase.from('users').select(columns).eq('id', userId).single()
+}
 
 function tabSearch(searchParams, tab) {
   const params = new URLSearchParams(searchParams)
@@ -64,7 +91,7 @@ function ListingCards({ listings, ratings }) {
   )
 }
 
-function ReviewsList({ reviews }) {
+function ReviewsList({ reviews, viewerId }) {
   if (reviews.length === 0) {
     return <p className="empty-state">No reviews yet.</p>
   }
@@ -72,10 +99,24 @@ function ReviewsList({ reviews }) {
   return (
     <div className="reviews-list">
       {reviews.map((review) => (
-        <ReviewCard key={review.id} review={review} />
+        <ReviewCard key={review.id} review={review} viewerId={viewerId} />
       ))}
     </div>
   )
+}
+
+async function attachReviewerIds(reviews) {
+  if (!reviews.length) return reviews
+  const { data } = await supabase
+    .from('reviews')
+    .select('id, reviewer_id')
+    .in('id', reviews.map((review) => review.id))
+  if (!data?.length) return reviews
+  const byId = new Map(data.map((row) => [row.id, row.reviewer_id]))
+  return reviews.map((review) => ({
+    ...review,
+    reviewer_id: review.reviewer_id ?? byId.get(review.id) ?? null,
+  }))
 }
 
 export default function Profile() {
@@ -114,19 +155,35 @@ export default function Profile() {
       setRatings({})
       setReviews([])
 
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id, display_name, full_name, avatar_url, verification_status, is_host')
-        .eq('id', id)
-        .single()
+      let { data: userData, error: userError } = await withIssuedAtRetry(() =>
+        loadPublicProfile(id, PROFILE_COLUMNS)
+      )
+
+      if (userError && verifiedColumnUnavailable(userError)) {
+        const fallback = await loadPublicProfile(id, PROFILE_COLUMNS_WITHOUT_BADGE)
+        userData = fallback.data
+        userError = fallback.error
+      }
 
       if (userError || !userData) {
-        setError(userError?.message || 'Profile not found.')
+        setError(userError ? PAGE_LOAD_ERROR : 'Profile not found.')
         setLoading(false)
         return
       }
 
-      setProfile(userData)
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      let account = null
+      if (session?.user?.id === id) {
+        const { data } = await supabase.rpc('my_account')
+        account = firstAccountRow(data)
+      }
+
+      setProfile({
+        ...userData,
+        verification_status: account?.verification_status ?? null,
+      })
 
       const [listingsResult, reviewsResult] = await Promise.all([
         supabase
@@ -139,7 +196,7 @@ export default function Profile() {
       ])
 
       if (listingsResult.error) {
-        setError(listingsResult.error.message)
+        setError(PAGE_LOAD_ERROR)
         setListings([])
         setRatings({})
       } else {
@@ -157,7 +214,7 @@ export default function Profile() {
       }
 
       if (!reviewsResult.error) {
-        setReviews(reviewsResult.data ?? [])
+        setReviews(await attachReviewerIds(reviewsResult.data ?? []))
       }
 
       setLoading(false)
@@ -180,9 +237,14 @@ export default function Profile() {
   }
 
   const givenName = publicName(profile) || 'Anonymous'
-  const verified = profile.verification_status === 'approved'
+  const verified =
+    typeof profile.is_id_verified === 'boolean'
+      ? profile.is_id_verified
+      : profile.verification_status === 'approved'
   const isOwn = viewerId === id
+  const about = typeof profile.bio === 'string' ? profile.bio.trim() : ''
   const isHost = Boolean(profile.is_host)
+  const hostCta = hostEntry(profile.verification_status)
   const allowedTabs = isHost ? OWN_TABS : OWN_TABS.filter((tab) => tab !== 'hosting')
   const requestedTab = searchParams.get('tab')
   const activeTab = allowedTabs.includes(requestedTab) ? requestedTab : 'bookings'
@@ -204,7 +266,26 @@ export default function Profile() {
           </div>
         )}
         <div className="profile-header__copy">
-          <h1 className="profile-header__name">{givenName}</h1>
+          <div className="profile-header__name-row">
+            <h1 className="profile-header__name">{givenName}</h1>
+            {!isOwn ? (
+              <OverflowMenu
+                label="More actions"
+                icon="⋮"
+                className="ui-overflow--quiet profile-header__menu"
+                items={[
+                  {
+                    label: 'Report profile',
+                    href: reportMailto({
+                      subject: profileReportSubject(givenName),
+                      url: typeof window === 'undefined' ? '' : window.location.href,
+                      id: profile.id,
+                    }),
+                  },
+                ]}
+              />
+            ) : null}
+          </div>
           {verified ? <p className="profile-verified">ID verified</p> : null}
           <HostRating reviews={reviews} />
         </div>
@@ -215,12 +296,26 @@ export default function Profile() {
         ) : null}
       </header>
 
+      {about ? (
+        <section className="profile-about" aria-labelledby="profile-about-heading">
+          <h2 id="profile-about-heading" className="detail-section__title">
+            About
+          </h2>
+          <p className="profile-about__body">{about}</p>
+        </section>
+      ) : isOwn ? (
+        <p className="profile-about__empty">
+          <Link to="/settings">Add a short bio</Link>
+        </p>
+      ) : null}
+
       {isOwn ? (
         <>
           <nav className="profile-tabs" aria-label="Profile">
             {tabs.map((tab) => (
               <Link
                 key={tab.id}
+                replace
                 to={{ pathname: `/u/${id}`, search: tabSearch(searchParams, tab.id) }}
                 className={
                   activeTab === tab.id
@@ -255,7 +350,7 @@ export default function Profile() {
               {!isHost ? (
                 <div className="empty-state">
                   <p>Share a skill on TryKai.</p>
-                  <Link to="/create-listing">Become a host</Link>
+                  <Link to={hostCta.to}>{hostCta.label}</Link>
                 </div>
               ) : (
                 <ListingCards listings={listings} ratings={ratings} />
@@ -268,7 +363,7 @@ export default function Profile() {
               <h2 className="detail-section__title">
                 Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
               </h2>
-              <ReviewsList reviews={reviews} />
+              <ReviewsList reviews={reviews} viewerId={viewerId} />
             </section>
           ) : null}
         </>
@@ -283,7 +378,7 @@ export default function Profile() {
             <h2 className="detail-section__title">
               Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
             </h2>
-            <ReviewsList reviews={reviews} />
+            <ReviewsList reviews={reviews} viewerId={viewerId} />
           </section>
         </>
       )}

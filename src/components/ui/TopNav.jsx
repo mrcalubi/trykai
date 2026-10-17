@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import HamburgerMenu from './HamburgerMenu'
 import { getInitials } from './getInitials'
 
@@ -22,6 +22,14 @@ function MenuIcon() {
       <path d="M4 12h16" />
       <path d="M4 17h16" />
     </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <span className="ui-topnav__close-icon" aria-hidden="true">
+      ✕
+    </span>
   )
 }
 
@@ -58,15 +66,18 @@ export function TopNavAccount({ avatarUrl, name, className = '' }) {
 export default function TopNav({
   isLoggedIn = false,
   isAdmin = false,
-  isHost = false,
+  verificationStatus,
   userId,
   avatarUrl,
   name,
   onMenuClick,
+  onLogOut,
   className = '',
 }) {
+  const location = useLocation()
   const [compact, setCompact] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [openedAt, setOpenedAt] = useState(null)
+  const menuOpen = openedAt === location.key
 
   useEffect(() => {
     function updateCompact() {
@@ -82,7 +93,7 @@ export default function TopNav({
     if (!menuOpen) return undefined
 
     function handleKeyDown(event) {
-      if (event.key === 'Escape') setMenuOpen(false)
+      if (event.key === 'Escape') setOpenedAt(null)
     }
 
     document.addEventListener('keydown', handleKeyDown)
@@ -90,12 +101,12 @@ export default function TopNav({
   }, [menuOpen])
 
   function handleMenuToggle() {
-    setMenuOpen((open) => !open)
+    setOpenedAt((key) => (key === location.key ? null : location.key))
     onMenuClick?.()
   }
 
   function handleMenuClose() {
-    setMenuOpen(false)
+    setOpenedAt(null)
   }
 
   const shellClasses = [
@@ -126,10 +137,15 @@ export default function TopNav({
             aria-controls="ui-hamburger-panel"
             onClick={handleMenuToggle}
           >
-            <MenuIcon />
+            {menuOpen ? <CloseIcon /> : <MenuIcon />}
           </button>
 
-          <Link to="/" className="ui-topnav__brand" aria-label="TryKai home">
+          <Link
+            to="/"
+            className="ui-topnav__brand"
+            aria-label="TryKai home"
+            onClick={handleMenuClose}
+          >
             <img
               src="/trykai.png"
               alt=""
@@ -163,9 +179,11 @@ export default function TopNav({
         <HamburgerMenu
           open={menuOpen}
           onClose={handleMenuClose}
+          onLogOut={onLogOut}
           isLoggedIn={isLoggedIn}
           isAdmin={isAdmin}
-          isHost={isHost}
+          verificationStatus={verificationStatus}
+          userId={userId}
         />
       </div>
       <div
