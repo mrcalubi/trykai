@@ -273,6 +273,7 @@ export default function Profile() {
             {tabs.map((tab) => (
               <Link
                 key={tab.id}
+                replace
                 to={{ pathname: `/u/${id}`, search: tabSearch(searchParams, tab.id) }}
                 className={
                   activeTab === tab.id

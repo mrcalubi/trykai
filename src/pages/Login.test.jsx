@@ -52,6 +52,7 @@ describe('Login form', () => {
     expect(password.closest('.ui-field')).toHaveClass('ui-field--floating')
     expect(password).toHaveAttribute('type', 'password')
     expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Hold to peek at password' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute(
       'href',
       '/forgot-password'

@@ -71,6 +71,7 @@ export default function TopNav({
   avatarUrl,
   name,
   onMenuClick,
+  onLogOut,
   className = '',
 }) {
   const location = useLocation()
@@ -178,9 +179,11 @@ export default function TopNav({
         <HamburgerMenu
           open={menuOpen}
           onClose={handleMenuClose}
+          onLogOut={onLogOut}
           isLoggedIn={isLoggedIn}
           isAdmin={isAdmin}
           isHost={isHost}
+          userId={userId}
         />
       </div>
       <div

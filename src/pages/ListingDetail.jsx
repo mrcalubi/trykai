@@ -48,6 +48,51 @@ function upcomingSessions(listingId, columns) {
     .gt('starts_at', new Date().toISOString())
 }
 
+const HOST_BIO_PREVIEW_LINES = 2
+const HOST_BIO_PREVIEW_CHARS = 160
+
+function previewHostBio(bio) {
+  const text = String(bio).trim()
+  const lines = text.split('\n')
+  let preview = lines.slice(0, HOST_BIO_PREVIEW_LINES).join('\n')
+  let truncated = lines.length > HOST_BIO_PREVIEW_LINES
+  if (preview.length > HOST_BIO_PREVIEW_CHARS) {
+    const cut = preview.slice(0, HOST_BIO_PREVIEW_CHARS)
+    preview = cut.replace(/\s+\S*$/, '').trimEnd() || cut.trimEnd()
+    truncated = true
+  }
+  return { preview, truncated }
+}
+
+function HostAvatar({ host, to }) {
+  const name = publicName(host) || 'Anonymous'
+  const avatar = host?.avatar_url ? (
+    <img src={host.avatar_url} alt="" className="detail-host__avatar" />
+  ) : (
+    <div className="detail-host__avatar-placeholder">{name[0]?.toUpperCase() || '?'}</div>
+  )
+  if (!to) return avatar
+  return (
+    <Link to={to} className="detail-host__avatar-link" aria-label={`${name}'s profile`}>
+      {avatar}
+    </Link>
+  )
+}
+
+function HostBioPreview({ bio, to }) {
+  const { preview, truncated } = previewHostBio(bio)
+  return (
+    <p className="detail-host__bio">
+      {preview}
+      {truncated && to ? (
+        <Link to={to} className="detail-host__more">
+          … more
+        </Link>
+      ) : null}
+    </p>
+  )
+}
+
 function visibleAreaLabel(revealedAddress, area) {
   if (typeof revealedAddress === 'string' && revealedAddress.trim()) return revealedAddress.trim()
   if (typeof area === 'string' && area.trim()) return area.trim()
@@ -605,13 +650,7 @@ export default function ListingDetail() {
           {areaLabel ? <p className="detail-area">{areaLabel}</p> : null}
 
           <div className="detail-host">
-            {host?.avatar_url ? (
-              <img src={host.avatar_url} alt="" className="detail-host__avatar" />
-            ) : (
-              <div className="detail-host__avatar-placeholder">
-                {publicName(host)?.[0]?.toUpperCase() || '?'}
-              </div>
-            )}
+            <HostAvatar host={host} to={listing.host_id ? `/u/${listing.host_id}` : null} />
             <div className="detail-host__copy">
               <p className="detail-host__name">
                 Hosted by{' '}
@@ -625,14 +664,10 @@ export default function ListingDetail() {
               </p>
               <HostRating reviews={hostReviews} />
               {typeof host?.bio === 'string' && host.bio.trim() ? (
-                <>
-                  <p className="detail-host__bio">{host.bio.trim()}</p>
-                  {listing.host_id ? (
-                    <Link to={`/u/${listing.host_id}`} className="detail-host__more">
-                      More about {publicName(host) || 'Anonymous'}
-                    </Link>
-                  ) : null}
-                </>
+                <HostBioPreview
+                  bio={host.bio}
+                  to={listing.host_id ? `/u/${listing.host_id}` : null}
+                />
               ) : null}
             </div>
           </div>
@@ -682,7 +717,7 @@ export default function ListingDetail() {
                 <span className="detail-booking-card__unit"> / person</span>
               )}
             </p>
-            {!checkoutSessionId && (
+            {!checkoutSessionId && sessionRange && (
               <p className="detail-booking-card__note">Pick a date, then a time</p>
             )}
 
@@ -822,7 +857,7 @@ export default function ListingDetail() {
             )}
 
             {!sessionRange && (
-              <p className="empty-state">No upcoming sessions available.</p>
+              <p className="empty-state">No upcoming sessions yet.</p>
             )}
 
             {sessionRange && !checkoutSessionId && (

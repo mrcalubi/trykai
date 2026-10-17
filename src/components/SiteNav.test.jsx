@@ -117,13 +117,28 @@ describe('SiteNav hamburger', () => {
       'href',
       '/create-listing'
     )
+    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute(
+      'href',
+      `/u/${makeAuthSession().user.id}`
+    )
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Create listing' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Log out' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Verification review' })).not.toBeInTheDocument()
+  })
+
+  it('signs the user out from the menu and sends them home', async () => {
+    signedIn()
+    const { user, currentPath } = renderNav()
+
+    await screen.findByRole('link', { name: 'Your profile' })
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    await user.click(screen.getByRole('button', { name: 'Log out' }))
+
+    expect(supabase.auth.signOut).toHaveBeenCalledOnce()
+    await waitFor(() => expect(currentPath()).toBe('/'))
   })
 
   it('labels Create listing once the profile reports is_host', async () => {

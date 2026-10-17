@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Profile from './Profile'
 import { supabase } from '../lib/supabase'
@@ -383,6 +385,30 @@ describe('Profile own tabs', () => {
     )
     expect(screen.queryByRole('heading', { name: 'My Bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
+  })
+
+  it('replaces the current history entry when switching tabs', async () => {
+    givenSignedIn()
+    const router = createMemoryRouter(
+      [
+        { path: '/', element: <p>Home page</p> },
+        { path: '/u/:id', element: <Profile /> },
+      ],
+      { initialEntries: ['/', `/u/${HOST_ID}?tab=bookings`], initialIndex: 1 }
+    )
+    const user = userEvent.setup({ delay: null })
+    render(<RouterProvider router={router} />)
+
+    await screen.findByRole('link', { name: 'Listings' })
+    await user.click(screen.getByRole('link', { name: 'Listings' }))
+
+    expect(router.state.location.pathname).toBe(`/u/${HOST_ID}`)
+    expect(router.state.location.search).toBe('?tab=listings')
+    expect(screen.getByRole('link', { name: 'Listings' })).toHaveAttribute('aria-current', 'page')
+
+    await router.navigate(-1)
+    expect(router.state.location.pathname).toBe('/')
+    expect(router.state.location.search).toBe('')
   })
 
   it('keeps other query keys when switching tabs', async () => {

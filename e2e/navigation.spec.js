@@ -66,6 +66,7 @@ test.describe('signed-out navigation', () => {
     await expect(page.getByLabel('Email')).toBeVisible()
     await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Show password' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Hold to peek at password' })).toHaveCount(0)
   })
 
   // The published terms have to be reachable from the nav while signed out, not
@@ -204,7 +205,7 @@ test.describe('signed-in navigation', () => {
     await expect(page.getByRole('menu')).toHaveCount(0)
   })
 
-  test('the hamburger is Browse, Become a host, and admin review only', async ({ page }) => {
+  test('the hamburger adds Profile, Settings, and Log out when signed in', async ({ page }) => {
     await stubAllExternalCalls(
       page,
       { users: [{ id: SIGNED_IN_USER.id, full_name: 'Mei Ling', avatar_url: null, is_host: false }] },
@@ -225,11 +226,36 @@ test.describe('signed-in navigation', () => {
       'href',
       '/create-listing'
     )
+    await expect(menu.getByRole('link', { name: 'Profile' })).toHaveAttribute(
+      'href',
+      `/u/${SIGNED_IN_USER.id}`
+    )
+    await expect(menu.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    await expect(menu.getByRole('button', { name: 'Log out' })).toBeVisible()
     await expect(menu.getByRole('link', { name: 'My bookings' })).toHaveCount(0)
     await expect(menu.getByRole('link', { name: 'Hosting' })).toHaveCount(0)
-    await expect(menu.getByRole('link', { name: 'Settings' })).toHaveCount(0)
-    await expect(menu.getByRole('link', { name: 'Log out' })).toHaveCount(0)
-    await expect(menu.getByRole('link', { name: 'Profile' })).toHaveCount(0)
+  })
+
+  test('profile tabs replace history so back leaves the profile', async ({ page }) => {
+    await stubAllExternalCalls(
+      page,
+      { users: [{ id: SIGNED_IN_USER.id, full_name: 'Mei Ling', avatar_url: null, is_host: false }] },
+      { session: makeAuthSession() }
+    )
+
+    await page.goto('/login')
+    await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+    await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+    await expect(page).toHaveURL(/\/$/)
+
+    await page.getByRole('link', { name: 'Your profile' }).click()
+    await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}`))
+    await page.getByRole('navigation', { name: 'Profile' }).getByRole('link', { name: 'Listings' }).click()
+    await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}\\?tab=listings`))
+
+    await page.goBack()
+    await expect(page).toHaveURL(/\/$/)
   })
 })
 

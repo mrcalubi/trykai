@@ -19,6 +19,11 @@ test.describe('listing detail', () => {
     await page.goto('/listings/listing-latte')
 
     await expect(page.getByText('Hosted by Mei')).toBeVisible()
+    await expect(page.getByRole('link', { name: "Mei's profile" })).toHaveAttribute(
+      'href',
+      '/u/host-1'
+    )
+    await expect(page.getByText('Pick a date, then a time')).toBeVisible()
     await expect(page.locator('.detail-area')).toHaveText('Tiong Bahru')
     await expect(page.getByText('$51').first()).toBeVisible()
     await expect(page.getByText('No reviews yet.')).toBeVisible()
@@ -100,7 +105,29 @@ test.describe('listing detail', () => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART], sessions: [], reviews: [] })
     await page.goto('/listings/listing-latte')
 
-    await expect(page.getByText('No upcoming sessions available.')).toBeVisible()
+    await expect(page.getByText('No upcoming sessions yet.')).toBeVisible()
+    await expect(page.getByText('Pick a date, then a time')).toHaveCount(0)
+  })
+
+  test('truncates a long host bio with an inline more link', async ({ page }) => {
+    await stubAllExternalCalls(page, {
+      listings: [
+        {
+          ...LATTE_ART,
+          users: {
+            ...LATTE_ART.users,
+            bio: 'I pull rosettas.\nAlso pour-overs.\nAnd cortados.',
+          },
+        },
+      ],
+      sessions: [OPEN_SESSION],
+      reviews: [],
+    })
+    await page.goto('/listings/listing-latte')
+
+    await expect(page.getByText(/I pull rosettas/)).toBeVisible()
+    await expect(page.getByRole('link', { name: '… more' })).toHaveAttribute('href', '/u/host-1')
+    await expect(page.getByRole('link', { name: /More about/ })).toHaveCount(0)
   })
 
   test('reveals the guest cancellation policy on request', async ({ page }) => {

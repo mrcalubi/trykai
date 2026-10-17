@@ -208,10 +208,30 @@ describe('ListingDetail content', () => {
 
     await screen.findByRole('link', { name: 'Mei' })
     expect(document.querySelector('.detail-host__bio').textContent).toBe(
-      'I pull rosettas.\nAlso pour-overs.\nAnd cortados.',
+      'I pull rosettas.\nAlso pour-overs.… more',
     )
-    expect(screen.getByRole('link', { name: 'More about Mei' })).toHaveAttribute('href', '/u/host-1')
+    expect(screen.getByRole('link', { name: '… more' })).toHaveAttribute('href', '/u/host-1')
+    expect(screen.getByRole('link', { name: "Mei's profile" })).toHaveAttribute('href', '/u/host-1')
+    expect(screen.queryByRole('link', { name: /More about/ })).not.toBeInTheDocument()
     expect(supabase.auth.getSession).toHaveBeenCalled()
+  })
+
+  it('keeps a short host bio without a more link', async () => {
+    givenListing(
+      makeListing({
+        users: {
+          display_name: 'Mei',
+          full_name: 'Mei Ling',
+          bio: 'I pull rosettas.',
+          avatar_url: null,
+        },
+      }),
+    )
+    renderPage()
+
+    await screen.findByRole('link', { name: 'Mei' })
+    expect(document.querySelector('.detail-host__bio').textContent).toBe('I pull rosettas.')
+    expect(screen.queryByRole('link', { name: '… more' })).not.toBeInTheDocument()
   })
 
   it('hides the host About when there is no bio', async () => {
@@ -220,6 +240,7 @@ describe('ListingDetail content', () => {
 
     await screen.findByRole('link', { name: 'Mei' })
     expect(document.querySelector('.detail-host__bio')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '… more' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /More about/ })).not.toBeInTheDocument()
   })
 
@@ -329,7 +350,8 @@ describe('ListingDetail content', () => {
     expect(css).toMatch(
       /\.detail-title,\s*\n\.detail-description,\s*\n\.detail-area,\s*\n\.detail-list li,\s*\n\.review-card__comment,\s*\n\.ui-card__title,\s*\n\.dashboard-card__title,\s*\n\.dashboard-card__meta,\s*\n\.profile-about__body,\s*\n\.detail-host__bio/
     )
-    expect(css).toMatch(/\.detail-host__bio \{[\s\S]*?-webkit-line-clamp:\s*2/)
+    expect(css).toMatch(/\.detail-host__more \{[\s\S]*?display:\s*inline/)
+    expect(css).toMatch(/\.detail-host \{[\s\S]*?align-items:\s*flex-start/)
   })
 
   it('hides the host rating when the host has no reviews', async () => {
@@ -455,7 +477,8 @@ describe('ListingDetail sessions', () => {
     givenSessions([])
     renderPage()
 
-    expect(await screen.findByText('No upcoming sessions available.')).toBeInTheDocument()
+    expect(await screen.findByText('No upcoming sessions yet.')).toBeInTheDocument()
+    expect(screen.queryByText('Pick a date, then a time')).not.toBeInTheDocument()
   })
 
   it('opens guest cancellation rules from a muted line under the book area', async () => {
@@ -481,6 +504,7 @@ describe('ListingDetail sessions', () => {
     renderPage()
 
     expect(await screen.findByText(/1 hr 30 min · 3 spots left/)).toBeInTheDocument()
+    expect(screen.getByText('Pick a date, then a time')).toBeInTheDocument()
   })
 
   it('uses the singular when only one spot is left', async () => {
