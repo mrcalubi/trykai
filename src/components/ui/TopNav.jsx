@@ -25,6 +25,14 @@ function MenuIcon() {
   )
 }
 
+function CloseIcon() {
+  return (
+    <span className="ui-topnav__close-icon" aria-hidden="true">
+      ✕
+    </span>
+  )
+}
+
 /** Logged-in account control: photo if avatarUrl, otherwise initials from name. */
 export function TopNavAccount({ avatarUrl, name, className = '' }) {
   const initials = getInitials(name)
@@ -128,7 +136,7 @@ export default function TopNav({
             aria-controls="ui-hamburger-panel"
             onClick={handleMenuToggle}
           >
-            <MenuIcon />
+            {menuOpen ? <CloseIcon /> : <MenuIcon />}
           </button>
 
           <Link

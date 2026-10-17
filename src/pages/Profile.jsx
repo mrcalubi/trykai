@@ -67,7 +67,7 @@ function ListingCards({ listings, ratings }) {
   )
 }
 
-function ReviewsList({ reviews }) {
+function ReviewsList({ reviews, viewerId }) {
   if (reviews.length === 0) {
     return <p className="empty-state">No reviews yet.</p>
   }
@@ -75,10 +75,24 @@ function ReviewsList({ reviews }) {
   return (
     <div className="reviews-list">
       {reviews.map((review) => (
-        <ReviewCard key={review.id} review={review} />
+        <ReviewCard key={review.id} review={review} viewerId={viewerId} />
       ))}
     </div>
   )
+}
+
+async function attachReviewerIds(reviews) {
+  if (!reviews.length) return reviews
+  const { data } = await supabase
+    .from('reviews')
+    .select('id, reviewer_id')
+    .in('id', reviews.map((review) => review.id))
+  if (!data?.length) return reviews
+  const byId = new Map(data.map((row) => [row.id, row.reviewer_id]))
+  return reviews.map((review) => ({
+    ...review,
+    reviewer_id: review.reviewer_id ?? byId.get(review.id) ?? null,
+  }))
 }
 
 export default function Profile() {
@@ -162,7 +176,7 @@ export default function Profile() {
       }
 
       if (!reviewsResult.error) {
-        setReviews(reviewsResult.data ?? [])
+        setReviews(await attachReviewerIds(reviewsResult.data ?? []))
       }
 
       setLoading(false)
@@ -213,9 +227,6 @@ export default function Profile() {
           <h1 className="profile-header__name">{givenName}</h1>
           {verified ? <p className="profile-verified">ID verified</p> : null}
           <HostRating reviews={reviews} />
-          {!isOwn ? (
-            <ReportLink subject={profileReportSubject(givenName)} itemId={profile.id} />
-          ) : null}
         </div>
         {isOwn ? (
           <Link to="/settings" className="profile-header__settings" aria-label="Settings">
@@ -290,7 +301,7 @@ export default function Profile() {
               <h2 className="detail-section__title">
                 Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
               </h2>
-              <ReviewsList reviews={reviews} />
+              <ReviewsList reviews={reviews} viewerId={viewerId} />
             </section>
           ) : null}
         </>
@@ -305,10 +316,14 @@ export default function Profile() {
             <h2 className="detail-section__title">
               Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
             </h2>
-            <ReviewsList reviews={reviews} />
+            <ReviewsList reviews={reviews} viewerId={viewerId} />
           </section>
         </>
       )}
+
+      {!isOwn ? (
+        <ReportLink subject={profileReportSubject(givenName)} itemId={profile.id} />
+      ) : null}
     </div>
   )
 }

@@ -1,55 +1,50 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
+import { CancellationPolicyInfo, GuestCancellationNote } from './CancellationPolicy'
 import {
-  CancellationPolicyCollapsible,
-  CancellationPolicyInfo,
-} from './CancellationPolicy'
-import { CANCELLATION_POLICY_ITEMS } from '../lib/cancellationPolicy'
+  CANCELLATION_POLICY_ITEMS,
+  GUEST_CANCELLATION_POLICY_ITEMS,
+  GUEST_HOST_CANCEL_COPY,
+} from '../lib/cancellationPolicy'
 
-describe('CancellationPolicyCollapsible', () => {
-  it('starts collapsed', () => {
-    render(<CancellationPolicyCollapsible />)
-    const toggle = screen.getByRole('button', { name: /Cancellation Policy/ })
+describe('GuestCancellationNote', () => {
+  it('starts with the guest rules closed', () => {
+    render(<GuestCancellationNote />)
+    const toggle = screen.getByRole('button', { name: 'Cancellation policy' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText(/Full refund/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Full refund if you cancel 48\+ hours before/)).toBeInTheDocument()
+    expect(screen.queryByText(/Full refund, including the platform fee/)).not.toBeInTheDocument()
   })
 
-  it('reveals every policy row when opened', async () => {
+  it('opens the guest tiers and host-cancel sentence only', async () => {
     const user = userEvent.setup()
-    render(<CancellationPolicyCollapsible />)
+    render(<GuestCancellationNote />)
 
-    await user.click(screen.getByRole('button', { name: /Cancellation Policy/ }))
+    await user.click(screen.getByRole('button', { name: 'Cancellation policy' }))
 
-    expect(screen.getByRole('button', { name: /Cancellation Policy/ })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Cancellation policy' })).toHaveAttribute(
       'aria-expanded',
       'true'
     )
-    for (const item of CANCELLATION_POLICY_ITEMS) {
+    for (const item of GUEST_CANCELLATION_POLICY_ITEMS) {
       expect(screen.getByText(`${item.scenario}:`)).toBeInTheDocument()
     }
+    expect(screen.getByText(GUEST_HOST_CANCEL_COPY)).toBeInTheDocument()
+    expect(screen.queryByText(/host receives a strike/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Listing is automatically deactivated/)).not.toBeInTheDocument()
   })
 
   it('collapses again on a second click', async () => {
     const user = userEvent.setup()
-    render(<CancellationPolicyCollapsible />)
-    const toggle = screen.getByRole('button', { name: /Cancellation Policy/ })
+    render(<GuestCancellationNote />)
+    const toggle = screen.getByRole('button', { name: 'Cancellation policy' })
 
     await user.click(toggle)
     await user.click(toggle)
 
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText(/Full refund/)).not.toBeInTheDocument()
-  })
-
-  it('swaps the chevron between plus and minus', async () => {
-    const user = userEvent.setup()
-    const { container } = render(<CancellationPolicyCollapsible />)
-    const chevron = () => container.querySelector('.cancellation-policy__chevron').textContent
-
-    expect(chevron()).toBe('+')
-    await user.click(screen.getByRole('button', { name: /Cancellation Policy/ }))
-    expect(chevron()).toBe('−')
+    expect(screen.queryByText(/Full refund, including the platform fee/)).not.toBeInTheDocument()
   })
 })
 

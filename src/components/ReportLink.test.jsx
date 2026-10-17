@@ -13,7 +13,7 @@ describe('ReportLink', () => {
       <ReportLink subject="Report: listing Latte art" itemId="listing-1" />
     )
 
-    const link = screen.getByRole('link', { name: 'Report' })
+    const link = screen.getByRole('link', { name: '⚑ Report' })
     expect(link).toHaveClass('report-link')
     expect(link.getAttribute('href')).toContain('mailto:hello@trykai.sg')
     expect(link.getAttribute('href')).toContain(encodeURIComponent('Report: listing Latte art'))

@@ -1,27 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-function BackArrow() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M15 18l-6-6 6-6" />
-    </svg>
-  )
-}
-
 function historyHasPreviousPage() {
   return (window.history.state?.idx ?? 0) > 0
+}
+
+function pageBackClassName(pathname) {
+  if (pathname.startsWith('/listings/') || pathname.startsWith('/u/')) {
+    return 'page-back page-back--detail'
+  }
+  if (
+    pathname.startsWith('/bookings') ||
+    pathname.startsWith('/hosting') ||
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/edit-listing') ||
+    pathname === '/cancellation-policy' ||
+    pathname === '/refund-policy' ||
+    pathname === '/dispute-policy' ||
+    pathname === '/terms' ||
+    pathname === '/privacy'
+  ) {
+    return 'page-back page-back--narrow'
+  }
+  return 'page-back'
 }
 
 export default function BackButton() {
@@ -46,9 +47,9 @@ export default function BackButton() {
   }
 
   return (
-    <div className="page-back">
+    <div className={pageBackClassName(location.pathname)}>
       <button type="button" className="page-back__button" onClick={handleClick} aria-label="Back">
-        <BackArrow />
+        <span aria-hidden="true">‹</span>
       </button>
     </div>
   )

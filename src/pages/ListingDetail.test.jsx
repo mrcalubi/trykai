@@ -133,11 +133,35 @@ describe('ListingDetail content', () => {
     expect(screen.getByText('Food')).toBeInTheDocument()
     expect(screen.getByText('Tiong Bahru')).toBeInTheDocument()
     expect(screen.getByText('Pull your first rosetta in ninety minutes.')).toBeInTheDocument()
-    const report = screen.getByRole('link', { name: 'Report' })
+    const report = screen.getByRole('link', { name: '⚑ Report' })
     expect(report).toHaveClass('report-link')
+    expect(report).toHaveTextContent('⚑ Report')
     expect(report.getAttribute('href')).toContain('mailto:hello@trykai.sg')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: listing Latte art')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('listing-1')
+    expect(document.querySelector('.detail-main > .report-link')).toBe(report)
+    expect(
+      screen.getByRole('heading', { name: /Reviews/ }).compareDocumentPosition(report) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
+
+  it('does not render a bare 0 in place of the planning area', async () => {
+    givenListing(makeListing({ area: 0 }))
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
+    expect(document.querySelector('.detail-area')).not.toBeInTheDocument()
+    expect(screen.queryByText('0')).not.toBeInTheDocument()
+  })
+
+  it('hides Report on your own listing', async () => {
+    givenListing()
+    givenSignedIn(makeAuthSession({ user: { id: 'host-1' } }))
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
+    expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
   })
 
   it('shows the card all-in total, not the raw lesson price', async () => {
@@ -245,13 +269,16 @@ describe('ListingDetail content', () => {
 
     await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
     expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_listing', { p_listing_id: 'listing-1' })
-    expect(supabase.__lastCall('reviews', 'select').filters).toEqual(
+    const hostRatingCall = supabase
+      .__calls('reviews', 'select')
+      .find((call) => call.filters.some((filter) => filter.column === 'reviewee_id'))
+    expect(hostRatingCall.filters).toEqual(
       expect.arrayContaining([
         { method: 'eq', column: 'reviewee_id', value: 'host-1' },
         { method: 'eq', column: 'role', value: 'guest' },
       ])
     )
-    expect(supabase.__lastCall('reviews', 'select').filters).not.toContainEqual({
+    expect(hostRatingCall.filters).not.toContainEqual({
       method: 'eq',
       column: 'bookings.sessions.listing_id',
       value: 'listing-1',
@@ -423,6 +450,23 @@ describe('ListingDetail sessions', () => {
     renderPage()
 
     expect(await screen.findByText('No upcoming sessions available.')).toBeInTheDocument()
+  })
+
+  it('opens guest cancellation rules from a muted line under the book area', async () => {
+    givenListing()
+    givenSessions([makeSession()])
+    const { user } = renderPage()
+
+    await screen.findByRole('button', { name: 'Book' })
+    expect(screen.queryByRole('button', { name: /Cancellation Policy/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/Full refund if you cancel 48\+ hours before/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Cancellation policy' }))
+
+    expect(screen.getByText(/Guest cancels 48\+ hours before session:/)).toBeInTheDocument()
+    expect(screen.getByText('If the host cancels, you get a full refund')).toBeInTheDocument()
+    expect(screen.queryByText(/host receives a strike/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Listing is automatically deactivated/)).not.toBeInTheDocument()
   })
 
   it('shows the duration and remaining spots for each session', async () => {

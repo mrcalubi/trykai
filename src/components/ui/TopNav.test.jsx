@@ -76,6 +76,7 @@ describe('TopNav', () => {
     expect(onMenuClick).toHaveBeenCalledTimes(1)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(toggle).toHaveAccessibleName('Close menu')
+    expect(toggle).toHaveTextContent('✕')
     expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).toHaveClass(
       'ui-hamburger--open'
     )
@@ -84,6 +85,7 @@ describe('TopNav', () => {
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(toggle).toHaveAccessibleName('Open menu')
+    expect(toggle).not.toHaveTextContent('✕')
     expect(screen.getByLabelText('Main menu').closest('.ui-hamburger')).not.toHaveClass(
       'ui-hamburger--open'
     )

@@ -19,6 +19,7 @@ test.describe('listing detail', () => {
     await page.goto('/listings/listing-latte')
 
     await expect(page.getByText('Hosted by Mei')).toBeVisible()
+    await expect(page.locator('.detail-area')).toHaveText('Tiong Bahru')
     await expect(page.getByText('$51').first()).toBeVisible()
     await expect(page.getByText('No reviews yet.')).toBeVisible()
     await expect(page.locator('.detail-host__rating')).toHaveCount(0)
@@ -99,12 +100,13 @@ test.describe('listing detail', () => {
     await expect(page.getByText('No upcoming sessions available.')).toBeVisible()
   })
 
-  test('reveals the cancellation policy on request', async ({ page }) => {
+  test('reveals the guest cancellation policy on request', async ({ page }) => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART], sessions: [], reviews: [] })
     await page.goto('/listings/listing-latte')
 
+    await expect(page.getByText(/Full refund if you cancel 48\+ hours before/)).toBeVisible()
     await expect(page.getByText('Guest cancels 48+ hours before session:')).toBeHidden()
-    await page.getByRole('button', { name: /Cancellation Policy/ }).click()
+    await page.getByRole('button', { name: 'Cancellation policy' }).click()
 
     await expect(page.getByText('Guest cancels 48+ hours before session:')).toBeVisible()
     await expect(page.getByText('Guest cancels 24–48 hours before session:')).toBeVisible()
@@ -112,6 +114,8 @@ test.describe('listing detail', () => {
     await expect(
       page.getByText('Guest cancels under 6 hours before session, or does not show up:')
     ).toBeVisible()
+    await expect(page.getByText('If the host cancels, you get a full refund')).toBeVisible()
+    await expect(page.getByText(/host receives a strike/)).toHaveCount(0)
   })
 
   test('a signed-out visitor still sees reviews for this listing', async ({ page }) => {

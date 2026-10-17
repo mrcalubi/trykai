@@ -7,7 +7,7 @@ import ReviewCard from '../components/ReviewCard'
 import HostRating from '../components/HostRating'
 import PhotoLightbox from '../components/PhotoLightbox'
 import SessionCalendar from '../components/SessionCalendar'
-import { CancellationPolicyCollapsible } from '../components/CancellationPolicy'
+import { GuestCancellationNote } from '../components/CancellationPolicy'
 import FormattedPrice from '../components/FormattedPrice'
 import {
   formatDayTitle,
@@ -45,6 +45,26 @@ function upcomingSessions(listingId, columns) {
     .eq('listing_id', listingId)
     .eq('status', 'open')
     .gt('starts_at', new Date().toISOString())
+}
+
+function visibleAreaLabel(revealedAddress, area) {
+  if (typeof revealedAddress === 'string' && revealedAddress.trim()) return revealedAddress.trim()
+  if (typeof area === 'string' && area.trim()) return area.trim()
+  return ''
+}
+
+async function attachReviewerIds(reviews) {
+  if (!reviews.length) return reviews
+  const { data } = await supabase
+    .from('reviews')
+    .select('id, reviewer_id')
+    .in('id', reviews.map((review) => review.id))
+  if (!data?.length) return reviews
+  const byId = new Map(data.map((row) => [row.id, row.reviewer_id]))
+  return reviews.map((review) => ({
+    ...review,
+    reviewer_id: review.reviewer_id ?? byId.get(review.id) ?? null,
+  }))
 }
 
 function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel, onPaymentFailed }) {
@@ -212,7 +232,7 @@ export default function ListingDetail() {
       }
 
       if (!reviewsResult.error) {
-        setReviews(reviewsResult.data ?? [])
+        setReviews(await attachReviewerIds(reviewsResult.data ?? []))
       }
 
       if (!hostReviewsResult.error) {
@@ -434,6 +454,7 @@ export default function ListingDetail() {
   }
 
   const host = listing.users
+  const areaLabel = visibleAreaLabel(revealedAddress, listing.area)
   const photos = listing.photo_urls?.length ? listing.photo_urls : []
   const groupPricing = listing.group_pricing !== false
   const cardPrice = guestFacingPriceCents(listing.price_per_person, guestsCount, groupPricing)
@@ -561,8 +582,7 @@ export default function ListingDetail() {
         <div className="detail-main">
           <span className="detail-category">{listing.category}</span>
           <h1 className="detail-title">{listing.title}</h1>
-          <p className="detail-area">{revealedAddress || listing.area}</p>
-          <ReportLink subject={listingReportSubject(listing.title)} itemId={listing.id} />
+          {areaLabel ? <p className="detail-area">{areaLabel}</p> : null}
 
           <div className="detail-host">
             {host?.avatar_url ? (
@@ -626,11 +646,16 @@ export default function ListingDetail() {
                     key={review.id}
                     review={review}
                     listingTitle={listing.title}
+                    viewerId={viewerId}
                   />
                 ))}
               </div>
             )}
           </section>
+
+          {!isOwnListing ? (
+            <ReportLink subject={listingReportSubject(listing.title)} itemId={listing.id} />
+          ) : null}
         </div>
 
         <aside className="detail-sidebar">
@@ -644,8 +669,6 @@ export default function ListingDetail() {
             {!checkoutSessionId && (
               <p className="detail-booking-card__note">Pick a date, then a time</p>
             )}
-
-            <CancellationPolicyCollapsible />
 
             {paymentError && (
               <p className="error-message detail-booking-card__error">{paymentError}</p>
@@ -815,6 +838,8 @@ export default function ListingDetail() {
                 This host is still setting up payouts. Booking will open once that is complete.
               </p>
             )}
+
+            <GuestCancellationNote />
           </div>
         </aside>
       </div>
