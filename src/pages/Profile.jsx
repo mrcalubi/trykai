@@ -17,6 +17,28 @@ import Bookings from './Bookings'
 import Hosting from './Hosting'
 
 const OWN_TABS = ['bookings', 'hosting', 'listings', 'reviews']
+const PROFILE_COLUMNS = 'id, display_name, bio, avatar_url, is_host, is_id_verified'
+const PROFILE_COLUMNS_WITHOUT_BADGE = 'id, display_name, bio, avatar_url, is_host'
+
+/**
+ * 00023 adds generated `is_id_verified`. Until that migration is applied,
+ * selecting the column fails the whole profile read. Checkout never asks
+ * for it, so a guest can book and only then hit this page.
+ */
+function verifiedColumnUnavailable(error) {
+  const message = String(error?.message ?? '')
+  const code = String(error?.code ?? '')
+  return (
+    code === '42703' ||
+    code === 'PGRST204' ||
+    code === '42501' ||
+    /is_id_verified|schema cache|does not exist|permission denied/i.test(message)
+  )
+}
+
+function loadPublicProfile(userId, columns) {
+  return supabase.from('users').select(columns).eq('id', userId).single()
+}
 
 function tabSearch(searchParams, tab) {
   const params = new URLSearchParams(searchParams)
@@ -133,13 +155,15 @@ export default function Profile() {
       setRatings({})
       setReviews([])
 
-      const { data: userData, error: userError } = await withIssuedAtRetry(() =>
-        supabase
-          .from('users')
-          .select('id, display_name, bio, avatar_url, is_host, is_id_verified')
-          .eq('id', id)
-          .single()
+      let { data: userData, error: userError } = await withIssuedAtRetry(() =>
+        loadPublicProfile(id, PROFILE_COLUMNS)
       )
+
+      if (userError && verifiedColumnUnavailable(userError)) {
+        const fallback = await loadPublicProfile(id, PROFILE_COLUMNS_WITHOUT_BADGE)
+        userData = fallback.data
+        userError = fallback.error
+      }
 
       if (userError || !userData) {
         setError(userError ? PAGE_LOAD_ERROR : 'Profile not found.')
@@ -213,7 +237,10 @@ export default function Profile() {
   }
 
   const givenName = publicName(profile) || 'Anonymous'
-  const verified = Boolean(profile.is_id_verified)
+  const verified =
+    typeof profile.is_id_verified === 'boolean'
+      ? profile.is_id_verified
+      : profile.verification_status === 'approved'
   const isOwn = viewerId === id
   const about = typeof profile.bio === 'string' ? profile.bio.trim() : ''
   const isHost = Boolean(profile.is_host)
