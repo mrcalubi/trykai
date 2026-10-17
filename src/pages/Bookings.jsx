@@ -16,6 +16,8 @@ import {
   paymentStatusFromIntent,
   paymentWasDeclined,
 } from '../lib/paymentReturn'
+import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
+import { formatSessionDateTime } from '../lib/sessionDate'
 
 const POLL_ATTEMPTS = 20
 const POLL_INTERVAL_MS = 2000
@@ -28,21 +30,6 @@ function getStripe() {
     stripePromise = import('@stripe/stripe-js').then(({ loadStripe }) => loadStripe(key))
   }
   return stripePromise
-}
-
-function formatSessionDateTime(iso) {
-  const date = new Intl.DateTimeFormat('en-SG', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'Asia/Singapore',
-  }).format(new Date(iso))
-  const time = new Intl.DateTimeFormat('en-SG', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'Asia/Singapore',
-  }).format(new Date(iso))
-  return `${date} at ${time}`
 }
 
 export default function Bookings({ embedded = false }) {
@@ -77,7 +64,8 @@ export default function Bookings({ embedded = false }) {
 
   const loadData = useCallback(async () => {
     const [bookingsResult, reviewsResult] = await Promise.all([
-      supabase
+      withIssuedAtRetry(() =>
+        supabase
         .from('bookings')
         .select(
           `
@@ -104,7 +92,8 @@ export default function Bookings({ embedded = false }) {
         `
         )
         .eq('guest_id', userId)
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+      ),
       supabase
         .from('reviews')
         .select('booking_id')
@@ -113,7 +102,7 @@ export default function Bookings({ embedded = false }) {
     ])
 
     if (bookingsResult.error) {
-      setError(bookingsResult.error.message)
+      setError(PAGE_LOAD_ERROR)
     } else {
       setBookings(bookingsResult.data)
 

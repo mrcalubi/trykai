@@ -107,7 +107,7 @@ export function formatDayLabel(dateKey) {
   return dayLabelFormat.format(singaporeMidnight(dateKey))
 }
 
-/** "Fri, 9 Oct", matching how session dates read elsewhere on the page. */
+/** "Fri, 9 Oct". The calendar already names the month and year above. */
 export function formatDayTitle(dateKey) {
   return dayTitleFormat.format(singaporeMidnight(dateKey))
 }

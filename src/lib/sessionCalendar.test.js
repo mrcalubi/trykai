@@ -104,6 +104,7 @@ describe('labels', () => {
     expect(formatMonthTitle('2026-10')).toBe('October 2026')
     expect(formatDayLabel('2026-10-09')).toBe('Friday, 9 October')
     expect(formatDayTitle('2026-10-09')).toBe('Fri, 9 Oct')
+    expect(formatDayTitle('2027-03-20')).toBe('Sat, 20 Mar')
   })
 
   it('counts sessions in words', () => {

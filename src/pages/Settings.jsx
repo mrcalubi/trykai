@@ -5,6 +5,7 @@ import { useAuthedUserId } from '../lib/authedUser'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import { getInitials } from '../components/ui/getInitials'
+import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 
 export default function Settings() {
   const userId = useAuthedUserId()
@@ -25,14 +26,16 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
 
   const loadProfile = useCallback(async () => {
-    const { data, error: loadError } = await supabase
-      .from('users')
-      .select('full_name, display_name, bio, email, avatar_url')
-      .eq('id', userId)
-      .single()
+    const { data, error: loadError } = await withIssuedAtRetry(() =>
+      supabase
+        .from('users')
+        .select('full_name, display_name, bio, email, avatar_url')
+        .eq('id', userId)
+        .single()
+    )
 
     if (loadError) {
-      setError(loadError.message)
+      setError(PAGE_LOAD_ERROR)
       setLoading(false)
       return
     }

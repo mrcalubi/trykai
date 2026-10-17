@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { supabase } from './lib/supabase'
@@ -52,6 +53,48 @@ describe('App routes', () => {
   it('serves the browse page at the root', async () => {
     renderAt('/')
 
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: "Singapore's not boring. You just haven't found your thing yet.",
+      })
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+  })
+
+  it('puts a back control on inner pages, not in the top nav', async () => {
+    renderAt('/login')
+
+    const back = await screen.findByRole('button', { name: 'Back' })
+    expect(back.closest('.page-back')).toBeInTheDocument()
+    expect(screen.getByRole('banner').contains(back)).toBe(false)
+  })
+
+  it('goes Home from back when there is no in-app previous page', async () => {
+    const user = userEvent.setup()
+    renderAt('/login')
+
+    await user.click(await screen.findByRole('button', { name: 'Back' }))
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: "Singapore's not boring. You just haven't found your thing yet.",
+      })
+    ).toBeInTheDocument()
+  })
+
+  it('uses in-app history for back after navigating inside the app', async () => {
+    const user = userEvent.setup()
+    renderAt('/')
+    await screen.findByRole('heading', {
+      level: 1,
+      name: "Singapore's not boring. You just haven't found your thing yet.",
+    })
+
+    await user.click(screen.getByRole('link', { name: 'Refund Policy' }))
+    expect(await screen.findByRole('heading', { name: 'Refund Policy' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(
       await screen.findByRole('heading', {
         level: 1,

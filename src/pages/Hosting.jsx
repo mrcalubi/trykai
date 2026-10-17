@@ -7,21 +7,8 @@ import { formatDuration } from '../lib/duration'
 import Button from '../components/ui/Button'
 import OverflowMenu from '../components/ui/OverflowMenu'
 import { hostCancelWarning } from '../lib/hostCancelCopy'
-
-function formatSessionDateTime(iso) {
-  const date = new Intl.DateTimeFormat('en-SG', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'Asia/Singapore',
-  }).format(new Date(iso))
-  const time = new Intl.DateTimeFormat('en-SG', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'Asia/Singapore',
-  }).format(new Date(iso))
-  return `${date} at ${time}`
-}
+import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
+import { formatSessionDateTime } from '../lib/sessionDate'
 
 function activeBookingsOn(session) {
   // Pending rows are unpaid checkouts, not guests the host has to refund.
@@ -150,20 +137,24 @@ export default function Hosting({ embedded = false }) {
   const loadData = useCallback(async () => {
     const listingColumns = 'id, title, area, category, photo_urls'
     const [profileResult, adminResult] = await Promise.all([
-      supabase
-        .from('users')
-        .select('stripe_payouts_enabled, is_host')
-        .eq('id', userId)
-        .single(),
+      withIssuedAtRetry(() =>
+        supabase
+          .from('users')
+          .select('stripe_payouts_enabled, is_host')
+          .eq('id', userId)
+          .single()
+      ),
       supabase.rpc('my_verification'),
     ])
 
-    let listingsResult = await supabase
-      .from('listings')
-      .select(`${listingColumns}, duration_mins`)
-      .eq('host_id', userId)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
+    let listingsResult = await withIssuedAtRetry(() =>
+      supabase
+        .from('listings')
+        .select(`${listingColumns}, duration_mins`)
+        .eq('host_id', userId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+    )
 
     // 00018 adds duration_mins. Until that migration is applied, asking for
     // the column fails the whole listings read and the host cannot add a session.
@@ -177,7 +168,7 @@ export default function Hosting({ embedded = false }) {
     }
 
     if (listingsResult.error) {
-      setError(listingsResult.error.message)
+      setError(PAGE_LOAD_ERROR)
       setListings([])
     } else {
       setError('')
@@ -213,7 +204,7 @@ export default function Hosting({ embedded = false }) {
         .order('starts_at', { ascending: true })
 
       if (sessionsError) {
-        setError((prev) => prev || sessionsError.message)
+        setError((prev) => prev || PAGE_LOAD_ERROR)
       } else {
         setHostSessions(sessionsData ?? [])
       }

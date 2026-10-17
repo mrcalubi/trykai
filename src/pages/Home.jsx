@@ -6,6 +6,7 @@ import { ratingsByListingId } from '../lib/listingRatings'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { sortListingsForBrowse } from '../lib/listingSort'
 import { REGIONS, regionForPlanningArea } from '../lib/planningAreas'
+import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 
 export default function Home() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -18,10 +19,11 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchListings() {
-      const { data, error: fetchError } = await supabase
-        .from('listings')
-        .select(
-          `
+      const { data, error: fetchError } = await withIssuedAtRetry(() =>
+        supabase
+          .from('listings')
+          .select(
+            `
           id,
           title,
           area,
@@ -33,14 +35,15 @@ export default function Home() {
             status
           )
         `
-        )
-        .eq('is_active', true)
-        .eq('sessions.status', 'open')
-        .gt('sessions.starts_at', new Date().toISOString())
-        .order('created_at', { ascending: false })
+          )
+          .eq('is_active', true)
+          .eq('sessions.status', 'open')
+          .gt('sessions.starts_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+      )
 
       if (fetchError) {
-        setError(fetchError.message)
+        setError(PAGE_LOAD_ERROR)
         setListings([])
         setRatings({})
         setLoading(false)

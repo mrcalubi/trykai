@@ -8,6 +8,9 @@ import ReviewCard from '../components/ReviewCard'
 import Card from '../components/ui/Card'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { ratingsByListingId } from '../lib/listingRatings'
+import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
+import { profileReportSubject } from '../lib/reportMailto'
+import ReportLink from '../components/ReportLink'
 import Bookings from './Bookings'
 import Hosting from './Hosting'
 
@@ -114,14 +117,16 @@ export default function Profile() {
       setRatings({})
       setReviews([])
 
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id, display_name, full_name, bio, avatar_url, verification_status, is_host')
-        .eq('id', id)
-        .single()
+      const { data: userData, error: userError } = await withIssuedAtRetry(() =>
+        supabase
+          .from('users')
+          .select('id, display_name, full_name, bio, avatar_url, verification_status, is_host')
+          .eq('id', id)
+          .single()
+      )
 
       if (userError || !userData) {
-        setError(userError?.message || 'Profile not found.')
+        setError(userError ? PAGE_LOAD_ERROR : 'Profile not found.')
         setLoading(false)
         return
       }
@@ -139,7 +144,7 @@ export default function Profile() {
       ])
 
       if (listingsResult.error) {
-        setError(listingsResult.error.message)
+        setError(PAGE_LOAD_ERROR)
         setListings([])
         setRatings({})
       } else {
@@ -208,6 +213,9 @@ export default function Profile() {
           <h1 className="profile-header__name">{givenName}</h1>
           {verified ? <p className="profile-verified">ID verified</p> : null}
           <HostRating reviews={reviews} />
+          {!isOwn ? (
+            <ReportLink subject={profileReportSubject(givenName)} itemId={profile.id} />
+          ) : null}
         </div>
         {isOwn ? (
           <Link to="/settings" className="profile-header__settings" aria-label="Settings">

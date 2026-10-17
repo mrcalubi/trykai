@@ -107,7 +107,7 @@ describe('ListingDetail loading and failure', () => {
     supabase.__on('listings', 'select', { data: null, error: { message: 'No rows found' } })
     renderPage()
 
-    expect(await screen.findByText('No rows found')).toBeInTheDocument()
+    expect(await screen.findByText('Something went wrong loading this page. Please refresh.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Back to browse/ })).toHaveAttribute('href', '/')
   })
 
@@ -133,6 +133,11 @@ describe('ListingDetail content', () => {
     expect(screen.getByText('Food')).toBeInTheDocument()
     expect(screen.getByText('Tiong Bahru')).toBeInTheDocument()
     expect(screen.getByText('Pull your first rosetta in ninety minutes.')).toBeInTheDocument()
+    const report = screen.getByRole('link', { name: 'Report' })
+    expect(report).toHaveClass('report-link')
+    expect(report.getAttribute('href')).toContain('mailto:hello@trykai.sg')
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: listing Latte art')
+    expect(decodeURIComponent(report.getAttribute('href'))).toContain('listing-1')
   })
 
   it('shows the card all-in total, not the raw lesson price', async () => {
@@ -408,7 +413,7 @@ describe('ListingDetail sessions', () => {
     supabase.__on('sessions', 'select', { data: null, error: { message: 'range failed' } })
     renderPage()
 
-    expect(await screen.findByText('range failed')).toBeInTheDocument()
+    expect(await screen.findByText('Something went wrong loading this page. Please refresh.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Back to browse/ })).toBeInTheDocument()
   })
 
@@ -617,7 +622,7 @@ describe('ListingDetail sessions', () => {
     })
     renderPage()
 
-    expect(await screen.findByText('sessions unavailable')).toBeInTheDocument()
+    expect(await screen.findByText('Something went wrong loading this page. Please refresh.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Learn latte art with me' })).toBeInTheDocument()
   })
 

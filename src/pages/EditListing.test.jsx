@@ -83,7 +83,10 @@ describe('EditListing access control', () => {
     supabase.__on('listings', 'select', { data: null, error: { message: 'permission denied' } })
     renderPage()
 
-    expect(await screen.findByText('permission denied')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Something went wrong loading this page. Please refresh.')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('permission denied')).not.toBeInTheDocument()
   })
 })
 

@@ -262,14 +262,16 @@ describe('Dashboard access control', () => {
     supabase.__on('listings', 'select', { data: null, error: { message: 'permission denied' } })
     await renderHosting()
 
-    expect(screen.getByText('permission denied')).toBeInTheDocument()
+    expect(screen.getByText('Something went wrong loading this page. Please refresh.')).toBeInTheDocument()
+    expect(screen.queryByText('permission denied')).not.toBeInTheDocument()
   })
 
   it('reports a load failure on bookings', async () => {
     supabase.__on('bookings', 'select', { data: null, error: { message: 'permission denied' } })
     await renderBookings()
 
-    expect(screen.getByText('permission denied')).toBeInTheDocument()
+    expect(screen.getByText('Something went wrong loading this page. Please refresh.')).toBeInTheDocument()
+    expect(screen.queryByText('permission denied')).not.toBeInTheDocument()
   })
 })
 
@@ -641,7 +643,7 @@ describe('Dashboard add session', () => {
 
     expect(
       await screen.findByText(
-        'Added 4 spots to the session on Tue, 1 Sept at 10:30 am. 7 spots left.'
+        'Added 4 spots to the session on Tue, 1 Sept 2099 at 10:30 am. 7 spots left.'
       )
     ).toBeInTheDocument()
     expect(screen.queryByLabelText('Date')).not.toBeInTheDocument()

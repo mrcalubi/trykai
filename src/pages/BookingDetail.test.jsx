@@ -6,7 +6,7 @@ import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { hoursFromNow, makeAuthSession } from '../test/fixtures'
-import { formatSessionDay } from '../../supabase/functions/_shared/email.ts'
+import { formatSessionDay } from '../lib/sessionDate'
 
 vi.mock('../lib/supabase')
 

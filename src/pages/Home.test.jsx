@@ -2,6 +2,7 @@ import { screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Home from './Home'
 import { supabase } from '../lib/supabase'
+import { PAGE_LOAD_ERROR } from '../lib/pageLoad'
 import { renderWithRouter } from '../test/render'
 import { makeListing, makeSession } from '../test/fixtures'
 
@@ -50,12 +51,37 @@ describe('Home loading and error states', () => {
     expect(screen.getByText('Loading listings…')).toBeInTheDocument()
   })
 
-  it('surfaces a fetch failure to the user', async () => {
+  it('surfaces a fetch failure to the user without the raw error', async () => {
     supabase.__on('listings', 'select', { data: null, error: { message: 'network down' } })
     renderWithRouter(<Home />)
 
-    expect(await screen.findByText('network down')).toBeInTheDocument()
+    expect(await screen.findByText(PAGE_LOAD_ERROR)).toBeInTheDocument()
+    expect(screen.queryByText('network down')).not.toBeInTheDocument()
     expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('retries a JWT issued-at-future error once after a second', async () => {
+    supabase.__once('listings', 'select', {
+      data: null,
+      error: { message: 'JWT issued at future' },
+    })
+    givenListings([LATTE])
+    renderWithRouter(<Home />)
+
+    expect(screen.getByText('Loading listings…')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Latte art' }, { timeout: 2500 })).toBeInTheDocument()
+    expect(screen.queryByText(/issued at future/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the friendly message when the JWT retry still fails', async () => {
+    supabase.__on('listings', 'select', {
+      data: null,
+      error: { message: 'JWT issued at future' },
+    })
+    renderWithRouter(<Home />)
+
+    expect(await screen.findByText(PAGE_LOAD_ERROR, {}, { timeout: 2500 })).toBeInTheDocument()
+    expect(screen.queryByText(/issued at future/i)).not.toBeInTheDocument()
   })
 
   it('invites the user back when there is nothing to browse', async () => {

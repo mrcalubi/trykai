@@ -31,25 +31,12 @@ import { formatDuration } from '../lib/duration'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { checkoutCanLeaveForWebhook } from '../lib/paymentReturn'
 import { publicName } from '../lib/publicName'
+import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
+import { listingReportSubject } from '../lib/reportMailto'
+import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
+import ReportLink from '../components/ReportLink'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
-
-function formatSessionDate(iso) {
-  return new Intl.DateTimeFormat('en-SG', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'Asia/Singapore',
-  }).format(new Date(iso))
-}
-
-function formatSessionTime(iso) {
-  return new Intl.DateTimeFormat('en-SG', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'Asia/Singapore',
-  }).format(new Date(iso))
-}
 
 function upcomingSessions(listingId, columns) {
   return supabase
@@ -171,23 +158,22 @@ export default function ListingDetail() {
             stripe_payouts_enabled
           )
         `
-      let { data: listingData, error: listingError } = await supabase
-        .from('listings')
-        .select(listingSelect)
-        .eq('id', id)
-        .eq('is_active', true)
-        .single()
+      let { data: listingData, error: listingError } = await withIssuedAtRetry(() =>
+        supabase.from('listings').select(listingSelect).eq('id', id).eq('is_active', true).single()
+      )
       if (listingError && /group_pricing/.test(listingError.message ?? '')) {
-        ;({ data: listingData, error: listingError } = await supabase
-          .from('listings')
-          .select(listingSelect.replace(/\s*group_pricing,\n/, '\n'))
-          .eq('id', id)
-          .eq('is_active', true)
-          .single())
+        ;({ data: listingData, error: listingError } = await withIssuedAtRetry(() =>
+          supabase
+            .from('listings')
+            .select(listingSelect.replace(/\s*group_pricing,\n/, '\n'))
+            .eq('id', id)
+            .eq('is_active', true)
+            .single()
+        ))
       }
 
       if (listingError) {
-        setError(listingError.message)
+        setError(PAGE_LOAD_ERROR)
         setLoading(false)
         return
       }
@@ -209,7 +195,7 @@ export default function ListingDetail() {
 
       const sessionRangeError = firstSessionResult.error || lastSessionResult.error
       if (sessionRangeError) {
-        setError(sessionRangeError.message)
+        setError(PAGE_LOAD_ERROR)
       } else {
         const firstStart = firstSessionResult.data?.[0]?.starts_at
         const lastStart = lastSessionResult.data?.[0]?.starts_at ?? firstStart
@@ -268,17 +254,16 @@ export default function ListingDetail() {
 
     async function fetchMonth() {
       const { startIso, endIso } = monthBounds(visibleMonth)
-      const { data, error: fetchError } = await upcomingSessions(
-        id,
-        'id, starts_at, duration_mins, spots_remaining'
+      const { data, error: fetchError } = await withIssuedAtRetry(() =>
+        upcomingSessions(id, 'id, starts_at, duration_mins, spots_remaining')
+          .gte('starts_at', startIso)
+          .lt('starts_at', endIso)
+          .order('starts_at', { ascending: true })
       )
-        .gte('starts_at', startIso)
-        .lt('starts_at', endIso)
-        .order('starts_at', { ascending: true })
 
       if (fetchError) {
         requestedMonths.current.delete(cacheKey)
-        setMonthError({ cacheKey, message: fetchError.message })
+        setMonthError({ cacheKey, message: PAGE_LOAD_ERROR })
         return
       }
       setSessionsByMonth((prev) => ({ ...prev, [cacheKey]: data ?? [] }))
@@ -577,6 +562,7 @@ export default function ListingDetail() {
           <span className="detail-category">{listing.category}</span>
           <h1 className="detail-title">{listing.title}</h1>
           <p className="detail-area">{revealedAddress || listing.area}</p>
+          <ReportLink subject={listingReportSubject(listing.title)} itemId={listing.id} />
 
           <div className="detail-host">
             {host?.avatar_url ? (
@@ -636,7 +622,11 @@ export default function ListingDetail() {
             ) : (
               <div className="reviews-list">
                 {reviews.map((review) => (
-                  <ReviewCard key={review.id} review={review} />
+                  <ReviewCard
+                    key={review.id}
+                    review={review}
+                    listingTitle={listing.title}
+                  />
                 ))}
               </div>
             )}
@@ -668,7 +658,7 @@ export default function ListingDetail() {
                   <div className="payment-panel__session">
                     <div>
                       <p className="session-card__date">
-                        {formatSessionDate(checkoutSession.starts_at)}
+                        {formatSessionDay(checkoutSession.starts_at)}
                       </p>
                       <p className="session-card__meta">
                         {formatSessionTime(checkoutSession.starts_at)} ·{' '}
