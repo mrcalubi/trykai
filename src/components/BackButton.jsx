@@ -1,5 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
+
+const BackSlotContext = createContext({ slotEl: null, setSlotEl: () => {} })
+
+export function BackSlotProvider({ children }) {
+  const [slotEl, setSlotEl] = useState(null)
+  const value = useMemo(() => ({ slotEl, setSlotEl }), [slotEl])
+  return <BackSlotContext.Provider value={value}>{children}</BackSlotContext.Provider>
+}
+
+export function BackRowActions({ children }) {
+  const { slotEl } = useContext(BackSlotContext)
+  if (!slotEl || children == null) return null
+  return createPortal(children, slotEl)
+}
 
 function historyHasPreviousPage() {
   return (window.history.state?.idx ?? 0) > 0
@@ -25,10 +40,30 @@ function pageBackClassName(pathname) {
   return 'page-back'
 }
 
+function BackChevron() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  )
+}
+
 export default function BackButton() {
   const navigate = useNavigate()
   const location = useLocation()
   const seenLocation = useRef(false)
+  const { setSlotEl } = useContext(BackSlotContext)
   const [navigatedInApp, setNavigatedInApp] = useState(historyHasPreviousPage)
 
   useEffect(() => {
@@ -49,8 +84,9 @@ export default function BackButton() {
   return (
     <div className={pageBackClassName(location.pathname)}>
       <button type="button" className="page-back__button" onClick={handleClick} aria-label="Back">
-        <span aria-hidden="true">‹</span>
+        <BackChevron />
       </button>
+      <div className="page-back__actions" ref={setSlotEl} />
     </div>
   )
 }

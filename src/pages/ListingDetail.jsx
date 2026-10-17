@@ -32,9 +32,10 @@ import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { checkoutCanLeaveForWebhook } from '../lib/paymentReturn'
 import { publicName } from '../lib/publicName'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
-import { listingReportSubject } from '../lib/reportMailto'
+import { listingReportSubject, reportMailto } from '../lib/reportMailto'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
-import ReportLink from '../components/ReportLink'
+import { BackRowActions } from '../components/BackButton'
+import OverflowMenu from '../components/ui/OverflowMenu'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -535,6 +536,25 @@ export default function ListingDetail() {
 
   return (
     <div className="page page--detail">
+      <BackRowActions>
+        {isOwnListing ? null : (
+          <OverflowMenu
+            label="More actions"
+            icon="⋮"
+            className="ui-overflow--quiet"
+            items={[
+              {
+                label: 'Report listing',
+                href: reportMailto({
+                  subject: listingReportSubject(listing.title),
+                  url: typeof window === 'undefined' ? '' : window.location.href,
+                  id: listing.id,
+                }),
+              },
+            ]}
+          />
+        )}
+      </BackRowActions>
       {photos.length > 0 ? (
         <div className="detail-gallery">
           <div
@@ -652,10 +672,6 @@ export default function ListingDetail() {
               </div>
             )}
           </section>
-
-          {!isOwnListing ? (
-            <ReportLink subject={listingReportSubject(listing.title)} itemId={listing.id} />
-          ) : null}
         </div>
 
         <aside className="detail-sidebar">
