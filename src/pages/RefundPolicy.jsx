@@ -4,7 +4,7 @@ export default function RefundPolicy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Refund Policy</h1>
-      <p className="policy-page__updated">Last updated: 27 August 2026</p>
+      <p className="policy-page__updated">Last updated: 17 October 2026</p>
 
       <h2>How refunds work</h2>
       <p>
@@ -22,16 +22,15 @@ export default function RefundPolicy() {
       </p>
 
       <h2>Processing time</h2>
-      <p>Processing time depends on how you originally paid:</p>
-      <ul>
-        <li>
-          <strong>Card:</strong> 3 to 5 business days
-        </li>
-        <li>
-          <strong>PayNow:</strong> usually reflects within a few hours, and no
-          more than 1 business day
-        </li>
-      </ul>
+      <p>
+        Card refunds usually take 5 to 10 business days to appear. PayNow
+        refunds are usually faster.
+      </p>
+      <p>
+        PayNow refunds can only be made within 90 days of payment. If an
+        automatic refund can&apos;t be completed, we&apos;ll contact you and
+        refund you another way.
+      </p>
       <p>
         Business days refer to Singapore business days, and exclude weekends and
         Singapore public holidays.

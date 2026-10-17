@@ -77,7 +77,7 @@ export default function CancellationPolicy() {
         </li>
       </ul>
 
-      <h3>Appealing a strike</h3>
+      <h3 id="appeals">Appealing a strike</h3>
       <p>
         If your cancellation or no show was caused by something genuinely
         outside your control (for example a sudden emergency, illness, or an

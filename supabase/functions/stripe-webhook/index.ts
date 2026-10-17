@@ -7,6 +7,7 @@ import {
 } from '../_shared/booking.ts'
 import {
   bookingConfirmedGuestHtml,
+  bookingConfirmedGuestSubject,
   bookingConfirmedHostHtml,
   bookingReference,
   cardDetailsFromCharge,
@@ -72,12 +73,15 @@ async function confirmSucceededPayment(paymentIntent: {
         starts_at,
         duration_mins,
         listings (
+          id,
           title,
           host_id,
           full_address,
           duration_mins,
           price_per_person,
           group_pricing,
+          category,
+          whats_provided,
           users:host_id (
             email,
             full_name,
@@ -185,15 +189,20 @@ async function confirmSucceededPayment(paymentIntent: {
     .eq('id', booking.guest_id)
     .single()
 
+  const guestName = publicDisplayName(guestProfile)
+  const hostName = publicDisplayName(host) || 'your host'
+  const durationMins = session?.duration_mins ?? listing?.duration_mins
+
   await sendResendEmail({
     apiKey,
     to: guestProfile?.email,
-    subject: `Booking confirmed: ${listingTitle}`,
+    subject: bookingConfirmedGuestSubject(listingTitle, session?.starts_at ?? ''),
     replyTo: GUEST_REPLY_TO,
     html: bookingConfirmedGuestHtml({
       bookingReference: reference,
       listingTitle,
-      hostName: publicDisplayName(host) || 'your host',
+      hostName,
+      guestName,
       sessionDate,
       duration,
       fullAddress: listing?.full_address ?? '',
@@ -204,6 +213,8 @@ async function confirmSucceededPayment(paymentIntent: {
       totalPaidCents: booking.total_amount,
       paymentMethod,
       sessionStartsAt: session?.starts_at ?? '',
+      durationMins,
+      whatsProvided: listing?.whats_provided,
       guestId: booking.guest_id,
       siteUrl,
     }),
@@ -215,7 +226,8 @@ async function confirmSucceededPayment(paymentIntent: {
     subject: `New booking for "${listingTitle}"`,
     html: bookingConfirmedHostHtml({
       bookingReference: reference,
-      guestName: publicDisplayName(guestProfile) || 'A guest',
+      hostName: publicDisplayName(host),
+      guestName: guestName || 'A guest',
       listingTitle,
       sessionDate,
       guestsCount: booking.guests_count,

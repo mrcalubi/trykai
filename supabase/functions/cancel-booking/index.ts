@@ -13,6 +13,7 @@ import {
   publicDisplayName,
   resolvePaymentMethod,
   sendCancellationEmails,
+  sendHostSessionCancelledEmail,
 } from '../_shared/email.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
 
@@ -139,6 +140,9 @@ async function notifyCancellation(
     guestId: string | null | undefined
     hostId: string | null | undefined
     listingTitle: string | null | undefined
+    listingId?: string | null
+    listingCategory?: string | null
+    hasOtherSessions?: boolean
     sessionStartsAt: string | null | undefined
     guestsCount: number
     paymentRail?: string | null
@@ -151,8 +155,8 @@ async function notifyCancellation(
       options.guestId
         ? admin.from('users').select('email, full_name, display_name').eq('id', options.guestId).maybeSingle()
         : Promise.resolve({ data: null }),
-      options.cancelledBy === 'guest' && options.hostId
-        ? admin.from('users').select('email').eq('id', options.hostId).maybeSingle()
+      options.hostId
+        ? admin.from('users').select('email, full_name, display_name').eq('id', options.hostId).maybeSingle()
         : Promise.resolve({ data: null }),
     ])
 
@@ -175,7 +179,12 @@ async function notifyCancellation(
       sessionDate: options.sessionStartsAt ? formatSessionDate(options.sessionStartsAt) : '',
       guestEmail: guestResult.data?.email,
       hostEmail: hostResult.data?.email,
-      guestName: publicDisplayName(guestResult.data) || guestResult.data?.full_name,
+      guestName: publicDisplayName(guestResult.data),
+      hostName: publicDisplayName(hostResult.data) || 'your host',
+      listingId: options.listingId,
+      listingCategory: options.listingCategory,
+      hasOtherSessions: options.hasOtherSessions,
+      paymentRail: options.paymentRail,
       guestsCount: options.guestsCount,
       paymentMethod,
       hostPayoutCents: hostPayoutAfterGuestCancel(
@@ -220,7 +229,7 @@ Deno.serve(async (req) => {
           id,
           listing_id,
           starts_at,
-          listings!inner ( host_id, title ),
+          listings!inner ( id, host_id, title, category ),
           bookings ( id, status, guests_count, total_amount, platform_fee, stripe_payment_id, session_id, guest_id, payment_rail, host_payout_amount )
         `,
         )
@@ -234,6 +243,16 @@ Deno.serve(async (req) => {
       const active = (session.bookings ?? []).filter(
         (booking: { status: string }) => booking.status === 'pending' || booking.status === 'confirmed',
       )
+
+      const { data: otherSessions } = await admin
+        .from('sessions')
+        .select('id')
+        .eq('listing_id', session.listing_id)
+        .eq('status', 'open')
+        .gt('starts_at', new Date().toISOString())
+        .neq('id', session.id)
+        .limit(1)
+      const hasOtherSessions = (otherSessions ?? []).length > 0
 
       const results = []
       for (const booking of active) {
@@ -254,6 +273,9 @@ Deno.serve(async (req) => {
             guestId: booking.guest_id,
             hostId: listing?.host_id,
             listingTitle: listing?.title,
+            listingId: listing?.id ?? session.listing_id,
+            listingCategory: listing?.category,
+            hasOtherSessions,
             sessionStartsAt: session.starts_at,
             guestsCount: booking.guests_count,
             paymentRail: booking.payment_rail,
@@ -265,7 +287,25 @@ Deno.serve(async (req) => {
       }
 
       if (results.length > 0) {
-        await admin.rpc('apply_host_strike', { p_host_id: user.id })
+        const { data: strikeCount } = await admin.rpc('apply_host_strike', { p_host_id: user.id })
+        const { data: hostProfile } = await admin
+          .from('users')
+          .select('email, full_name, display_name')
+          .eq('id', user.id)
+          .maybeSingle()
+        const confirmedGuests = active
+          .filter((booking: { status: string }) => booking.status === 'confirmed')
+          .reduce((sum: number, booking: { guests_count?: number }) => sum + (booking.guests_count || 0), 0)
+        await sendHostSessionCancelledEmail({
+          apiKey: Deno.env.get('RESEND_API_KEY'),
+          hostEmail: hostProfile?.email,
+          hostName: publicDisplayName(hostProfile),
+          listingTitle: listing?.title || 'your session',
+          sessionDate: session.starts_at ? formatSessionDate(session.starts_at) : '',
+          guestCount: confirmedGuests || active.reduce((sum: number, booking: { guests_count?: number }) => sum + (booking.guests_count || 0), 0),
+          strikeCount: typeof strikeCount === 'number' ? strikeCount : 1,
+          siteUrl: Deno.env.get('SITE_URL'),
+        })
       }
       return jsonResponse({ cancelled: results.length })
     }
@@ -288,7 +328,7 @@ Deno.serve(async (req) => {
         guest_id,
         payment_rail,
         host_payout_amount,
-        sessions ( starts_at, spots_remaining, listings ( title, host_id ) )
+        sessions ( starts_at, spots_remaining, listings ( id, title, host_id, category ) )
       `,
       )
       .eq('id', body.booking_id)
@@ -321,6 +361,15 @@ Deno.serve(async (req) => {
     // A pending row was never charged. Don't email a refund that does not exist.
     if (booking.status !== 'pending') {
       const listing = asRecord(session.listings)
+      const { data: otherSessions } = listing?.id
+        ? await admin
+            .from('sessions')
+            .select('id')
+            .eq('listing_id', listing.id)
+            .eq('status', 'open')
+            .gt('starts_at', new Date().toISOString())
+            .limit(1)
+        : { data: [] }
       await notifyCancellation(admin, {
         cancelledBy: 'guest',
         refundAmount: result.refund_amount ?? refundAmount,
@@ -328,6 +377,9 @@ Deno.serve(async (req) => {
         guestId: booking.guest_id,
         hostId: listing?.host_id,
         listingTitle: listing?.title,
+        listingId: listing?.id,
+        listingCategory: listing?.category,
+        hasOtherSessions: (otherSessions ?? []).length > 0,
         sessionStartsAt: session.starts_at,
         guestsCount: booking.guests_count,
         paymentRail: booking.payment_rail,

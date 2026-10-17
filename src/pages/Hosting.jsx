@@ -6,6 +6,7 @@ import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { formatDuration } from '../lib/duration'
 import Button from '../components/ui/Button'
 import OverflowMenu from '../components/ui/OverflowMenu'
+import { hostCancelWarning } from '../lib/hostCancelCopy'
 
 function formatSessionDateTime(iso) {
   const date = new Intl.DateTimeFormat('en-SG', {
@@ -594,7 +595,7 @@ export default function Hosting({ embedded = false }) {
                 {confirmCancelSessionId === session.id && (
                   <div className="cancel-confirm">
                     <p className="cancel-confirm__warning">
-                      {`Cancelling refunds all ${guestTotal} guests in full and adds a strike to your account.`}
+                      {hostCancelWarning(guestTotal)}
                     </p>
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <button

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Card from '../components/ui/Card'
 import { ratingsByListingId } from '../lib/listingRatings'
@@ -7,11 +8,12 @@ import { sortListingsForBrowse } from '../lib/listingSort'
 import { REGIONS, regionForPlanningArea } from '../lib/planningAreas'
 
 export default function Home() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [listings, setListings] = useState([])
   const [ratings, setRatings] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('All')
+  const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || 'All')
   const [regionFilter, setRegionFilter] = useState('All')
 
   useEffect(() => {
@@ -109,7 +111,13 @@ export default function Home() {
                 <button
                   key={category}
                   type="button"
-                  onClick={() => setCategoryFilter(category)}
+                  onClick={() => {
+                    setCategoryFilter(category)
+                    const params = new URLSearchParams(searchParams)
+                    if (category === 'All') params.delete('category')
+                    else params.set('category', category)
+                    setSearchParams(params, { replace: true })
+                  }}
                   className={`filter-pill${activeCategory === category ? ' filter-pill--active' : ''}`}
                 >
                   {category}
