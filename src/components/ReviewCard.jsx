@@ -52,7 +52,7 @@ export default function ReviewCard({ review, listingTitle, viewerId }) {
           <OverflowMenu
             label="More actions"
             icon="⋮"
-            className="review-card__menu"
+            className="review-card__menu ui-overflow--quiet"
             items={[{ label: 'Report review', href: reportHref }]}
           />
         ) : null}

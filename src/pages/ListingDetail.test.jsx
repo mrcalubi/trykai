@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ListingDetail from './ListingDetail'
+import BackButton, { BackSlotProvider } from '../components/BackButton'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { hoursFromNow, makeAuthSession, makeListing, makeReview, makeSession } from '../test/fixtures'
@@ -81,10 +82,16 @@ function givenSignedIn(session = makeAuthSession()) {
 }
 
 function renderPage() {
-  return renderWithRouter(<ListingDetail />, {
-    route: '/listings/listing-1',
-    path: '/listings/:id',
-  })
+  return renderWithRouter(
+    <BackSlotProvider>
+      <BackButton />
+      <ListingDetail />
+    </BackSlotProvider>,
+    {
+      route: '/listings/listing-1',
+      path: '/listings/:id',
+    }
+  )
 }
 
 beforeEach(() => {
@@ -127,23 +134,20 @@ describe('ListingDetail loading and failure', () => {
 describe('ListingDetail content', () => {
   it('renders the listing headline details', async () => {
     givenListing(makeListing({ title: 'Latte art', category: 'Food', area: 'Tiong Bahru' }))
-    renderPage()
+    const { user } = renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Latte art', level: 1 })).toBeInTheDocument()
     expect(screen.getByText('Food')).toBeInTheDocument()
     expect(screen.getByText('Tiong Bahru')).toBeInTheDocument()
     expect(screen.getByText('Pull your first rosetta in ninety minutes.')).toBeInTheDocument()
-    const report = screen.getByRole('link', { name: '⚑ Report' })
-    expect(report).toHaveClass('report-link')
-    expect(report).toHaveTextContent('⚑ Report')
+    expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
+    const more = screen.getByRole('button', { name: 'More actions' })
+    expect(document.querySelector('.page-back__actions')).toContainElement(more)
+    await user.click(more)
+    const report = screen.getByRole('menuitem', { name: 'Report listing' })
     expect(report.getAttribute('href')).toContain('mailto:hello@trykai.sg')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: listing Latte art')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('listing-1')
-    expect(document.querySelector('.detail-main > .report-link')).toBe(report)
-    expect(
-      screen.getByRole('heading', { name: /Reviews/ }).compareDocumentPosition(report) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
   })
 
   it('does not render a bare 0 in place of the planning area', async () => {
@@ -162,6 +166,8 @@ describe('ListingDetail content', () => {
 
     await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
     expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
+    expect(document.querySelector('.page-back__actions .ui-overflow')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
   })
 
   it('shows the card all-in total, not the raw lesson price', async () => {

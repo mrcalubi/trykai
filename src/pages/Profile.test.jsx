@@ -81,23 +81,20 @@ describe('Profile loading and failure', () => {
 
 describe('Profile public content', () => {
   it('shows the display name, even when signed out', async () => {
-    renderPage()
+    const { user } = renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Mei', level: 1 })).toBeInTheDocument()
     expect(screen.queryByText('Mei Ling Tan')).not.toBeInTheDocument()
     expect(supabase.auth.getSession).toHaveBeenCalled()
     expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
-    const report = screen.getByRole('link', { name: '⚑ Report' })
-    expect(report).toHaveClass('report-link')
-    expect(report).toHaveTextContent('⚑ Report')
+    expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
+    const more = screen.getByRole('button', { name: 'More actions' })
+    expect(more.closest('.profile-header__name-row')).toBeInTheDocument()
+    await user.click(more)
+    const report = screen.getByRole('menuitem', { name: 'Report profile' })
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: profile Mei')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain(HOST_ID)
-    expect(document.querySelector('.page--detail > .report-link')).toBe(report)
-    expect(
-      screen.getByRole('heading', { name: /Reviews/ }).compareDocumentPosition(report) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
   })
 
   it('does not split a multi-word display name', async () => {
@@ -347,6 +344,7 @@ describe('Profile own tabs', () => {
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
   })
 
   it('scrolls the tab bar horizontally without showing a scrollbar in any browser', () => {

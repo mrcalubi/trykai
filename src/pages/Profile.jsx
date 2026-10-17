@@ -9,8 +9,8 @@ import Card from '../components/ui/Card'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
-import { profileReportSubject } from '../lib/reportMailto'
-import ReportLink from '../components/ReportLink'
+import { profileReportSubject, reportMailto } from '../lib/reportMailto'
+import OverflowMenu from '../components/ui/OverflowMenu'
 import Bookings from './Bookings'
 import Hosting from './Hosting'
 
@@ -224,7 +224,26 @@ export default function Profile() {
           </div>
         )}
         <div className="profile-header__copy">
-          <h1 className="profile-header__name">{givenName}</h1>
+          <div className="profile-header__name-row">
+            <h1 className="profile-header__name">{givenName}</h1>
+            {!isOwn ? (
+              <OverflowMenu
+                label="More actions"
+                icon="⋮"
+                className="ui-overflow--quiet profile-header__menu"
+                items={[
+                  {
+                    label: 'Report profile',
+                    href: reportMailto({
+                      subject: profileReportSubject(givenName),
+                      url: typeof window === 'undefined' ? '' : window.location.href,
+                      id: profile.id,
+                    }),
+                  },
+                ]}
+              />
+            ) : null}
+          </div>
           {verified ? <p className="profile-verified">ID verified</p> : null}
           <HostRating reviews={reviews} />
         </div>
@@ -320,10 +339,6 @@ export default function Profile() {
           </section>
         </>
       )}
-
-      {!isOwn ? (
-        <ReportLink subject={profileReportSubject(givenName)} itemId={profile.id} />
-      ) : null}
     </div>
   )
 }

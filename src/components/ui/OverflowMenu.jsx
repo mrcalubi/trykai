@@ -12,6 +12,7 @@ export default function OverflowMenu({
   const itemRefs = useRef([])
   const triggerRef = useRef(null)
   const menuId = useId()
+  const hasItems = Boolean(items?.length)
 
   useEffect(() => {
     if (!open) return undefined
@@ -71,6 +72,8 @@ export default function OverflowMenu({
     setOpen(false)
     select?.()
   }
+
+  if (!hasItems) return null
 
   return (
     <div className={['ui-overflow', className].filter(Boolean).join(' ')} ref={rootRef}>
