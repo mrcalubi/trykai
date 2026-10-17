@@ -56,7 +56,7 @@ test.describe('browsing listings', () => {
     await stubAllExternalCalls(page, { listings: [latteNextWeek, boxingTomorrow] })
     await page.goto('/')
 
-    await expect(page.locator('.listings-grid h2')).toHaveText([
+    await expect(page.locator('.listings-grid h3')).toHaveText([
       'Boxing basics',
       'Learn latte art with me',
     ])
