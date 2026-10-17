@@ -487,7 +487,7 @@ describe('ListingDetail sessions', () => {
     ])
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: /9 Oct 2099 · 2 sessions/ })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /9 Oct · 2 sessions/ })).toBeInTheDocument()
     expect(screen.getByText('11:00 am')).toBeInTheDocument()
     expect(screen.getByText(/33 min · 2 spots left/)).toBeInTheDocument()
     expect(screen.getByText('11:00 pm')).toBeInTheDocument()
@@ -506,11 +506,11 @@ describe('ListingDetail sessions', () => {
       makeSession({ id: 'twenty-seventh', starts_at: '2099-10-27T03:00:00.000Z', duration_mins: 111 }),
     ])
     const { user } = renderPage()
-    await screen.findByRole('heading', { name: /9 Oct 2099 · 1 session/ })
+    await screen.findByRole('heading', { name: /9 Oct · 1 session/ })
 
     await user.click(screen.getByRole('button', { name: /27 October, 1 session/ }))
 
-    expect(screen.getByRole('heading', { name: /27 Oct 2099 · 1 session/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /27 Oct · 1 session/ })).toBeInTheDocument()
     expect(screen.getByText(/1 hr 51 min/)).toBeInTheDocument()
     expect(screen.queryByText(/33 min/)).not.toBeInTheDocument()
   })
@@ -522,7 +522,7 @@ describe('ListingDetail sessions', () => {
       makeSession({ id: 'november', starts_at: '2099-11-02T03:00:00.000Z', duration_mins: 60 }),
     ])
     const { user } = renderPage()
-    await screen.findByRole('heading', { name: /9 Oct 2099 · 1 session/ })
+    await screen.findByRole('heading', { name: /9 Oct · 1 session/ })
 
     const october = monthBounds('2099-10')
     const firstMonth = supabase.__calls('sessions', 'select').find((call) =>
@@ -540,11 +540,11 @@ describe('ListingDetail sessions', () => {
     })
 
     await user.click(screen.getByRole('button', { name: 'Next month' }))
-    expect(await screen.findByRole('heading', { name: /2 Nov 2099 · 1 session/ })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /2 Nov · 1 session/ })).toBeInTheDocument()
     expect(screen.getByText(/1 hr · 3 spots left/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Previous month' }))
-    expect(await screen.findByRole('heading', { name: /9 Oct 2099 · 1 session/ })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /9 Oct · 1 session/ })).toBeInTheDocument()
 
     const ranged = supabase
       .__calls('sessions', 'select')
@@ -572,7 +572,7 @@ describe('ListingDetail sessions', () => {
 
     const books = await screen.findAllByRole('button', { name: 'Book' })
     expect(books.length).toBeLessThan(40)
-    expect(screen.getByRole('heading', { name: /1 Oct 2099 · \d+ sessions/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /1 Oct · \d+ sessions/ })).toBeInTheDocument()
 
     const ranged = supabase
       .__calls('sessions', 'select')
@@ -596,7 +596,7 @@ describe('ListingDetail sessions', () => {
       makeSession({ id: 'december', starts_at: '2099-12-02T03:00:00.000Z', duration_mins: 40 }),
     ])
     const { user } = renderPage()
-    await screen.findByRole('heading', { name: /9 Oct 2099 · 1 session/ })
+    await screen.findByRole('heading', { name: /9 Oct · 1 session/ })
 
     await user.click(screen.getByRole('button', { name: 'Next month' }))
 
@@ -605,7 +605,7 @@ describe('ListingDetail sessions', () => {
 
     await user.click(screen.getByRole('button', { name: 'Next month' }))
 
-    expect(await screen.findByRole('heading', { name: /2 Dec 2099 · 1 session/ })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /2 Dec · 1 session/ })).toBeInTheDocument()
     expect(screen.getByText(/40 min · 3 spots left/)).toBeInTheDocument()
   })
 

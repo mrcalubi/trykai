@@ -67,7 +67,8 @@ export default function TopNav({
 }) {
   const location = useLocation()
   const [compact, setCompact] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [openedAt, setOpenedAt] = useState(null)
+  const menuOpen = openedAt === location.key
 
   useEffect(() => {
     function updateCompact() {
@@ -80,14 +81,10 @@ export default function TopNav({
   }, [])
 
   useEffect(() => {
-    setMenuOpen(false)
-  }, [location.pathname, location.search])
-
-  useEffect(() => {
     if (!menuOpen) return undefined
 
     function handleKeyDown(event) {
-      if (event.key === 'Escape') setMenuOpen(false)
+      if (event.key === 'Escape') setOpenedAt(null)
     }
 
     document.addEventListener('keydown', handleKeyDown)
@@ -95,12 +92,12 @@ export default function TopNav({
   }, [menuOpen])
 
   function handleMenuToggle() {
-    setMenuOpen((open) => !open)
+    setOpenedAt((key) => (key === location.key ? null : location.key))
     onMenuClick?.()
   }
 
   function handleMenuClose() {
-    setMenuOpen(false)
+    setOpenedAt(null)
   }
 
   const shellClasses = [

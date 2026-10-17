@@ -1,5 +1,3 @@
-import { formatSessionDay } from './sessionDate'
-
 // Calendar maths for session dates, always in Singapore time. Singapore has no
 // daylight saving, so a fixed +08:00 offset maps local midnight exactly.
 const SINGAPORE_OFFSET = '+08:00'
@@ -23,6 +21,13 @@ const dayLabelFormat = new Intl.DateTimeFormat('en-SG', {
   weekday: 'long',
   day: 'numeric',
   month: 'long',
+  timeZone: TIME_ZONE,
+})
+
+const dayTitleFormat = new Intl.DateTimeFormat('en-SG', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
   timeZone: TIME_ZONE,
 })
 
@@ -102,9 +107,9 @@ export function formatDayLabel(dateKey) {
   return dayLabelFormat.format(singaporeMidnight(dateKey))
 }
 
-/** "Fri, 9 Oct", or "Fri, 9 Oct 2027" when the year is not this year. */
-export function formatDayTitle(dateKey, now = Date.now()) {
-  return formatSessionDay(singaporeMidnight(dateKey).toISOString(), now)
+/** "Fri, 9 Oct". The calendar already names the month and year above. */
+export function formatDayTitle(dateKey) {
+  return dayTitleFormat.format(singaporeMidnight(dateKey))
 }
 
 export function sessionCountLabel(count) {
