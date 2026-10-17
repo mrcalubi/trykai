@@ -29,7 +29,7 @@ const QUICK_FILTERS = [
 const TRUST_POINTS = [
   { icon: 'shield', label: 'ID-verified hosts' },
   { icon: 'pin', label: 'Exact address after booking' },
-  { icon: 'wallet', label: 'Pay by PayNow or card' },
+  { icon: 'wallet', label: 'Pay by PayNow or Card' },
 ]
 
 const STEPS = [
@@ -39,7 +39,7 @@ const STEPS = [
   },
   {
     title: 'Book a verified host',
-    body: 'Every host passes an ID check before they can list. Pay by PayNow or card.',
+    body: 'Every host passes an ID check before they can list. Pay by PayNow or Card.',
   },
   {
     title: 'Show up and try it',
@@ -196,7 +196,7 @@ export default function Home() {
             <span className="home-hero__mark">your thing</span> yet.
           </h1>
           <p className="home-hero__subtitle">
-            Solo, with friends, or on a date — something better than scrolling for the tenth time.
+            Solo, with friends, or on a date — your next hobby awaits.
           </p>
           <div className="home-hero__actions">
             <a href="#listings" className="ui-button ui-button--primary ui-button--lg">
