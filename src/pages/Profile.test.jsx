@@ -88,10 +88,16 @@ describe('Profile public content', () => {
     expect(supabase.auth.getSession).toHaveBeenCalled()
     expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
-    const report = screen.getByRole('link', { name: 'Report' })
+    const report = screen.getByRole('link', { name: '⚑ Report' })
     expect(report).toHaveClass('report-link')
+    expect(report).toHaveTextContent('⚑ Report')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: profile Mei')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain(HOST_ID)
+    expect(document.querySelector('.page--detail > .report-link')).toBe(report)
+    expect(
+      screen.getByRole('heading', { name: /Reviews/ }).compareDocumentPosition(report) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
   })
 
   it('does not split a multi-word display name', async () => {
@@ -172,7 +178,13 @@ describe('Profile public content', () => {
 
     await screen.findByText('Wonderful host.')
     expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_host', { p_host_id: HOST_ID })
-    expect(supabase.__calls('reviews', 'select')).toHaveLength(0)
+    expect(supabase.__calls('reviews', 'select')).toEqual([
+      expect.objectContaining({
+        filters: expect.arrayContaining([
+          expect.objectContaining({ method: 'in', column: 'id' }),
+        ]),
+      }),
+    ])
     expect(supabase.__calls('bookings', 'select')).toHaveLength(0)
   })
 
@@ -334,7 +346,7 @@ describe('Profile own tabs', () => {
     )
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Report' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
   })
 
   it('scrolls the tab bar horizontally without showing a scrollbar in any browser', () => {

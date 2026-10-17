@@ -74,6 +74,25 @@ describe('OverflowMenu', () => {
     expect(screen.getByRole('menuitem', { name: 'View listing' })).toHaveFocus()
   })
 
+  it('can render an external href item', async () => {
+    const { user } = renderMenu([{ label: 'Report review', href: 'mailto:hello@trykai.sg' }])
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    expect(screen.getByRole('menuitem', { name: 'Report review' })).toHaveAttribute(
+      'href',
+      'mailto:hello@trykai.sg'
+    )
+  })
+
+  it('uses a custom trigger icon when given one', () => {
+    render(
+      <MemoryRouter>
+        <OverflowMenu icon="⋮" items={[{ label: 'Report review', href: 'mailto:hello@trykai.sg' }]} />
+      </MemoryRouter>
+    )
+    expect(screen.getByRole('button', { name: 'More actions' })).toHaveTextContent('⋮')
+  })
+
   it('runs the action and closes after a choice', async () => {
     const onDelete = vi.fn()
     const { user } = renderMenu([{ label: 'Delete', onSelect: onDelete }])

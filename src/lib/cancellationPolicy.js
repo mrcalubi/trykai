@@ -34,6 +34,10 @@ export const CANCELLATION_POLICY_ITEMS = [
   { scenario: '3 host strikes', resolution: 'Listing is automatically deactivated' },
 ]
 
+export const GUEST_CANCELLATION_POLICY_ITEMS = CANCELLATION_POLICY_ITEMS.slice(0, 4)
+
+export const GUEST_HOST_CANCEL_COPY = 'If the host cancels, you get a full refund'
+
 export function formatCents(cents) {
   const dollars = Number(cents) / 100
   if (!Number.isFinite(dollars)) return '$0'

@@ -153,28 +153,48 @@ a {
 
 .page-back {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 8px 24px 0;
+  padding: 4px 24px 0;
+}
+
+.page-back--narrow {
+  max-width: 720px;
+}
+
+.page-back--detail {
+  max-width: 1120px;
+}
+
+.page-back + .page {
+  padding-top: 12px;
+}
+
+.page-back + .page--form {
+  padding-top: 24px;
 }
 
 .page-back__button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 28px;
+  height: 28px;
   margin: 0;
   padding: 0;
   border: none;
-  background: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--muted) 16%, transparent);
   color: var(--text-h);
+  font-size: 22px;
+  line-height: 1;
   cursor: pointer;
 }
 
 .page-back__button:hover,
 .page-back__button:focus-visible {
   color: var(--primary);
+  background: color-mix(in srgb, var(--muted) 24%, transparent);
 }
 
 .report-link {
@@ -194,8 +214,9 @@ a {
   text-decoration: underline;
 }
 
-.review-card .report-link {
-  margin-top: 10px;
+.detail-main > .report-link,
+.page--detail > .report-link {
+  margin-top: 28px;
 }
 
 .page--narrow {
@@ -282,6 +303,11 @@ a {
 .ui-topnav__menu:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+.ui-topnav__close-icon {
+  font-size: 20px;
+  line-height: 1;
 }
 
 .ui-topnav__brand {
@@ -2190,6 +2216,46 @@ body.lightbox-open {
   margin-top: 12px;
 }
 
+.guest-cancel-note {
+  margin-top: 16px;
+}
+
+.guest-cancel-note__line {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.guest-cancel-note__link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.guest-cancel-note__link:hover,
+.guest-cancel-note__link:focus-visible {
+  color: var(--text-h);
+}
+
+.guest-cancel-note__rules {
+  margin-top: 10px;
+}
+
+.guest-cancel-note__rules .cancellation-policy__content {
+  padding: 0;
+  border-top: none;
+  background: transparent;
+}
+
+.guest-cancel-note__rules .cancellation-policy__row {
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .session-card {
   display: flex;
   justify-content: space-between;
@@ -3010,8 +3076,29 @@ body.lightbox-open {
 
 .review-card__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+}
+
+.review-card__menu {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.review-card__menu .ui-overflow__trigger {
+  min-width: 36px;
+  min-height: 36px;
+  border: none;
+  color: var(--muted);
+  font-size: 18px;
+  font-weight: 700;
+  background: transparent;
+}
+
+.review-card__menu .ui-overflow__trigger:hover,
+.review-card__menu .ui-overflow__trigger:focus-visible {
+  background: var(--navy-light);
+  color: var(--text-h);
 }
 
 .review-card__avatar {

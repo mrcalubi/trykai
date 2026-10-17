@@ -33,6 +33,24 @@ describe('BackButton', () => {
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
   })
 
+  it('is a compact circled chevron aligned to the listing column', async () => {
+    renderApp('/listings/listing-1')
+    const back = screen.getByRole('button', { name: 'Back' })
+    expect(back).toHaveTextContent('‹')
+    expect(back.closest('.page-back')).toHaveClass('page-back--detail')
+  })
+
+  it('narrows to the policy column on policy pages', () => {
+    render(
+      <MemoryRouter initialEntries={['/cancellation-policy']}>
+        <BackButton />
+      </MemoryRouter>
+    )
+    expect(screen.getByRole('button', { name: 'Back' }).closest('.page-back')).toHaveClass(
+      'page-back--narrow'
+    )
+  })
+
   it('goes to Home when there is no in-app previous page', async () => {
     const user = userEvent.setup()
     renderApp('/login')
