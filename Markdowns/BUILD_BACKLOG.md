@@ -194,13 +194,15 @@ Decided 29 September 2026. Remaining: HOST_ONBOARDING, BUSINESS, and HANDOVER st
 In this order after warm-contact launch:
 
 1. **Remove a guest (partial cancel).** Cancellation is the whole booking only. Let a guest drop one person from a paid group booking and refund that share on the same four tiers. First money-path change after launch. Do not build this before launch.
-2. **Recurring sessions.** Hosts repeat a session without re-entering each date.
+2. **Linked session series (optional).** Bulk-create of independent sessions is live. Remaining: a real series object if hosts ask to edit or cancel a run as one.
 3. **Review reminder email.** About 3 hours after the session ends, email the guest if they have not left a review. (Also listed as P2.12; wait until after launch.)
 4. **Saved listings.** Guests bookmark a listing to find it again.
 5. **Host-to-guest reviews, then the review filter.** Two-way reviews are promised (P2.4). After that path exists, guests can filter browse by rating.
 6. **`full_name` database-level fix.** Revoke anon SELECT once nothing public reads the column (P2.13). Public surfaces already show `display_name`.
 7. **Handle `refund.failed`.** Stripe can fail a refund after we have already written `cancelled` and emailed the guest. Listen for the event, alert `hello@trykai.sg`, and do not leave the booking looking refunded when it is not.
-8. **Stop sessions beyond 90 days out (optional).** PayNow checkout is already blocked more than 80 days ahead (`PAYNOW_MAX_DAYS_AHEAD`). Remaining: whether hosts should also be stopped from creating sessions that far out, so every date can still offer PayNow.
+8. **Sessions beyond 80 days (closed).** PayNow checkout and the host add-sessions calendar both stop at `PAYNOW_MAX_DAYS_AHEAD` (80). Direct INSERT could still write a later row; no product path does.
+9. **Refund Stripe fees after 100 bookings.** Launch absorbs Stripe’s kept processing fee on full refunds (~S$1.45 card / ~S$0.35 PayNow). Review then; leaning towards making the booking fee non-refundable on 48h+ guest cancellations, with notice.
+10. **Host-wide session overlap in the database.** Preview already refuses a clash with any of this host’s sessions. The trigger and `add_listing_session` are still per listing. Candidate migration if hosts double-book themselves across listings.
 
 Then: identity and social layer, Date Mode, credit bundles, multi session courses, "this weekend" filter, search, in app notifications, listing performance nudges, listing video, host Pro subscription, payout clawback.
 

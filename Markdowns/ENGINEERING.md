@@ -370,6 +370,8 @@ src/
 │   ├── planningAreas.js         # 55 URA planning areas and their five regions
 │   ├── pageLoad.js              # JWT issued-at-future retry + friendly first-load error
 │   ├── sessionDate.js           # Session day/time; year only when it is not this year
+│   ├── sessionCalendar.js       # Singapore month grid for listing and host calendars
+│   ├── sessionBatch.js          # Bulk-create dates, 80-day window, clash preview, 40 cap
 │   ├── reportMailto.js          # Report links to hello@trykai.sg
 │   └── edgeFunctionError.js     # Read Edge Function error bodies
 ├── pages/
@@ -387,7 +389,7 @@ src/
 │   ├── RedirectToOwnProfile.jsx # /bookings and /hosting → /u/:id?tab=…, query string kept
 │   ├── BookingDetail.jsx        # /bookings/:id guest receipt and cancel
 │   ├── Bookings.jsx             # Guest view: My Bookings cards link to /bookings/:id, reviews, ?booking= poll
-│   ├── Hosting.jsx              # Host view: listing rows, hosted sessions, Connect payouts
+│   ├── Hosting.jsx              # Host view: listing rows, bulk add sessions, hosted sessions, Connect payouts
 │   ├── Settings.jsx             # Profile (photo, names, About) + Account (email, deletion); Log out (also in hamburger)
 │   ├── StyleGuide.jsx           # UI kit preview at /style-guide
 │   ├── RefundPolicy.jsx
@@ -407,6 +409,9 @@ src/
 │   ├── StarPicker.jsx
 │   ├── CancellationPolicy.jsx   # Host info block / guest note on the listing card
 │   ├── PlanningAreaSelect.jsx   # Searchable planning-area combobox on create/edit
+│   ├── SessionCalendar.jsx      # Guest month calendar on listing detail
+│   ├── DateMultiSelectCalendar.jsx # Host tap-to-select dates
+│   ├── AddSessionsForm.jsx      # Bulk add: quick-fill, times, preview, create
 │   └── ui/
 │       ├── TopNav.jsx           # Global top bar; avatar links to own profile, via SiteNav
 │       ├── HamburgerMenu.jsx    # Slide-in panel; signed-in adds Profile, Settings, Log out
@@ -473,7 +478,8 @@ supabase/functions/
 | Listing-page reviews                                       | `reviews_for_listing` (`00011`); do not embed `bookings` from the client                            |
 | Browse and profile listing-card ratings                    | `listing_ratings` (`00015`); one RPC per page, never per card                                       |
 | Host-profile reviews                                       | `reviews_for_host` (`00013`); do not embed `bookings` from the client                               |
-| Delete an empty hosted session                             | `delete_empty_session` (`00012`); Hosting Delete, not Cancel                                        |
+| Delete an empty hosted session                             | `delete_empty_session` (`00012`); Hosting Delete / Delete selected, not Cancel                      |
+| Bulk-create sessions                                       | `src/lib/sessionBatch.js`; each keep is `add_listing_session`                                       |
 | Soft-delete a listing                                      | `delete_listing` (`00015`); owner only; refuses active upcoming bookings                            |
 | Public profile                                             | `src/pages/Profile.jsx` (`/u/:id`)                                                                  |
 | Own-profile private tabs                                   | same page; Bookings/Hosting mounted as panels; `?tab=` (replace, not push)                           |
@@ -560,7 +566,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
    For manual submissions, Caleb reviews at `/admin/verifications`: both documents side by side, approve, or reject with a reason. Both paths call `review_verification` (`00007`, service role only), which writes the decision, the reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record, and `method` records which route decided it. Whichever function made the decision emails the host. A rejected host also sees the reason on `/verify-identity` when they try again.
 5. **Creates the listing.** Title, description, category, price in cents, max guests, duration in minutes, a URA planning area (searchable dropdown), private full address, up to 5 photos, what's provided. Inserts into `listings`, sets `is_host = true`, navigates to `/dashboard` (which redirects to `/bookings`, then the own-profile Bookings tab). **Does not create the first session in the same form.** No photography guidance. No T&C checkbox.
-6. **Adds a session** from the Hosting tab “Add session”. Date, time, and spots. The length shown is the listing's `duration_mins`. The call is `add_listing_session`. The same start time as an existing open or full session of that length adds the spots onto it (and reopens it if it was full). Any other overlap is refused, including a session that starts during another one. A session that starts when another ends is allowed. A new row appears under Upcoming Hosted Sessions even with zero bookings. An empty upcoming session can be removed with Delete, which calls `delete_empty_session` and sets `status = 'cancelled'` (no strike, no refund). A session with pending or confirmed bookings has Cancel instead, not Delete.
+6. **Adds sessions** from the Hosting tab “Add session”. Calendar dates from tomorrow through today + 80 days, optional quick-fill (weekdays every 1 / 2 weeks), one or more start times, and spots. Each date × time is one session; max 40. Preview skips past, host-wide clashes, and in-batch clashes. Each keep is `add_listing_session`. The same start time as an existing open or full session of that length still merges spots if the RPC is reached; the preview treats that overlap as a skip. Any other overlap is refused by the listing-scoped trigger, including a session that starts during another one. A session that starts when another ends is allowed. Booked sessions show first on that listing; empty ones show the next 3 then “Show all N open sessions”. Empty rows can be deleted one-by-one or tick-selected (`delete_empty_session`, no strike). A session with pending or confirmed bookings has Cancel instead.
 7. **Payout setup.** Hosting “Set up payouts” → `create-account-link` → Stripe Express onboarding. Account Link `return_url`/`refresh_url` still use `/dashboard?connect=`, which redirects to `/hosting?connect=`, then `/u/:id?connect=&tab=hosting`. That return re-reads the account from Stripe (`{ refresh: true }`) before showing enabled or “isn't finished yet.” Book stays disabled for guests until `stripe_payouts_enabled`.
 8. **Receives bookings.** Email from `stripe-webhook` after confirmation, with guest name, session details, guest count.
 9. **Edits and deletes.** `EditListing.jsx` checks `host_id = current user`. The Hosting listing row opens Edit when tapped. Delete is in the ⋯ menu and goes through `delete_listing`: owner only, refuses if any upcoming session has a pending or confirmed booking, otherwise `is_active = false` and empty upcoming sessions become `cancelled`.
@@ -619,7 +625,7 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **BookingDetail.jsx** — `/bookings/:bookingId`, guest only (anyone else, including the host, is sent to `/bookings`). Listing photo and title to the listing, host avatar and display name to `/u/:id`, date (year only when it is not this year), time, duration, Add to Google Calendar, `get_listing_address` plus Open in Google Maps, What's provided, guests, total paid, payment method, booking reference, status, and the same cancel + refund preview as the list.
 
-**Hosting.jsx** — host: My Listings heading with “+ New listing”; one card per row below 1024px, two from 1024px. Each card is a thumbnail plus title on one line (opens Edit), a ⋯ menu in the top-right corner (View listing, Edit, Delete), and a full-width Add session button below. Delete confirms through `delete_listing` (blocked copy when upcoming bookings exist). All upcoming non-cancelled sessions show active booking count and guest count (Delete when empty, Cancel with "refunds your guest / both guests / all N guests in full" plus a strike, never per-guest amounts); session dates show the year only when it is not this year; Connect payout setup. Admins with `pending_count > 0` see a one-line “N verifications waiting · Review” banner. Reads `?connect=` (return/refresh re-read payouts from Stripe, then drop only that key). A signed-in user who is not a host is redirected to `/bookings` if this page is mounted directly. Mounted on the own-profile Hosting tab; `/hosting` itself is a redirect.
+**Hosting.jsx** — host: Upcoming at the top is every session with a confirmed booking, across listings, chronological (listing name, date, time, guests booked; empty copy “No upcoming bookings yet.”). Then My Listings with “+ New listing”; one card per row below 1024px, two from 1024px. Each card is a thumbnail plus title on one line (opens Edit), a ⋯ menu in the top-right corner (View listing, Edit, Delete), a full-width Add session button, then that listing’s empty upcoming sessions (next 3, then “Show all N open sessions”). Booked sessions are not repeated there. Add session is a calendar + times form with preview. Delete confirms through `delete_listing` (blocked copy when upcoming bookings exist). Empty sessions: Delete or tick-select + Delete selected (`delete_empty_session`). Booked sessions: Cancel from Upcoming with "refunds your guest / both guests / all N guests in full" plus a strike, never per-guest amounts. Session dates show the year only when it is not this year; Connect payout setup. Admins with `pending_count > 0` see a one-line “N verifications waiting · Review” banner. Reads `?connect=` (return/refresh re-read payouts from Stripe, then drop only that key). A signed-in user who is not a host is redirected to `/bookings` if this page is mounted directly. Mounted on the own-profile Hosting tab; `/hosting` itself is a redirect.
 
 **Settings.jsx** — auth required. Grouped as Profile (photo, display name, About you textarea with a live 0/500 count, full name with hint "Private, never shown publicly.") and Account (email read-only, deletion contact line). Log out is a button at the bottom and also in the signed-in hamburger (same `signOut` then Home). `display_name` UPDATE granted in `00014`; `bio` in `00021`; `full_name` and `avatar_url` from `00005` after `00007` revoked verification fields. Linked from the gear on your own profile and from the hamburger.
 
