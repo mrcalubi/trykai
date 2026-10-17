@@ -9,6 +9,7 @@ import OverflowMenu from '../components/ui/OverflowMenu'
 import { hostCancelWarning } from '../lib/hostCancelCopy'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { formatSessionDateTime } from '../lib/sessionDate'
+import { firstAccountRow } from '../lib/myAccount'
 import { formatBatchSummary, skipReasonFromRpcMessage } from '../lib/sessionBatch'
 
 function activeBookingsOn(session) {
@@ -17,8 +18,7 @@ function activeBookingsOn(session) {
 }
 
 function firstRow(data) {
-  if (Array.isArray(data)) return data[0] ?? null
-  return data ?? null
+  return firstAccountRow(data)
 }
 
 function listingUpcomingStats(listingId, hostSessions) {
@@ -139,13 +139,7 @@ export default function Hosting({ embedded = false }) {
   const loadData = useCallback(async () => {
     const listingColumns = 'id, title, area, category, photo_urls'
     const [profileResult, adminResult] = await Promise.all([
-      withIssuedAtRetry(() =>
-        supabase
-          .from('users')
-          .select('stripe_payouts_enabled, is_host')
-          .eq('id', userId)
-          .single()
-      ),
+      withIssuedAtRetry(() => supabase.rpc('my_account')),
       supabase.rpc('my_verification'),
     ])
 
@@ -178,8 +172,9 @@ export default function Hosting({ embedded = false }) {
     }
 
     if (!profileResult.error) {
-      setPayoutsEnabled(Boolean(profileResult.data?.stripe_payouts_enabled))
-      setIsHost(Boolean(profileResult.data?.is_host))
+      const account = firstAccountRow(profileResult.data)
+      setPayoutsEnabled(Boolean(account?.stripe_payouts_enabled))
+      setIsHost(Boolean(account?.is_host))
     }
 
     const adminRow = firstRow(adminResult.data)

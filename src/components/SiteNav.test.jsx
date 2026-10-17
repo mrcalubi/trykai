@@ -12,6 +12,17 @@ function signedIn(session = makeAuthSession()) {
   supabase.auth.getSession.mockResolvedValue({ data: { session }, error: null })
 }
 
+function givenAccount(row = { display_name: 'Mei Ling', avatar_url: null }) {
+  const previous = supabase.rpc.getMockImplementation()
+  supabase.rpc.mockImplementation(async (name, args) => {
+    if (name === 'my_account') {
+      return { data: row ? [row] : [], error: null }
+    }
+    if (previous) return previous(name, args)
+    return { data: null, error: null }
+  })
+}
+
 // The nav is chrome: it spans routes instead of belonging to one.
 function renderNav(options = {}) {
   return renderWithRouter(<SiteNav />, { outlivesNavigation: true, ...options })
@@ -42,10 +53,7 @@ describe('SiteNav when signed out', () => {
 describe('SiteNav when signed in', () => {
   it('shows initials when the profile has no avatar', async () => {
     signedIn()
-    supabase.__on('users', 'select', {
-      data: { full_name: 'Mei Ling', avatar_url: null, is_host: false },
-      error: null,
-    })
+    givenAccount({ display_name: 'Mei Ling', avatar_url: null })
     renderNav()
 
     const account = await screen.findByRole('link', { name: 'Your profile' })
@@ -56,10 +64,7 @@ describe('SiteNav when signed in', () => {
 
   it('shows the photo when the profile has an avatar', async () => {
     signedIn()
-    supabase.__on('users', 'select', {
-      data: { full_name: 'Mei Ling', avatar_url: 'https://cdn.test/avatar.jpg', is_host: false },
-      error: null,
-    })
+    givenAccount({ display_name: 'Mei Ling', avatar_url: 'https://cdn.test/avatar.jpg' })
     renderNav()
 
     const account = await screen.findByRole('link', { name: 'Your profile' })
@@ -71,28 +76,21 @@ describe('SiteNav when signed in', () => {
 
   it('falls back to the email initial when the profile has no name', async () => {
     signedIn(makeAuthSession({ user: { email: 'kai@example.com', full_name: null } }))
-    supabase.__on('users', 'select', { data: null, error: null })
+    givenAccount(null)
     renderNav()
 
     const account = await screen.findByRole('link', { name: 'Your profile' })
     await waitFor(() => expect(account).toHaveTextContent('K'))
   })
 
-  it('looks the profile up by the signed-in user id', async () => {
+  it('loads the signed-in account through my_account', async () => {
     signedIn(makeAuthSession({ user: { id: 'user-77' } }))
+    givenAccount({ display_name: 'Mei Ling', avatar_url: null })
     renderNav()
 
     await screen.findByRole('link', { name: 'Your profile' })
-    await waitFor(() => expect(supabase.__calls('users', 'select')).toHaveLength(1))
-    expect(supabase.__lastCall('users', 'select').filters).toContainEqual({
-      method: 'eq',
-      column: 'id',
-      value: 'user-77',
-    })
-    expect(supabase.__lastCall('users', 'select').chain).toContainEqual({
-      method: 'select',
-      args: ['full_name, avatar_url'],
-    })
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('my_account'))
+    expect(supabase.__calls('users')).toHaveLength(0)
   })
 
   it('takes the avatar to the signed-in user own profile', async () => {

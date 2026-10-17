@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { firstAccountRow } from '../lib/myAccount'
 import TopNav from './ui/TopNav'
 
 /**
@@ -12,7 +13,7 @@ import TopNav from './ui/TopNav'
 export default function SiteNav() {
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
-  const [fullName, setFullName] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState(null)
@@ -27,7 +28,7 @@ export default function SiteNav() {
       const nextUser = session?.user ?? null
       setUser(nextUser)
       if (!nextUser) {
-        setFullName('')
+        setDisplayName('')
         setAvatarUrl('')
         setIsAdmin(false)
         setVerificationStatus(null)
@@ -50,15 +51,11 @@ export default function SiteNav() {
   useEffect(() => {
     if (!user) return
 
-    supabase
-      .from('users')
-      .select('full_name, avatar_url')
-      .eq('id', user.id)
-      .single()
-      .then(({ data }) => {
-        setFullName(data?.full_name || '')
-        setAvatarUrl(data?.avatar_url || '')
-      })
+    supabase.rpc('my_account').then(({ data, error }) => {
+      const row = firstAccountRow(data)
+      setDisplayName(!error && row?.display_name ? row.display_name : '')
+      setAvatarUrl(!error && row?.avatar_url ? row.avatar_url : '')
+    })
 
     // `is_admin` has no client SELECT grant, so the menu asks the same
     // caller-scoped function RequireAdmin uses. The review function checks
@@ -78,7 +75,7 @@ export default function SiteNav() {
       verificationStatus={verificationStatus}
       userId={user?.id}
       avatarUrl={avatarUrl || undefined}
-      name={fullName || user?.email || ''}
+      name={displayName || user?.email || ''}
       onLogOut={handleLogOut}
     />
   )

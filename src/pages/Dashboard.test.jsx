@@ -40,6 +40,7 @@ function givenData({
   spotsRemaining = 2,
   hostStrikes = 0,
   isHost,
+  payoutsEnabled = true,
 } = {}) {
   supabase.__on('listings', 'select', { data: listings, error: null })
   supabase.__on('bookings', 'select', (call) =>
@@ -51,13 +52,31 @@ function givenData({
       ? { data: { spots_remaining: spotsRemaining }, error: null }
       : { data: hostSessions, error: null }
   )
-  supabase.__on('users', 'select', {
-    data: {
-      stripe_payouts_enabled: true,
-      is_host: isHost ?? listings.length > 0,
-      host_strikes: hostStrikes,
-    },
-    error: null,
+  accountRow = {
+    stripe_payouts_enabled: payoutsEnabled,
+    is_host: isHost ?? listings.length > 0,
+    host_strikes: hostStrikes,
+  }
+  const previousRpc = supabase.rpc.getMockImplementation()
+  givenRpc(async (name, args) => {
+    if (previousRpc) return previousRpc(name, args)
+    return { data: null, error: null }
+  })
+}
+
+let accountRow = {
+  stripe_payouts_enabled: true,
+  is_host: false,
+  host_strikes: 0,
+}
+
+function givenRpc(impl) {
+  supabase.rpc.mockImplementation(async (name, args) => {
+    if (name === 'my_account') {
+      return { data: [accountRow], error: null }
+    }
+    if (impl) return impl(name, args)
+    return { data: null, error: null }
   })
 }
 
@@ -273,6 +292,7 @@ describe('Dashboard access control', () => {
       column: 'host_id',
       value: 'user-42',
     })
+    expect(supabase.rpc).toHaveBeenCalledWith('my_account')
   })
 
   it('reports a load failure on hosting', async () => {
@@ -295,7 +315,7 @@ describe('Dashboard access control', () => {
 
 describe('Dashboard verification review', () => {
   it('offers a slim review banner to an admin when submissions are waiting', async () => {
-    supabase.rpc.mockImplementation(async (name) => {
+    givenRpc(async (name) => {
       if (name === 'my_verification') {
         return { data: [{ is_admin: true, pending_count: 3 }], error: null }
       }
@@ -312,7 +332,7 @@ describe('Dashboard verification review', () => {
   })
 
   it('hides the banner when an admin has an empty queue', async () => {
-    supabase.rpc.mockImplementation(async (name) => {
+    givenRpc(async (name) => {
       if (name === 'my_verification') {
         return { data: [{ is_admin: true, pending_count: 0 }], error: null }
       }
@@ -442,7 +462,7 @@ describe('Dashboard listings', () => {
 
   it('deactivates a listing through delete_listing rather than a client update', async () => {
     givenData({ listings: [makeMyListing()] })
-    supabase.rpc.mockImplementation(async (name, args) => {
+    givenRpc(async (name, args) => {
       if (name === 'delete_listing') return { data: args.p_listing_id, error: null }
       return { data: null, error: null }
     })
@@ -475,7 +495,7 @@ describe('Dashboard listings', () => {
         makeHostSession({ id: 's-empty-2', bookings: [] }),
       ],
     })
-    supabase.rpc.mockImplementation(async (name, args) => {
+    givenRpc(async (name, args) => {
       if (name === 'delete_listing') return { data: args.p_listing_id, error: null }
       return { data: null, error: null }
     })
@@ -511,7 +531,7 @@ describe('Dashboard listings', () => {
 
   it('removes the listing from the page once deleted', async () => {
     givenData({ listings: [makeMyListing()] })
-    supabase.rpc.mockImplementation(async (name, args) => {
+    givenRpc(async (name, args) => {
       if (name === 'delete_listing') return { data: args.p_listing_id, error: null }
       return { data: null, error: null }
     })
@@ -536,7 +556,7 @@ describe('Dashboard listings', () => {
 
   it('reports a failed deletion', async () => {
     givenData({ listings: [makeMyListing()] })
-    supabase.rpc.mockImplementation(async (name) => {
+    givenRpc(async (name) => {
       if (name === 'delete_listing') {
         return { data: null, error: { message: 'not your listing' } }
       }
@@ -725,7 +745,7 @@ describe('Dashboard add session', () => {
   })
 
   it('puts a server overlap into the skipped summary instead of a generic error', async () => {
-    supabase.rpc.mockImplementation(async (name) => {
+    givenRpc(async (name) => {
       if (name === 'add_listing_session') {
         return {
           data: null,
@@ -986,7 +1006,7 @@ describe('Dashboard host cancellation', () => {
       listings: [makeMyListing()],
       hostSessions: [makeHostSession({ bookings: [] })],
     })
-    supabase.rpc.mockImplementation(async (name) => {
+    givenRpc(async (name) => {
       if (name === 'delete_empty_session') return { data: 'session-1', error: null }
       return { data: null, error: null }
     })
@@ -1008,7 +1028,7 @@ describe('Dashboard host cancellation', () => {
       listings: [makeMyListing()],
       hostSessions: [makeHostSession({ bookings: [] })],
     })
-    supabase.rpc.mockImplementation(async (name) => {
+    givenRpc(async (name) => {
       if (name === 'delete_empty_session') {
         return { data: null, error: { message: 'not allowed' } }
       }
@@ -1152,7 +1172,7 @@ describe('Dashboard host cancellation', () => {
         }),
       ],
     })
-    supabase.rpc.mockImplementation(async (name) => {
+    givenRpc(async (name) => {
       if (name === 'delete_empty_session') return { data: true, error: null }
       return { data: null, error: null }
     })
@@ -1217,22 +1237,14 @@ describe('Dashboard host cancellation', () => {
 
 describe('Dashboard payout setup', () => {
   it('asks a host without payouts enabled to set them up', async () => {
-    givenData({ listings: [makeMyListing()] })
-    supabase.__on('users', 'select', {
-      data: { stripe_payouts_enabled: false, is_host: true },
-      error: null,
-    })
+    givenData({ listings: [makeMyListing()], payoutsEnabled: false })
     await renderHosting()
 
     expect(screen.getByRole('heading', { name: 'Set up payouts' })).toBeInTheDocument()
   })
 
   it('asks Stripe for an account link when payouts are not set up', async () => {
-    givenData({ listings: [makeMyListing()] })
-    supabase.__on('users', 'select', {
-      data: { stripe_payouts_enabled: false, is_host: true },
-      error: null,
-    })
+    givenData({ listings: [makeMyListing()], payoutsEnabled: false })
     supabase.functions.invoke.mockResolvedValue({
       data: { stripe_payouts_enabled: true, url: null },
       error: null,
@@ -1250,11 +1262,7 @@ describe('Dashboard payout setup', () => {
   })
 
   it('shows Stripe’s actual error when payout setup fails', async () => {
-    givenData({ listings: [makeMyListing()] })
-    supabase.__on('users', 'select', {
-      data: { stripe_payouts_enabled: false, is_host: true },
-      error: null,
-    })
+    givenData({ listings: [makeMyListing()], payoutsEnabled: false })
     supabase.functions.invoke.mockResolvedValue({
       data: null,
       error: {

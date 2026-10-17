@@ -128,6 +128,10 @@ describe('ListingDetail loading and failure', () => {
       column: 'is_active',
       value: true,
     })
+    const listingSelect = supabase.__lastCall('listings', 'select').chain[0].args[0]
+    expect(listingSelect).toMatch(/users!host_id/)
+    expect(listingSelect).toMatch(/display_name/)
+    expect(listingSelect).not.toMatch(/full_name/)
   })
 })
 
@@ -244,12 +248,14 @@ describe('ListingDetail content', () => {
     expect(screen.queryByRole('link', { name: /More about/ })).not.toBeInTheDocument()
   })
 
-  it('falls back to the first name when display_name is missing', async () => {
-    givenListing(makeListing({ users: { full_name: 'Mei Ling', avatar_url: null } }))
+  it('shows Anonymous when display_name is missing', async () => {
+    givenListing(makeListing({ users: { avatar_url: null } }))
     renderPage()
 
-    expect(await screen.findByRole('link', { name: 'Mei' })).toHaveAttribute('href', '/u/host-1')
-    expect(screen.queryByText('Mei Ling')).not.toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Anonymous' })).toHaveAttribute(
+      'href',
+      '/u/host-1'
+    )
   })
 
   it('falls back to Anonymous when the host profile is missing', async () => {
@@ -989,7 +995,7 @@ describe('ListingDetail booking', () => {
   it('does not start payment when the host cannot receive payouts', async () => {
     givenListing(
       makeListing({
-        users: { full_name: 'Mei Ling', avatar_url: null, stripe_payouts_enabled: false },
+        users: { display_name: 'Mei', avatar_url: null, stripe_payouts_enabled: false },
       }),
     )
     givenSignedIn()

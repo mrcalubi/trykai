@@ -10,6 +10,7 @@ import { formatGuestFacingPrice } from '../lib/pricing'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { hostEntry } from '../lib/hostEntry'
+import { firstAccountRow } from '../lib/myAccount'
 import { profileReportSubject, reportMailto } from '../lib/reportMailto'
 import OverflowMenu from '../components/ui/OverflowMenu'
 import Bookings from './Bookings'
@@ -135,7 +136,7 @@ export default function Profile() {
       const { data: userData, error: userError } = await withIssuedAtRetry(() =>
         supabase
           .from('users')
-          .select('id, display_name, full_name, bio, avatar_url, verification_status, is_host')
+          .select('id, display_name, bio, avatar_url, is_host, is_id_verified')
           .eq('id', id)
           .single()
       )
@@ -146,7 +147,19 @@ export default function Profile() {
         return
       }
 
-      setProfile(userData)
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      let account = null
+      if (session?.user?.id === id) {
+        const { data } = await supabase.rpc('my_account')
+        account = firstAccountRow(data)
+      }
+
+      setProfile({
+        ...userData,
+        verification_status: account?.verification_status ?? null,
+      })
 
       const [listingsResult, reviewsResult] = await Promise.all([
         supabase
@@ -200,7 +213,7 @@ export default function Profile() {
   }
 
   const givenName = publicName(profile) || 'Anonymous'
-  const verified = profile.verification_status === 'approved'
+  const verified = Boolean(profile.is_id_verified)
   const isOwn = viewerId === id
   const about = typeof profile.bio === 'string' ? profile.bio.trim() : ''
   const isHost = Boolean(profile.is_host)

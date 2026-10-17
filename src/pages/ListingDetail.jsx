@@ -221,7 +221,6 @@ export default function ListingDetail() {
           host_id,
           users!host_id (
             display_name,
-            full_name,
             bio,
             avatar_url,
             stripe_payouts_enabled

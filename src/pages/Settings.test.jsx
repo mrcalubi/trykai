@@ -24,9 +24,22 @@ function givenProfile({
   email = 'mei@example.com',
   avatar_url: avatarUrl = null,
 } = {}) {
-  supabase.__on('users', 'select', {
-    data: { full_name: fullName, display_name: displayName, bio, email, avatar_url: avatarUrl },
-    error: null,
+  supabase.rpc.mockImplementation(async (fn) => {
+    if (fn === 'my_account') {
+      return {
+        data: [
+          {
+            full_name: fullName,
+            display_name: displayName,
+            bio,
+            email,
+            avatar_url: avatarUrl,
+          },
+        ],
+        error: null,
+      }
+    }
+    return { data: null, error: null }
   })
 }
 
@@ -55,14 +68,7 @@ describe('Settings access', () => {
   it('loads the signed-in user own profile', async () => {
     await renderSettings()
 
-    expect(supabase.__lastCall('users', 'select').filters).toContainEqual({
-      method: 'eq',
-      column: 'id',
-      value: USER_ID,
-    })
-    expect(supabase.__lastCall('users', 'select').chain[0].args[0]).toBe(
-      'full_name, display_name, bio, email, avatar_url'
-    )
+    expect(supabase.rpc).toHaveBeenCalledWith('my_account')
     expect(screen.getByLabelText('About you')).toHaveValue('')
     expect(screen.getByText('0/500')).toBeInTheDocument()
     expect(
@@ -78,7 +84,7 @@ describe('Settings access', () => {
   })
 
   it('reports a load failure', async () => {
-    supabase.__on('users', 'select', { data: null, error: { message: 'permission denied' } })
+    supabase.rpc.mockResolvedValue({ data: null, error: { message: 'permission denied' } })
     renderWithRouter(
       <RequireAuth>
         <Settings />
@@ -163,6 +169,7 @@ describe('Settings profile form', () => {
       bio: null,
     })
     expect(call.filters).toContainEqual({ method: 'eq', column: 'id', value: USER_ID })
+    expect(call.chain.some((step) => step.method === 'select')).toBe(false)
     expect(await screen.findByText('Your profile has been saved.')).toBeInTheDocument()
   })
 

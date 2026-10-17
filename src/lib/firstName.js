@@ -1,5 +1,5 @@
 /**
- * Fallback when `display_name` is empty. Public surfaces use `publicName`.
+ * Split a legal name. Public surfaces use `publicName` (`display_name` only).
  */
 export function firstName(fullName) {
   if (typeof fullName !== 'string') return ''

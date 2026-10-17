@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { stubAllExternalCalls } from './support/network'
-import { LATTE_ART, SIGNED_IN_USER, makeAuthSession } from './support/fixtures'
+import { LATTE_ART, SIGNED_IN_USER, makeAuthSession, makeMyAccount } from './support/fixtures'
 
 test.describe('host add sessions', () => {
   test('quick-fills Sat and Sun for 2 weeks at two times into 8 sessions', async ({ page }) => {
@@ -20,12 +20,19 @@ test.describe('host add sessions', () => {
         users: [
           {
             id: SIGNED_IN_USER.id,
-            full_name: 'Kai Host',
             display_name: 'Kai',
             avatar_url: null,
             is_host: true,
+            is_id_verified: true,
             stripe_payouts_enabled: true,
           },
+        ],
+        'rpc/my_account': [
+          makeMyAccount({
+            is_host: true,
+            stripe_payouts_enabled: true,
+            verification_status: 'approved',
+          }),
         ],
       },
       { session: makeAuthSession() },
@@ -75,13 +82,19 @@ test.describe('verified host create listing', () => {
         users: [
           {
             id: SIGNED_IN_USER.id,
-            full_name: 'Kai Host',
             display_name: 'Kai',
             avatar_url: null,
             is_host: true,
-            verification_status: 'approved',
+            is_id_verified: true,
             stripe_payouts_enabled: true,
           },
+        ],
+        'rpc/my_account': [
+          makeMyAccount({
+            is_host: true,
+            stripe_payouts_enabled: true,
+            verification_status: 'approved',
+          }),
         ],
         'rpc/my_verification': [{ verification_status: 'approved', is_admin: false }],
       },

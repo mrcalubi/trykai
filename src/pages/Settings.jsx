@@ -5,6 +5,7 @@ import { useAuthedUserId } from '../lib/authedUser'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import { getInitials } from '../components/ui/getInitials'
+import { firstAccountRow } from '../lib/myAccount'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 
 export default function Settings() {
@@ -27,26 +28,23 @@ export default function Settings() {
 
   const loadProfile = useCallback(async () => {
     const { data, error: loadError } = await withIssuedAtRetry(() =>
-      supabase
-        .from('users')
-        .select('full_name, display_name, bio, email, avatar_url')
-        .eq('id', userId)
-        .single()
+      supabase.rpc('my_account')
     )
+    const row = firstAccountRow(data)
 
-    if (loadError) {
+    if (loadError || !row) {
       setError(PAGE_LOAD_ERROR)
       setLoading(false)
       return
     }
 
-    setFullName(data?.full_name || '')
-    setDisplayName(data?.display_name || '')
-    setBio(data?.bio || '')
-    setEmail(data?.email || '')
-    setAvatarUrl(data?.avatar_url || '')
+    setFullName(row.full_name || '')
+    setDisplayName(row.display_name || '')
+    setBio(row.bio || '')
+    setEmail(row.email || '')
+    setAvatarUrl(row.avatar_url || '')
     setLoading(false)
-  }, [userId])
+  }, [])
 
   useEffect(() => {
     let cancelled = false
