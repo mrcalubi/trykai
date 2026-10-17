@@ -209,6 +209,14 @@ describe('CreateListing validation', () => {
     expect(screen.getByRole('button', { name: 'Create listing' })).toBeEnabled()
   })
 
+  it('hides the guest-vs-host line until a price is entered', async () => {
+    givenSignedIn()
+    givenVerification('approved')
+    renderPage()
+    await screen.findByLabelText('Title')
+    expect(screen.queryByText(/Guests see/)).not.toBeInTheDocument()
+  })
+
   it('shows the public guest price and host payout under the price field', async () => {
     givenSignedIn()
     givenVerification('approved')

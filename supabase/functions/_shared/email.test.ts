@@ -5,6 +5,8 @@ import {
   bookingConfirmedGuestHtml,
   bookingConfirmedHostHtml,
   bookingReference,
+  cardDetailsFromCharge,
+  emailSiteUrl,
   escapeHtml,
   formatCents,
   formatDuration,
@@ -100,6 +102,11 @@ describe('bookingReference', () => {
   it('takes the first 8 characters and uppercases them', () => {
     expect(bookingReference('a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toBe('A1B2C3D4')
   })
+
+  it('treats a missing id as an empty reference', () => {
+    expect(bookingReference(null)).toBe('')
+    expect(bookingReference(undefined)).toBe('')
+  })
 })
 
 describe('formatDuration', () => {
@@ -108,12 +115,32 @@ describe('formatDuration', () => {
     expect(formatDuration(60)).toBe('1 hr')
     expect(formatDuration(45)).toBe('45 min')
   })
+
+  it('returns empty for missing or invalid lengths', () => {
+    expect(formatDuration(null)).toBe('')
+    expect(formatDuration(0)).toBe('')
+    expect(formatDuration(Number.NaN)).toBe('')
+  })
+})
+
+describe('emailSiteUrl', () => {
+  it('strips a trailing slash and falls back when the value is blank', () => {
+    expect(emailSiteUrl('https://trykai.sg/')).toBe('https://trykai.sg')
+    expect(emailSiteUrl('   ')).toBe('https://trykai.sg')
+    expect(emailSiteUrl(null)).toBe('https://trykai.sg')
+  })
 })
 
 describe('publicDisplayName', () => {
   it('prefers display_name and falls back to the first name', () => {
     expect(publicDisplayName({ display_name: 'Mei', full_name: 'Mei Ling Tan' })).toBe('Mei')
     expect(publicDisplayName({ display_name: '  ', full_name: 'Mei Ling Tan' })).toBe('Mei')
+  })
+
+  it('returns empty when there is no public name to show', () => {
+    expect(publicDisplayName(null)).toBe('')
+    expect(publicDisplayName({ display_name: null, full_name: null })).toBe('')
+    expect(publicDisplayName({ display_name: '', full_name: '   ' })).toBe('')
   })
 })
 
@@ -124,6 +151,21 @@ describe('payment method', () => {
       'Visa ending in 4242',
     )
     expect(formatPaymentMethod({ paymentRail: 'card' })).toBe('Card')
+    expect(formatPaymentMethod({ paymentRail: 'card', cardLast4: '4242' })).toBe(
+      'Card ending in 4242',
+    )
+    expect(formatPaymentMethod({ paymentRail: 'card', cardBrand: 'maestro', cardLast4: '1234' })).toBe(
+      'Maestro ending in 1234',
+    )
+  })
+
+  it('ignores a charge that is not an expanded object', () => {
+    expect(cardDetailsFromCharge(null)).toEqual({ brand: null, last4: null })
+    expect(cardDetailsFromCharge('ch_123')).toEqual({ brand: null, last4: null })
+    expect(cardDetailsFromCharge({ payment_method_details: { card: { brand: 1, last4: 4 } } })).toEqual({
+      brand: null,
+      last4: null,
+    })
   })
 
   it('reads brand and last 4 from an expanded PaymentIntent charge', () => {
@@ -142,6 +184,28 @@ describe('payment method', () => {
       resolvePaymentMethod({ paymentRail: 'paynow', retrieveIntent }),
     ).resolves.toBe('PayNow')
     expect(retrieveIntent).not.toHaveBeenCalled()
+  })
+
+  it('treats a string latest_charge as card with no last 4', () => {
+    expect(paymentMethodFromIntent('card', { latest_charge: 'ch_123' })).toBe('Card')
+    expect(paymentMethodFromIntent(null, null)).toBe('Card')
+  })
+
+  it('uses Card when there is no intent to retrieve', async () => {
+    await expect(resolvePaymentMethod({ paymentRail: 'card' })).resolves.toBe('Card')
+  })
+
+  it('reads the retrieved charge when Stripe answers', async () => {
+    await expect(
+      resolvePaymentMethod({
+        paymentRail: 'card',
+        retrieveIntent: async () => ({
+          latest_charge: {
+            payment_method_details: { card: { brand: 'visa', last4: '4242' } },
+          },
+        }),
+      }),
+    ).resolves.toBe('Visa ending in 4242')
   })
 
   it('falls back to Card when retrieve fails', async () => {
@@ -203,6 +267,16 @@ describe('receiptPriceLines', () => {
     })
     expect(lines.join('\n')).not.toMatch(/group discount/i)
   })
+
+  it('treats a missing guest count as one person', () => {
+    const lines = receiptPriceLines({
+      pricePerPersonCents: 2500,
+      guestsCount: Number.NaN,
+      paymentRail: 'card',
+      totalPaidCents: 2800,
+    })
+    expect(lines[0]).toBe('$28 per person x 1 guests')
+  })
 })
 
 describe('refundDeadlineLines', () => {
@@ -211,6 +285,7 @@ describe('refundDeadlineLines', () => {
     expect(lines[0]).toBe(`Full refund if you cancel before ${formatSessionDate('2026-08-26T11:00:00.000Z')}`)
     expect(lines[1]).toBe(`50% refund if you cancel before ${formatSessionDate('2026-08-27T11:00:00.000Z')}`)
     expect(lines[2]).toBe(`25% refund if you cancel before ${formatSessionDate('2026-08-28T05:00:00.000Z')}`)
+    expect(refundDeadlineLines('not-a-date')).toEqual([])
   })
 })
 
@@ -243,6 +318,17 @@ describe('booking confirmation emails', () => {
     expect(html).toContain('https://trykai.sg/terms')
     expect(html).toContain('https://trykai.sg/privacy')
     expect(html).not.toContain('/dashboard')
+  })
+
+  it('omits duration, address, and a missing host name', () => {
+    const html = guestReceipt({
+      hostName: '',
+      duration: '',
+      fullAddress: '',
+    })
+    expect(html).toContain('with your host.')
+    expect(html).not.toContain('Duration:')
+    expect(html).not.toContain('Address:')
   })
 
   it('names the card brand and last 4 when the guest paid by card', () => {
@@ -410,6 +496,10 @@ describe('formatCents', () => {
 
   it('still renders zero as an amount', () => {
     expect(formatCents(0)).toBe('$0')
+  })
+
+  it('renders a non-number as zero', () => {
+    expect(formatCents(Number.NaN)).toBe('$0')
   })
 
   it('groups thousands the way a guest reads a price', () => {

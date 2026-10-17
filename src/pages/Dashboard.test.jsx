@@ -945,6 +945,24 @@ describe('Dashboard host cancellation', () => {
     expect(supabase.rpc.mock.calls.some(([name]) => name === 'delete_empty_session')).toBe(false)
   })
 
+  it('names a single guest in the cancel warning without an amount', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({
+          bookings: [{ id: 'booking-1', status: 'confirmed', guests_count: 1 }],
+        }),
+      ],
+    })
+    const { user } = await renderHosting()
+
+    expect(screen.getByText(/1 guest/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel session' }))
+    expect(
+      screen.getByText('Cancelling refunds all 1 guests in full and adds a strike to your account.')
+    ).toBeInTheDocument()
+  })
+
   it('warns about the strike before cancelling', async () => {
     givenData({ listings: [makeMyListing()], hostSessions: [makeHostSession()] })
     const { user } = await renderHosting()

@@ -110,6 +110,14 @@ describe('EditListing prefill', () => {
     ).toBeInTheDocument()
   })
 
+  it('clears duration and group pricing when the saved listing has none', async () => {
+    givenListing({ duration_mins: null, group_pricing: false })
+    await renderLoaded()
+
+    expect(screen.getByLabelText('Duration (mins)')).toHaveValue(null)
+    expect(screen.getByRole('checkbox', { name: 'Offer group pricing' })).not.toBeChecked()
+  })
+
   it('shows a founding host only the public price and their payout', async () => {
     supabase.__on('users', 'select', {
       data: { is_founding_host: true },

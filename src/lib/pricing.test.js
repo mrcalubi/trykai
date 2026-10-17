@@ -80,6 +80,7 @@ describe('pricing.js matches booking.ts', () => {
   it('labels the live all-in price per person', () => {
     expect(groupPriceLabel(2500, 1)).toBe('$28 per person')
     expect(groupPriceLabel(2500, 2)).toBe('$27 each · 5% group discount')
+    expect(groupPriceLabel(2500, 4, false)).toBe('$28 each')
     expect(groupPriceLabel(135800, 1)).toBe('$1,521 per person')
     expect(discountedPerPersonCents(2500, 4)).toBe(2125)
   })
@@ -92,6 +93,11 @@ describe('pricing.js matches booking.ts', () => {
     expect(hostListingPriceHint(0)).toBe('')
     expect(parsePriceInputCents('25')).toBe(2500)
     expect(parsePriceInputCents('')).toBeNull()
+    expect(parsePriceInputCents(null)).toBeNull()
+    expect(parsePriceInputCents('   ')).toBeNull()
+    expect(parsePriceInputCents('0')).toBeNull()
+    expect(parsePriceInputCents('abc')).toBeNull()
+    expect(hostListingPriceHint(Number.NaN)).toBe('')
   })
 
   it('hints the next group tier when one is still available', () => {
