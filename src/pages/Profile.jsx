@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { AuthedUserContext } from '../lib/authedUser'
@@ -130,6 +130,20 @@ export default function Profile() {
   const [error, setError] = useState('')
   const [viewerId, setViewerId] = useState(null)
   const [viewerReady, setViewerReady] = useState(false)
+  // Delete on the Hosting tab soft-deletes the row. A profile fetch that
+  // started before that delete can still return the listing; drop those ids.
+  const removedListingIds = useRef(new Set())
+
+  function forgetListing(listingId) {
+    removedListingIds.current.add(listingId)
+    setListings((current) => current.filter((listing) => listing.id !== listingId))
+    setRatings((current) => {
+      if (!(listingId in current)) return current
+      const next = { ...current }
+      delete next[listingId]
+      return next
+    })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -200,7 +214,9 @@ export default function Profile() {
         setListings([])
         setRatings({})
       } else {
-        const rows = listingsResult.data ?? []
+        const rows = (listingsResult.data ?? []).filter(
+          (listing) => !removedListingIds.current.has(listing.id),
+        )
         setListings(rows)
         const listingIds = rows.map((listing) => listing.id)
         if (listingIds.length > 0) {
@@ -340,7 +356,7 @@ export default function Profile() {
           {activeTab === 'hosting' ? (
             <div className="profile-tab-panel">
               <AuthedUserContext.Provider value={viewerId}>
-                <Hosting embedded />
+                <Hosting embedded onListingDeleted={forgetListing} />
               </AuthedUserContext.Provider>
             </div>
           ) : null}
