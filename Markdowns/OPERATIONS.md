@@ -33,7 +33,7 @@ Week 8 of the original plan (15–21 September) is ending. The week-by-week sect
 
 **In the tree now (not true of the 31 August snapshot):**
 - Schema is `00001`–`00012`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` hourly via pg_cron. `00011` is `reviews_for_listing` plus guest review INSERT (confirmed, session ended, one per booking per role). `00012` is `delete_empty_session` (soft-delete empty upcoming sessions) and `confirm_paid_booking` requiring `status = 'open'`. Not yet applied on staging.
-- `Navbar.jsx` is deleted. `SiteNav` mounts `TopNav` once in `App.jsx`. Signed-in hamburger is Browse, Create listing / Become a host, Verification review for admins. Avatar goes to your own profile.
+- `Navbar.jsx` is deleted. `SiteNav` mounts `TopNav` once in `App.jsx`. Signed-in hamburger is Browse, Host a session (verified) / Become a host (not yet verified), Verification review for admins. Avatar goes to your own profile.
 - Browse uses the kit `Card` and shows the card all-in price. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only.
 - Guest bookings and host tools live as tabs on your own `/u/:id`. `/bookings` and `/hosting` redirect there. `/settings` is the account page. `/dashboard` redirects.
 - trykai.sg is verified in Resend. From-address is `TryKai <no-reply@trykai.sg>`. `notify-verification-pending` is secret-gated. `notify-verification-result` is gone. Staging booking confirmation emails confirmed arriving.

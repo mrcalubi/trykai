@@ -151,7 +151,10 @@ test.describe('signed-out navigation', () => {
   test('returns the visitor to where they were headed after logging in', async ({ page }) => {
     await stubAllExternalCalls(
       page,
-      { users: [{ id: SIGNED_IN_USER.id, verification_status: 'approved' }] },
+      {
+        users: [{ id: SIGNED_IN_USER.id, verification_status: 'approved' }],
+        'rpc/my_verification': [{ verification_status: 'approved' }],
+      },
       { session: makeAuthSession() }
     )
     await page.goto('/create-listing')
@@ -224,7 +227,7 @@ test.describe('signed-in navigation', () => {
     await expect(menu.getByRole('link', { name: 'Browse' })).toBeVisible()
     await expect(menu.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
       'href',
-      '/create-listing'
+      '/verify-identity'
     )
     await expect(menu.getByRole('link', { name: 'Profile' })).toHaveAttribute(
       'href',

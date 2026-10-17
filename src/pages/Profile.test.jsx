@@ -431,7 +431,7 @@ describe('Profile own tabs', () => {
     )
   })
 
-  it('hides Hosting and prompts Become a host on a non-host own Listings tab', async () => {
+  it('hides Hosting and prompts Host a session on a verified non-host Listings tab', async () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
@@ -444,7 +444,7 @@ describe('Profile own tabs', () => {
 
     await screen.findByRole('navigation', { name: 'Profile' })
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Host a session' })).toHaveAttribute(
       'href',
       '/create-listing'
     )

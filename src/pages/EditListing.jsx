@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
+import { foundingHostFromRpc } from '../lib/foundingHost'
 import { hostListingPriceHint, parsePriceInputCents } from '../lib/pricing'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 
@@ -36,7 +37,7 @@ export default function EditListing() {
   const [existingPhotos, setExistingPhotos] = useState([])
   const [newPhotos, setNewPhotos] = useState([])
   const newPhotosRef = useRef(newPhotos)
-  const [isFoundingHost, setIsFoundingHost] = useState(false)
+  const [isFoundingHost, setIsFoundingHost] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const priceHint = hostListingPriceHint(parsePriceInputCents(price), isFoundingHost)
@@ -49,11 +50,11 @@ export default function EditListing() {
 
   useEffect(() => {
     async function fetchListing() {
-      const [{ data, error: fetchError }, { data: profile }] = await Promise.all([
+      const [{ data, error: fetchError }, founding] = await Promise.all([
         withIssuedAtRetry(() =>
           supabase.from('listings').select('*').eq('id', id).eq('host_id', userId).single()
         ),
-        supabase.from('users').select('is_founding_host').eq('id', userId).maybeSingle(),
+        supabase.rpc('my_is_founding_host'),
       ])
 
       if (fetchError || !data) {
@@ -62,7 +63,7 @@ export default function EditListing() {
         return
       }
 
-      setIsFoundingHost(Boolean(profile?.is_founding_host))
+      setIsFoundingHost(foundingHostFromRpc(founding.data, founding.error))
 
       setTitle(data.title)
       setDescription(data.description)

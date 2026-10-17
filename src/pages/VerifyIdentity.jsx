@@ -51,6 +51,12 @@ export default function VerifyIdentity() {
     async function loadStatus() {
       const { status, reason } = await readStatus()
       if (cancelled) return
+      // The success card is only for the moment verification lands. A later
+      // visit from an already-approved host goes straight to create listing.
+      if (status === 'approved' && !returnedFromStripe) {
+        navigate('/create-listing', { replace: true })
+        return
+      }
       setVerificationStatus(status)
       setRejectionReason(reason)
       setStatusChecked(true)
@@ -67,7 +73,7 @@ export default function VerifyIdentity() {
     return () => {
       cancelled = true
     }
-  }, [readStatus, returnedFromStripe])
+  }, [navigate, readStatus, returnedFromStripe])
 
   useEffect(() => {
     if (!awaitingResult) return
@@ -123,7 +129,7 @@ export default function VerifyIdentity() {
 
     if (data?.already_verified) {
       setStripeLoading(false)
-      setVerificationStatus('approved')
+      navigate('/create-listing', { replace: true })
       return
     }
 
@@ -197,7 +203,7 @@ export default function VerifyIdentity() {
 
   if (verificationStatus === 'approved') {
     return (
-      <div className="page page--form">
+      <div className="page page--form page--form-status">
         <div className="form-card">
           <h1 className="form-card__title">Identity verified</h1>
           <p className="form-card__subtitle">
@@ -205,7 +211,7 @@ export default function VerifyIdentity() {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/create-listing')}
+            onClick={() => navigate('/create-listing', { replace: true })}
             className="btn btn--primary"
           >
             Create a listing
@@ -231,7 +237,7 @@ export default function VerifyIdentity() {
 
   if (verificationStatus === 'pending' || submitted) {
     return (
-      <div className="page page--form">
+      <div className="page page--form page--form-status">
         <div className="form-card">
           <h1 className="form-card__title">Under review</h1>
           <p className="success-message">

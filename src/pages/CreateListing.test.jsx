@@ -15,8 +15,18 @@ function givenSignedIn(userId = 'host-1') {
   })
 }
 
-function givenVerification(status) {
-  supabase.__on('users', 'select', { data: { verification_status: status }, error: null })
+function givenVerification(status, { foundingHost = false, foundingError = null } = {}) {
+  supabase.rpc.mockImplementation(async (fn) => {
+    if (fn === 'my_verification') {
+      return { data: [{ verification_status: status }], error: null }
+    }
+    if (fn === 'my_is_founding_host') {
+      return foundingError
+        ? { data: null, error: foundingError }
+        : { data: foundingHost, error: null }
+    }
+    return { data: null, error: null }
+  })
 }
 
 // Mounted behind the same guard App.jsx puts it behind, so the page always has
@@ -98,24 +108,34 @@ describe('CreateListing access control', () => {
 
   it('treats a missing verification record as unverified', async () => {
     givenSignedIn()
-    supabase.__on('users', 'select', { data: null, error: null })
+    supabase.rpc.mockResolvedValue({ data: [], error: null })
     const { currentPath } = renderPage()
 
     await waitFor(() => expect(currentPath()).toBe('/verify-identity'))
   })
 
-  it('holds hosts whose verification is still under review', async () => {
+  it('sends pending hosts to the verification status page', async () => {
     givenSignedIn()
     givenVerification('pending')
-    renderPage()
+    const { currentPath } = renderPage()
 
-    expect(await screen.findByText('Verification under review')).toBeInTheDocument()
+    await waitFor(() => expect(currentPath()).toBe('/verify-identity'))
     expect(screen.queryByLabelText('Title')).not.toBeInTheDocument()
   })
 
   it('shows the form to an approved host', async () => {
     givenSignedIn()
     givenVerification('approved')
+    renderPage()
+
+    expect(await screen.findByLabelText('Title')).toBeInTheDocument()
+  })
+
+  it('still shows the form when founding-host status cannot be read', async () => {
+    givenSignedIn()
+    givenVerification('approved', {
+      foundingError: { message: 'permission denied for column is_founding_host' },
+    })
     renderPage()
 
     expect(await screen.findByLabelText('Title')).toBeInTheDocument()
@@ -231,16 +251,25 @@ describe('CreateListing validation', () => {
 
   it('omits the later-booking cut for a founding host', async () => {
     givenSignedIn()
-    givenVerification('approved')
-    supabase.__on('users', 'select', {
-      data: { verification_status: 'approved', is_founding_host: true },
-      error: null,
-    })
+    givenVerification('approved', { foundingHost: true })
     const { user } = renderPage()
     await screen.findByLabelText('Title')
     await user.type(screen.getByLabelText('Price per person (SGD)'), '25')
 
     expect(screen.getByText('Guests see $28 · You receive $25')).toBeInTheDocument()
+    expect(screen.queryByText(/after your first 3 bookings/)).not.toBeInTheDocument()
+  })
+
+  it('hides the price hint when founding-host status is unknown', async () => {
+    givenSignedIn()
+    givenVerification('approved', {
+      foundingError: { message: 'function my_is_founding_host does not exist' },
+    })
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await user.type(screen.getByLabelText('Price per person (SGD)'), '25')
+
+    expect(screen.queryByText(/Guests see/)).not.toBeInTheDocument()
     expect(screen.queryByText(/after your first 3 bookings/)).not.toBeInTheDocument()
   })
 })

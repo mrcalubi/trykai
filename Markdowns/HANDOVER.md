@@ -26,7 +26,7 @@ Rule that keeps the docs honest: one fact, one home. When two docs disagree, say
 
 **UI**
 - Global nav: `Navbar.jsx` deleted. `SiteNav` mounted once in `App.jsx` feeds real auth into `TopNav`.
-- Hamburger is navigation only: Browse, Create listing / Become a host (always, so non hosts have a route to hosting), Verification review (admins only, gated via `my_verification()`). Bookings and Hosting are tabs on your own `/u/:id`, not hamburger links.
+- Hamburger is navigation only: Browse, Host a session (verified) / Become a host (not yet verified), Verification review (admins only, gated via `my_verification()`). Bookings and Hosting are tabs on your own `/u/:id`, not hamburger links.
 - Avatar links to your own profile. Settings is the gear on that page; Log out is on `/settings`. There is no avatar dropdown.
 - Colour token set at `:root` in `index.css`, including `--scrim`. Status colours use a strong token for text and a tint for backgrounds. Coral stays functional only.
 - Browse grid uses the UI kit `Card`. Square images, 2 line title clamp, one line meta. Hero removed. The price on that card is the card all-in total from `formatGuestFacingPrice`, not the raw lesson price.
