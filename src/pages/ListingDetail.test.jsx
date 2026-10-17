@@ -758,6 +758,61 @@ describe('ListingDetail booking', () => {
     expect(document.querySelector('.detail-booking-card__note')).not.toBeInTheDocument()
   })
 
+  it('disables PayNow when the session is more than 80 days away', async () => {
+    givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(81 * 24) })])
+    givenSignedIn()
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    const paynow = screen.getByRole('button', { name: /PayNow/ })
+    expect(paynow).toBeDisabled()
+    expect(
+      screen.getByText('PayNow is available for sessions within 80 days. Please pay by card.')
+    ).toBeInTheDocument()
+    expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$51')
+    expect(paynow).toHaveTextContent('$51')
+    expect(paynow).not.toHaveTextContent('$48.45')
+    expect(screen.getByRole('button', { name: /^Card/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(supabase.functions.invoke).not.toHaveBeenCalled()
+  })
+
+  it('keeps PayNow available on the 80-day boundary', async () => {
+    givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(80 * 24) })])
+    givenSignedIn()
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    expect(screen.getByRole('button', { name: /PayNow/ })).toBeEnabled()
+    expect(
+      screen.queryByText('PayNow is available for sessions within 80 days. Please pay by card.')
+    ).not.toBeInTheDocument()
+  })
+
+  it('switches to card when the server rejects PayNow as too far ahead', async () => {
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: {
+        error: 'PayNow is available for sessions within 80 days. Please pay by card.',
+        code: 'paynow_too_far_ahead',
+      },
+      error: { message: 'Edge Function returned a non-2xx status code' },
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(screen.getByRole('button', { name: /PayNow/ }))
+
+    expect(
+      await screen.findByText('PayNow is available for sessions within 80 days. Please pay by card.')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Edge Function returned a non-2xx status code')).not.toBeInTheDocument()
+    expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$51')
+    expect(screen.getByRole('button', { name: /^Card/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /PayNow/ })).toBeDisabled()
+  })
+
   it('asks the edge function for a card payment intent after the guest picks a rail', async () => {
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({

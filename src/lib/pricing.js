@@ -13,6 +13,10 @@ import {
   groupDiscountRate,
   HOST_FEE_RATE,
   MAX_GUESTS_PER_BOOKING,
+  PAYNOW_MAX_DAYS_AHEAD,
+  PAYNOW_TOO_FAR_AHEAD,
+  PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+  isPayNowTooFarAhead,
 } from '../../supabase/functions/_shared/booking.ts'
 import { formatCents } from './cancellationPolicy'
 
@@ -21,6 +25,10 @@ export {
   discountedPerPersonCents,
   groupDiscountRate,
   MAX_GUESTS_PER_BOOKING,
+  PAYNOW_MAX_DAYS_AHEAD,
+  PAYNOW_TOO_FAR_AHEAD,
+  PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+  isPayNowTooFarAhead,
 }
 
 export function guestFacingPriceCents(

@@ -2594,6 +2594,7 @@ body.lightbox-open {
 .payment-rails__hint {
   margin: 0;
   font-size: 13px;
+  color: var(--muted);
 }
 
 .payment-rail {

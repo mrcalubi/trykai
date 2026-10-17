@@ -274,7 +274,7 @@ Also decided but **not yet built**: reschedule, once per booking, same 48 hour c
 
 **Group pricing.** When `listings.group_pricing` is true (the default), the lesson price per person is discounted then multiplied by guests, in integer cents: 5% for 2, 10% for 3, 15% for 4, 20% for 5 or more. Never more than 20%. The card fee and the PayNow 5% apply once to that discounted lesson total. A group booking is one booking row.
 
-**PayNow.** Shown as a flat 5% discount off the card all-in total for that guest count, displayed at checkout only.
+**PayNow.** Shown as a flat 5% discount off the card all-in total for that guest count, displayed at checkout only. PayNow is refused when the session starts more than `PAYNOW_MAX_DAYS_AHEAD` (80) days from now — Stripe cannot refund PayNow after 90 days. `create-payment-intent` returns `paynow_too_far_ahead`; the checkout UI disables PayNow and keeps card pricing. Card is unaffected.
 
 **Host fee.** 10% of the discounted lesson total, triggered per host: every non founding host's first three **confirmed** bookings are free, their fourth booking onward pays the fee. A group booking counts as one toward those three. Founding hosts (`is_founding_host`) never pay.
 
@@ -450,7 +450,7 @@ supabase/functions/
 │   ├── email.ts                 # Resend helper + booking receipt, cancel, and host-strike HTML
 │   ├── payouts.ts               # 24h Transfer eligibility, skip reasons, charge backfill
 │   └── verification.ts          # Status, Identity params, 30-day retention rules
-├── create-payment-intent/       # Pending booking + PaymentIntent (no emails)
+├── create-payment-intent/       # Pending booking + PaymentIntent; refuses PayNow >80 days out
 ├── abandon-checkout/            # Guest JWT only; drop unpaid pending; leave if PI succeeded
 ├── stripe-webhook/              # Platform or Connect webhook secret → confirm, identity, account.updated
 ├── create-connect-account/      # Express account for the signed-in host
@@ -537,7 +537,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 **5. Phone verification.** OTP required before booking, per progressive disclosure. **Not built.**
 
-**6. Checkout.** Guest picks 1 to N guests, N = min(spots remaining, 10). The per-person lesson price updates live when group pricing is on. Guest then picks Card or PayNow (5% off that card total) *before* `create-payment-intent`. The function recomputes the price from `guests_count` and listing settings and ignores any client total. It creates a pending booking, then a PaymentIntent locked to that rail. No host email is sent here. `confirm_paid_booking` decrements spots by `guests_count`; if not enough remain, the whole booking is refunded. Cancellation is the whole booking only, same four refund tiers.
+**6. Checkout.** Guest picks 1 to N guests, N = min(spots remaining, 10). The per-person lesson price updates live when group pricing is on. Guest then picks Card or PayNow (5% off that card total) *before* `create-payment-intent`. PayNow is disabled when the session is more than 80 days away. The function recomputes the price from `guests_count` and listing settings and ignores any client total. It creates a pending booking, then a PaymentIntent locked to that rail. No host email is sent here. `confirm_paid_booking` decrements spots by `guests_count`; if not enough remain, the whole booking is refunded. Cancellation is the whole booking only, same four refund tiers.
 
 **7. Payment.** Payment Element `confirmPayment` uses `return_url=/dashboard?booking=<id>`. `stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, freezes host fee/payout, emails guest and host receipts via `_shared/email.ts` (greet by display name, short booking reference, What's provided when the listing has any, all-in price lines with no separate booking-fee row, PayNow saving when that rail was used, "Your bank will show this payment as Stripe Payments Singapore" on PayNow only, Add to Google Calendar, View booking to `/bookings/<id>`, one quiet Cancellation policy link — no refund-tier dates). Guest confirmation subject is `You're in! <listing> on <Fri, 28 Aug>`. Guest confirmation sets reply-to `hello@trykai.sg`. Failed/canceled intents mark the pending row cancelled without touching spots. Oversell refunds immediately, including when confirm finds the session cancelled or otherwise not `open`. `account.updated` syncs `stripe_payouts_enabled` (match on `stripe_account_id`; unknown accounts are a no-op). The webhook accepts `STRIPE_WEBHOOK_SECRET` or `STRIPE_CONNECT_WEBHOOK_SECRET`.
 

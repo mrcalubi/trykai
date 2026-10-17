@@ -1,3 +1,8 @@
+import {
+  PAYNOW_TOO_FAR_AHEAD,
+  PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+} from '../../supabase/functions/_shared/booking.ts'
+
 function messageFromBody(body) {
   if (body == null) return ''
   if (typeof body === 'string') return body.trim()
@@ -43,4 +48,10 @@ export async function edgeFunctionErrorMessage(error, data) {
   }
 
   return error.message || 'Something went wrong'
+}
+
+export function isPayNowTooFarAheadError(data, message = '') {
+  if (data?.code === PAYNOW_TOO_FAR_AHEAD) return true
+  if (data?.error === PAYNOW_TOO_FAR_AHEAD) return true
+  return message === PAYNOW_TOO_FAR_AHEAD || message === PAYNOW_TOO_FAR_AHEAD_MESSAGE
 }
