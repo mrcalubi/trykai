@@ -70,7 +70,6 @@ export default function Input({
   const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue ?? '')
   const [focused, setFocused] = useState(false)
   const [passwordToggled, setPasswordToggled] = useState(false)
-  const [passwordPeeking, setPasswordPeeking] = useState(false)
   const currentValue = isControlled ? value : uncontrolledValue
   const floated = floatingLabel && (focused || String(currentValue ?? '').length > 0)
   const fieldClasses = [
@@ -91,8 +90,7 @@ export default function Input({
     .filter(Boolean)
     .join(' ')
   const inputPlaceholder = floatingLabel ? placeholder || ' ' : placeholder
-  const passwordVisible = passwordToggled || passwordPeeking
-  const inputType = isPassword && passwordVisible ? 'text' : type
+  const inputType = isPassword && passwordToggled ? 'text' : type
   const labelEl = label ? (
     <label htmlFor={inputId} className="ui-field__label">
       {label}
@@ -124,43 +122,8 @@ export default function Input({
   ) : (
     <input type={inputType} {...fieldProps} />
   )
-  function startPeek(event) {
-    event.preventDefault()
-    setPasswordPeeking(true)
-    if (event.pointerId != null) {
-      event.currentTarget.setPointerCapture?.(event.pointerId)
-    }
-  }
-
-  function stopPeek() {
-    setPasswordPeeking(false)
-  }
-
   const passwordToggle = isPassword ? (
     <div className="ui-field__password-actions">
-      <button
-        type="button"
-        className="ui-field__toggle ui-field__toggle--peek"
-        aria-label="Hold to peek at password"
-        aria-pressed={passwordPeeking}
-        aria-controls={inputId}
-        onPointerDown={startPeek}
-        onPointerUp={stopPeek}
-        onPointerCancel={stopPeek}
-        onLostPointerCapture={stopPeek}
-        onKeyDown={(event) => {
-          if (event.key === ' ' || event.key === 'Enter') {
-            event.preventDefault()
-            setPasswordPeeking(true)
-          }
-        }}
-        onKeyUp={(event) => {
-          if (event.key === ' ' || event.key === 'Enter') stopPeek()
-        }}
-        onBlur={stopPeek}
-      >
-        <EyeIcon />
-      </button>
       <button
         type="button"
         className="ui-field__toggle"

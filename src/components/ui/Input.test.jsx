@@ -1,4 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import Input from './Input'
@@ -30,19 +32,8 @@ describe('Input', () => {
 
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
     expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Hold to peek at password' })).toBeInTheDocument()
-  })
-
-  it('reveals the password only while peek is held', () => {
-    render(<Input id="password" label="Password" type="password" />)
-    const field = screen.getByLabelText('Password')
-    const peek = screen.getByRole('button', { name: 'Hold to peek at password' })
-
-    fireEvent.pointerDown(peek)
-    expect(field).toHaveAttribute('type', 'text')
-
-    fireEvent.pointerUp(peek)
-    expect(field).toHaveAttribute('type', 'password')
+    expect(screen.queryByRole('button', { name: 'Hold to peek at password' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button')).toHaveLength(1)
   })
 
   it('toggles a password field between masked and plain text', async () => {
@@ -60,17 +51,10 @@ describe('Input', () => {
     expect(field).toHaveAttribute('type', 'password')
   })
 
-  it('keeps a toggled-on password visible after peek is released', () => {
-    render(<Input id="password" label="Password" type="password" />)
-    const field = screen.getByLabelText('Password')
-    const peek = screen.getByRole('button', { name: 'Hold to peek at password' })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show password' }))
-    fireEvent.pointerDown(peek)
-    fireEvent.pointerUp(peek)
-
-    expect(field).toHaveAttribute('type', 'text')
-    expect(screen.getByRole('button', { name: 'Hide password' })).toBeInTheDocument()
+  it('hides the browser password reveal so only the kit toggle shows', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../../index.css'), 'utf8')
+    expect(css).toMatch(/input\[type=['"]password['"]\]::-ms-reveal/)
+    expect(css).toMatch(/input\[type=['"]password['"]\]::-ms-clear/)
   })
 
   it('does not show a visibility toggle on text fields', () => {
