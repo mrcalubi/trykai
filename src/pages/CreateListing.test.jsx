@@ -208,6 +208,41 @@ describe('CreateListing validation', () => {
     await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
     expect(screen.getByRole('button', { name: 'Create listing' })).toBeEnabled()
   })
+
+  it('hides the guest-vs-host line until a price is entered', async () => {
+    givenSignedIn()
+    givenVerification('approved')
+    renderPage()
+    await screen.findByLabelText('Title')
+    expect(screen.queryByText(/Guests see/)).not.toBeInTheDocument()
+  })
+
+  it('shows the public guest price and host payout under the price field', async () => {
+    givenSignedIn()
+    givenVerification('approved')
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await user.type(screen.getByLabelText('Price per person (SGD)'), '25')
+
+    expect(
+      screen.getByText('Guests see $28 · You receive $25 · $22.50 after your first 3 bookings')
+    ).toBeInTheDocument()
+  })
+
+  it('omits the later-booking cut for a founding host', async () => {
+    givenSignedIn()
+    givenVerification('approved')
+    supabase.__on('users', 'select', {
+      data: { verification_status: 'approved', is_founding_host: true },
+      error: null,
+    })
+    const { user } = renderPage()
+    await screen.findByLabelText('Title')
+    await user.type(screen.getByLabelText('Price per person (SGD)'), '25')
+
+    expect(screen.getByText('Guests see $28 · You receive $25')).toBeInTheDocument()
+    expect(screen.queryByText(/after your first 3 bookings/)).not.toBeInTheDocument()
+  })
 })
 
 describe('CreateListing submission', () => {

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
+import { hostListingPriceHint, parsePriceInputCents } from '../lib/pricing'
 
 const MAX_PHOTOS = 5
 
@@ -34,8 +35,10 @@ export default function EditListing() {
   const [existingPhotos, setExistingPhotos] = useState([])
   const [newPhotos, setNewPhotos] = useState([])
   const newPhotosRef = useRef(newPhotos)
+  const [isFoundingHost, setIsFoundingHost] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const priceHint = hostListingPriceHint(parsePriceInputCents(price), isFoundingHost)
 
   const totalPhotos = existingPhotos.length + newPhotos.length
 
@@ -45,18 +48,18 @@ export default function EditListing() {
 
   useEffect(() => {
     async function fetchListing() {
-      const { data, error: fetchError } = await supabase
-        .from('listings')
-        .select('*')
-        .eq('id', id)
-        .eq('host_id', userId)
-        .single()
+      const [{ data, error: fetchError }, { data: profile }] = await Promise.all([
+        supabase.from('listings').select('*').eq('id', id).eq('host_id', userId).single(),
+        supabase.from('users').select('is_founding_host').eq('id', userId).maybeSingle(),
+      ])
 
       if (fetchError || !data) {
         setError(fetchError?.message || 'Listing not found.')
         setFetching(false)
         return
       }
+
+      setIsFoundingHost(Boolean(profile?.is_founding_host))
 
       setTitle(data.title)
       setDescription(data.description)
@@ -298,19 +301,22 @@ export default function EditListing() {
           </label>
 
           <div className="form__row">
-            <label className="label">
-              Price per person (SGD)
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="20"
-                min="1"
-                step="0.01"
-                required
-                className="input"
-              />
-            </label>
+            <div>
+              <label className="label">
+                Price per person (SGD)
+                <input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="20"
+                  min="1"
+                  step="0.01"
+                  required
+                  className="input"
+                />
+              </label>
+              {priceHint ? <span className="hint">{priceHint}</span> : null}
+            </div>
 
             <label className="label">
               Max guests

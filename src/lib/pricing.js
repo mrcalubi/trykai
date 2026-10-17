@@ -11,6 +11,7 @@ import {
   discountedLessonCents,
   discountedPerPersonCents,
   groupDiscountRate,
+  HOST_FEE_RATE,
   MAX_GUESTS_PER_BOOKING,
 } from '../../supabase/functions/_shared/booking.ts'
 import { formatCents } from './cancellationPolicy'
@@ -97,6 +98,28 @@ export function groupPriceLabel(
   if (guestsCount <= 1) return `${each} per person`
   if (rate === 0) return `${each} each`
   return `${each} each · ${Math.round(rate * 100)}% group discount`
+}
+
+export function parsePriceInputCents(value) {
+  if (value == null || String(value).trim() === '') return null
+  const cents = Math.round(Number.parseFloat(String(value)) * 100)
+  if (!Number.isFinite(cents) || cents < 1) return null
+  return cents
+}
+
+/**
+ * Hosts may see the public all-in listing price next to what they receive.
+ * They never see an individual guest's payment. Non-founding hosts also see
+ * the 10% fee that starts on the fourth confirmed booking.
+ */
+export function hostListingPriceHint(pricePerPersonCents, isFoundingHost = false) {
+  if (!Number.isFinite(pricePerPersonCents) || pricePerPersonCents < 1) return ''
+  const guestsSee = formatGuestFacingPrice(pricePerPersonCents)
+  const youReceive = formatCents(pricePerPersonCents)
+  const line = `Guests see ${guestsSee} · You receive ${youReceive}`
+  if (isFoundingHost) return line
+  const afterFee = formatCents(Math.round(pricePerPersonCents * (1 - HOST_FEE_RATE)))
+  return `${line} · ${afterFee} after your first 3 bookings`
 }
 
 export function nextGroupTierHint(guestsCount, groupPricing, maxGuests) {

@@ -129,6 +129,23 @@ export function calculateHostPayout(lessonAmount: number, hostFee: number): numb
   return lessonAmount - hostFee
 }
 
+/**
+ * What the host still receives after a guest cancel. The guest refund is taken
+ * out of the frozen payout; a full refund (or any refund larger than the
+ * payout) leaves nothing. Hosts are shown only this remainder, never the
+ * guest's payment or refund.
+ */
+export function hostPayoutAfterGuestCancel(
+  originalHostPayoutCents: number,
+  guestRefundCents: number,
+): number {
+  const payout = Number(originalHostPayoutCents)
+  const refund = Number(guestRefundCents)
+  if (!Number.isFinite(payout) || payout <= 0) return 0
+  if (!Number.isFinite(refund) || refund <= 0) return Math.round(payout)
+  return Math.max(0, Math.round(payout) - Math.round(refund))
+}
+
 export function nextHostStrikeState(currentStrikes: number | null | undefined): {
   hostStrikes: number
   deactivateListings: boolean

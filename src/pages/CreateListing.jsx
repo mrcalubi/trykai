@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { CancellationPolicyInfo } from '../components/CancellationPolicy'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
+import { hostListingPriceHint, parsePriceInputCents } from '../lib/pricing'
 
 const MAX_PHOTOS = 5
 
@@ -30,8 +31,10 @@ export default function CreateListing() {
   const photosRef = useRef(photos)
   const [groupPricing, setGroupPricing] = useState(true)
   const [acceptedHostTerms, setAcceptedHostTerms] = useState(false)
+  const [isFoundingHost, setIsFoundingHost] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const priceHint = hostListingPriceHint(parsePriceInputCents(price), isFoundingHost)
 
   useEffect(() => {
     photosRef.current = photos
@@ -41,12 +44,13 @@ export default function CreateListing() {
     async function checkVerification() {
       const { data } = await supabase
         .from('users')
-        .select('verification_status')
+        .select('verification_status, is_founding_host')
         .eq('id', userId)
         .single()
 
       const status = data?.verification_status || 'unverified'
       setVerificationStatus(status)
+      setIsFoundingHost(Boolean(data?.is_founding_host))
       setVerificationChecked(true)
 
       if (status === 'unverified' || status === 'rejected') {
@@ -299,19 +303,22 @@ export default function CreateListing() {
           </label>
 
           <div className="form__row">
-            <label className="label">
-              Price per person (SGD)
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="20"
-                min="1"
-                step="0.01"
-                required
-                className="input"
-              />
-            </label>
+            <div>
+              <label className="label">
+                Price per person (SGD)
+                <input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="20"
+                  min="1"
+                  step="0.01"
+                  required
+                  className="input"
+                />
+              </label>
+              {priceHint ? <span className="hint">{priceHint}</span> : null}
+            </div>
 
             <label className="label">
               Max guests

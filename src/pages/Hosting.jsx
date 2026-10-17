@@ -203,7 +203,7 @@ export default function Hosting({ embedded = false }) {
           starts_at,
           listing_id,
           listings (title),
-          bookings (id, status, guests_count, total_amount)
+          bookings (id, status, guests_count)
         `
         )
         .in('listing_id', listingIds)
@@ -594,8 +594,7 @@ export default function Hosting({ embedded = false }) {
                 {confirmCancelSessionId === session.id && (
                   <div className="cancel-confirm">
                     <p className="cancel-confirm__warning">
-                      Cancelling this session will issue full refunds to all guests and add a
-                      strike to your account. Three strikes will deactivate your listing.
+                      {`Cancelling refunds all ${guestTotal} guests in full and adds a strike to your account.`}
                     </p>
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <button

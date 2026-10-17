@@ -10,6 +10,7 @@ import {
   calculateGuestRefund,
   calculateHostFee,
   calculateHostPayout,
+  hostPayoutAfterGuestCancel,
   confirmRpcErrorKind,
   decideAbandonCheckout,
   guestCancelDecision,
@@ -144,6 +145,14 @@ describe('calculateHostFee', () => {
     })
     expect(calculateHostPayout(lesson, fee)).toBe(2250)
     expect(calculateHostPayout(lesson, 0)).toBe(2500)
+  })
+
+  it('cuts the host payout by the guest refund and never below zero', () => {
+    expect(hostPayoutAfterGuestCancel(8500, 0)).toBe(8500)
+    expect(hostPayoutAfterGuestCancel(8500, 4250)).toBe(4250)
+    expect(hostPayoutAfterGuestCancel(8500, 9600)).toBe(0)
+    expect(hostPayoutAfterGuestCancel(0, 2800)).toBe(0)
+    expect(hostPayoutAfterGuestCancel(Number.NaN, 100)).toBe(0)
   })
 })
 

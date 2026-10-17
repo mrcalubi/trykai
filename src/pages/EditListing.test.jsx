@@ -105,6 +105,29 @@ describe('EditListing prefill', () => {
     await renderLoaded()
 
     expect(screen.getByLabelText('Price per person (SGD)')).toHaveValue(45)
+    expect(
+      screen.getByText('Guests see $51 · You receive $45 · $40.50 after your first 3 bookings')
+    ).toBeInTheDocument()
+  })
+
+  it('clears duration and group pricing when the saved listing has none', async () => {
+    givenListing({ duration_mins: null, group_pricing: false })
+    await renderLoaded()
+
+    expect(screen.getByLabelText('Duration (mins)')).toHaveValue(null)
+    expect(screen.getByRole('checkbox', { name: 'Offer group pricing' })).not.toBeChecked()
+  })
+
+  it('shows a founding host only the public price and their payout', async () => {
+    supabase.__on('users', 'select', {
+      data: { is_founding_host: true },
+      error: null,
+    })
+    givenListing({ price_per_person: 2500 })
+    await renderLoaded()
+
+    expect(screen.getByText('Guests see $28 · You receive $25')).toBeInTheDocument()
+    expect(screen.queryByText(/after your first 3 bookings/)).not.toBeInTheDocument()
   })
 
   it('keeps the cents when the stored price is not a whole dollar', async () => {

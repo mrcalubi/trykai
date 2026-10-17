@@ -1,7 +1,14 @@
 import Stripe from 'https://esm.sh/stripe@13.3.0?target=deno'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { spotsToRestore } from '../_shared/booking.ts'
-import { hasValidSecret, jsonResponse, textResponse } from '../_shared/http.ts'
+import {
+  bookingReference,
+  formatSessionDate,
+  publicDisplayName,
+  resolvePaymentMethod,
+  sendCancellationEmails,
+} from '../_shared/email.ts'
+import { asRecord, hasValidSecret, jsonResponse, textResponse } from '../_shared/http.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
   apiVersion: '2023-10-16',
@@ -27,7 +34,19 @@ Deno.serve(async (req) => {
 
     const { data: booking, error } = await admin
       .from('bookings')
-      .select('id, status, guests_count, total_amount, stripe_payment_id, session_id')
+      .select(
+        `
+        id,
+        status,
+        guests_count,
+        total_amount,
+        stripe_payment_id,
+        session_id,
+        guest_id,
+        payment_rail,
+        sessions ( starts_at, listings ( title, host_id ) )
+      `,
+      )
       .eq('id', booking_id)
       .single()
 
@@ -85,6 +104,46 @@ Deno.serve(async (req) => {
           })
           .eq('id', booking.session_id)
       }
+    }
+
+    const session = asRecord(booking.sessions)
+    const listing = asRecord(session?.listings)
+
+    try {
+      const { data: guestProfile } = booking.guest_id
+        ? await admin
+            .from('users')
+            .select('email, full_name, display_name')
+            .eq('id', booking.guest_id)
+            .maybeSingle()
+        : { data: null }
+
+      const paymentMethod = await resolvePaymentMethod({
+        paymentRail: booking.payment_rail,
+        retrieveIntent: booking.stripe_payment_id
+          ? () =>
+              stripe.paymentIntents.retrieve(booking.stripe_payment_id, {
+                expand: ['latest_charge'],
+              })
+          : undefined,
+      })
+
+      await sendCancellationEmails({
+        apiKey: Deno.env.get('RESEND_API_KEY'),
+        cancelledBy: 'host',
+        refundAmountCents: refundAmount,
+        bookingReference: bookingReference(booking.id),
+        listingTitle: listing?.title || 'your session',
+        sessionDate: session?.starts_at ? formatSessionDate(session.starts_at) : '',
+        guestEmail: guestProfile?.email,
+        hostEmail: null,
+        guestName: publicDisplayName(guestProfile) || guestProfile?.full_name,
+        guestsCount: booking.guests_count,
+        paymentMethod,
+        siteUrl: Deno.env.get('SITE_URL'),
+      })
+    } catch (emailErr) {
+      console.error('admin-cancel-booking: email failed', emailErr)
     }
 
     return jsonResponse({ ok: true, refund_amount: refundAmount })
