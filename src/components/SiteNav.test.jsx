@@ -83,6 +83,27 @@ describe('SiteNav when signed in', () => {
     await waitFor(() => expect(account).toHaveTextContent('K'))
   })
 
+  it('reads the display name from users when my_account is missing', async () => {
+    signedIn()
+    supabase.rpc.mockImplementation(async (name) => {
+      if (name === 'my_account') {
+        return {
+          data: null,
+          error: { code: 'PGRST202', message: 'Could not find the function public.my_account' },
+        }
+      }
+      return { data: null, error: null }
+    })
+    supabase.__on('users', 'select', {
+      data: { display_name: 'Mei Ling', avatar_url: null },
+      error: null,
+    })
+    renderNav()
+
+    const account = await screen.findByRole('link', { name: 'Your profile' })
+    await waitFor(() => expect(account).toHaveTextContent('ML'))
+  })
+
   it('loads the signed-in account through my_account', async () => {
     signedIn(makeAuthSession({ user: { id: 'user-77' } }))
     givenAccount({ display_name: 'Mei Ling', avatar_url: null })

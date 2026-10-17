@@ -25,17 +25,6 @@ const PROFILE_COLUMNS_WITHOUT_BADGE = 'id, display_name, bio, avatar_url, is_hos
  * selecting the column fails the whole profile read. Checkout never asks
  * for it, so a guest can book and only then hit this page.
  */
-function verifiedColumnUnavailable(error) {
-  const message = String(error?.message ?? '')
-  const code = String(error?.code ?? '')
-  return (
-    code === '42703' ||
-    code === 'PGRST204' ||
-    code === '42501' ||
-    /is_id_verified|schema cache|does not exist|permission denied/i.test(message)
-  )
-}
-
 function loadPublicProfile(userId, columns) {
   return supabase.from('users').select(columns).eq('id', userId).single()
 }
@@ -159,10 +148,14 @@ export default function Profile() {
         loadPublicProfile(id, PROFILE_COLUMNS)
       )
 
-      if (userError && verifiedColumnUnavailable(userError)) {
+      // Any failure of the wider select (missing column, grant, or schema
+      // cache) should still show the profile when the older columns work.
+      if (userError) {
         const fallback = await loadPublicProfile(id, PROFILE_COLUMNS_WITHOUT_BADGE)
-        userData = fallback.data
-        userError = fallback.error
+        if (!fallback.error && fallback.data) {
+          userData = fallback.data
+          userError = null
+        }
       }
 
       if (userError || !userData) {

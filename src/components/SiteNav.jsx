@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { firstAccountRow } from '../lib/myAccount'
+import { loadOwnAccount } from '../lib/myAccount'
 import TopNav from './ui/TopNav'
 
 /**
@@ -51,10 +51,9 @@ export default function SiteNav() {
   useEffect(() => {
     if (!user) return
 
-    supabase.rpc('my_account').then(({ data, error }) => {
-      const row = firstAccountRow(data)
-      setDisplayName(!error && row?.display_name ? row.display_name : '')
-      setAvatarUrl(!error && row?.avatar_url ? row.avatar_url : '')
+    loadOwnAccount(user.id).then(({ data, error }) => {
+      setDisplayName(!error && data?.display_name ? data.display_name : '')
+      setAvatarUrl(!error && data?.avatar_url ? data.avatar_url : '')
     })
 
     // `is_admin` has no client SELECT grant, so the menu asks the same

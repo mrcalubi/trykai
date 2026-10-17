@@ -5,8 +5,8 @@ import { useAuthedUserId } from '../lib/authedUser'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import { getInitials } from '../components/ui/getInitials'
-import { firstAccountRow } from '../lib/myAccount'
-import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
+import { loadOwnAccount } from '../lib/myAccount'
+import { PAGE_LOAD_ERROR } from '../lib/pageLoad'
 
 export default function Settings() {
   const userId = useAuthedUserId()
@@ -27,10 +27,10 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
 
   const loadProfile = useCallback(async () => {
-    const { data, error: loadError } = await withIssuedAtRetry(() =>
-      supabase.rpc('my_account')
-    )
-    const row = firstAccountRow(data)
+    const [{ data: row, error: loadError }, sessionResult] = await Promise.all([
+      loadOwnAccount(userId),
+      supabase.auth.getSession(),
+    ])
 
     if (loadError || !row) {
       setError(PAGE_LOAD_ERROR)
@@ -38,13 +38,15 @@ export default function Settings() {
       return
     }
 
+    const sessionEmail = sessionResult.data.session?.user?.email || ''
     setFullName(row.full_name || '')
     setDisplayName(row.display_name || '')
     setBio(row.bio || '')
-    setEmail(row.email || '')
+    setEmail(row.email || sessionEmail)
     setAvatarUrl(row.avatar_url || '')
+    setError('')
     setLoading(false)
-  }, [])
+  }, [userId])
 
   useEffect(() => {
     let cancelled = false

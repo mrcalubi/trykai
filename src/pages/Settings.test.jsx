@@ -97,6 +97,41 @@ describe('Settings access', () => {
     ).toBeInTheDocument()
     expect(screen.queryByText('permission denied')).not.toBeInTheDocument()
   })
+
+  it('loads the form from users when my_account is not deployed yet', async () => {
+    supabase.rpc.mockResolvedValue({
+      data: null,
+      error: {
+        code: 'PGRST202',
+        message: 'Could not find the function public.my_account without parameters in the schema cache',
+      },
+    })
+    supabase.__on('users', 'select', {
+      data: {
+        email: 'mei@example.com',
+        full_name: 'Mei Ling',
+        display_name: 'Mei',
+        bio: 'I pull rosettas.',
+        avatar_url: null,
+      },
+      error: null,
+    })
+
+    renderWithRouter(
+      <RequireAuth>
+        <Settings />
+      </RequireAuth>,
+      { route: '/settings', path: '/settings' }
+    )
+
+    expect(await screen.findByLabelText('Display name')).toHaveValue('Mei')
+    expect(screen.getByLabelText('Full name')).toHaveValue('Mei Ling')
+    expect(screen.getByLabelText('About you')).toHaveValue('I pull rosettas.')
+    expect(screen.getByLabelText('Email')).toHaveValue('mei@example.com')
+    expect(
+      screen.queryByText('Something went wrong loading this page. Please refresh.')
+    ).not.toBeInTheDocument()
+  })
 })
 
 describe('Settings profile form', () => {
