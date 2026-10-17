@@ -43,7 +43,7 @@ Two user types, one account. A user is a guest by default and becomes a host whe
 | AI coding                  | Cursor                                                               | Implementation. Claude handles architecture.                                                                                                                                                                                                                                                                                                 |
 
 
-**CI** (`.github/workflows/ci.yml`): lint, Vitest with coverage, `vite build`, Playwright (desktop + phone Chromium), Deno type-check of `_shared/{booking,http,connect,email,payouts}.ts`. Handler type-check is advisory (`continue-on-error`). Coverage floors: lines 92%, functions 90%, branches 87%; money files 100%.
+**CI** (`.github/workflows/ci.yml`): lint, Vitest with coverage, `vite build`, Playwright (desktop + phone Chromium), Deno type-check of `_shared/{booking,http,connect,email,payouts,verification}.ts`, and a dry run that every `supabase/functions/<name>/index.ts` matches a `[functions.<name>]` block. Handler type-check is advisory (`continue-on-error`). On push to `staging` or `main`, after those checks pass, `scripts/deploy-edge-functions.mjs` deploys every Edge Function (`supabase functions deploy --use-api`). Staging uses project ref `hzgybclfvpuxkmytdoos` unless `STAGING_SUPABASE_PROJECT_REF` is set. Production requires `PRODUCTION_SUPABASE_PROJECT_REF`. Both require GitHub secret `SUPABASE_ACCESS_TOKEN`. Pull requests do not deploy. Coverage floors: lines 92%, functions 90%, branches 87%; money files 100%.
 
 ### Styling
 
@@ -478,6 +478,7 @@ supabase/functions/
 
 | Looking for                                                | Where                                                                                               |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Deploy every Edge Function                                 | `scripts/deploy-edge-functions.mjs`. CI deploys on push to `staging` and `main`.                    |
 | Browse page and filters                                    | `src/pages/Home.jsx`                                                                                |
 | Planning areas and browse regions                          | `src/lib/planningAreas.js`, `00016`                                                                 |
 | Listing detail and booking                                 | `src/pages/ListingDetail.jsx`                                                                       |

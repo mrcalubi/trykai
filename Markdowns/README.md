@@ -26,7 +26,7 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 - Atomic `spots_remaining` decrement via `confirm_paid_booking` (service role only)
 - Guest address reveal via `get_listing_address` (confirmed guest only). `listings.full_address` is still granted SELECT
 - Four tier cancellation refunds via `cancel-booking` (guest emailed the refund amount, including $0). `/bookings` and `/hosting` invoke that function; they do not PATCH bookings from the browser
-- CI: Vitest coverage floors 92% / 90% / 87%, money files 100%, Playwright desktop + phone, Deno type-check of shared Edge modules
+- CI: Vitest coverage floors 92% / 90% / 87%, money files 100%, Playwright desktop + phone, Deno type-check of shared Edge modules. A push to `staging` or `main` deploys every Edge Function after those checks pass. Pull requests do not deploy.
 - Global chrome is `SiteNav` → `TopNav`. `Navbar.jsx` is deleted. Browse uses the kit `Card`. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only
 - Avatar goes to your own `/u/:id`. Signed-in hamburger is Browse, Host a session (verified) / Become a host (not yet verified), Verification review for admins. `/bookings` and `/hosting` redirect to profile tabs. `/settings` is Profile + Account, with Log out. `/dashboard` still redirects. Login uses the kit Input with floating labels
 - Resend from-address is `TryKai <no-reply@trykai.sg>`. trykai.sg is verified. Staging booking confirmation emails confirmed arriving
