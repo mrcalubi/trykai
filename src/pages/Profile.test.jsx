@@ -97,6 +97,106 @@ describe('Profile loading and failure', () => {
     expect(screen.queryByText('not found')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to listings' })).toHaveAttribute('href', '/')
   })
+
+  it('loads the profile when is_id_verified is not in the database yet', async () => {
+    supabase.__on('users', 'select', (call) => {
+      const columns = call.chain.find((step) => step.method === 'select')?.args[0] ?? ''
+      if (String(columns).includes('is_id_verified')) {
+        return {
+          data: null,
+          error: { code: '42703', message: 'column users.is_id_verified does not exist' },
+        }
+      }
+      return {
+        data: {
+          id: HOST_ID,
+          display_name: 'Mei',
+          bio: null,
+          avatar_url: null,
+          is_host: true,
+        },
+        error: null,
+      }
+    })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Mei', level: 1 })).toBeInTheDocument()
+    expect(
+      screen.queryByText('Something went wrong loading this page. Please refresh.')
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('ID verified')).not.toBeInTheDocument()
+    const selects = supabase.__calls('users', 'select').map((call) => call.chain[0].args[0])
+    expect(selects).toEqual([
+      'id, display_name, bio, avatar_url, is_host, is_id_verified',
+      'id, display_name, bio, avatar_url, is_host',
+    ])
+  })
+
+  it('retries without the badge column when the grant is missing', async () => {
+    supabase.__on('users', 'select', (call) => {
+      const columns = call.chain.find((step) => step.method === 'select')?.args[0] ?? ''
+      if (String(columns).includes('is_id_verified')) {
+        return {
+          data: null,
+          error: { code: '42501', message: 'permission denied for table users' },
+        }
+      }
+      return {
+        data: {
+          id: HOST_ID,
+          display_name: 'Mei',
+          bio: 'I pull rosettas.',
+          avatar_url: null,
+          is_host: true,
+        },
+        error: null,
+      }
+    })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'About' })).toBeInTheDocument()
+    expect(screen.getByText('I pull rosettas.')).toBeInTheDocument()
+    expect(
+      screen.queryByText('Something went wrong loading this page. Please refresh.')
+    ).not.toBeInTheDocument()
+  })
+
+  it('keeps the ID verified badge from my_account when the public column is missing', async () => {
+    givenSignedIn(HOST_ID)
+    supabase.__on('users', 'select', (call) => {
+      const columns = call.chain.find((step) => step.method === 'select')?.args[0] ?? ''
+      if (String(columns).includes('is_id_verified')) {
+        return {
+          data: null,
+          error: { message: "Could not find the 'is_id_verified' column of 'users' in the schema cache" },
+        }
+      }
+      return {
+        data: {
+          id: HOST_ID,
+          display_name: 'Mei',
+          bio: null,
+          avatar_url: null,
+          is_host: false,
+        },
+        error: null,
+      }
+    })
+    givenRpcs({
+      account: {
+        display_name: 'Mei',
+        bio: null,
+        avatar_url: null,
+        is_host: false,
+        verification_status: 'approved',
+        stripe_payouts_enabled: false,
+      },
+    })
+    renderPage()
+
+    expect(await screen.findByText('ID verified')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Profile' })).toBeInTheDocument()
+  })
 })
 
 describe('Profile public content', () => {
