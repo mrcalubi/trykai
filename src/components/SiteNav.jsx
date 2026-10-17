@@ -15,7 +15,7 @@ export default function SiteNav() {
   const [fullName, setFullName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
-  const [isHost, setIsHost] = useState(false)
+  const [verificationStatus, setVerificationStatus] = useState(null)
 
   async function handleLogOut() {
     await supabase.auth.signOut()
@@ -30,7 +30,7 @@ export default function SiteNav() {
         setFullName('')
         setAvatarUrl('')
         setIsAdmin(false)
-        setIsHost(false)
+        setVerificationStatus(null)
       }
     }
 
@@ -52,21 +52,22 @@ export default function SiteNav() {
 
     supabase
       .from('users')
-      .select('full_name, avatar_url, is_host')
+      .select('full_name, avatar_url')
       .eq('id', user.id)
       .single()
       .then(({ data }) => {
         setFullName(data?.full_name || '')
         setAvatarUrl(data?.avatar_url || '')
-        setIsHost(Boolean(data?.is_host))
       })
 
     // `is_admin` has no client SELECT grant, so the menu asks the same
     // caller-scoped function RequireAdmin uses. The review function checks
     // again server-side; this only decides whether to show the link.
+    // `verification_status` here picks Host a session vs Become a host.
     supabase.rpc('my_verification').then(({ data, error }) => {
       const row = Array.isArray(data) ? data[0] : data
       setIsAdmin(!error && Boolean(row?.is_admin))
+      setVerificationStatus(error ? null : row?.verification_status ?? null)
     })
   }, [user])
 
@@ -74,7 +75,7 @@ export default function SiteNav() {
     <TopNav
       isLoggedIn={Boolean(user)}
       isAdmin={isAdmin}
-      isHost={isHost}
+      verificationStatus={verificationStatus}
       userId={user?.id}
       avatarUrl={avatarUrl || undefined}
       name={fullName || user?.email || ''}

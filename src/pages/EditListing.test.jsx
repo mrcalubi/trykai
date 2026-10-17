@@ -17,6 +17,15 @@ function givenSignedIn(userId = HOST_ID) {
   })
 }
 
+function givenFoundingHost(value, error = null) {
+  supabase.rpc.mockImplementation(async (fn) => {
+    if (fn === 'my_is_founding_host') {
+      return error ? { data: null, error } : { data: value, error: null }
+    }
+    return { data: null, error: null }
+  })
+}
+
 function givenListing(overrides = {}) {
   supabase.__on('listings', 'select', {
     data: makeListing({
@@ -60,6 +69,7 @@ beforeEach(() => {
   supabase.__reset()
   givenSignedIn()
   givenListing()
+  givenFoundingHost(false)
 })
 
 describe('EditListing access control', () => {
@@ -122,14 +132,21 @@ describe('EditListing prefill', () => {
   })
 
   it('shows a founding host only the public price and their payout', async () => {
-    supabase.__on('users', 'select', {
-      data: { is_founding_host: true },
-      error: null,
-    })
+    givenFoundingHost(true)
     givenListing({ price_per_person: 2500 })
     await renderLoaded()
 
     expect(screen.getByText('Guests see $28 · You receive $25')).toBeInTheDocument()
+    expect(screen.queryByText(/after your first 3 bookings/)).not.toBeInTheDocument()
+  })
+
+  it('hides the price hint when founding-host status is unknown', async () => {
+    givenFoundingHost(null, { message: 'function my_is_founding_host does not exist' })
+    givenListing({ price_per_person: 2500 })
+    await renderLoaded()
+
+    expect(screen.getByLabelText('Price per person (SGD)')).toHaveValue(25)
+    expect(screen.queryByText(/Guests see/)).not.toBeInTheDocument()
     expect(screen.queryByText(/after your first 3 bookings/)).not.toBeInTheDocument()
   })
 

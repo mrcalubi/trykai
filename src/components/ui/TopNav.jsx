@@ -66,7 +66,7 @@ export function TopNavAccount({ avatarUrl, name, className = '' }) {
 export default function TopNav({
   isLoggedIn = false,
   isAdmin = false,
-  isHost = false,
+  verificationStatus,
   userId,
   avatarUrl,
   name,
@@ -182,7 +182,7 @@ export default function TopNav({
           onLogOut={onLogOut}
           isLoggedIn={isLoggedIn}
           isAdmin={isAdmin}
-          isHost={isHost}
+          verificationStatus={verificationStatus}
           userId={userId}
         />
       </div>

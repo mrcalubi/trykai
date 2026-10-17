@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { CancellationPolicyInfo } from '../components/CancellationPolicy'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
+import { foundingHostFromRpc } from '../lib/foundingHost'
 import { hostListingPriceHint, parsePriceInputCents } from '../lib/pricing'
 
 const MAX_PHOTOS = 5
@@ -31,7 +32,7 @@ export default function CreateListing() {
   const photosRef = useRef(photos)
   const [groupPricing, setGroupPricing] = useState(true)
   const [acceptedHostTerms, setAcceptedHostTerms] = useState(false)
-  const [isFoundingHost, setIsFoundingHost] = useState(false)
+  const [isFoundingHost, setIsFoundingHost] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const priceHint = hostListingPriceHint(parsePriceInputCents(price), isFoundingHost)
@@ -42,25 +43,29 @@ export default function CreateListing() {
 
   useEffect(() => {
     async function checkVerification() {
-      const { data } = await supabase
-        .from('users')
-        .select('verification_status, is_founding_host')
-        .eq('id', userId)
-        .single()
-
-      const status = data?.verification_status || 'unverified'
+      // Gate on `my_verification()`. Founding-host status is a separate
+      // caller-scoped RPC — `users.is_founding_host` has no client SELECT grant.
+      const { data } = await supabase.rpc('my_verification')
+      const row = Array.isArray(data) ? data[0] : data
+      const status = row?.verification_status || 'unverified'
       setVerificationStatus(status)
-      setIsFoundingHost(Boolean(data?.is_founding_host))
       setVerificationChecked(true)
 
-      if (status === 'unverified' || status === 'rejected') {
+      if (status !== 'approved') {
         navigate('/verify-identity', {
-          state: {
-            message: 'You need to verify your identity before you can host on TryKai.',
-          },
+          state:
+            status === 'pending'
+              ? undefined
+              : {
+                  message: 'You need to verify your identity before you can host on TryKai.',
+                },
           replace: true,
         })
+        return
       }
+
+      const founding = await supabase.rpc('my_is_founding_host')
+      setIsFoundingHost(foundingHostFromRpc(founding.data, founding.error))
     }
 
     checkVerification()
@@ -232,20 +237,6 @@ export default function CreateListing() {
 
   if (!verificationChecked) {
     return <p className="status-message">Loading…</p>
-  }
-
-  if (verificationStatus === 'pending') {
-    return (
-      <div className="page page--form">
-        <div className="form-card">
-          <h1 className="form-card__title">Verification under review</h1>
-          <p className="form-card__subtitle">
-            Your identity verification is being reviewed. You&apos;ll be able to create
-            listings once you&apos;re approved — usually within 1–2 business days.
-          </p>
-        </div>
-      </div>
-    )
   }
 
   if (verificationStatus !== 'approved') {

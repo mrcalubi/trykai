@@ -42,7 +42,7 @@ describe('HamburgerMenu', () => {
     expect(screen.getByRole('link', { name: 'Browse' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
       'href',
-      '/create-listing'
+      '/verify-identity'
     )
     expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/u/user-77')
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
@@ -57,11 +57,16 @@ describe('HamburgerMenu', () => {
     expect(document.querySelector('.ui-hamburger__item--logout')).toHaveTextContent('Log out')
   })
 
-  it('labels Create listing for a host and does not add Hosting', () => {
-    renderMenu({ open: true, isLoggedIn: true, isHost: true, userId: 'user-77' })
+  it('labels Host a session for a verified host and does not add Hosting', () => {
+    renderMenu({
+      open: true,
+      isLoggedIn: true,
+      verificationStatus: 'approved',
+      userId: 'user-77',
+    })
 
     expect(screen.getByRole('link', { name: 'Browse' })).toHaveAttribute('href', '/')
-    expect(screen.getByRole('link', { name: 'Create listing' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Host a session' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
@@ -71,6 +76,16 @@ describe('HamburgerMenu', () => {
     expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Become a host' })).not.toBeInTheDocument()
+  })
+
+  it('sends a pending host to the verification status page', () => {
+    renderMenu({ open: true, isLoggedIn: true, verificationStatus: 'pending' })
+
+    expect(screen.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
+      'href',
+      '/verify-identity'
+    )
+    expect(screen.queryByRole('link', { name: 'Host a session' })).not.toBeInTheDocument()
   })
 
   it('offers verification review only to an admin', () => {

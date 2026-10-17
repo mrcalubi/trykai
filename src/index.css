@@ -224,6 +224,10 @@ a {
   padding: 48px 24px 64px;
 }
 
+.page--form-status {
+  align-items: flex-start;
+}
+
 .page--centered {
   text-align: center;
 }

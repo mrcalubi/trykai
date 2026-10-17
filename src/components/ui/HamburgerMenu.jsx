@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { hostEntry } from '../../lib/hostEntry'
 
 const LOGGED_OUT_LINKS = [
   { label: 'Log in or sign up', to: '/login' },
@@ -8,13 +9,10 @@ const LOGGED_OUT_LINKS = [
   { label: 'Dispute policy', to: '/dispute-policy' },
 ]
 
-function loggedInItems({ isAdmin, isHost, userId }) {
+function loggedInItems({ isAdmin, verificationStatus, userId }) {
   return [
     { label: 'Browse', to: '/' },
-    {
-      label: isHost ? 'Create listing' : 'Become a host',
-      to: '/create-listing',
-    },
+    hostEntry(verificationStatus),
     ...(isAdmin ? [{ label: 'Verification review', to: '/admin/verifications' }] : []),
     ...(userId ? [{ label: 'Profile', to: `/u/${userId}` }] : []),
     { label: 'Settings', to: '/settings' },
@@ -30,11 +28,13 @@ export default function HamburgerMenu({
   onLogOut,
   isLoggedIn = false,
   isAdmin = false,
-  isHost = false,
+  verificationStatus,
   userId,
   className = '',
 }) {
-  const items = isLoggedIn ? loggedInItems({ isAdmin, isHost, userId }) : LOGGED_OUT_LINKS
+  const items = isLoggedIn
+    ? loggedInItems({ isAdmin, verificationStatus, userId })
+    : LOGGED_OUT_LINKS
 
   function handleLinkClick() {
     onClose?.()

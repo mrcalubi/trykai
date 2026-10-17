@@ -9,6 +9,7 @@ import Card from '../components/ui/Card'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
+import { hostEntry } from '../lib/hostEntry'
 import { profileReportSubject, reportMailto } from '../lib/reportMailto'
 import OverflowMenu from '../components/ui/OverflowMenu'
 import Bookings from './Bookings'
@@ -203,6 +204,7 @@ export default function Profile() {
   const isOwn = viewerId === id
   const about = typeof profile.bio === 'string' ? profile.bio.trim() : ''
   const isHost = Boolean(profile.is_host)
+  const hostCta = hostEntry(profile.verification_status)
   const allowedTabs = isHost ? OWN_TABS : OWN_TABS.filter((tab) => tab !== 'hosting')
   const requestedTab = searchParams.get('tab')
   const activeTab = allowedTabs.includes(requestedTab) ? requestedTab : 'bookings'
@@ -308,7 +310,7 @@ export default function Profile() {
               {!isHost ? (
                 <div className="empty-state">
                   <p>Share a skill on TryKai.</p>
-                  <Link to="/create-listing">Become a host</Link>
+                  <Link to={hostCta.to}>{hostCta.label}</Link>
                 </div>
               ) : (
                 <ListingCards listings={listings} ratings={ratings} />

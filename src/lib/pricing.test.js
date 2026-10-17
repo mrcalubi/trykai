@@ -90,6 +90,8 @@ describe('pricing.js matches booking.ts', () => {
     expect(hostListingPriceHint(2500, false)).toBe(
       'Guests see $28 · You receive $25 · $22.50 after your first 3 bookings',
     )
+    expect(hostListingPriceHint(2500, null)).toBe('')
+    expect(hostListingPriceHint(2500)).toBe('')
     expect(hostListingPriceHint(0)).toBe('')
     expect(parsePriceInputCents('25')).toBe(2500)
     expect(parsePriceInputCents('')).toBeNull()

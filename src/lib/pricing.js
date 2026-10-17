@@ -118,10 +118,13 @@ export function parsePriceInputCents(value) {
 /**
  * Hosts may see the public all-in listing price next to what they receive.
  * They never see an individual guest's payment. Non-founding hosts also see
- * the 10% fee that starts on the fourth confirmed booking.
+ * the 10% fee that starts on the fourth confirmed booking. Unknown
+ * founding-host status hides the whole line so we never show that 10%
+ * cut to a host who might be grandfathered.
  */
-export function hostListingPriceHint(pricePerPersonCents, isFoundingHost = false) {
+export function hostListingPriceHint(pricePerPersonCents, isFoundingHost) {
   if (!Number.isFinite(pricePerPersonCents) || pricePerPersonCents < 1) return ''
+  if (isFoundingHost !== true && isFoundingHost !== false) return ''
   const guestsSee = formatGuestFacingPrice(pricePerPersonCents)
   const youReceive = formatCents(pricePerPersonCents)
   const line = `Guests see ${guestsSee} · You receive ${youReceive}`

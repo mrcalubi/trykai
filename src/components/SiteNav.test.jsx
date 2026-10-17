@@ -78,7 +78,7 @@ describe('SiteNav when signed in', () => {
     await waitFor(() => expect(account).toHaveTextContent('K'))
   })
 
-  it('looks the profile up by the signed-in user id, including is_host', async () => {
+  it('looks the profile up by the signed-in user id', async () => {
     signedIn(makeAuthSession({ user: { id: 'user-77' } }))
     renderNav()
 
@@ -91,7 +91,7 @@ describe('SiteNav when signed in', () => {
     })
     expect(supabase.__lastCall('users', 'select').chain).toContainEqual({
       method: 'select',
-      args: ['full_name, avatar_url, is_host'],
+      args: ['full_name, avatar_url'],
     })
   })
 
@@ -115,7 +115,7 @@ describe('SiteNav hamburger', () => {
     expect(screen.getByRole('link', { name: 'Browse' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'Become a host' })).toHaveAttribute(
       'href',
-      '/create-listing'
+      '/verify-identity'
     )
     expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute(
       'href',
@@ -141,10 +141,10 @@ describe('SiteNav hamburger', () => {
     await waitFor(() => expect(currentPath()).toBe('/'))
   })
 
-  it('labels Create listing once the profile reports is_host', async () => {
+  it('labels Host a session once my_verification reports approved', async () => {
     signedIn()
-    supabase.__on('users', 'select', {
-      data: { full_name: 'Mei Ling', avatar_url: null, is_host: true },
+    supabase.rpc.mockResolvedValue({
+      data: [{ verification_status: 'approved', is_admin: false }],
       error: null,
     })
     const { user } = renderNav()
@@ -152,7 +152,7 @@ describe('SiteNav hamburger', () => {
     await screen.findByRole('link', { name: 'Your profile' })
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
 
-    expect(await screen.findByRole('link', { name: 'Create listing' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Host a session' })).toHaveAttribute(
       'href',
       '/create-listing'
     )

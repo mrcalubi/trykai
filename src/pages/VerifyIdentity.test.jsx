@@ -164,11 +164,10 @@ describe('VerifyIdentity access control', () => {
 
   it('sends an approved host on to create a listing', async () => {
     givenStatus('approved')
-    const { user, currentPath } = renderPage()
-
-    await user.click(await screen.findByRole('button', { name: 'Create a listing' }))
+    const { currentPath } = renderPage()
 
     await waitFor(() => expect(currentPath()).toBe('/create-listing'))
+    expect(screen.queryByRole('heading', { name: 'Identity verified' })).not.toBeInTheDocument()
   })
 
   it('relays the reason the host was sent here', async () => {
@@ -238,13 +237,14 @@ describe('VerifyIdentity Stripe Identity path', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows the approved view when Stripe had already verified them', async () => {
+  it('sends an already-verified host to create a listing', async () => {
     givenIdentitySession({ data: { already_verified: true, url: null }, error: null })
-    const { user } = renderPage()
+    const { user, currentPath } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Verify with Stripe' }))
 
-    expect(await screen.findByRole('heading', { name: 'Identity verified' })).toBeInTheDocument()
+    await waitFor(() => expect(currentPath()).toBe('/create-listing'))
+    expect(screen.queryByRole('heading', { name: 'Identity verified' })).not.toBeInTheDocument()
   })
 })
 
@@ -299,6 +299,15 @@ describe('VerifyIdentity return from Stripe', () => {
     renderPage({ route: '/verify-identity?identity=return' })
 
     expect(await screen.findByRole('heading', { name: 'Identity verified' })).toBeInTheDocument()
+  })
+
+  it('lets a just-verified host continue to create a listing', async () => {
+    givenStatus('approved')
+    const { user, currentPath } = renderPage({ route: '/verify-identity?identity=return' })
+
+    await user.click(await screen.findByRole('button', { name: 'Create a listing' }))
+
+    await waitFor(() => expect(currentPath()).toBe('/create-listing'))
   })
 })
 
