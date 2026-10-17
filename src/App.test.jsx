@@ -140,6 +140,13 @@ describe('App routes', () => {
     expect(window.location.pathname).toBe('/login')
   })
 
+  it('sends a signed-out visitor from a booking detail to login', async () => {
+    renderAt('/bookings/booking-1')
+
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/login')
+  })
+
   it('sends a signed-out visitor from hosting to login', async () => {
     renderAt('/hosting')
 

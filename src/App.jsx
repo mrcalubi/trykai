@@ -14,6 +14,7 @@ import EditListing from './pages/EditListing'
 import VerifyIdentity from './pages/VerifyIdentity'
 import Dashboard from './pages/Dashboard'
 import RedirectToOwnProfile from './pages/RedirectToOwnProfile'
+import BookingDetail from './pages/BookingDetail'
 import Settings from './pages/Settings'
 import AdminVerifications from './pages/AdminVerifications'
 import RefundPolicy from './pages/RefundPolicy'
@@ -55,6 +56,14 @@ export default function App() {
           element={
             <RequireAuth>
               <EditListing />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/bookings/:bookingId"
+          element={
+            <RequireAuth>
+              <BookingDetail />
             </RequireAuth>
           }
         />

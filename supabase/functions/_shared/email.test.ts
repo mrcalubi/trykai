@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   bookingCancelledGuestHtml,
+  bookingCancelledGuestSubject,
   bookingCancelledHostHtml,
   bookingConfirmedGuestHtml,
   bookingConfirmedGuestSubject,
@@ -104,7 +105,7 @@ function guestReceipt(overrides = {}) {
     sessionStartsAt: SESSION_STARTS,
     durationMins: 90,
     whatsProvided: ['Apron', 'Coffee beans'],
-    guestId: 'guest-1',
+    bookingId: 'booking-1',
     siteUrl: 'https://trykai.sg',
     ...overrides,
   })
@@ -304,8 +305,23 @@ describe('receiptPriceLines', () => {
       paymentRail: 'card',
       totalPaidCents: 9600,
     })
-    expect(lines).toContain('Group discount (15%) −$16')
-    expect(lines.join('\n')).not.toMatch(/booking fee|platform fee/i)
+    expect(lines[0]).toBe('$24 per person x 4 guests')
+    expect(lines).toContain('Group discount (15%)')
+    expect(lines.join('\n')).not.toMatch(/−\$16|booking fee|platform fee/i)
+  })
+
+  it('uses the booking card total per guest, not the 1-guest all-in price', () => {
+    const lines = receiptPriceLines({
+      pricePerPersonCents: 100,
+      guestsCount: 2,
+      groupPricing: true,
+      paymentRail: 'paynow',
+      totalPaidCents: 475,
+    })
+    expect(lines[0]).toBe('$2.50 per person x 2 guests')
+    expect(lines).toContain('PayNow saving $0.25')
+    expect(lines.at(-1)).toBe('Total paid $4.75')
+    expect(lines.join('\n')).not.toMatch(/group discount/i)
   })
 
   it('adds the PayNow saving against the all-in card total', () => {
@@ -403,14 +419,43 @@ describe('googleCalendarUrl', () => {
 })
 
 describe('refund timing copy', () => {
-  it('uses one published sentence for every rail', () => {
-    const timing =
-      'Card refunds usually take 5 to 10 business days to appear. PayNow refunds are usually faster.'
-    expect(refundTimingCopy('card')).toBe(timing)
-    expect(refundTimingCopy('paynow')).toBe(timing)
-    expect(refundTimingCopy()).toBe(timing)
+  it('shows only the line for the method used', () => {
+    expect(refundTimingCopy('card')).toBe(
+      'Card refunds usually take 5 to 10 business days to appear.',
+    )
+    expect(refundTimingCopy('paynow')).toBe(
+      'PayNow refunds are usually faster than card refunds.',
+    )
+    expect(refundTimingCopy()).toBe(
+      'Card refunds usually take 5 to 10 business days to appear.',
+    )
     expect(refundMethodNoun('paynow')).toBe('PayNow')
     expect(refundMethodNoun('card')).toBe('card')
+  })
+
+  it('puts the refund amount on a guest-cancel subject only when there is one', () => {
+    expect(
+      bookingCancelledGuestSubject({
+        cancelledBy: 'guest',
+        listingTitle: 'Latte art',
+        refundAmountCents: 5100,
+      }),
+    ).toBe('Booking cancelled: Latte art · $51 refund')
+    expect(
+      bookingCancelledGuestSubject({
+        cancelledBy: 'guest',
+        listingTitle: 'Latte art',
+        refundAmountCents: 0,
+      }),
+    ).toBe('Booking cancelled: Latte art')
+    expect(
+      bookingCancelledGuestSubject({
+        cancelledBy: 'host',
+        listingTitle: 'Latte art',
+        refundAmountCents: 5100,
+        hostName: 'Mei Ling',
+      }),
+    ).toBe('Mei Ling had to cancel Latte art')
   })
 
   it('phrases host-facing guest counts without amounts', () => {
@@ -432,8 +477,9 @@ describe('booking confirmation emails', () => {
     expect(html).toContain('12 Club Street, Singapore 069410')
     expect(html).toContain('Guests:</strong> 4 guests')
     expect(html).toContain("What's provided:</strong> Apron, Coffee beans")
-    expect(html).toContain('$28 per person x 4 guests')
-    expect(html).toContain('Group discount (15%) −$16')
+    expect(html).toContain('$24 per person x 4 guests')
+    expect(html).toContain('Group discount (15%)')
+    expect(html).not.toContain('−$16')
     expect(html).toContain('PayNow saving $4.80')
     expect(html).toContain('Total paid $91.20')
     expect(html).toContain('Payment method:</strong> PayNow')
@@ -448,7 +494,7 @@ describe('booking confirmation emails', () => {
     expect(html).toContain('Add to Google Calendar')
     expect(html).toContain('dates=20260828T110000Z/20260828T123000Z')
     expect(html.replace('<!DOCTYPE html>', '')).not.toContain('!')
-    expect(html).toContain('href="https://trykai.sg/u/guest-1?tab=bookings"')
+    expect(html).toContain('href="https://trykai.sg/bookings/booking-1"')
     expect(html).toContain('View booking')
     expect(html).toContain('Questions for your host? Reply to this email.')
     expect(html).toContain('Browse more experiences')
@@ -678,11 +724,13 @@ describe('cancellation emails', () => {
   it('tells a guest who cancelled that the refund is on its way', () => {
     const html = guestCancelMail()
     expect(html).toContain('Hi caleb2,')
-    expect(html).toContain("Sorry you can't make Latte art.")
+    expect(html).toContain("Sorry you can't make it")
+    expect(html).not.toContain("Sorry you can't make Latte art.")
     expect(html).toContain('Your refund of $51 is on its way to your PayNow.')
-    expect(html).toContain(
-      'Card refunds usually take 5 to 10 business days to appear. PayNow refunds are usually faster.',
-    )
+    expect(html).toContain('PayNow refunds are usually faster than card refunds.')
+    expect(html).not.toContain('5 to 10 business days')
+    expect(html).toContain('Listing:</strong> Latte art')
+    expect(html).toContain('Date and time:</strong> 28 Aug 2026, 7:00 pm')
     expect(html).not.toMatch(/3 to 5 business days|few hours|1 business day/)
     expect(html).toContain('Booking reference:</strong> A1B2C3D4')
     expect(html).toContain('Guests:</strong> 2 guests')
@@ -697,18 +745,20 @@ describe('cancellation emails', () => {
 
   it('says there is no refund when the guest cancelled at $0', () => {
     const html = guestCancelMail({ refundAmountCents: 0, guestsCount: 1 })
+    expect(html).toContain("Sorry you can't make it")
     expect(html).toContain("There's no refund for this cancellation.")
+    expect(html).toContain('Date and time:</strong> 28 Aug 2026, 7:00 pm')
     expect(html).toContain('Guests:</strong> 1 guest')
     expect(html).not.toContain('on its way')
     expect(html).not.toContain('5 to 10 business days')
+    expect(html).not.toContain('usually faster')
   })
 
-  it('uses the same timing sentence when the guest paid by card', () => {
+  it('uses the card timing line when the guest paid by card', () => {
     const html = guestCancelMail({ paymentRail: 'card', paymentMethod: 'Visa ending in 4242' })
     expect(html).toContain('on its way to your card.')
-    expect(html).toContain(
-      'Card refunds usually take 5 to 10 business days to appear. PayNow refunds are usually faster.',
-    )
+    expect(html).toContain('Card refunds usually take 5 to 10 business days to appear.')
+    expect(html).not.toContain('PayNow refunds are usually faster')
     expect(html).not.toMatch(/3 to 5 business days|few hours|1 business day/)
   })
 
@@ -717,9 +767,9 @@ describe('cancellation emails', () => {
     expect(html).toContain('Hi caleb2,')
     expect(html).toContain("We're sorry. Mei Ling had to cancel your session on 28 Aug 2026, 7:00 pm.")
     expect(html).toContain("You'll get a full refund of $51.")
-    expect(html).toContain(
-      'Card refunds usually take 5 to 10 business days to appear. PayNow refunds are usually faster.',
-    )
+    expect(html).toContain('Card refunds usually take 5 to 10 business days to appear.')
+    expect(html).not.toContain('PayNow refunds are usually faster')
+    expect(html).toContain('Date and time:</strong> 28 Aug 2026, 7:00 pm')
     expect(html).toContain("See Mei Ling&#39;s other sessions")
     expect(html).toContain('href="https://trykai.sg/listings/listing-1"')
     expect(html).toContain('Browse other experiences')
@@ -852,9 +902,10 @@ describe('cancellation emails', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
       to: 'guest@trykai.sg',
-      subject: "Sorry you can't make it",
+      subject: 'Booking cancelled: Latte art',
       reply_to: 'hello@trykai.sg',
     })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).html).toContain("Sorry you can't make it")
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).html).toContain(
       "There's no refund for this cancellation.",
     )
@@ -868,6 +919,37 @@ describe('cancellation emails', () => {
       "You won't receive a payout for this booking",
     )
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).html).not.toMatch(/Refund amount|PayNow/)
+
+    fetchMock.mockClear()
+
+    await sendCancellationEmails({
+      apiKey: 're_test',
+      cancelledBy: 'guest',
+      refundAmountCents: 5100,
+      bookingReference: 'A1B2C3D4',
+      listingTitle: 'Latte art',
+      sessionDate: '28 Aug 2026, 7:00 pm',
+      guestEmail: 'guest@trykai.sg',
+      hostEmail: 'host@trykai.sg',
+      guestName: 'caleb2',
+      hostName: 'Mei Ling',
+      paymentRail: 'card',
+      guestsCount: 1,
+      paymentMethod: 'Card',
+      hostPayoutCents: 0,
+    })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).subject).toBe(
+      'Booking cancelled: Latte art · $51 refund',
+    )
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).html).toContain(
+      'Card refunds usually take 5 to 10 business days to appear.',
+    )
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).html).toContain(
+      'Date and time:</strong> 28 Aug 2026, 7:00 pm',
+    )
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).html).not.toContain(
+      "There's no refund for this cancellation.",
+    )
   })
 
   it('does not throw when Resend is down, so a refund already issued is not rolled back', async () => {

@@ -83,8 +83,26 @@ export function googleCalendarUrl(options: {
   return `https://calendar.google.com/calendar/render?${params.toString()}&dates=${dates}`
 }
 
-export function refundTimingCopy(_paymentRail?: string | null): string {
-  return 'Card refunds usually take 5 to 10 business days to appear. PayNow refunds are usually faster.'
+export function refundTimingCopy(paymentRail?: string | null): string {
+  if (paymentRail === 'paynow') {
+    return 'PayNow refunds are usually faster than card refunds.'
+  }
+  return 'Card refunds usually take 5 to 10 business days to appear.'
+}
+
+export function bookingCancelledGuestSubject(options: {
+  cancelledBy: 'guest' | 'host'
+  listingTitle: string
+  refundAmountCents: number
+  hostName?: string | null
+}): string {
+  if (options.cancelledBy === 'host') {
+    return `${options.hostName || 'Your host'} had to cancel ${options.listingTitle}`
+  }
+  if (options.refundAmountCents > 0) {
+    return `Booking cancelled: ${options.listingTitle} · ${formatCents(options.refundAmountCents)} refund`
+  }
+  return `Booking cancelled: ${options.listingTitle}`
 }
 
 export function refundMethodNoun(paymentRail?: string | null): string {
@@ -218,7 +236,6 @@ export function receiptPriceLines(options: {
 }): string[] {
   const guestsCount = Math.max(1, Number(options.guestsCount) || 1)
   const groupPricing = options.groupPricing !== false
-  const unit = calculateGuestCharge(options.pricePerPersonCents, 'card').totalAmount
   const listLesson = options.pricePerPersonCents * guestsCount
   const discountedLesson = discountedLessonCents(
     options.pricePerPersonCents,
@@ -227,12 +244,11 @@ export function receiptPriceLines(options: {
   )
   const cardListTotal = calculateGuestCharge(listLesson, 'card').totalAmount
   const cardDiscountedTotal = calculateGuestCharge(discountedLesson, 'card').totalAmount
+  const perPerson = Math.round(cardDiscountedTotal / guestsCount)
   const rate = groupDiscountRate(guestsCount, groupPricing)
-  const lines = [`${formatCents(unit)} per person x ${guestCountLabel(guestsCount)}`]
+  const lines = [`${formatCents(perPerson)} per person x ${guestCountLabel(guestsCount)}`]
   if (rate > 0 && cardListTotal > cardDiscountedTotal) {
-    lines.push(
-      `Group discount (${Math.round(rate * 100)}%) −${formatCents(cardListTotal - cardDiscountedTotal)}`,
-    )
+    lines.push(`Group discount (${Math.round(rate * 100)}%)`)
   }
   if (options.paymentRail === 'paynow') {
     const paynowTotal = calculateGuestCharge(discountedLesson, 'paynow').totalAmount
@@ -298,7 +314,7 @@ export function bookingConfirmedGuestHtml(options: {
   sessionStartsAt: string
   durationMins?: number | null
   whatsProvided?: string[] | null
-  guestId: string
+  bookingId: string
   siteUrl?: string
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
@@ -334,7 +350,7 @@ export function bookingConfirmedGuestHtml(options: {
     <p style="margin:0 0 16px;"><strong>Payment method:</strong> ${escapeHtml(options.paymentMethod)}</p>
     ${options.paymentRail === 'paynow' ? '<p style="margin:0 0 16px;">Your bank will show this payment as Stripe Payments Singapore.</p>' : ''}
     ${calendar ? `<p style="margin:0 0 8px;"><a href="${escapeHtml(calendar)}" style="color:#111;">Add to Google Calendar</a></p>` : ''}
-    ${primaryButton(`${siteUrl}/u/${encodeURIComponent(options.guestId)}?tab=bookings`, 'View booking')}
+    ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
     <p style="margin:0 0 8px;">Questions for your host? Reply to this email.</p>
     <p style="margin:0 0 16px;"><a href="${siteUrl}" style="color:#111;">Browse more experiences</a></p>
     <p style="margin:0;font-size:13px;color:#666;">Need to change plans? <a href="${siteUrl}/cancellation-policy" style="color:#666;">Cancellation policy</a></p>
@@ -427,8 +443,10 @@ export function bookingCancelledGuestHtml(options: {
     options.cancelledBy === 'host'
       ? `<p style="margin:0 0 16px;">We're sorry. ${escapeHtml(hostName)} had to cancel your session on ${escapeHtml(options.sessionDate)}. You'll get a full refund of ${escapeHtml(refund)}. ${escapeHtml(timing)}</p>`
       : options.refundAmountCents > 0
-        ? `<p style="margin:0 0 16px;">Sorry you can't make ${escapeHtml(options.listingTitle)}. Your refund of ${escapeHtml(refund)} is on its way to your ${escapeHtml(method)}. ${escapeHtml(timing)}</p>`
-        : `<p style="margin:0 0 16px;">Sorry you can't make ${escapeHtml(options.listingTitle)}. There's no refund for this cancellation.</p>`
+        ? `<p style="margin:0 0 16px;">Sorry you can't make it</p>
+    <p style="margin:0 0 16px;">Your refund of ${escapeHtml(refund)} is on its way to your ${escapeHtml(method)}. ${escapeHtml(timing)}</p>`
+        : `<p style="margin:0 0 16px;">Sorry you can't make it</p>
+    <p style="margin:0 0 16px;">There's no refund for this cancellation.</p>`
 
   const cta =
     options.cancelledBy === 'host'
@@ -441,6 +459,8 @@ export function bookingCancelledGuestHtml(options: {
     `
     <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
     ${body}
+    <p style="margin:0 0 8px;"><strong>Listing:</strong> ${escapeHtml(options.listingTitle)}</p>
+    <p style="margin:0 0 16px;"><strong>Date and time:</strong> ${escapeHtml(options.sessionDate)}</p>
     <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
     <p style="margin:0 0 16px;"><strong>Guests:</strong> ${guestCountLabel(options.guestsCount)}</p>
     ${cta}
@@ -555,10 +575,12 @@ export async function sendCancellationEmails(options: {
   siteUrl?: string
 }): Promise<void> {
   try {
-    const guestSubject =
-      options.cancelledBy === 'host'
-        ? `${options.hostName || 'Your host'} had to cancel ${options.listingTitle}`
-        : "Sorry you can't make it"
+    const guestSubject = bookingCancelledGuestSubject({
+      cancelledBy: options.cancelledBy,
+      listingTitle: options.listingTitle,
+      refundAmountCents: options.refundAmountCents,
+      hostName: options.hostName,
+    })
     await sendResendEmail({
       apiKey: options.apiKey,
       to: options.guestEmail,

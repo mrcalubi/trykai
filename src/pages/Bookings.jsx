@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useLocation, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
@@ -428,7 +428,9 @@ export default function Bookings({ embedded = false }) {
               return (
               <div key={booking.id} className="dashboard-card">
                 <p className="dashboard-card__title">
-                  {booking.sessions?.listings?.title || 'Unknown listing'}
+                  <Link to={`/bookings/${booking.id}`}>
+                    {booking.sessions?.listings?.title || 'Unknown listing'}
+                  </Link>
                 </p>
                 <p className="dashboard-card__meta">
                   {booking.sessions?.starts_at

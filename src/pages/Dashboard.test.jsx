@@ -720,6 +720,16 @@ describe('Dashboard guest cancellation', () => {
     expect(screen.getByRole('button', { name: 'Cancel booking' })).toBeInTheDocument()
   })
 
+  it('links each booking card to its detail page', async () => {
+    givenData({ bookings: [makeBooking()] })
+    await renderBookings()
+
+    expect(screen.getByRole('link', { name: 'Learn latte art with me' })).toHaveAttribute(
+      'href',
+      '/bookings/booking-1',
+    )
+  })
+
   it('does not offer cancellation once the session has passed', async () => {
     givenData({
       bookings: [makeBooking({ sessions: { starts_at: hoursFromNow(-2), listings: {} } })],
