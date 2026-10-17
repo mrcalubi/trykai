@@ -37,13 +37,18 @@ describe('ListingCard', () => {
   })
 
   it('reads the host name from the `users` relation when `host` is absent', () => {
-    renderCard({ host: undefined, users: { full_name: 'Arun' } })
+    renderCard({ host: undefined, users: { display_name: 'Arun' } })
     expect(screen.getByText(/^Arun · /)).toBeInTheDocument()
   })
 
   it('reads the host name when the relation comes back as an array', () => {
-    renderCard({ host: [{ full_name: 'Siti' }] })
+    renderCard({ host: [{ display_name: 'Siti' }] })
     expect(screen.getByText(/^Siti · /)).toBeInTheDocument()
+  })
+
+  it('omits the host segment when only full_name is present', () => {
+    renderCard({ host: undefined, users: { full_name: 'Arun' }, area: 'Bedok', price_per_person: 2000 })
+    expect(screen.getByText('Bedok · $23/person')).toBeInTheDocument()
   })
 
   it('omits the host segment when there is no host record', () => {

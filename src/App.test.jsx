@@ -140,9 +140,9 @@ describe('App routes', () => {
     supabase.__on('users', 'select', {
       data: {
         id: 'host-1',
-        full_name: 'Mei Ling',
+        display_name: 'Mei',
         avatar_url: null,
-        verification_status: 'approved',
+        is_id_verified: true,
       },
       error: null,
     })

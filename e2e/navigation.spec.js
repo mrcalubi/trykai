@@ -191,7 +191,28 @@ test.describe('signed-in navigation', () => {
   test('the avatar goes to your own profile, not an account menu', async ({ page }) => {
     await stubAllExternalCalls(
       page,
-      { users: [{ id: SIGNED_IN_USER.id, full_name: 'Mei Ling', avatar_url: null, is_host: false }] },
+      {
+        users: [
+          {
+            id: SIGNED_IN_USER.id,
+            display_name: 'Mei',
+            avatar_url: null,
+            is_host: false,
+            is_id_verified: false,
+          },
+        ],
+        'rpc/my_account': [
+          {
+            email: SIGNED_IN_USER.email,
+            full_name: 'Mei Ling',
+            display_name: 'Mei',
+            avatar_url: null,
+            is_host: false,
+            verification_status: 'unverified',
+            stripe_payouts_enabled: false,
+          },
+        ],
+      },
       { session: makeAuthSession() }
     )
 
@@ -211,7 +232,28 @@ test.describe('signed-in navigation', () => {
   test('the hamburger adds Profile, Settings, and Log out when signed in', async ({ page }) => {
     await stubAllExternalCalls(
       page,
-      { users: [{ id: SIGNED_IN_USER.id, full_name: 'Mei Ling', avatar_url: null, is_host: false }] },
+      {
+        users: [
+          {
+            id: SIGNED_IN_USER.id,
+            display_name: 'Mei',
+            avatar_url: null,
+            is_host: false,
+            is_id_verified: false,
+          },
+        ],
+        'rpc/my_account': [
+          {
+            email: SIGNED_IN_USER.email,
+            full_name: 'Mei Ling',
+            display_name: 'Mei',
+            avatar_url: null,
+            is_host: false,
+            verification_status: 'unverified',
+            stripe_payouts_enabled: false,
+          },
+        ],
+      },
       { session: makeAuthSession() }
     )
 
@@ -242,7 +284,28 @@ test.describe('signed-in navigation', () => {
   test('profile tabs replace history so back leaves the profile', async ({ page }) => {
     await stubAllExternalCalls(
       page,
-      { users: [{ id: SIGNED_IN_USER.id, full_name: 'Mei Ling', avatar_url: null, is_host: false }] },
+      {
+        users: [
+          {
+            id: SIGNED_IN_USER.id,
+            display_name: 'Mei',
+            avatar_url: null,
+            is_host: false,
+            is_id_verified: false,
+          },
+        ],
+        'rpc/my_account': [
+          {
+            email: SIGNED_IN_USER.email,
+            full_name: 'Mei Ling',
+            display_name: 'Mei',
+            avatar_url: null,
+            is_host: false,
+            verification_status: 'unverified',
+            stripe_payouts_enabled: false,
+          },
+        ],
+      },
       { session: makeAuthSession() }
     )
 
@@ -267,7 +330,26 @@ test.describe('verification review', () => {
     await stubAllExternalCalls(
       page,
       {
-        users: [{ id: SIGNED_IN_USER.id, full_name: 'Caleb', avatar_url: null }],
+        users: [
+          {
+            id: SIGNED_IN_USER.id,
+            display_name: 'Caleb',
+            avatar_url: null,
+            is_host: false,
+            is_id_verified: false,
+          },
+        ],
+        'rpc/my_account': [
+          {
+            email: SIGNED_IN_USER.email,
+            full_name: 'Caleb',
+            display_name: 'Caleb',
+            avatar_url: null,
+            is_host: false,
+            verification_status: 'unverified',
+            stripe_payouts_enabled: false,
+          },
+        ],
         'rpc/my_verification': [{ is_admin: true }],
       },
       {

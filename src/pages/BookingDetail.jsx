@@ -62,7 +62,6 @@ export default function BookingDetail() {
             host_id,
             users:host_id (
               display_name,
-              full_name,
               avatar_url
             )
           )

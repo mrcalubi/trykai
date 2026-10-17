@@ -14,15 +14,17 @@ vi.mock('../lib/supabase')
 const HOST_ID = 'host-1'
 const OTHER_ID = 'user-99'
 
+let lastProfile = null
+
 function givenProfile(profile = {
   id: HOST_ID,
   display_name: 'Mei',
-  full_name: 'Mei Ling Tan',
   bio: null,
   avatar_url: null,
-  verification_status: 'approved',
+  is_id_verified: true,
   is_host: true,
 }) {
+  lastProfile = profile
   supabase.__on('users', 'select', { data: profile, error: null })
 }
 
@@ -30,10 +32,26 @@ function givenListings(listings) {
   supabase.__on('listings', 'select', { data: listings, error: null })
 }
 
-function givenRpcs({ hostReviews = [], listingRatings = [] } = {}) {
+function givenRpcs({ hostReviews = [], listingRatings = [], account } = {}) {
+  const fallbackAccount = lastProfile
+    ? {
+        display_name: lastProfile.display_name,
+        bio: lastProfile.bio,
+        avatar_url: lastProfile.avatar_url,
+        is_host: lastProfile.is_host,
+        verification_status:
+          lastProfile.verification_status ??
+          (lastProfile.is_id_verified ? 'approved' : 'unverified'),
+        stripe_payouts_enabled: lastProfile.stripe_payouts_enabled ?? true,
+      }
+    : null
   supabase.rpc.mockImplementation(async (name) => {
     if (name === 'reviews_for_host') return { data: hostReviews, error: null }
     if (name === 'listing_ratings') return { data: listingRatings, error: null }
+    if (name === 'my_account') {
+      const row = account === undefined ? fallbackAccount : account
+      return { data: row ? [row] : [], error: null }
+    }
     return { data: null, error: null }
   })
 }
@@ -103,9 +121,8 @@ describe('Profile public content', () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Latte Queen',
-      full_name: 'Mei Ling Tan',
       avatar_url: null,
-      verification_status: 'approved',
+      is_id_verified: true,
       is_host: true,
     })
     renderPage()
@@ -114,18 +131,17 @@ describe('Profile public content', () => {
     expect(screen.queryByText('Mei')).not.toBeInTheDocument()
   })
 
-  it('falls back to the first name when display_name is empty', async () => {
+  it('shows Anonymous when display_name is empty', async () => {
     givenProfile({
       id: HOST_ID,
       display_name: '',
-      full_name: 'Mei Ling Tan',
       avatar_url: null,
-      verification_status: 'approved',
+      is_id_verified: true,
       is_host: true,
     })
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Mei', level: 1 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Anonymous', level: 1 })).toBeInTheDocument()
   })
 
   it('shows the ID verified badge only when the host is approved', async () => {
@@ -137,9 +153,8 @@ describe('Profile public content', () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
-      full_name: 'Mei Ling',
       avatar_url: null,
-      verification_status: 'pending',
+      is_id_verified: false,
       is_host: true,
     })
     renderPage()
@@ -279,7 +294,7 @@ describe('Profile public content', () => {
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
 
     expect(supabase.__lastCall('users', 'select').chain[0].args[0]).toBe(
-      'id, display_name, full_name, bio, avatar_url, verification_status, is_host'
+      'id, display_name, bio, avatar_url, is_host, is_id_verified'
     )
   })
 
@@ -287,10 +302,9 @@ describe('Profile public content', () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
-      full_name: 'Mei Ling Tan',
       bio: 'I pull rosettas.\nAlso pour-overs.',
       avatar_url: null,
-      verification_status: 'approved',
+      is_id_verified: true,
       is_host: true,
     })
     renderPage()
@@ -331,6 +345,7 @@ describe('Profile own tabs', () => {
     renderPage()
 
     expect(await screen.findByRole('navigation', { name: 'Profile' })).toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('my_account')
     expect(screen.getByRole('link', { name: 'Bookings' })).toHaveAttribute(
       'aria-current',
       'page'
@@ -435,11 +450,11 @@ describe('Profile own tabs', () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
-      full_name: 'Mei Ling Tan',
       avatar_url: null,
-      verification_status: 'approved',
+      is_id_verified: true,
       is_host: false,
     })
+    givenHostReviews([])
     const { user } = renderPage({ search: '?tab=listings' })
 
     await screen.findByRole('navigation', { name: 'Profile' })
@@ -458,11 +473,11 @@ describe('Profile own tabs', () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
-      full_name: 'Mei Ling Tan',
       avatar_url: null,
-      verification_status: 'approved',
+      is_id_verified: true,
       is_host: false,
     })
+    givenHostReviews([])
     renderPage({ search: '?tab=hosting' })
 
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
@@ -473,10 +488,9 @@ describe('Profile own tabs', () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
-      full_name: 'Mei Ling Tan',
       bio: 'I pull rosettas.',
       avatar_url: null,
-      verification_status: 'approved',
+      is_id_verified: true,
       is_host: true,
     })
     renderPage()
