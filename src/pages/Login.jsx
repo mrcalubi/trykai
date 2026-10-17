@@ -210,7 +210,7 @@ export default function Login() {
           </button>
         </form>
 
-        <p style={{ marginTop: '24px', fontSize: '14px', textAlign: 'center', color: 'var(--text)' }}>
+        <p className="form-card__footer">
           {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
           <button type="button" onClick={toggleMode} className="link-btn">
             {isSignup ? 'Log in' : 'Sign up'}

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
+import PhotoTips from '../components/PhotoTips'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import { hostListingPriceHint, parsePriceInputCents } from '../lib/pricing'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
@@ -258,11 +259,12 @@ export default function EditListing() {
 
   return (
     <div className="page page--form">
-      <div className="form-card" style={{ maxWidth: '560px' }}>
+      <div className="form-card form-card--wide">
         <h1 className="form-card__title">Edit listing</h1>
         <p className="form-card__subtitle">Update your experience details</p>
 
         <form onSubmit={handleSubmit} className="form">
+          <h2 className="form-section__title">The basics</h2>
           <label className="label">
             Title
             <input
@@ -304,6 +306,7 @@ export default function EditListing() {
             </select>
           </label>
 
+          <h2 className="form-section__title">Price and time</h2>
           <div className="form__row">
             <div>
               <label className="label">
@@ -365,6 +368,7 @@ export default function EditListing() {
             price per person.
           </span>
 
+          <h2 className="form-section__title">Location</h2>
           <label className="label">
             Area
             <PlanningAreaSelect value={area} onChange={setArea} required />
@@ -383,6 +387,8 @@ export default function EditListing() {
             <span className="hint">Hidden from browse — revealed after confirmed booking</span>
           </label>
 
+          <h2 className="form-section__title">Photos</h2>
+          <PhotoTips />
           <div>
             <label className="label">
               Photos
@@ -392,8 +398,7 @@ export default function EditListing() {
                 multiple
                 onChange={handlePhotoChange}
                 disabled={totalPhotos >= MAX_PHOTOS}
-                className="input"
-                style={{ padding: '10px' }}
+                className="input input--file"
               />
             </label>
             <span className="hint">

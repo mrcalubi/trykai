@@ -56,8 +56,9 @@ test.describe('host add sessions', () => {
     await page.getByLabel('Time 2').fill('14:00')
     await page.getByLabel('Spots total').fill('4')
 
-    const selected = page.locator('.session-calendar__day--selected')
-    await expect(selected).toHaveCount(4)
+    // Count every picked date, not the highlighted days: from a Saturday, the
+    // fourth date falls in next month and is off the calendar on screen.
+    await expect(page.getByText(/^4 dates selected\./)).toBeVisible()
 
     await page.getByRole('button', { name: 'Review sessions' }).click()
     await expect(page.getByText('This creates 8 sessions.')).toBeVisible()

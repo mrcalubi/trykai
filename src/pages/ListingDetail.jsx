@@ -38,6 +38,7 @@ import { listingReportSubject, reportMailto } from '../lib/reportMailto'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import { BackRowActions } from '../components/BackButton'
 import OverflowMenu from '../components/ui/OverflowMenu'
+import Icon from '../components/ui/Icon'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -200,6 +201,9 @@ export default function ListingDetail() {
   const [viewerId, setViewerId] = useState(null)
   const [activePhoto, setActivePhoto] = useState(0)
   const [lightboxIndex, setLightboxIndex] = useState(null)
+  const [hostVerified, setHostVerified] = useState(false)
+  const bookingRef = useRef(null)
+  const [bookingInView, setBookingInView] = useState(false)
 
   useEffect(() => {
     async function fetchListing() {
@@ -247,6 +251,20 @@ export default function ListingDetail() {
       }
 
       setListing(listingData)
+
+      // `is_id_verified` arrives with migration 00023; before that the column
+      // is missing and the badge simply stays hidden.
+      setHostVerified(false)
+      if (listingData.host_id) {
+        supabase
+          .from('users')
+          .select('is_id_verified')
+          .eq('id', listingData.host_id)
+          .maybeSingle()
+          .then(({ data, error: verifiedError }) => {
+            setHostVerified(!verifiedError && data?.is_id_verified === true)
+          })
+      }
 
       const [firstSessionResult, lastSessionResult, reviewsResult, hostReviewsResult, authResult] =
         await Promise.all([
@@ -339,6 +357,18 @@ export default function ListingDetail() {
 
     fetchMonth()
   }, [id, visibleMonth])
+
+  // The phone booking bar steps aside once the booking card itself is on screen.
+  useEffect(() => {
+    const node = bookingRef.current
+    if (!node || typeof IntersectionObserver === 'undefined') return undefined
+    const observer = new IntersectionObserver(
+      ([entry]) => setBookingInView(entry.isIntersecting),
+      { rootMargin: '0px 0px -96px 0px' }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [loading, listing])
 
   // CSS scroll-snap does the swiping; this only keeps the position dots in step.
   function trackGalleryPosition(e) {
@@ -554,6 +584,11 @@ export default function ListingDetail() {
     guestsCount,
     groupPricing,
   )
+  const listingRating =
+    reviews.length > 0
+      ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
+      : null
+  const showBookBar = Boolean(sessionRange) && !checkoutSessionId && !isOwnListing
   const nextHint = checkoutSession
     ? nextGroupTierHint(
         guestsCount,
@@ -612,7 +647,7 @@ export default function ListingDetail() {
   }
 
   return (
-    <div className="page page--detail">
+    <div className={`page page--detail${showBookBar ? ' page--with-book-bar' : ''}`}>
       <BackRowActions>
         {isOwnListing ? null : (
           <OverflowMenu
@@ -677,9 +712,24 @@ export default function ListingDetail() {
 
       <div className="detail-layout">
         <div className="detail-main">
-          <span className="detail-category">{listing.category}</span>
+          {listing.category ? <span className="detail-category">{listing.category}</span> : null}
           <h1 className="detail-title">{listing.title}</h1>
-          {areaLabel ? <p className="detail-area">{areaLabel}</p> : null}
+          {areaLabel || listingRating ? (
+            <div className="detail-facts">
+              {areaLabel ? (
+                <p className="detail-fact detail-area">
+                  <Icon name="pin" size={17} />
+                  {areaLabel}
+                </p>
+              ) : null}
+              {listingRating ? (
+                <p className="detail-fact">
+                  <Icon name="star" size={17} />
+                  {listingRating.toFixed(1)} ({reviews.length} review{reviews.length === 1 ? '' : 's'})
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="detail-host">
             <HostAvatar host={host} to={listing.host_id ? `/u/${listing.host_id}` : null} />
@@ -694,6 +744,12 @@ export default function ListingDetail() {
                   publicName(host) || 'Anonymous'
                 )}
               </p>
+              {hostVerified ? (
+                <p className="verified-badge">
+                  <Icon name="shield" size={15} />
+                  ID verified
+                </p>
+              ) : null}
               <HostRating reviews={hostReviews} />
               {typeof host?.bio === 'string' && host.bio.trim() ? (
                 <HostBioPreview
@@ -712,20 +768,39 @@ export default function ListingDetail() {
           {listing.whats_provided?.length > 0 && (
             <section className="detail-section">
               <h2 className="detail-section__title">What&apos;s provided</h2>
-              <ul className="detail-list">
+              <ul className="detail-list detail-list--checks">
                 {listing.whats_provided.map((item) => (
-                  <li key={item}>{item}</li>
+                  <li key={item}>
+                    <Icon name="check" size={18} strokeWidth={2.4} />
+                    {item}
+                  </li>
                 ))}
               </ul>
             </section>
           )}
+
+          {areaLabel ? (
+            <section className="detail-section">
+              <h2 className="detail-section__title">Where you&apos;ll be</h2>
+              <div className="detail-location">
+                <span className="detail-location__icon">
+                  <Icon name="pin" size={22} />
+                </span>
+                <p className="detail-location__copy">
+                  {revealedAddress
+                    ? `Your booking is at ${areaLabel}.`
+                    : `Sessions are held in ${areaLabel}. The exact address is shared once you have booked.`}
+                </p>
+              </div>
+            </section>
+          ) : null}
 
           <section className="detail-section">
             <h2 className="detail-section__title">
               Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
             </h2>
             {reviews.length === 0 ? (
-              <p className="empty-state">No reviews yet.</p>
+              <p className="empty-state empty-state--boxed">No reviews yet.</p>
             ) : (
               <div className="reviews-list">
                 {reviews.map((review) => (
@@ -741,7 +816,7 @@ export default function ListingDetail() {
           </section>
         </div>
 
-        <aside className="detail-sidebar">
+        <aside id="booking" ref={bookingRef} className="detail-sidebar">
           <div className="detail-booking-card">
             <p className="detail-booking-card__price">
               <FormattedPrice cents={checkoutPrice} />
@@ -937,6 +1012,21 @@ export default function ListingDetail() {
           </div>
         </aside>
       </div>
+
+      {showBookBar ? (
+        <div className={`book-bar${bookingInView ? ' book-bar--away' : ''}`}>
+          <div className="book-bar__price">
+            <p className="book-bar__amount">
+              <FormattedPrice cents={cardPrice} />
+              <span className="book-bar__unit"> / person</span>
+            </p>
+            <p className="book-bar__note">Save 5% with PayNow</p>
+          </div>
+          <a href="#booking" className="btn btn--primary">
+            Choose a date
+          </a>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -35,8 +35,8 @@ function givenListings(listings) {
 }
 
 function listingTitles() {
-  return screen
-    .getAllByRole('heading', { level: 2 })
+  return within(document.querySelector('.listings-grid'))
+    .getAllByRole('heading', { level: 3 })
     .map((heading) => heading.textContent)
 }
 
@@ -116,7 +116,7 @@ describe('Home listing grid', () => {
 
     const card = await screen.findByRole('link', { name: /Latte art/ })
     expect(card).toHaveAttribute('href', '/listings/l-1')
-    expect(within(card).getByRole('heading', { level: 2, name: 'Latte art' })).toBeInTheDocument()
+    expect(within(card).getByRole('heading', { level: 3, name: 'Latte art' })).toBeInTheDocument()
     expect(within(card).getByText('Food')).toBeInTheDocument()
   })
 
@@ -363,5 +363,63 @@ describe('Home filters', () => {
       .getAllByRole('button')
       .map((button) => button.textContent)
     expect(pills).toEqual(['All', 'Food'])
+  })
+})
+
+describe('Home card details', () => {
+  it('shows the host initials and the area on each card', async () => {
+    givenListings([LATTE])
+    renderWithRouter(<Home />)
+
+    const card = await screen.findByRole('link', { name: /Latte art/ })
+    expect(card.querySelector('.ui-card__host')).toHaveTextContent('M')
+    expect(within(card).getByText('Tiong Bahru')).toBeInTheDocument()
+  })
+
+  it('asks for the host name and photo but nothing private', async () => {
+    givenListings([LATTE])
+    renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    const select = supabase.__lastCall('listings', 'select').chain.find(
+      (step) => step.method === 'select'
+    )?.args[0]
+    expect(select).toMatch(/users!host_id\s*\(\s*display_name,\s*avatar_url\s*\)/)
+    expect(select).not.toMatch(/email|phone/)
+  })
+})
+
+describe('Home quick filters', () => {
+  it('offers Under $30 only when a listing qualifies, and narrows the grid', async () => {
+    const CHEAP = makeListing({ id: 'l-5', title: 'Cheap chess', category: 'Other', price_per_person: 2000 })
+    givenListings([LATTE, CHEAP])
+    const { user } = renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    await user.click(screen.getByRole('button', { name: 'Under $30' }))
+
+    expect(listingTitles()).toEqual(['Cheap chess'])
+    expect(screen.getByRole('button', { name: 'Under $30' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('hides a quick filter nothing would match', async () => {
+    givenListings([LATTE, BOXING])
+    renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    expect(screen.queryByRole('button', { name: 'Under $30' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'This weekend' })).not.toBeInTheDocument()
+  })
+
+  it('clears every filter from the empty state', async () => {
+    givenListings([LATTE, BOXING])
+    const { user } = renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    await user.click(screen.getByRole('button', { name: 'Food' }))
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+    expect(listingTitles()).toEqual(['Latte art', 'Boxing basics'])
   })
 })
