@@ -96,6 +96,12 @@ const PATHS = {
       <path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
     </>
   ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5M12 8h.01" />
+    </>
+  ),
   camera: (
     <>
       <rect x="3" y="5" width="18" height="14" rx="2" />

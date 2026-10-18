@@ -1,5 +1,5 @@
 const MAX_EDGE = 1600
-const QUALITY = 0.8
+const QUALITY = 0.82
 
 function canvasToBlob(canvas, type, quality) {
   return new Promise((resolve, reject) => {
@@ -9,6 +9,15 @@ function canvasToBlob(canvas, type, quality) {
     }
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('encode'))), type, quality)
   })
+}
+
+function isHeadlessImageHost() {
+  return typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent || '')
+}
+
+function fallback(file, error) {
+  console.error('compressImage: using the original file', error)
+  return file
 }
 
 function loadImageFromFile(file) {
@@ -27,32 +36,48 @@ function loadImageFromFile(file) {
     image.onerror = () => finish(reject, new Error('Could not read the photo'))
     image.src = url
 
+    // jsdom often never fires load/error. Do not time out a real browser:
+    // a large phone photo can take longer than a short timer to decode.
     queueMicrotask(() => {
       if (settled) return
       if (image.naturalWidth || image.width) finish(resolve, image)
-      else if (image.complete) finish(reject, new Error('Could not read the photo'))
+      else if (image.complete || isHeadlessImageHost()) {
+        finish(reject, new Error('Could not read the photo'))
+      }
     })
-
-    setTimeout(() => {
-      if (settled) return
-      if (image.naturalWidth || image.width) finish(resolve, image)
-      else finish(reject, new Error('Could not read the photo'))
-    }, 50)
   })
 }
 
+async function sourceFromFile(file) {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(file)
+      if (bitmap.width && bitmap.height) {
+        return { image: bitmap, close: () => bitmap.close?.() }
+      }
+      bitmap.close?.()
+    } catch {
+      // Fall through to Image. Some environments expose a broken bitmap API.
+    }
+  }
+  return { image: await loadImageFromFile(file), close: () => {} }
+}
+
 /**
- * Shrink an image on the main thread before upload: long edge 1600px, JPEG ~0.8.
+ * Shrink an image on the main thread before upload: long edge 1600px, JPEG 0.82.
  * No workers, no eval. Any failure returns the original file so upload can proceed.
  */
 export async function compressImage(file, { maxEdge = MAX_EDGE, quality = QUALITY } = {}) {
+  let close = () => {}
   try {
     if (!file || !String(file.type || '').startsWith('image/')) return file
 
-    const image = await loadImageFromFile(file)
+    const source = await sourceFromFile(file)
+    close = source.close
+    const image = source.image
     const sourceWidth = image.naturalWidth || image.width
     const sourceHeight = image.naturalHeight || image.height
-    if (!sourceWidth || !sourceHeight) return file
+    if (!sourceWidth || !sourceHeight) return fallback(file, new Error('Could not read the photo'))
 
     const scale = Math.min(1, maxEdge / Math.max(sourceWidth, sourceHeight))
     const width = Math.max(1, Math.round(sourceWidth * scale))
@@ -62,14 +87,15 @@ export async function compressImage(file, { maxEdge = MAX_EDGE, quality = QUALIT
     canvas.width = width
     canvas.height = height
     const ctx = canvas.getContext('2d')
-    if (!ctx) return file
+    if (!ctx) return fallback(file, new Error('no 2d context'))
 
     ctx.drawImage(image, 0, 0, width, height)
     const blob = await canvasToBlob(canvas, 'image/jpeg', quality)
     const base = String(file.name || 'photo').replace(/\.[^.]+$/, '') || 'photo'
     return new File([blob], `${base}.jpg`, { type: 'image/jpeg', lastModified: Date.now() })
   } catch (error) {
-    console.error('compressImage: using the original file', error)
-    return file
+    return fallback(file, error)
+  } finally {
+    close()
   }
 }

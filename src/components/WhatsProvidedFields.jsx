@@ -9,6 +9,7 @@ import {
 export default function WhatsProvidedFields({ value, onChange }) {
   const [draft, setDraft] = useState('')
   const custom = customProvidedItems(value)
+  const noneSelected = value.includes('None')
   const canAdd = custom.length < MAX_CUSTOM_PROVIDED
 
   function togglePreset(option) {
@@ -27,7 +28,7 @@ export default function WhatsProvidedFields({ value, onChange }) {
   function addCustom(event) {
     event.preventDefault()
     const next = draft.trim().slice(0, MAX_CUSTOM_PROVIDED_CHARS)
-    if (!next || !canAdd) return
+    if (!next || !canAdd || noneSelected) return
     if (value.includes(next) || WHATS_PROVIDED_PRESETS.includes(next)) {
       setDraft('')
       return
@@ -49,6 +50,7 @@ export default function WhatsProvidedFields({ value, onChange }) {
             <input
               type="checkbox"
               checked={value.includes(option)}
+              disabled={option !== 'None' && noneSelected}
               onChange={() => togglePreset(option)}
             />
             {option}
@@ -56,14 +58,18 @@ export default function WhatsProvidedFields({ value, onChange }) {
         ))}
       </div>
       <div className="provided-custom">
-        {custom.map((item) => (
-          <span key={item} className="provided-custom__chip">
-            {item}
-            <button type="button" onClick={() => removeCustom(item)} aria-label={`Remove ${item}`}>
-              ×
-            </button>
-          </span>
-        ))}
+        {custom.length ? (
+          <div className="provided-custom__chips">
+            {custom.map((item) => (
+              <span key={item} className="provided-custom__chip">
+                {item}
+                <button type="button" onClick={() => removeCustom(item)} aria-label={`Remove ${item}`}>
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
         {canAdd ? (
           <div className="provided-custom__add">
             <label className="label">
@@ -72,6 +78,7 @@ export default function WhatsProvidedFields({ value, onChange }) {
                 type="text"
                 value={draft}
                 maxLength={MAX_CUSTOM_PROVIDED_CHARS}
+                disabled={noneSelected}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') addCustom(event)
@@ -80,7 +87,12 @@ export default function WhatsProvidedFields({ value, onChange }) {
                 className="input"
               />
             </label>
-            <button type="button" className="btn btn--ghost btn--small" onClick={addCustom}>
+            <button
+              type="button"
+              className="btn btn--ghost btn--small"
+              onClick={addCustom}
+              disabled={noneSelected}
+            >
               + Add your own
             </button>
           </div>

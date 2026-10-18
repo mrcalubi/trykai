@@ -138,6 +138,7 @@ test.describe('verified host create listing', () => {
     await page.getByLabel('Photos').setInputFiles('src/assets/categories/food.png')
     await expect(page.getByText('Maximum of 5 photos (1/5)')).toBeVisible()
     await expect(page.getByText('Cover', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Crop cover' })).toBeVisible()
     await next()
 
     await expect(page.getByRole('heading', { name: 'Price and group size' })).toBeVisible()
@@ -147,6 +148,9 @@ test.describe('verified host create listing', () => {
     await page.getByRole('button', { name: 'More guests' }).click()
     await page.getByText('1.5 hr', { exact: true }).click()
     await expect(page.getByText('Guests pay')).toBeVisible()
+    await expect(page.getByText('You get')).toBeVisible()
+    await expect(page.getByText(/Full session of 6/)).toBeVisible()
+    await expect(page.getByText('10% host fee from your 4th booking.')).toBeVisible()
     await next()
 
     await expect(page.getByRole('heading', { name: 'Where it happens' })).toBeVisible()

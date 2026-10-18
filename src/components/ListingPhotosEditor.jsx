@@ -121,17 +121,18 @@ export default function ListingPhotosEditor({
                 dragFrom.current = null
               }}
             >
-              <img src={photo.previewUrl} alt="" className="preview-image" />
-              {index === 0 ? <span className="preview-item__cover">Cover</span> : null}
-              <button
-                type="button"
-                onClick={() => removeAt(index)}
-                className="preview-remove"
-                aria-label="Remove photo"
-              >
-                ×
-              </button>
-              <div className="preview-item__tools">
+              <div className="preview-item__frame">
+                <img src={photo.previewUrl} alt="" className="preview-image" />
+                {index === 0 ? <span className="preview-item__cover">Cover</span> : null}
+                <button
+                  type="button"
+                  onClick={() => removeAt(index)}
+                  className="preview-remove"
+                  aria-label="Remove photo"
+                >
+                  ×
+                </button>
+                <div className="preview-item__strip">
                 <button
                   type="button"
                   className="preview-item__tool"
@@ -153,7 +154,7 @@ export default function ListingPhotosEditor({
                 {index === 0 ? (
                   <button
                     type="button"
-                    className="preview-item__tool"
+                    className="preview-item__tool preview-item__tool--action"
                     onClick={() => {
                       setCrop({ x: 0, y: 0 })
                       setZoom(1)
@@ -164,10 +165,15 @@ export default function ListingPhotosEditor({
                     Crop cover
                   </button>
                 ) : (
-                  <button type="button" className="preview-item__tool" onClick={() => setCover(index)}>
+                  <button
+                    type="button"
+                    className="preview-item__tool preview-item__tool--action"
+                    onClick={() => setCover(index)}
+                  >
                     Set as cover
                   </button>
                 )}
+                </div>
               </div>
             </div>
           ))}

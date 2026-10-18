@@ -1415,15 +1415,23 @@ a {
 .provided-custom {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 10px;
   margin-top: 12px;
+}
+
+.provided-custom__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .provided-custom__chip {
   display: inline-flex;
   align-items: center;
+  width: auto;
+  max-width: 100%;
   gap: 8px;
-  margin-right: 8px;
   padding: 4px 10px;
   font-size: 13px;
   background: var(--surface);
@@ -1447,23 +1455,35 @@ a {
   gap: 8px;
 }
 
-.preview-item__tools {
+.preview-item__strip {
   position: absolute;
-  inset: auto 4px 4px 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  z-index: 1;
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
+  min-width: 0;
 }
 
 .preview-item__tool {
-  padding: 2px 6px;
+  flex: 0 0 auto;
+  padding: 4px 7px;
   font-size: 11px;
   font-weight: 600;
+  line-height: 1.2;
   color: var(--navy);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
   cursor: pointer;
+}
+
+.preview-item__tool--action {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .preview-item__tool:disabled {
@@ -1676,6 +1696,11 @@ input[type='radio'] {
   font-weight: 400;
   color: var(--text-h);
   cursor: pointer;
+}
+
+.checkbox-label:has(input:disabled) {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .checkbox-label--agree {
@@ -4552,6 +4577,11 @@ body.lightbox-open {
 .preview-item {
   position: relative;
   width: 148px;
+}
+
+.preview-item__frame {
+  position: relative;
+  width: 148px;
   height: 148px;
 }
 
@@ -6014,8 +6044,9 @@ body.lightbox-open {
 
 .preview-item__cover {
   position: absolute;
-  bottom: 6px;
+  top: 6px;
   left: 6px;
+  z-index: 1;
   padding: 2px 7px;
   font-family: var(--mono);
   font-size: 10px;
@@ -6082,7 +6113,7 @@ body.lightbox-open {
 .price-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   padding: 16px;
   font-size: 14px;
   color: var(--navy);
@@ -6090,10 +6121,57 @@ body.lightbox-open {
   border-radius: var(--radius-lg);
 }
 
-.price-panel__row {
-  display: flex;
-  justify-content: space-between;
+.price-panel__figures {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
+}
+
+.price-panel__figures--solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.price-panel__figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+}
+
+.price-panel__figure-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.price-panel__figure-amount {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+.price-panel__figure-unit {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.price-panel__session {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-strong);
+}
+
+.price-panel__session-line {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  line-height: 1.4;
 }
 
 .price-panel__amount {
@@ -6103,20 +6181,52 @@ body.lightbox-open {
   white-space: nowrap;
 }
 
-.price-panel__row--small {
-  font-size: 12px;
+.price-panel__info {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
 }
 
-.price-panel__row--small .price-panel__amount {
-  font-weight: 400;
+.price-panel__info[aria-expanded='true'] {
+  color: var(--navy);
+  border-color: var(--navy);
 }
 
-.price-panel__row--total {
-  padding-top: 10px;
-  font-size: 15px;
-  font-weight: 700;
-  border-top: 1px solid var(--border-strong);
+.price-panel__popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--navy);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.price-panel__popover p,
+.price-panel__popover ul {
+  margin: 0;
+}
+
+.price-panel__popover ul {
+  padding-left: 18px;
 }
 
 .wizard-row {

@@ -116,10 +116,17 @@ export function parsePriceInputCents(value) {
   return cents
 }
 
+export const GROUP_DISCOUNT_TIERS = [
+  { guests: 2, percent: 5 },
+  { guests: 3, percent: 10 },
+  { guests: 4, percent: 15 },
+  { guests: '5+', percent: 20 },
+]
+
 /**
  * The numbers the create-listing price step shows a host. Founding-host status
- * decides whether the host fee applies, so `null` (unknown) leaves out every
- * host-side figure rather than promise a cut the host may not get.
+ * decides whether the host fee applies, so `null` (unknown) leaves out "you get"
+ * and the fee footnote rather than promise a cut the host may not get.
  */
 export function hostPriceBreakdown(
   pricePerPersonCents,
@@ -128,30 +135,25 @@ export function hostPriceBreakdown(
   groupPricing = true,
 ) {
   if (!Number.isFinite(pricePerPersonCents) || pricePerPersonCents < 1) return null
-  const guestsPayCents = guestFacingPriceCents(pricePerPersonCents)
-  if (isFoundingHost !== true && isFoundingHost !== false) {
-    return {
-      guestsPayCents,
-      youReceiveCents: null,
-      afterFeeCents: null,
-      fullSessionLowCents: null,
-      fullSessionHighCents: null,
-    }
-  }
   const size = Number.isFinite(groupSize) && groupSize > 0 ? groupSize : 1
   const high = pricePerPersonCents * size
-  const low = discountedLessonCents(pricePerPersonCents, size, groupPricing)
-  const showRange = Boolean(groupPricing) && size > 1 && low !== high
+  const togetherCents = discountedLessonCents(pricePerPersonCents, size, groupPricing)
+  const guestsPayCents = guestFacingPriceCents(pricePerPersonCents)
+  const knownHost = isFoundingHost === true || isFoundingHost === false
   return {
     guestsPayCents,
-    youReceiveCents: pricePerPersonCents,
-    afterFeeCents: isFoundingHost
-      ? null
-      : Math.round(pricePerPersonCents * (1 - HOST_FEE_RATE)),
+    youReceiveCents: knownHost ? pricePerPersonCents : null,
+    afterFeeCents:
+      isFoundingHost === false ? Math.round(pricePerPersonCents * (1 - HOST_FEE_RATE)) : null,
     feeFreeBookings: HOST_FEE_FREE_BOOKINGS,
     feePercent: Math.round(HOST_FEE_RATE * 100),
-    fullSessionLowCents: showRange ? low : null,
+    isFoundingHost: knownHost ? isFoundingHost : null,
+    groupPricing: Boolean(groupPricing),
+    groupSize: size,
+    togetherCents,
     fullSessionHighCents: high,
+    fullSessionLowCents:
+      Boolean(groupPricing) && size > 1 && togetherCents !== high ? togetherCents : null,
   }
 }
 
