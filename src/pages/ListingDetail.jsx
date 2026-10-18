@@ -38,7 +38,6 @@ import { listingReportSubject, reportMailto } from '../lib/reportMailto'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import { BackRowActions } from '../components/BackButton'
 import Icon from '../components/ui/Icon'
-import { regionForPlanningArea } from '../lib/planningAreas'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -684,7 +683,6 @@ export default function ListingDetail() {
     url: typeof window === 'undefined' ? '' : window.location.href,
     id: listing.id,
   })
-  const areaRegion = regionForPlanningArea(listing.area)
   const duration = formatDuration(listing.duration_mins)
   const maxGuests = Number(listing.max_guests)
   const paynowSaving = cardPrice - paynowPrice
@@ -1139,27 +1137,12 @@ export default function ListingDetail() {
                       <>
                         <p className="detail-location__title">{areaLabel}, Singapore</p>
                         <p className="detail-location__note">
-                          {areaRegion
-                            ? `${areaRegion} region. The general area, not the exact spot.`
-                            : 'The general area, not the exact spot.'}
+                          Exact address sent once your booking is confirmed.
                         </p>
                       </>
                     )}
                   </div>
                 </div>
-                {revealedAddress ? null : (
-                  <div className="detail-location__row">
-                    <span className="detail-location__icon">
-                      <Icon name="lock" size={20} />
-                    </span>
-                    <div className="detail-location__copy">
-                      <p className="detail-location__title">Exact address after booking</p>
-                      <p className="detail-location__note">
-                        Sent once your booking is confirmed, with directions in your booking.
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
             </section>
           ) : null}
@@ -1187,18 +1170,14 @@ export default function ListingDetail() {
             )}
           </section>
 
-          <nav className="detail-links" aria-label="Policies and reporting">
-            <Link to="/cancellation-policy" className="detail-links__row">
-              Cancellation: full refund 48+ hours before
-              <Icon name="chevronRight" size={18} />
-            </Link>
-            {isOwnListing ? null : (
+          {isOwnListing ? null : (
+            <nav className="detail-links" aria-label="Reporting">
               <a href={reportHref} className="detail-links__row">
                 Report this listing
                 <Icon name="chevronRight" size={18} />
               </a>
-            )}
-          </nav>
+            </nav>
+          )}
         </div>
       </div>
 

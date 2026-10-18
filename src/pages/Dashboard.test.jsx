@@ -404,7 +404,7 @@ describe('Dashboard listings', () => {
     expect(card.className).toContain('hosting-listing-card')
   })
 
-  it('keeps thumbnail and title on one line, the menu in the card corner, and two columns from 1024px', () => {
+  it('keeps thumbnail and title on one line, the menu in the card corner, and one listing per row', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
     const listing = css.match(/\.hosting-listing \{[\s\S]*?\n\}/)
     const main = css.match(/\.hosting-listing__main \{[\s\S]*?\n\}/)
@@ -427,7 +427,7 @@ describe('Dashboard listings', () => {
     expect(listings?.[0]).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/)
     expect(listings?.[0]).toMatch(/align-items:\s*start/)
     expect(css).toMatch(/\.add-sessions__repeat select\.input \{[^}]*padding-right:\s*36px/)
-    expect(css).toMatch(
+    expect(css).not.toMatch(
       /@media \(min-width: 1024px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
     )
     expect(css).not.toMatch(
@@ -436,6 +436,7 @@ describe('Dashboard listings', () => {
     expect(css).not.toMatch(
       /@media \(min-width: 768px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2/
     )
+    expect(css).toMatch(/\.hosting-sessions__more \{[^}]*padding:\s*10px 14px/)
     expect(css).toMatch(
       /\.dashboard-card\.hosting-listing-card:has\(\.ui-overflow__menu\) \{[^}]*z-index:\s*30;/
     )
@@ -1215,6 +1216,21 @@ describe('Dashboard host cancellation', () => {
 
     expect(within(card).getAllByRole('button', { name: 'Delete' })).toHaveLength(4)
     expect(within(card).queryByRole('button', { name: 'Show all 4 open sessions' })).not.toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Show fewer' })).toBeInTheDocument()
+
+    await user.click(within(card).getByRole('button', { name: 'Show fewer' }))
+
+    expect(within(card).getAllByRole('button', { name: 'Delete' })).toHaveLength(3)
+    expect(within(card).getByRole('button', { name: 'Show all 4 open sessions' })).toBeInTheDocument()
+  })
+
+  it('omits a dangling separator when the listing has no area', async () => {
+    givenData({ listings: [makeMyListing({ area: '', title: 'No area yet' })] })
+    await renderHosting()
+
+    expect(listingCard('No area yet').querySelector('.dashboard-card__meta')).toHaveTextContent(
+      /^Food$/,
+    )
   })
 
   it('deletes only the empty sessions that were ticked', async () => {

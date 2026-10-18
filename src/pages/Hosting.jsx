@@ -13,6 +13,7 @@ import {
   SESSION_HAS_BOOKINGS_MESSAGE,
   isSessionHasBookingsError,
 } from '../lib/listingSpots'
+import { listingCategoryAreaLine } from '../lib/listingCategories'
 import { firstAccountRow } from '../lib/myAccount'
 import { formatBatchSummary, skipReasonFromRpcMessage, singaporeDateTime, singaporeTimeValue } from '../lib/sessionBatch'
 import { singaporeDateKey } from '../lib/sessionCalendar'
@@ -676,7 +677,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                     <div className="hosting-listing__text">
                       <p className="dashboard-card__title">{listing.title}</p>
                       <p className="dashboard-card__meta">
-                        {listing.category} · {listing.area}
+                        {listingCategoryAreaLine(listing.category, listing.area)}
                       </p>
                     </div>
                   </Link>
@@ -717,6 +718,13 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                   onToggleSelect={toggleEmptySession}
                   onExpand={() =>
                     setExpandedEmptyListingIds((prev) => new Set(prev).add(listing.id))
+                  }
+                  onCollapse={() =>
+                    setExpandedEmptyListingIds((prev) => {
+                      const next = new Set(prev)
+                      next.delete(listing.id)
+                      return next
+                    })
                   }
                   onAskDelete={(sessionId) => {
                     setDeleteSessionError('')
@@ -773,6 +781,7 @@ function ListingSessions({
   deleteSessionLoading,
   onToggleSelect,
   onExpand,
+  onCollapse,
   onAskDelete,
   onAskBulkDelete,
   onDeleteSession,
@@ -823,9 +832,13 @@ function ListingSessions({
           onSaveEdit={onSaveEdit}
         />
       ))}
-      {empty.length > 3 && !expanded ? (
-        <button type="button" className="btn btn--ghost hosting-sessions__more" onClick={onExpand}>
-          Show all {empty.length} open sessions
+      {empty.length > 3 ? (
+        <button
+          type="button"
+          className="btn btn--ghost hosting-sessions__more"
+          onClick={expanded ? onCollapse : onExpand}
+        >
+          {expanded ? 'Show fewer' : `Show all ${empty.length} open sessions`}
         </button>
       ) : null}
       {selectedHere.length > 0 ? (
