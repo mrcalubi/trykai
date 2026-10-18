@@ -1,5 +1,6 @@
 import Stripe from 'https://esm.sh/stripe@13.3.0?target=deno'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { authenticateAdmin } from '../_shared/admin-auth.ts'
 import { spotsToRestore } from '../_shared/booking.ts'
 import {
   bookingReference,
@@ -9,12 +10,18 @@ import {
   sendCancellationEmails,
   sendDisputeRefundEmail,
 } from '../_shared/email.ts'
-import { asRecord, hasValidSecret, jsonResponse, textResponse } from '../_shared/http.ts'
+import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
+import { adminCancelEvent, cleanNote, recordMoneyEvent } from '../_shared/money-events.ts'
 
 // reason 'host_cancelled' (default): the host could not run the session.
 // reason 'dispute': ops upheld a guest dispute (OPERATIONS.md, Guest dispute
 // refund). Same full refund and cancel; the guest gets a refund receipt
 // instead of "your host had to cancel".
+//
+// Caller: an admin's own JWT (users.is_admin re-checked), or the
+// x-admin-secret break-glass with x-admin-operator (_shared/admin-auth.ts).
+// Each cancel writes a booking_money_events row naming who did it, with the
+// optional free-text `note`.
 type CancelReason = 'host_cancelled' | 'dispute'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
@@ -25,23 +32,39 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return textResponse('ok')
 
-  const secret = Deno.env.get('ADMIN_FUNCTION_SECRET')
-  if (!hasValidSecret(req, secret, ['x-admin-secret'])) {
-    return textResponse('Unauthorized', 401)
-  }
-
   try {
-    const { booking_id, reason: rawReason } = await req.json()
+    const admin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    )
+    const auth = await authenticateAdmin(req, {
+      breakGlassSecret: Deno.env.get('ADMIN_FUNCTION_SECRET'),
+      getUserId: async (authorization) => {
+        const supabaseAuth = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          { global: { headers: { Authorization: authorization } } },
+        )
+        const {
+          data: { user },
+        } = await supabaseAuth.auth.getUser()
+        return user?.id ?? null
+      },
+      isAdmin: async (userId) => {
+        const { data } = await admin.from('users').select('is_admin').eq('id', userId).maybeSingle()
+        return data?.is_admin === true
+      },
+    })
+    if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status)
+
+    const { booking_id, reason: rawReason, note: rawNote } = await req.json()
     if (!booking_id) return jsonResponse({ error: 'booking_id is required' }, 400)
     if (rawReason != null && rawReason !== 'host_cancelled' && rawReason !== 'dispute') {
       return jsonResponse({ error: "reason must be 'host_cancelled' or 'dispute'" }, 400)
     }
     const reason: CancelReason = rawReason ?? 'host_cancelled'
-
-    const admin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    )
+    const note = cleanNote(rawNote)
+    if (!note.ok) return jsonResponse({ error: note.error }, note.status)
 
     const { data: booking, error } = await admin
       .from('bookings')
@@ -52,6 +75,7 @@ Deno.serve(async (req) => {
         guests_count,
         total_amount,
         refund_amount,
+        host_payout_amount,
         payout_released_at,
         stripe_payment_id,
         session_id,
@@ -94,7 +118,7 @@ Deno.serve(async (req) => {
     const refundAmount = booking.status === 'confirmed' || stripeRefundId ? booking.total_amount : 0
     const refundedNow = Math.max(0, refundAmount - (booking.refund_amount ?? 0))
 
-    await admin
+    const { error: cancelError } = await admin
       .from('bookings')
       .update({
         status: 'cancelled',
@@ -106,6 +130,20 @@ Deno.serve(async (req) => {
         payout_held_at: null,
       })
       .eq('id', booking.id)
+    if (cancelError) {
+      console.error('admin-cancel-booking: booking not updated', booking.id, stripeRefundId, cancelError.message)
+    }
+
+    // Logged even if the row write failed: the Stripe refund already happened.
+    const audit = await recordMoneyEvent(
+      (r) => admin.from('booking_money_events').insert(r),
+      adminCancelEvent(booking, auth.actor, {
+        reason,
+        refundedNowCents: refundedNow,
+        stripeRefundId,
+        note: note.note,
+      }),
+    )
 
     if (restore > 0) {
       const { data: session } = await admin
@@ -150,7 +188,7 @@ Deno.serve(async (req) => {
           paymentRail: booking.payment_rail,
           siteUrl: Deno.env.get('SITE_URL'),
         })
-        return jsonResponse(cancelResult(booking, refundAmount, refundedNow, reason))
+        return jsonResponse({ ...cancelResult(booking, refundAmount, refundedNow, reason), ...audit })
       }
 
       const { data: hostProfile } = listing?.host_id
@@ -204,7 +242,7 @@ Deno.serve(async (req) => {
       console.error('admin-cancel-booking: email failed', emailErr)
     }
 
-    return jsonResponse(cancelResult(booking, refundAmount, refundedNow, reason))
+    return jsonResponse({ ...cancelResult(booking, refundAmount, refundedNow, reason), ...audit })
   } catch (err) {
     return jsonResponse({ error: err.message }, 500)
   }

@@ -1,7 +1,7 @@
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, stripe-signature, x-admin-secret, x-cron-secret, x-notify-secret',
+    'authorization, x-client-info, apikey, content-type, stripe-signature, x-admin-secret, x-admin-operator, x-cron-secret, x-notify-secret',
 }
 
 export function jsonResponse(body: unknown, status = 200): Response {
@@ -34,6 +34,9 @@ export type StripeEventAction =
   | 'cancel_pending'
   | 'sync_account'
   | 'review_identity'
+  | 'chargeback_opened'
+  | 'chargeback_closed'
+  | 'reconcile_refund'
   | 'ignore'
 
 /** Platform first, then the Connected-accounts destination if that secret is set. */
@@ -79,6 +82,9 @@ export function stripeEventAction(eventType: string): StripeEventAction {
   ) {
     return 'review_identity'
   }
+  if (eventType === 'charge.dispute.created') return 'chargeback_opened'
+  if (eventType === 'charge.dispute.closed') return 'chargeback_closed'
+  if (eventType === 'charge.refunded') return 'reconcile_refund'
   return 'ignore'
 }
 
