@@ -170,8 +170,15 @@ No photo banner and no persistent search bar for launch (unchanged): with tens o
 ### Hosting, bookings, profile, settings, auth
 Same tokens and components: raised white cards with `--shadow-sm`, display titles, tabs with a navy underline, consistent banners. Inline `style={{…}}` in pages is not allowed; add a class instead.
 
-### Create and edit listing
-One form (not split into steps for now), grouped into titled sections — *The basics*, *Price and time*, *Location*, *Photos*, *What's provided* — with the photo tip panel in the Photos section.
+### Create listing (built from the canvas "New listing, step 3 · phone" mockup, 18 October 2026)
+- **Five steps:** *The basics* (title, category as six icon tiles, description), *Add photos* (tips panel, a dashed upload tile, previews with the first marked Cover), *Price and group size*, *Where it happens* (area and full address), *Final touches* (what's provided, a preview of the browse card, cancellation policy, Host terms, Create listing).
+- **Chrome:** close (to Hosting), "New listing" and "Save draft" on top; "Step N of 5" in mono with "Next: <step>" and five progress segments; Back and Continue (Create listing on the last step) at the bottom. Continue checks only the current step and says what is missing; Create listing re-checks every step.
+- **Price step:** a large S$ price field, then a sand panel with what guests pay (all in), what the host receives, the price after the first 3 bookings with the 10% host fee (hidden for founding hosts), and "A full session of N pays you up to". When founding-host status cannot be read only the guest price shows. Group size is a round stepper (1 to 50, default 4), session length is four chips (1 hr, 1.5 hr, 2 hr, Other with a minutes field), and group discounts are a checkbox card.
+- **Drafts:** "Save draft" keeps the text answers in this browser (not photos); next time the first step offers Restore draft or Discard. Publishing clears it.
+- **Phones and tablets:** a full-screen flow over the site nav, with Back and Continue pinned to the bottom. **From 1024px:** the steps sit in a white card (max 640px) with a sticky "How guests will see it" preview of the browse card beside it, updating as the host types.
+
+### Edit listing
+Still one form, grouped into titled sections — *The basics*, *Price and time*, *Location*, *Photos*, *What's provided* — with the photo tip panel in the Photos section. Hosts editing want every field at once.
 
 ---
 

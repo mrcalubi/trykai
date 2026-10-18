@@ -82,6 +82,7 @@ const PATHS = {
     </>
   ),
   chevronLeft: <path d="M15 5l-7 7 7 7" />,
+  close: <path d="M6 6l12 12M18 6L6 18" />,
   lock: (
     <>
       <rect x="5" y="10.5" width="14" height="10" rx="2.5" />
