@@ -49,8 +49,9 @@ Week 8 of the original plan (15–21 September) is ending. The week-by-week sect
 
 **Open in the app:**
 - P0.4: browse and Book ignore `is_suspended`. INSERT is already gated by `00008`.
-- P0.7: `listings.full_address` grant still too wide.
 - Forgot password is not built.
+
+**P0.7 done:** `00025` grants SELECT on every `listings` column except `full_address`. `listing_address(listing_id)` returns the address to the host or a confirmed guest. `get_listing_address` is dropped. Emails still SELECT the column with the service role.
 
 **Carried non-engineering:** insurance quote, unsigned founders' agreement, Ruiheng not told about the profit share, safety protocol drafted but not ratified, production `00003` hotfix confirmation.
 
@@ -683,7 +684,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 ## Security and data
 - [ ] RLS enabled on all tables
 - [ ] RLS audit complete: no self approval of verification status, no self reset of strikes, no cross user document access
-- [ ] `full_address` never exposed in a public query
+- [x] `full_address` never exposed in a public query (`00025` column grant; `listing_address()` is the only client path)
 - [ ] Verification documents in a private bucket
 - [ ] Prices stored as integers in cents
 - [ ] No sensitive data in client side code or console logs
@@ -697,7 +698,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [x] Favicon showing
 
 ## Host onboarding experience
-- [ ] Photography guidance shown during listing creation
+- [x] Photography guidance shown during listing creation
 - [ ] Creation flow is clear to a non technical host
 - [ ] Host knows what to expect after submitting verification
 - [ ] Host knows what to expect once the listing is live

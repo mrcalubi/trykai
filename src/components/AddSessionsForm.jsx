@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { formatDuration } from '../lib/duration'
 import {
   SESSION_BATCH_MAX,
@@ -37,7 +38,6 @@ export default function AddSessionsForm({
   const [forWeeks, setForWeeks] = useState(2)
   const [times, setTimes] = useState([''])
   const [durationMins, setDurationMins] = useState('')
-  const [spotsTotal, setSpotsTotal] = useState('')
   const [error, setError] = useState('')
   const [preview, setPreview] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -103,9 +103,9 @@ export default function AddSessionsForm({
       return
     }
 
-    const spots = parseInt(spotsTotal, 10)
-    if (Number.isNaN(spots) || spots < 1) {
-      setError('Spots total must be at least 1.')
+    const spots = Number(listing.max_guests)
+    if (!Number.isInteger(spots) || spots < 1) {
+      setError('Set spots per session in listing settings first.')
       return
     }
 
@@ -136,7 +136,7 @@ export default function AddSessionsForm({
 
   async function confirm() {
     if (!preview) return
-    const spots = parseInt(spotsTotal, 10)
+    const spots = Number(listing.max_guests)
     setSaving(true)
     setError('')
     const result = await onCreated({
@@ -280,18 +280,12 @@ export default function AddSessionsForm({
         </label>
       )}
 
-      <label className="label">
-        Spots total
-        <input
-          type="number"
-          value={spotsTotal}
-          onChange={(event) => setSpotsTotal(event.target.value)}
-          min="1"
-          placeholder="4"
-          required
-          className="input"
-        />
-      </label>
+      <p className="hint">
+        {Number.isInteger(Number(listing.max_guests)) && Number(listing.max_guests) >= 1
+          ? `${listing.max_guests} spots per session · `
+          : ''}
+        <Link to={`/edit-listing/${listing.id}`}>change in listing settings</Link>
+      </p>
 
       {error ? <p className="error-message">{error}</p> : null}
 

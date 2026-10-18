@@ -132,6 +132,7 @@ describe('ListingDetail loading and failure', () => {
     expect(listingSelect).toMatch(/users!host_id/)
     expect(listingSelect).toMatch(/display_name/)
     expect(listingSelect).not.toMatch(/full_name/)
+    expect(listingSelect).not.toMatch(/full_address/)
   })
 })
 
@@ -152,6 +153,48 @@ describe('ListingDetail content', () => {
     expect(report.getAttribute('href')).toContain('mailto:hello@trykai.sg')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: listing Latte art')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('listing-1')
+  })
+
+  it('does not reveal the address to a signed-out visitor', async () => {
+    givenListing(makeListing({ area: 'Tiong Bahru', full_address: '12 Coffee Road' }))
+    renderPage()
+
+    expect(await screen.findByText('Tiong Bahru')).toBeInTheDocument()
+    expect(document.querySelector('.detail-area')).toHaveTextContent('Tiong Bahru')
+    expect(screen.queryByText('12 Coffee Road')).not.toBeInTheDocument()
+    expect(supabase.rpc).not.toHaveBeenCalledWith('listing_address', expect.anything())
+  })
+
+  it('does not reveal the address to a signed-in guest without a confirmed booking', async () => {
+    givenSignedIn()
+    givenListing(makeListing({ area: 'Tiong Bahru' }))
+    supabase.rpc.mockImplementation(async (name) => {
+      if (name === 'listing_address') return { data: null, error: null }
+      return { data: null, error: null }
+    })
+    renderPage()
+
+    expect(await screen.findByText('Tiong Bahru')).toBeInTheDocument()
+    expect(document.querySelector('.detail-area')).toHaveTextContent('Tiong Bahru')
+    expect(screen.queryByText('12 Coffee Road')).not.toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('listing_address', { listing_id: 'listing-1' })
+  })
+
+  it('reveals the address to a guest after listing_address returns it', async () => {
+    givenSignedIn()
+    givenListing(makeListing({ area: 'Tiong Bahru' }))
+    supabase.rpc.mockImplementation(async (name) => {
+      if (name === 'listing_address') return { data: '12 Coffee Road', error: null }
+      return { data: null, error: null }
+    })
+    renderPage()
+
+    expect(await screen.findAllByText('12 Coffee Road')).not.toHaveLength(0)
+    expect(document.querySelector('.detail-area')).toHaveTextContent('12 Coffee Road')
+    expect(document.querySelector('.detail-location__title')).toHaveTextContent('12 Coffee Road')
+    expect(screen.queryByText('Tiong Bahru')).not.toBeInTheDocument()
+    expect(screen.queryByText('Exact address after booking')).not.toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('listing_address', { listing_id: 'listing-1' })
   })
 
   it('does not render a bare 0 in place of the planning area', async () => {
@@ -178,17 +221,23 @@ describe('ListingDetail content', () => {
     renderPage()
 
     expect(await screen.findByText('Bedok, Singapore')).toBeInTheDocument()
-    expect(screen.getByText(/^East region\./)).toBeInTheDocument()
-    expect(screen.getByText('Exact address after booking')).toBeInTheDocument()
+    expect(
+      screen.getByText('Exact address sent once your booking is confirmed.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/^East region\./)).not.toBeInTheDocument()
+    expect(screen.queryByText('Exact address after booking')).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.detail-location__icon')).toHaveLength(1)
     expect(screen.queryByRole('link', { name: 'Open in Google Maps' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: /Cancellation: full refund/ }),
+    ).not.toBeInTheDocument()
   })
 
   it('gives a confirmed guest the exact address with a map link', async () => {
     givenListing()
     givenSignedIn()
-    supabase.__on('bookings', 'select', { data: [{ id: 'booking-1' }], error: null })
     supabase.rpc.mockImplementation(async (name) =>
-      name === 'get_listing_address'
+      name === 'listing_address'
         ? { data: '1 Tiong Bahru Road', error: null }
         : { data: [], error: null }
     )

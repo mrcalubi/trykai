@@ -64,7 +64,7 @@ function givenBooking(booking) {
 
 function givenAddress(address) {
   supabase.rpc.mockImplementation(async (name) => {
-    if (name === 'get_listing_address') return { data: address, error: null }
+    if (name === 'listing_address') return { data: address, error: null }
     return { data: null, error: null }
   })
 }
@@ -113,6 +113,8 @@ describe('BookingDetail', () => {
       'href',
       expect.stringContaining('calendar.google.com'),
     )
+    expect(supabase.rpc).toHaveBeenCalledWith('listing_address', { listing_id: 'listing-1' })
+    expect(supabase.__lastCall('bookings', 'select').chain[0].args[0]).not.toMatch(/full_address/)
     expect(screen.getByText(/12 Club Street, Singapore 069410/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Open in Google Maps' })).toHaveAttribute(
       'href',

@@ -180,7 +180,7 @@ assumed:
 
 - **Edge function handlers are not executed in tests.** Their business rules live in `supabase/functions/_shared/*.ts` and are covered there; Stripe signature verification and the HTTP plumbing are type-checked. Missing/invalid webhook signatures return 400 in `stripe-webhook`.
 - **No signed-in end-to-end journey against a real Stripe account.** The browser suite stubs the network. Staging test-mode (test cards + PayNow test) is the remaining live check.
-- **`full_address` reveal** is covered at the page level via `get_listing_address`; the browser suite does not log in.
+- **`full_address` reveal** is covered at the page level via `listing_address()` (anon and unbooked guest get no address; confirmed guest and host do). `00025` grants SELECT on every `listings` column except `full_address` and drops `get_listing_address`. The browser suite stubs the RPC on Edit listing; it does not log in against a live database.
 - **Review gating** still allows `pending` in the dashboard UI; tests describe current behaviour, they do not yet enforce the product rule.
 - **StyleGuide category PNGs** (`src/assets/categories/food.png` and siblings) are imported but not in the repo. That can fail `vite build` because `App.jsx` always imports StyleGuide. Not covered by a dedicated test.
 

@@ -5,6 +5,7 @@ import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession } from '../test/fixtures'
+import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
 
 vi.mock('../lib/supabase')
 
@@ -50,6 +51,10 @@ async function next(user) {
   await user.click(screen.getByRole('button', { name: 'Continue' }))
 }
 
+async function skipEmptyPhotos(user) {
+  await user.click(await screen.findByRole('button', { name: 'Skip for now' }))
+}
+
 async function completeBasics(user, values) {
   await user.clear(screen.getByLabelText('Title'))
   if (values.title) await user.type(screen.getByLabelText('Title'), values.title)
@@ -59,7 +64,7 @@ async function completeBasics(user, values) {
 }
 
 async function setGroupSize(user, target) {
-  const count = () => Number(screen.getByLabelText('Max guests').textContent)
+  const count = () => Number(document.querySelector('.guest-stepper__count').textContent)
   while (count() < target) await user.click(screen.getByRole('button', { name: 'More guests' }))
   while (count() > target && count() > 1) {
     await user.click(screen.getByRole('button', { name: 'Fewer guests' }))
@@ -114,6 +119,7 @@ async function fillValidForm(user, overrides = {}) {
   await completeBasics(user, values)
   await stepHeading('Add photos')
   await next(user)
+  await skipEmptyPhotos(user)
   await stepHeading('Price and group size')
   await completePrice(user, values)
   await stepHeading('Where it happens')
@@ -132,6 +138,7 @@ async function goToPhotos(user) {
 async function goToPrice(user) {
   await goToPhotos(user)
   await next(user)
+  await skipEmptyPhotos(user)
   await stepHeading('Price and group size')
 }
 
@@ -267,8 +274,19 @@ describe('CreateListing validation', () => {
 
     await completeBasics(user, { ...VALID, title: '   ' })
 
-    expect(await screen.findByText('Give your listing a title.')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_FIELD_HINTS.title)).toBeInTheDocument()
+    expect(document.querySelector('.error-message')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'The basics' })).toBeInTheDocument()
+  })
+
+  it('asks for a description in the same warm tone', async () => {
+    const { user } = renderPage()
+    await stepHeading('The basics')
+
+    await completeBasics(user, { ...VALID, description: '' })
+
+    expect(await screen.findByText(LISTING_FIELD_HINTS.description)).toBeInTheDocument()
+    expect(document.querySelector('.error-message')).not.toBeInTheDocument()
   })
 
   it('asks for a category before moving on', async () => {
@@ -277,7 +295,7 @@ describe('CreateListing validation', () => {
 
     await completeBasics(user, { ...VALID, category: null })
 
-    expect(await screen.findByText('Choose a category.')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_FIELD_HINTS.category)).toBeInTheDocument()
   })
 
   it('rejects a price of zero', async () => {
@@ -286,7 +304,7 @@ describe('CreateListing validation', () => {
 
     await completePrice(user, { ...VALID, price: '0' })
 
-    expect(await screen.findByText('Please enter a valid price.')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_FIELD_HINTS.price)).toBeInTheDocument()
   })
 
   it('asks how long each session lasts', async () => {
@@ -295,7 +313,7 @@ describe('CreateListing validation', () => {
 
     await completePrice(user, { ...VALID, duration: null })
 
-    expect(await screen.findByText('Choose how long each session lasts.')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_FIELD_HINTS.duration)).toBeInTheDocument()
   })
 
   it('rejects a custom duration below one minute', async () => {
@@ -304,7 +322,7 @@ describe('CreateListing validation', () => {
 
     await completePrice(user, { ...VALID, duration: 0 })
 
-    expect(await screen.findByText('Duration must be at least 1 minute.')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_FIELD_HINTS.duration)).toBeInTheDocument()
   })
 
   it('never lets the group size drop below one', async () => {
@@ -313,7 +331,8 @@ describe('CreateListing validation', () => {
 
     await setGroupSize(user, 1)
 
-    expect(screen.getByLabelText('Max guests')).toHaveTextContent('1')
+    expect(screen.getByText('Spots per session')).toBeInTheDocument()
+    expect(document.querySelector('.guest-stepper__count')).toHaveTextContent('1')
     expect(screen.getByRole('button', { name: 'Fewer guests' })).toBeDisabled()
   })
 
@@ -325,7 +344,7 @@ describe('CreateListing validation', () => {
 
     await completeLocation(user, { ...VALID, fullAddress: '  ' })
 
-    expect(await screen.findByText('Enter the full address.')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_FIELD_HINTS.fullAddress)).toBeInTheDocument()
   })
 
   it('keeps Create listing disabled until the host agrees to the Host terms', async () => {
@@ -362,14 +381,50 @@ describe('CreateListing price panel', () => {
 
     await user.type(screen.getByLabelText('Your price per guest'), '25')
 
-    const row = (label) => screen.getByText(label).closest('.price-panel__row')
-    expect(row('Guests pay')).toHaveTextContent('$28')
-    expect(row('You receive per guest')).toHaveTextContent('$25')
-    expect(row(/After your first 3 bookings \(10% host fee\)/)).toHaveTextContent('$22.50')
-    expect(row('A full session of 4 pays you up to')).toHaveTextContent('$100')
+    expect(screen.getByText('Guests pay').closest('.price-panel__figure')).toHaveTextContent('$28')
+    expect(screen.getByText('You get').closest('.price-panel__figure')).toHaveTextContent('$25')
+    expect(screen.getByText(/Full session of 4/)).toHaveTextContent('Full session of 4: $100')
+    expect(screen.getByText(/Full session of 4/)).not.toHaveTextContent('up to')
+    expect(screen.getByText('10% host fee from your 4th booking.')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Group discounts come off your price, e.g. a group of 4 together pays you $85 instead of $100.',
+      ),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'How these numbers work' }))
+    expect(screen.getByText('2 guests: 5% off the lesson')).toBeInTheDocument()
+    expect(screen.getByText(/One group of 4: \$85 before any host fee/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/After the 10% host fee \(from your 4th booking\): \$22.50 per person/),
+    ).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'More guests' }))
-    expect(row('A full session of 5 pays you up to')).toHaveTextContent('$125')
+    expect(screen.getByText(/Full session of 5/)).toHaveTextContent('Full session of 5: $125')
+    expect(
+      screen.getByText(
+        'Group discounts come off your price, e.g. a group of 5 together pays you $100 instead of $125.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('shows one full-session number when group discounts are off', async () => {
+    givenSignedIn()
+    givenVerification('approved')
+    const { user } = renderPage()
+    await goToPrice(user)
+
+    await user.type(screen.getByLabelText('Your price per guest'), '25')
+    await user.click(screen.getByRole('checkbox', { name: /Offer group discounts/ }))
+
+    expect(screen.getByText(/Full session of 4/)).toHaveTextContent('Full session of 4: $100')
+    expect(
+      screen.queryByText(/Group discounts come off your price/),
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'How these numbers work' }))
+    expect(
+      screen.getByText('Group discounts are off. Guests pay the same per person at every group size.'),
+    ).toBeInTheDocument()
   })
 
   it('omits the host fee for a founding host', async () => {
@@ -380,8 +435,9 @@ describe('CreateListing price panel', () => {
 
     await user.type(screen.getByLabelText('Your price per guest'), '25')
 
-    expect(screen.getByText('You receive per guest')).toBeInTheDocument()
-    expect(screen.queryByText(/host fee/)).not.toBeInTheDocument()
+    expect(screen.getByText('You get')).toBeInTheDocument()
+    expect(screen.getByText('Founding host: no host fee, ever.')).toBeInTheDocument()
+    expect(screen.queryByText('10% host fee from your 4th booking.')).not.toBeInTheDocument()
   })
 
   it('shows only the guest price when founding-host status is unknown', async () => {
@@ -395,7 +451,7 @@ describe('CreateListing price panel', () => {
     await user.type(screen.getByLabelText('Your price per guest'), '25')
 
     expect(screen.getByText('Guests pay')).toBeInTheDocument()
-    expect(screen.queryByText('You receive per guest')).not.toBeInTheDocument()
+    expect(screen.queryByText('You get')).not.toBeInTheDocument()
     expect(screen.queryByText(/host fee/)).not.toBeInTheDocument()
   })
 })
@@ -535,17 +591,34 @@ describe('CreateListing "what is provided"', () => {
     await user.click(screen.getByRole('checkbox', { name: 'None' }))
 
     expect(screen.getByRole('checkbox', { name: 'Materials' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Materials' })).toBeDisabled()
     expect(screen.getByRole('checkbox', { name: 'None' })).toBeChecked()
+    expect(screen.getByLabelText('Add your own')).toBeDisabled()
   })
 
   it('drops "None" again when a real option is picked', async () => {
     const { user } = renderPage()
     await fillValidForm(user)
     await user.click(screen.getByRole('checkbox', { name: 'None' }))
+    expect(screen.getByRole('checkbox', { name: 'Food & drinks' })).toBeDisabled()
+
+    await user.click(screen.getByRole('checkbox', { name: 'None' }))
     await user.click(screen.getByRole('checkbox', { name: 'Food & drinks' }))
 
     expect(screen.getByRole('checkbox', { name: 'None' })).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Food & drinks' })).toBeChecked()
+  })
+
+  it('stores a custom item on the listing', async () => {
+    const { user } = renderPage()
+    await fillValidForm(user)
+    await user.type(screen.getByLabelText('Add your own'), 'Apron')
+    await user.click(screen.getByRole('button', { name: '+ Add your own' }))
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'insert')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'insert').payload.whats_provided).toEqual(['Apron'])
   })
 
   it('saves an empty list when "None" is submitted', async () => {
@@ -605,6 +678,23 @@ describe('CreateListing photos', () => {
     expect(screen.getByLabelText('Photos')).toBeDisabled()
   })
 
+  it('shows the photo tips in the agreed tone', async () => {
+    const { user } = renderPage()
+    await goToPhotos(user)
+
+    expect(screen.getByText('A few tips for great photos')).toBeInTheDocument()
+    expect(
+      screen.getByText('Natural light is your best friend. A window beats any flash.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Lead with the good stuff: the latte, the bowl, the finished piece.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Hands in action beat an empty room.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Tidy the background so your skill takes centre stage.'),
+    ).toBeInTheDocument()
+  })
+
   it('lets a photo be removed before submitting', async () => {
     const { user } = renderPage()
     await goToPhotos(user)
@@ -614,6 +704,53 @@ describe('CreateListing photos', () => {
     await user.click(screen.getAllByRole('button', { name: 'Remove photo' })[0])
 
     expect(await screen.findByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
+  })
+
+  it('asks before continuing with no photos, then lets the host skip', async () => {
+    const { user } = renderPage()
+    await goToPhotos(user)
+    await next(user)
+
+    expect(
+      screen.getByText('Your skill deserves to be seen! Listings with photos get far more bookings.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Add photos' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Add photos' }))
+    expect(screen.getByRole('heading', { name: 'Add photos' })).toBeInTheDocument()
+
+    await next(user)
+    await user.click(screen.getByRole('button', { name: 'Skip for now' }))
+    await stepHeading('Price and group size')
+  })
+
+  it('lets the host set a later photo as the cover', async () => {
+    const { user } = renderPage()
+    await goToPhotos(user)
+    selectFiles([imageFile('a.png'), imageFile('b.png')])
+    await screen.findByText('Maximum of 5 photos (2/5)')
+    expect(screen.getByText('Drag to reorder. The first photo is your cover.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Photo 2' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Make cover' }))
+
+    const items = document.querySelectorAll('.preview-item')
+    expect(items[0].querySelector('.preview-item__cover')).toHaveTextContent('Cover')
+    expect(screen.queryByRole('button', { name: 'Set as cover' })).not.toBeInTheDocument()
+  })
+
+  it('opens the cover crop dialog', async () => {
+    const { user } = renderPage()
+    await goToPhotos(user)
+    selectFiles([imageFile('a.png')])
+    await screen.findByText('Maximum of 5 photos (1/5)')
+
+    await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Crop' }))
+
+    expect(screen.getByText('Crop the cover to the listing card')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Free' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Use this crop' })).toBeDisabled()
   })
 
   async function publishWithOnePhoto(user) {
@@ -651,7 +788,7 @@ describe('CreateListing photos', () => {
 
     await user.click(screen.getByRole('button', { name: 'Create listing' }))
 
-    expect(await screen.findByText('storage full')).toBeInTheDocument()
+    expect(await screen.findByText(PHOTO_UPLOAD_ERROR)).toBeInTheDocument()
     expect(supabase.__calls('listings', 'insert')).toHaveLength(0)
   })
 })
@@ -688,6 +825,7 @@ describe('CreateListing drafts', () => {
     await completeBasics(user, { title: 'Pottery taster', category: 'Arts', description: 'Throw a bowl.' })
     await stepHeading('Add photos')
     await next(user)
+    await skipEmptyPhotos(user)
     await stepHeading('Price and group size')
     await user.click(screen.getByRole('button', { name: 'Save draft' }))
 

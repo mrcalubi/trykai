@@ -10,6 +10,9 @@ if (!window.URL.revokeObjectURL) {
   window.URL.revokeObjectURL = vi.fn()
 }
 
+// ScrollToTop calls window.scrollTo; jsdom only logs "Not implemented".
+window.scrollTo = () => {}
+
 afterEach(() => {
   cleanup()
   vi.useRealTimers()

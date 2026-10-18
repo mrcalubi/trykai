@@ -619,7 +619,7 @@ describe('Profile own tabs', () => {
     renderPage({ search: '?tab=hosting' })
 
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'My Listings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Your listings' })).not.toBeInTheDocument()
   })
 
   it('shows your own About when a bio is saved', async () => {

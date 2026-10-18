@@ -7,6 +7,7 @@ import { categoryIconName } from '../components/ui/categoryIcon'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { sortListingsForBrowse } from '../lib/listingSort'
+import { BROWSE_CATEGORIES } from '../lib/listingCategories'
 import { REGIONS, regionForPlanningArea } from '../lib/planningAreas'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { publicName } from '../lib/publicName'
@@ -29,7 +30,7 @@ const QUICK_FILTERS = [
 const TRUST_POINTS = [
   { icon: 'shield', label: 'ID-verified hosts' },
   { icon: 'pin', label: 'Exact address after booking' },
-  { icon: 'wallet', label: 'Pay by PayNow or Card' },
+  { icon: 'wallet', label: 'Most sessions S$15–30' },
 ]
 
 const STEPS = [
@@ -145,13 +146,8 @@ export default function Home() {
     fetchListings()
   }, [])
 
-  const categories = useMemo(() => {
-    const unique = [...new Set(listings.map((l) => l.category).filter(Boolean))]
-    return ['All', ...unique.sort()]
-  }, [listings])
-
   const activeCategory =
-    categoryFilter === 'All' || categories.includes(categoryFilter)
+    categoryFilter === 'All' || BROWSE_CATEGORIES.includes(categoryFilter)
       ? categoryFilter
       : 'All'
 
@@ -259,7 +255,7 @@ export default function Home() {
           <>
             <div className="filters">
               <div className="category-bar filter-pills" role="group" aria-label="Categories">
-                {categories.map((category) => (
+                {BROWSE_CATEGORIES.map((category) => (
                   <button
                     key={category}
                     type="button"

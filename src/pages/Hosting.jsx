@@ -10,8 +10,19 @@ import Icon from '../components/ui/Icon'
 import { hostCancelWarning } from '../lib/hostCancelCopy'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { formatSessionDateTime } from '../lib/sessionDate'
+import {
+  SESSION_HAS_BOOKINGS_MESSAGE,
+  isSessionHasBookingsError,
+} from '../lib/listingSpots'
+import { listingCategoryAreaLine } from '../lib/listingCategories'
 import { firstAccountRow } from '../lib/myAccount'
-import { formatBatchSummary, skipReasonFromRpcMessage } from '../lib/sessionBatch'
+import {
+  formatBatchSummary,
+  singaporeDateTime,
+  singaporeTimeValue,
+  skipReasonFromRpcMessage,
+} from '../lib/sessionBatch'
+import { singaporeDateKey } from '../lib/sessionCalendar'
 import { LISTING_STEPS, clearDraft, draftValues, readDraft } from '../lib/listingDraft'
 import {
   formatSgd,
@@ -139,6 +150,11 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
   const [confirmDeleteListingId, setConfirmDeleteListingId] = useState(null)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [deleteSessionLoading, setDeleteSessionLoading] = useState(false)
+  const [editingSessionId, setEditingSessionId] = useState(null)
+  const [editDate, setEditDate] = useState('')
+  const [editTime, setEditTime] = useState('')
+  const [editError, setEditError] = useState('')
+  const [editLoading, setEditLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [cancelError, setCancelError] = useState('')
   const [deleteSessionError, setDeleteSessionError] = useState('')
@@ -456,6 +472,45 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
     setConfirmCancelSessionId(null)
     setConfirmDeleteSessionId(null)
     setConfirmBulkDeleteListingId(null)
+    setEditingSessionId(null)
+    setEditError('')
+  }
+
+  function openSessionEdit(session) {
+    setConfirmDeleteSessionId(null)
+    setConfirmBulkDeleteListingId(null)
+    setEditError('')
+    setEditingSessionId(session.id)
+    setEditDate(singaporeDateKey(session.starts_at))
+    setEditTime(singaporeTimeValue(session.starts_at))
+  }
+
+  async function handleEditOpenSession(session) {
+    setEditError('')
+    const startsAt = singaporeDateTime(editDate, editTime)
+    if (Number.isNaN(startsAt.getTime())) {
+      setEditError('Please enter a date and time.')
+      return
+    }
+
+    setEditLoading(true)
+    const { error: rpcError } = await supabase.rpc('edit_open_session', {
+      p_session_id: session.id,
+      p_starts_at: startsAt.toISOString(),
+    })
+    setEditLoading(false)
+
+    if (rpcError) {
+      setEditError(
+        isSessionHasBookingsError(rpcError.message)
+          ? SESSION_HAS_BOOKINGS_MESSAGE
+          : rpcError.message,
+      )
+      return
+    }
+
+    setEditingSessionId(null)
+    await loadData()
   }
 
   async function handleDeleteListing(listingId) {
@@ -810,7 +865,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                               priceCents: listing.price_per_person,
                               durationMins: listing.duration_mins,
                               maxGuests: listing.max_guests,
-                            }) || `${listing.category} · ${listing.area}`}
+                            }) || listingCategoryAreaLine(listing.category, listing.area)}
                           </p>
                         </div>
                       </Link>
@@ -861,6 +916,13 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                       onExpand={() =>
                         setExpandedEmptyListingIds((prev) => new Set(prev).add(listing.id))
                       }
+                      onCollapse={() =>
+                        setExpandedEmptyListingIds((prev) => {
+                          const next = new Set(prev)
+                          next.delete(listing.id)
+                          return next
+                        })
+                      }
                       onAskDelete={(sessionId) => {
                         setDeleteSessionError('')
                         setConfirmCancelSessionId(null)
@@ -876,6 +938,15 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                       onDeleteSession={handleDeleteEmptySession}
                       onBulkDelete={handleDeleteSelectedEmpty}
                       onKeep={clearSessionConfirms}
+                      editingSessionId={editingSessionId}
+                      editDate={editDate}
+                      editTime={editTime}
+                      editError={editError}
+                      editLoading={editLoading}
+                      onAskEdit={openSessionEdit}
+                      onEditDate={setEditDate}
+                      onEditTime={setEditTime}
+                      onSaveEdit={handleEditOpenSession}
                     />
                   </article>
                 )
@@ -1003,11 +1074,21 @@ function ListingSessions({
   deleteSessionLoading,
   onToggleSelect,
   onExpand,
+  onCollapse,
   onAskDelete,
   onAskBulkDelete,
   onDeleteSession,
   onBulkDelete,
   onKeep,
+  editingSessionId,
+  editDate,
+  editTime,
+  editError,
+  editLoading,
+  onAskEdit,
+  onEditDate,
+  onEditTime,
+  onSaveEdit,
 }) {
   const empty = sessions.filter((session) => activeBookingsOn(session).length === 0)
   const shownEmpty = expanded ? empty : empty.slice(0, 3)
@@ -1033,11 +1114,24 @@ function ListingSessions({
           onCancelSession={() => {}}
           onDeleteSession={onDeleteSession}
           onKeep={onKeep}
+          editing={editingSessionId === session.id}
+          editDate={editDate}
+          editTime={editTime}
+          editError={editingSessionId === session.id ? editError : ''}
+          editLoading={editLoading}
+          onAskEdit={onAskEdit}
+          onEditDate={onEditDate}
+          onEditTime={onEditTime}
+          onSaveEdit={onSaveEdit}
         />
       ))}
-      {empty.length > 3 && !expanded ? (
-        <button type="button" className="btn btn--ghost hosting-sessions__more" onClick={onExpand}>
-          Show all {empty.length} open sessions
+      {empty.length > 3 ? (
+        <button
+          type="button"
+          className="btn btn--ghost hosting-sessions__more"
+          onClick={expanded ? onCollapse : onExpand}
+        >
+          {expanded ? 'Show fewer' : `Show all ${empty.length} open sessions`}
         </button>
       ) : null}
       {selectedHere.length > 0 ? (
@@ -1086,9 +1180,21 @@ function SessionRow({
   onCancelSession,
   onDeleteSession,
   onKeep,
+  editing = false,
+  editDate = '',
+  editTime = '',
+  editError = '',
+  editLoading = false,
+  onAskEdit,
+  onEditDate,
+  onEditTime,
+  onSaveEdit,
 }) {
   const activeBookings = activeBookingsOn(session)
   const hasActiveBookings = activeBookings.length > 0
+  const hasBlockingBookings = (session.bookings ?? []).some(
+    (booking) => booking.status === 'pending' || booking.status === 'confirmed',
+  )
   const guestTotal = activeBookings.reduce(
     (sum, booking) => sum + (booking.guests_count || 0),
     0,
@@ -1110,33 +1216,83 @@ function SessionRow({
             />
           </label>
         ) : null}
-        <div className="hosting-session__text">
-          <p className="dashboard-card__title">{title}</p>
-          <p className="dashboard-card__meta">
-            {showListing ? `${when} · ${guestLabel}` : `${activeBookings.length} active booking(s) · ${guestLabel}`}
-          </p>
-        </div>
+        {selectable && editing ? (
+          <div className="hosting-session__edit">
+            <label className="label">
+              Date
+              <input
+                type="date"
+                className="input"
+                value={editDate}
+                onChange={(event) => onEditDate(event.target.value)}
+              />
+            </label>
+            <label className="label">
+              Time
+              <input
+                type="time"
+                className="input"
+                value={editTime}
+                onChange={(event) => onEditTime(event.target.value)}
+              />
+            </label>
+          </div>
+        ) : (
+          <div className="hosting-session__text">
+            <p className="dashboard-card__title">{title}</p>
+            {showListing ? (
+              <p className="dashboard-card__meta">
+                {when} · {guestLabel}
+              </p>
+            ) : null}
+          </div>
+        )}
       </div>
       <div className="booking-card__actions">
         {hasActiveBookings && !confirmCancel ? (
           <button
             type="button"
             onClick={() => onAskCancel(session.id)}
-            className="btn btn--ghost hosting-session__action"
+            className="btn btn--ghost hosting-session__action hosting-session__action--danger"
           >
             Cancel session
           </button>
         ) : null}
-        {!hasActiveBookings && !confirmDelete ? (
+        {!hasBlockingBookings && selectable && !editing && onAskEdit ? (
+          <button
+            type="button"
+            onClick={() => onAskEdit(session)}
+            className="btn btn--ghost hosting-session__action"
+          >
+            Edit
+          </button>
+        ) : null}
+        {selectable && editing ? (
+          <>
+            <button
+              type="button"
+              disabled={editLoading}
+              onClick={() => onSaveEdit(session)}
+              className="btn btn--ghost hosting-session__action"
+            >
+              {editLoading ? 'Saving…' : 'Save'}
+            </button>
+            <button type="button" onClick={onKeep} className="btn btn--ghost hosting-session__action">
+              Cancel
+            </button>
+          </>
+        ) : null}
+        {!hasActiveBookings && !confirmDelete && !editing ? (
           <button
             type="button"
             onClick={() => onAskDelete(session.id)}
-            className="btn btn--ghost hosting-session__action"
+            className="btn btn--ghost hosting-session__action hosting-session__action--danger"
           >
             Delete
           </button>
         ) : null}
       </div>
+      {editError ? <p className="error-message">{editError}</p> : null}
 
       {confirmCancel ? (
         <div className="cancel-confirm">

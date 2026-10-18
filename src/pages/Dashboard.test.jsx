@@ -101,6 +101,7 @@ function makeMyListing(overrides = {}) {
     category: 'Food',
     photo_urls: ['https://cdn.test/latte.jpg'],
     duration_mins: 90,
+    max_guests: 4,
     ...overrides,
   }
 }
@@ -405,7 +406,7 @@ describe('Dashboard listings', () => {
     expect(card.className).toContain('hosting-listing-card')
   })
 
-  it('keeps thumbnail and title on one line, the menu in the card corner, and two columns from 1024px', () => {
+  it('keeps thumbnail and title on one line, the menu in the card corner, and one listing per row', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
     const listing = css.match(/\.hosting-listing \{[\s\S]*?\n\}/)
     const main = css.match(/\.hosting-listing__main \{[\s\S]*?\n\}/)
@@ -423,9 +424,18 @@ describe('Dashboard listings', () => {
     expect(menu?.[0]).toMatch(/right:\s*8px/)
     expect(foot?.[0]).toMatch(/justify-content:\s*space-between/)
     expect(listings?.[0]).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/)
-    expect(css).toMatch(
+    expect(listings?.[0]).toMatch(/align-items:\s*start/)
+    expect(css).toMatch(/\.add-sessions__repeat select\.input \{[^}]*padding-right:\s*36px/)
+    expect(css).not.toMatch(
       /@media \(min-width: 1024px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
     )
+    expect(css).not.toMatch(
+      /@media \(min-width: 768px\) \{\s*\.hosting-listing \{\s*flex-direction:\s*row;/
+    )
+    expect(css).not.toMatch(
+      /@media \(min-width: 768px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2/
+    )
+    expect(css).toMatch(/\.hosting-sessions__more \{[^}]*padding:\s*10px 14px/)
     expect(css).toMatch(
       /\.dashboard-card\.hosting-listing-card:has\(\.ui-overflow__menu\) \{[^}]*z-index:\s*30;/
     )
@@ -574,11 +584,10 @@ describe('Dashboard add session', () => {
     await user.click(screen.getByRole('button', { name: 'Add sessions' }))
   }
 
-  async function fillSession(user, { daysAhead = 1, time = '10:30', spots = '4' } = {}) {
+  async function fillSession(user, { daysAhead = 1, time = '10:30' } = {}) {
     const dateKey = dateKeyFromToday(daysAhead)
     await selectCalendarDate(user, dateKey)
     fireEvent.change(screen.getByLabelText('Time'), { target: { value: time } })
-    fireEvent.change(screen.getByLabelText('Spots total'), { target: { value: spots } })
     return dateKey
   }
 
@@ -625,7 +634,13 @@ describe('Dashboard add session', () => {
     await openSessionForm(user)
 
     expect(screen.getByText('Each session is 1 hr 30 min.')).toBeInTheDocument()
+    expect(screen.getByText(/4 spots per session/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'change in listing settings' })).toHaveAttribute(
+      'href',
+      '/edit-listing/listing-1'
+    )
     expect(screen.queryByLabelText('Duration (mins)')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Spots total')).not.toBeInTheDocument()
   })
 
   it('stores the start time as UTC converted from Singapore time', async () => {
@@ -645,10 +660,11 @@ describe('Dashboard add session', () => {
     expect(supabase.__calls('sessions', 'insert')).toHaveLength(0)
   })
 
-  it('sends the spot count and lets the database set the length', async () => {
+  it('sends the listing spots and lets the database set the length', async () => {
+    givenData({ listings: [makeMyListing({ max_guests: 6 })] })
     const { user } = await renderHosting()
     await openSessionForm(user)
-    await fillSession(user, { spots: '6' })
+    await fillSession(user)
 
     await reviewAndCreate(user)
 
@@ -718,13 +734,16 @@ describe('Dashboard add session', () => {
     if (blocked) expect(blocked).toBeDisabled()
   })
 
-  it('rejects a session with no spots', async () => {
+  it('asks the host to set listing spots when max_guests is missing', async () => {
+    givenData({ listings: [makeMyListing({ max_guests: null })] })
     const { user } = await renderHosting()
     await openSessionForm(user)
-    await fillSession(user, { spots: '0' })
+    await fillSession(user)
     fireEvent.submit(document.querySelector('.dashboard-card__form'))
 
-    expect(await screen.findByText('Spots total must be at least 1.')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Set spots per session in listing settings first.')
+    ).toBeInTheDocument()
   })
 
   it('closes the form after a successful save', async () => {
@@ -793,7 +812,6 @@ describe('Dashboard add session', () => {
     fireEvent.change(screen.getByLabelText('Time'), { target: { value: '10:00' } })
     await user.click(screen.getByRole('button', { name: '+ add time' }))
     fireEvent.change(screen.getByLabelText('Time 2'), { target: { value: '14:00' } })
-    fireEvent.change(screen.getByLabelText('Spots total'), { target: { value: '4' } })
 
     await user.click(screen.getByRole('button', { name: 'Review sessions' }))
 
@@ -978,7 +996,8 @@ describe('Dashboard host cancellation', () => {
     await renderHosting()
 
     expect(screen.queryByRole('heading', { name: 'Upcoming bookings' })).not.toBeInTheDocument()
-    expect(screen.getByText(/0 active booking\(s\) · 0 guests booked/)).toBeInTheDocument()
+    expect(screen.queryByText(/active booking/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel session' })).not.toBeInTheDocument()
   })
@@ -1034,7 +1053,7 @@ describe('Dashboard host cancellation', () => {
 
     expect(await screen.findByText('not allowed')).toBeInTheDocument()
     expect(within(listingCard('Latte art')).getByRole('button', { name: 'Confirm delete' })).toBeInTheDocument()
-    expect(within(listingCard('Latte art')).getByText(/active booking/)).toBeInTheDocument()
+    expect(within(listingCard('Latte art')).queryByText(/active booking/)).not.toBeInTheDocument()
   })
 
   it('does not offer Delete on a session with a confirmed booking', async () => {
@@ -1042,8 +1061,54 @@ describe('Dashboard host cancellation', () => {
     await renderHosting()
 
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
     expect(within(sectionFor('Upcoming bookings')).getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
     expect(supabase.rpc.mock.calls.some(([name]) => name === 'delete_empty_session')).toBe(false)
+  })
+
+  it('moves an empty session through edit_open_session', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [makeHostSession({ bookings: [] })],
+    })
+    givenRpc(async (name) => {
+      if (name === 'edit_open_session') return { data: 'session-1', error: null }
+      return { data: null, error: null }
+    })
+    const { user } = await renderHosting()
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const dateKey = dateKeyFromToday(2)
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: dateKey } })
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '15:00' } })
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(supabase.rpc).toHaveBeenCalledWith('edit_open_session', {
+        p_session_id: 'session-1',
+        p_starts_at: `${dateKey}T07:00:00.000Z`,
+      })
+    )
+  })
+
+  it('keeps the session and explains when a booking wins the race', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [makeHostSession({ bookings: [] })],
+    })
+    givenRpc(async (name) => {
+      if (name === 'edit_open_session') {
+        return { data: null, error: { message: 'session_has_bookings' } }
+      }
+      return { data: null, error: null }
+    })
+    const { user } = await renderHosting()
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(
+      await screen.findByText("Someone just started booking this session, so it can't be edited.")
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
   })
 
   it('names a single guest in the cancel warning without an amount', async () => {
@@ -1151,6 +1216,24 @@ describe('Dashboard host cancellation', () => {
 
     expect(within(card).getAllByRole('button', { name: 'Delete' })).toHaveLength(4)
     expect(within(card).queryByRole('button', { name: 'Show all 4 open sessions' })).not.toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Show fewer' })).toBeInTheDocument()
+
+    await user.click(within(card).getByRole('button', { name: 'Show fewer' }))
+
+    expect(within(card).getAllByRole('button', { name: 'Delete' })).toHaveLength(3)
+    expect(within(card).getByRole('button', { name: 'Show all 4 open sessions' })).toBeInTheDocument()
+  })
+
+  it('omits a dangling separator when the listing has no area', async () => {
+    // Without price, length or group size the card falls back to category and area.
+    givenData({
+      listings: [makeMyListing({ area: '', title: 'No area yet', duration_mins: null, max_guests: null })],
+    })
+    await renderHosting()
+
+    expect(listingCard('No area yet').querySelector('.hosting-listing__facts')).toHaveTextContent(
+      /^Food$/,
+    )
   })
 
   it('deletes only the empty sessions that were ticked', async () => {
@@ -1474,7 +1557,7 @@ describe('Hosting photo tips', () => {
       'aria-expanded',
       'true'
     )
-    expect(screen.getByText('Shoot by a window in daylight, with the flash off.')).toBeInTheDocument()
+    expect(screen.getByText('Natural light is your best friend. A window beats any flash.')).toBeInTheDocument()
   })
 })
 
