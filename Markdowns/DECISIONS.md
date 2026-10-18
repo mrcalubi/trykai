@@ -173,7 +173,7 @@ Ask instead for one of two things:
 ### Status: Stripe Connect is in the repo
 **Decided 16 August 2026. Implementation walked 31 August 2026.** After HitPay disabled payment capability on 13 August, and after their Platform account route was found to be the same split model already ruled out, TryKai moved to **Stripe Connect using separate charges and transfers**.
 
-The money loop is now in this tree: Payment Element checkout, signed `stripe-webhook` → `confirm_paid_booking`, Connect Express onboarding, `cancel-booking` refunds, `release-payout` Transfers 24 hours after `starts_at`. Remaining work is ops (apply `00005`, Dashboard webhook + secrets, platform payouts **manual**, founding-host flags, staging test-mode booking), not a second provider decision. See BUILD_BACKLOG.md.
+The money loop is now in this tree: Payment Element checkout, signed `stripe-webhook` → `confirm_paid_booking`, Connect Express onboarding, `cancel-booking` refunds, `release-payout` Transfers 72 hours after the session ends (`starts_at` + `duration_mins`). Remaining work is ops (apply `00005`, Dashboard webhook + secrets, platform payouts **manual**, founding-host flags, staging test-mode booking), not a second provider decision. See BUILD_BACKLOG.md.
 
 Why Connect: it is the only option that does what TryKai needs *without requiring anyone's approval*. Publicly documented, supported in Singapore, transfers delayable up to 90 days, and the codebase is already on Stripe. HitPay said no twice, the second time overturning their own CEO's explicit approval two days earlier.
 
@@ -182,7 +182,7 @@ Why Connect: it is the only option that does what TryKai needs *without requirin
 The HitPay thread stays open. If they return with something workable it can be compared properly, but nothing is planned around it.
 
 ### The requirement that constrains everything
-The host's share must be held until **24 hours after the session takes place**, not 24 hours after the guest pays. Guests book days or weeks ahead. Every published guest protection depends on this hold:
+The host's share must be held until **72 hours after the session ends**, not after the guest pays. Guests book days or weeks ahead. Every published guest protection depends on this hold:
 
 - A guest cancelling 5 days out is owed a full refund. If the host was paid 4 days ago, TryKai refunds out of pocket and chases the host.
 - Clawback assumes the host has future bookings to deduct from. At 11 hosts and single digit monthly bookings, often they will not.
@@ -255,7 +255,7 @@ Published at /cancellation-policy, /refund-policy, /dispute-policy. Finalised 29
 
 **Stripe keeps its processing fee on refunds.** About S$1.45 on a S$28 card booking, about S$0.35 on PayNow. Launch still pays full refunds for guest 48h+ and host cancellations, so TryKai absorbs that fee. Review after the first 100 bookings; leaning towards making the booking fee non-refundable on 48h+ guest cancellations, with notice to users.
 
-**Payout collision:** if a dispute is confirmed after a payout has released, TryKai refunds the guest first, absorbs the cost, and recovers from the host including from future payouts. `release-payout` now exists and Transfers 24h after `starts_at`. It does **not** hold for open disputes; it only skips rows with `stripe_refund_id` set. Clawback after release is still not built.
+**Payout collision:** if a dispute is confirmed after a payout has released, TryKai refunds the guest first, absorbs the cost, and recovers from the host including from future payouts. `release-payout` now exists and Transfers 72 hours after the session ends. It does **not** hold for open disputes; it only skips rows with `stripe_refund_id` set. Clawback after release is still not built.
 
 ---
 
@@ -551,6 +551,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-10-18 — Crop every photo; group-discount example under the checkbox.** Every thumb has ← → · Crop · Set as cover (Set as cover hidden on the cover). Cover crop stays 4:3; other photos default to 4:3 with a Free option. Create and Edit listing both mount `ListingPricePanel`. Under "Offer group discounts", one live line: "Group discounts come off your price, e.g. a group of N together pays you $Y instead of $X." Hidden when the checkbox is off.
 
 **2026-10-18 — Photo tiles: drag only; one 4:3 cover ratio.** Arrows and Set as cover are gone. Tiles are photo + Cover + ×; tap opens Crop / Make cover / Remove. Reorder is `@dnd-kit` (touch + keyboard). Cover ratio is 4:3 — `--listing-cover-aspect` in CSS and `LISTING_COVER_ASPECT` in JS — on browse cards, unused `ListingCard`, listing gallery (phone swipe and a lone desktop photo), booking detail, wizard preview, and cover crop. Browse cards had been 1:1 in CSS; DESIGN already specified 4/3 so they now match. Hosting / checkout / editor thumbs stay square and crop from the centre. Open Graph later is 1.91:1, centre-cropped from the cover.
+
+**2026-10-18 — Host payout hold is 72 hours after the session ends.** The hold now counts from the session's end (`starts_at` + `sessions.duration_mins`), not its start, and `PAYOUT_HOLD_MS` in `_shared/payouts.ts` goes from 24 to 72 hours, so guests and ops have three days to raise a no-show, safety report or dispute before the host is paid. The hourly `release-payout` schedule is unchanged; a booking is skipped as `hold_not_elapsed` until 72 hours after the end, or as `invalid_duration` if the session has no positive length. Terms, Dispute Policy, and host onboarding copy say 72 hours. Supersedes the 24 hour hold.
 
 ---
 

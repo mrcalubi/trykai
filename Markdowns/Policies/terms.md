@@ -118,7 +118,7 @@ TryKai charges Hosts a fee of 10% of the lesson price on each confirmed booking,
 ### 5. Payouts
 
 - Payments are processed by Stripe. You must complete Stripe's payout setup before guests can book you.
-- Your share (the lesson price, less any Host fee) is transferred to your Stripe account about 24 hours after your session's start time.
+- Your share (the lesson price, less any Host fee) is transferred to your Stripe account about 72 hours after your session ends.
 - We may hold a payout while we look into a dispute, a fraud concern or a breach of these terms.
 
 ### 6. Cancellations and strikes

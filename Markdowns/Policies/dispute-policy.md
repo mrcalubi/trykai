@@ -32,7 +32,7 @@ If a host cancellation or no show was caused by something genuinely outside the 
 
 ## If a payout has already been released
 
-Host payouts are normally released 24 hours after a session starts. In rare cases, a dispute may be confirmed after that payout has already gone out, for example if a safety report or complaint comes in a few days later. When this happens, TryKai will refund the guest first, treat the amount as a cost to us in the meantime, and work separately to recover it from the host, including from future payouts where applicable. The host issue itself, such as a strike or suspension, is handled independently of this recovery process.
+Host payouts are normally released 72 hours after a session ends. In rare cases, a dispute may be confirmed after that payout has already gone out, for example if a safety report or complaint comes in a few days later. When this happens, TryKai will refund the guest first, treat the amount as a cost to us in the meantime, and work separately to recover it from the host, including from future payouts where applicable. The host issue itself, such as a strike or suspension, is handled independently of this recovery process.
 
 ## What we can and cannot do
 
