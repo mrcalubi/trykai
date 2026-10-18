@@ -46,9 +46,10 @@ test.describe('host add sessions', () => {
 
     await page.goto('/hosting')
     await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}\\?tab=hosting`))
-    await expect(page.getByText('Learn latte art with me')).toBeVisible()
+    const card = page.locator('.hosting-listing-card').filter({ hasText: 'Learn latte art with me' })
+    await expect(card).toBeVisible()
 
-    await page.getByRole('button', { name: 'Add session' }).click()
+    await card.getByRole('button', { name: 'Add sessions' }).click()
     await page.getByRole('button', { name: 'Sat', exact: true }).click()
     await page.getByRole('button', { name: 'Sun', exact: true }).click()
     await page.getByLabel('Time', { exact: true }).fill('10:00')

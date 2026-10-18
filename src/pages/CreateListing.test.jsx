@@ -31,12 +31,12 @@ function givenVerification(status, { foundingHost = false, foundingError = null 
 
 // Mounted behind the same guard App.jsx puts it behind, so the page always has
 // a signed-in user. RequireAuth owns the signed-out case and tests it itself.
-function renderPage() {
+function renderPage(route = '/create-listing') {
   return renderWithRouter(
     <RequireAuth>
       <CreateListing />
     </RequireAuth>,
-    { route: '/create-listing', path: '/create-listing' }
+    { route, path: '/create-listing' }
   )
 }
 
@@ -680,6 +680,34 @@ describe('CreateListing drafts', () => {
 
     expect(screen.getByLabelText('Title')).toHaveValue('Pottery taster')
     expect(screen.getByRole('radio', { name: 'Arts' })).toBeChecked()
+  })
+
+  it('keeps the step a draft was saved on', async () => {
+    const { user } = renderPage()
+    await stepHeading('The basics')
+    await completeBasics(user, { title: 'Pottery taster', category: 'Arts', description: 'Throw a bowl.' })
+    await stepHeading('Add photos')
+    await next(user)
+    await stepHeading('Price and group size')
+    await user.click(screen.getByRole('button', { name: 'Save draft' }))
+
+    const saved = JSON.parse(window.localStorage.getItem('trykai:listing-draft:host-9'))
+    expect(saved.step).toBe(2)
+    expect(saved.title).toBe('Pottery taster')
+  })
+
+  it('opens a draft already restored at its step when Hosting sends the host to continue it', async () => {
+    window.localStorage.setItem(
+      'trykai:listing-draft:host-9',
+      JSON.stringify({ step: 2, title: 'Bake a focaccia together', category: 'Food', price: '20' })
+    )
+    renderPage({ pathname: '/create-listing', state: { resumeDraft: true } })
+
+    await stepHeading('Price and group size')
+    expect(screen.getByText('Step 3 of 5')).toBeInTheDocument()
+    expect(screen.getByLabelText('Your price per guest')).toHaveValue(20)
+    expect(screen.getByText(/Draft restored/)).toBeInTheDocument()
+    expect(screen.queryByText('You have a saved draft on this device.')).not.toBeInTheDocument()
   })
 
   it('throws the draft away on Discard', async () => {

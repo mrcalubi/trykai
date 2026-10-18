@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Bookings from './Bookings'
 import Hosting from './Hosting'
 import Dashboard from './Dashboard'
@@ -41,6 +41,7 @@ function givenData({
   hostStrikes = 0,
   isHost,
   payoutsEnabled = true,
+  verificationStatus = 'approved',
 } = {}) {
   supabase.__on('listings', 'select', { data: listings, error: null })
   supabase.__on('bookings', 'select', (call) =>
@@ -56,6 +57,7 @@ function givenData({
     stripe_payouts_enabled: payoutsEnabled,
     is_host: isHost ?? listings.length > 0,
     host_strikes: hostStrikes,
+    verification_status: verificationStatus,
   }
   const previousRpc = supabase.rpc.getMockImplementation()
   givenRpc(async (name, args) => {
@@ -123,7 +125,7 @@ async function renderHosting(options = {}) {
     </RequireAuth>,
     { route: '/hosting', path: '/hosting', ...options }
   )
-  await screen.findByRole('heading', { name: 'Dashboard', level: 1 })
+  await screen.findByRole('heading', { name: 'Hosting', level: 1 })
   return utils
 }
 
@@ -155,7 +157,7 @@ function sectionFor(title) {
 }
 
 function listingCard(title) {
-  return within(sectionFor('My Listings')).getByText(title).closest('.dashboard-card')
+  return within(sectionFor('Your listings')).getByText(title).closest('.dashboard-card')
 }
 
 function dateKeyFromToday(daysAhead) {
@@ -266,7 +268,7 @@ describe('Hosting access for guests', () => {
     )
 
     await waitFor(() => expect(currentPath()).toBe('/bookings'))
-    expect(screen.queryByRole('heading', { name: 'My Listings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Your listings' })).not.toBeInTheDocument()
   })
 })
 
@@ -364,13 +366,13 @@ describe('Dashboard empty states', () => {
     givenData({ isHost: true })
     await renderHosting()
 
-    expect(within(sectionFor('Upcoming')).getByText('No upcoming bookings yet.')).toBeInTheDocument()
-    const listings = sectionFor('My Listings')
+    expect(screen.queryByRole('heading', { name: 'Upcoming bookings' })).not.toBeInTheDocument()
+    const listings = sectionFor('Your listings')
     expect(within(listings).getByRole('link', { name: 'Create one' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
-    expect(within(listings).getByRole('link', { name: '+ New listing' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'New listing' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
@@ -391,10 +393,10 @@ describe('Dashboard listings', () => {
       'src',
       'https://cdn.test/latte.jpg'
     )
-    expect(within(card).getByRole('button', { name: 'Add session' }).className).toContain(
+    expect(within(card).getByRole('button', { name: 'Add sessions' }).className).toContain(
       'hosting-listing__add'
     )
-    expect(within(sectionFor('My Listings')).getByRole('link', { name: '+ New listing' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'New listing' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
@@ -409,29 +411,20 @@ describe('Dashboard listings', () => {
     const main = css.match(/\.hosting-listing__main \{[\s\S]*?\n\}/)
     const text = css.match(/\.hosting-listing__text \{[\s\S]*?\n\}/)
     const menu = css.match(/\.ui-overflow\.hosting-listing__menu \{[\s\S]*?\n\}/)
-    const add = css.match(/\.hosting-listing__add \{[\s\S]*?\n\}/)
-    const card = css.match(/\.dashboard-card\.hosting-listing-card \{[\s\S]*?\n\}/)
+    const foot = css.match(/\.hosting-listing__foot \{[\s\S]*?\n\}/)
     const listings = css.match(/\.dashboard-list--listings \{[\s\S]*?\n\}/)
     expect(listing?.[0]).toMatch(/flex-direction:\s*column/)
-    expect(listing?.[0]).not.toMatch(/flex-wrap:\s*wrap/)
     expect(main?.[0]).toMatch(/display:\s*flex/)
     expect(main?.[0]).not.toMatch(/flex-direction:\s*column/)
-    expect(text?.[0]).toMatch(/flex:\s*1/)
+    expect(main?.[0]).toMatch(/padding-right:\s*44px/)
     expect(text?.[0]).toMatch(/min-width:\s*0/)
     expect(menu?.[0]).toMatch(/position:\s*absolute/)
-    expect(menu?.[0]).toMatch(/top:\s*4px/)
-    expect(menu?.[0]).toMatch(/right:\s*4px/)
-    expect(add?.[0]).toMatch(/width:\s*100%/)
-    expect(card?.[0]).toMatch(/padding:\s*12px/)
+    expect(menu?.[0]).toMatch(/top:\s*8px/)
+    expect(menu?.[0]).toMatch(/right:\s*8px/)
+    expect(foot?.[0]).toMatch(/justify-content:\s*space-between/)
     expect(listings?.[0]).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/)
     expect(css).toMatch(
       /@media \(min-width: 1024px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
-    )
-    expect(css).not.toMatch(
-      /@media \(min-width: 768px\) \{\s*\.hosting-listing \{\s*flex-direction:\s*row;/
-    )
-    expect(css).not.toMatch(
-      /@media \(min-width: 768px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2/
     )
     expect(css).toMatch(
       /\.dashboard-card\.hosting-listing-card:has\(\.ui-overflow__menu\) \{[^}]*z-index:\s*30;/
@@ -551,7 +544,7 @@ describe('Dashboard listings', () => {
     await user.click(screen.getByRole('button', { name: 'Keep listing' }))
 
     expect(supabase.rpc.mock.calls.some(([name]) => name === 'delete_listing')).toBe(false)
-    expect(screen.getByText('Latte art')).toBeInTheDocument()
+    expect(listingCard('Latte art')).toBeInTheDocument()
   })
 
   it('reports a failed deletion', async () => {
@@ -568,7 +561,7 @@ describe('Dashboard listings', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
 
     expect(await screen.findByText('not your listing')).toBeInTheDocument()
-    expect(screen.getByText('Latte art')).toBeInTheDocument()
+    expect(listingCard('Latte art')).toBeInTheDocument()
   })
 })
 
@@ -578,7 +571,7 @@ describe('Dashboard add session', () => {
   })
 
   async function openSessionForm(user) {
-    await user.click(screen.getByRole('button', { name: 'Add session' }))
+    await user.click(screen.getByRole('button', { name: 'Add sessions' }))
   }
 
   async function fillSession(user, { daysAhead = 1, time = '10:30', spots = '4' } = {}) {
@@ -607,7 +600,7 @@ describe('Dashboard add session', () => {
     const { user } = await renderHosting()
 
     expect(screen.queryByText(/duration_mins does not exist/)).not.toBeInTheDocument()
-    expect(screen.getByText('Latte art')).toBeInTheDocument()
+    expect(listingCard('Latte art')).toBeInTheDocument()
 
     await openSessionForm(user)
     expect(screen.getByLabelText('Duration (mins)')).toBeInTheDocument()
@@ -805,7 +798,7 @@ describe('Dashboard add session', () => {
     await user.click(screen.getByRole('button', { name: 'Review sessions' }))
 
     expect(screen.getByText('This creates 8 sessions.')).toBeInTheDocument()
-    expect(screen.getByRole('list').querySelectorAll('li')).toHaveLength(8)
+    expect(within(listingCard('Latte art')).getByRole('list').querySelectorAll('li')).toHaveLength(8)
   })
 })
 
@@ -949,9 +942,9 @@ describe('Dashboard host cancellation', () => {
     })
     await renderHosting()
 
-    expect(within(sectionFor('Upcoming')).getByText('Latte art')).toBeInTheDocument()
-    expect(within(sectionFor('Upcoming')).getByText(/4 guests booked/)).toBeInTheDocument()
-    expect(within(sectionFor('Upcoming')).getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
+    expect(within(sectionFor('Upcoming bookings')).getByText('Latte art')).toBeInTheDocument()
+    expect(within(sectionFor('Upcoming bookings')).getByText(/4 guests booked/)).toBeInTheDocument()
+    expect(within(sectionFor('Upcoming bookings')).getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
     expect(within(listingCard('Latte art')).queryByRole('button', { name: 'Cancel session' })).not.toBeInTheDocument()
   })
 
@@ -968,7 +961,7 @@ describe('Dashboard host cancellation', () => {
     })
     await renderHosting()
 
-    expect(within(sectionFor('Upcoming')).getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
+    expect(within(sectionFor('Upcoming bookings')).getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
     expect(within(listingCard('Latte art')).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
     expect(within(listingCard('Latte art')).queryByRole('button', { name: 'Cancel session' })).not.toBeInTheDocument()
   })
@@ -984,7 +977,7 @@ describe('Dashboard host cancellation', () => {
     })
     await renderHosting()
 
-    expect(within(sectionFor('Upcoming')).getByText('No upcoming bookings yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Upcoming bookings' })).not.toBeInTheDocument()
     expect(screen.getByText(/0 active booking\(s\) · 0 guests booked/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel session' })).not.toBeInTheDocument()
@@ -1049,7 +1042,7 @@ describe('Dashboard host cancellation', () => {
     await renderHosting()
 
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
-    expect(within(sectionFor('Upcoming')).getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
+    expect(within(sectionFor('Upcoming bookings')).getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
     expect(supabase.rpc.mock.calls.some(([name]) => name === 'delete_empty_session')).toBe(false)
   })
 
@@ -1080,8 +1073,9 @@ describe('Dashboard host cancellation', () => {
     expect(
       screen.getByText('Cancelling refunds both guests in full and adds a strike to your account.')
     ).toBeInTheDocument()
-    expect(screen.queryByText(/Full refund of/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/\$90|\$45|total/i)).not.toBeInTheDocument()
+    const warning = within(sectionFor('Upcoming bookings'))
+    expect(warning.queryByText(/Full refund of/)).not.toBeInTheDocument()
+    expect(warning.queryByText(/\$90|\$45|total/i)).not.toBeInTheDocument()
   })
 
   it('asks the cancel-booking function to cancel the whole session', async () => {
@@ -1147,7 +1141,7 @@ describe('Dashboard host cancellation', () => {
     const { user } = await renderHosting()
     const card = listingCard('Latte art')
 
-    expect(within(sectionFor('Upcoming')).getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
+    expect(within(sectionFor('Upcoming bookings')).getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
     expect(within(card).queryByRole('button', { name: 'Cancel session' })).not.toBeInTheDocument()
     expect(within(card).getAllByRole('button', { name: 'Delete' })).toHaveLength(3)
     expect(within(card).getByRole('button', { name: 'Show all 4 open sessions' })).toBeInTheDocument()
@@ -1197,7 +1191,7 @@ describe('Dashboard host cancellation', () => {
     )
     expect(supabase.rpc).toHaveBeenCalledWith('delete_empty_session', { p_session_id: 'empty-1' })
     expect(supabase.rpc).toHaveBeenCalledWith('delete_empty_session', { p_session_id: 'empty-2' })
-    expect(within(sectionFor('Upcoming')).getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
+    expect(within(sectionFor('Upcoming bookings')).getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
     expect(within(card).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
   })
 
@@ -1224,7 +1218,7 @@ describe('Dashboard host cancellation', () => {
     })
     await renderHosting()
 
-    const upcoming = sectionFor('Upcoming')
+    const upcoming = sectionFor('Upcoming bookings')
     const titles = within(upcoming)
       .getAllByText(/Latte art|Boxing/)
       .map((node) => node.textContent)
@@ -1235,12 +1229,264 @@ describe('Dashboard host cancellation', () => {
   })
 })
 
+describe('Hosting setup checklist', () => {
+  function step(title) {
+    return within(sectionFor('Get ready for guests')).getByText(title).closest('li')
+  }
+
+  it('counts what is done and offers the next action on each open step', async () => {
+    givenData({ listings: [makeMyListing()], payoutsEnabled: false })
+    await renderHosting()
+
+    const setup = sectionFor('Get ready for guests')
+    expect(within(setup).getByText('2 of 4')).toBeInTheDocument()
+    expect(within(setup).getByRole('progressbar', { name: 'Setup progress' })).toHaveAttribute(
+      'aria-valuenow',
+      '2'
+    )
+    expect(within(setup).getByText('Guests can only book once all four are done.')).toBeInTheDocument()
+    expect(step('ID verified')).toHaveTextContent('Done. Guests see your verified badge.')
+    expect(step('First listing created')).toHaveTextContent('Latte art')
+    expect(within(step('Set up payouts')).getByRole('button', { name: 'Set up payouts' })).toBeInTheDocument()
+    expect(
+      within(step('Add your first session')).getByRole('button', { name: 'Add your first session' })
+    ).toBeInTheDocument()
+  })
+
+  it('names the first listing the host created, which comes last in the newest-first list', async () => {
+    givenData({
+      listings: [
+        makeMyListing({ id: 'listing-2', title: 'Boxing' }),
+        makeMyListing({ id: 'listing-1', title: 'Latte art' }),
+      ],
+    })
+    await renderHosting()
+
+    expect(step('First listing created')).toHaveTextContent('Latte art')
+  })
+
+  it('asks a host whose ID is still being checked to wait rather than verify again', async () => {
+    givenData({ listings: [makeMyListing()], verificationStatus: 'pending' })
+    await renderHosting()
+
+    expect(step('Verify your ID')).toHaveTextContent('We are checking your ID.')
+    expect(within(step('Verify your ID')).queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('opens the session form on the first listing without dates from Add', async () => {
+    givenData({
+      listings: [
+        makeMyListing({ id: 'listing-2', title: 'Boxing' }),
+        makeMyListing({ id: 'listing-1', title: 'Latte art' }),
+      ],
+    })
+    const { user } = await renderHosting()
+
+    await user.click(screen.getByRole('button', { name: 'Add your first session' }))
+
+    expect(within(listingCard('Boxing')).getByLabelText('Time')).toBeInTheDocument()
+    expect(within(listingCard('Latte art')).queryByLabelText('Time')).not.toBeInTheDocument()
+  })
+
+  it('goes away once all four steps are done', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [makeHostSession({ bookings: [] })],
+    })
+    await renderHosting()
+
+    expect(screen.queryByRole('heading', { name: 'Get ready for guests' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Hosting this month', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-15T04:00:00Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('reads sessions from the start of the Singapore month', async () => {
+    givenData({ listings: [makeMyListing()] })
+    await renderHosting()
+
+    expect(supabase.__lastCall('sessions', 'select').filters).toContainEqual({
+      method: 'gte',
+      column: 'starts_at',
+      value: '2026-09-30T16:00:00.000Z',
+    })
+  })
+
+  it('counts sessions, paid guests and what the host takes home this month', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({
+          id: 'past',
+          starts_at: '2026-10-10T02:00:00Z',
+          bookings: [{ id: 'b1', status: 'confirmed', guests_count: 2, host_payout_amount: 4000 }],
+        }),
+        makeHostSession({
+          id: 'soon',
+          starts_at: '2026-10-20T02:00:00Z',
+          bookings: [
+            { id: 'b2', status: 'confirmed', guests_count: 1, total_amount: 2500, platform_fee: 300 },
+            { id: 'b3', status: 'pending', guests_count: 3, total_amount: 7500, platform_fee: 900 },
+          ],
+        }),
+        makeHostSession({ id: 'november', starts_at: '2026-11-03T02:00:00Z', bookings: [] }),
+      ],
+    })
+    await renderHosting()
+
+    const month = sectionFor('This month')
+    const stat = (label) => within(month).getByText(label).closest('.hosting-stat')
+    expect(stat('Sessions')).toHaveTextContent('2')
+    expect(stat('Guests booked')).toHaveTextContent('3')
+    expect(stat('Earned')).toHaveTextContent('S$62')
+  })
+
+  it('shows zeroes for a new host', async () => {
+    givenData({ listings: [makeMyListing()] })
+    await renderHosting()
+
+    const month = sectionFor('This month')
+    expect(within(month).getByText('Earned').closest('.hosting-stat')).toHaveTextContent('S$0')
+  })
+})
+
+describe('Hosting listing cards', () => {
+  it('flags a listing with no dates as hidden and leads with Add sessions', async () => {
+    givenData({
+      listings: [makeMyListing({ price_per_person: 2300, duration_mins: 90, max_guests: 4 })],
+    })
+    await renderHosting()
+
+    const card = listingCard('Latte art')
+    expect(within(card).getByText('Hidden: no sessions')).toBeInTheDocument()
+    expect(within(card).getByText('S$23 · 90 min · up to 4')).toBeInTheDocument()
+    expect(within(card).getByText('No dates yet')).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Add sessions' }).className).toContain(
+      'primary'
+    )
+  })
+
+  it('marks a listing with dates as live and shows the next one', async () => {
+    const startsAt = hoursFromNow(30)
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [makeHostSession({ starts_at: startsAt, bookings: [] })],
+    })
+    await renderHosting()
+
+    const card = listingCard('Latte art')
+    expect(within(card).getByText('Live')).toBeInTheDocument()
+    expect(within(card).getByText(`Next: ${formatSessionDateTime(startsAt)}`)).toBeInTheDocument()
+    expect(within(card).queryByText('Hidden: no sessions')).not.toBeInTheDocument()
+  })
+})
+
+describe('Hosting draft listing', () => {
+  const DRAFT_KEY = `trykai:listing-draft:${USER_ID}`
+
+  function memoryStorage() {
+    const items = new Map()
+    return {
+      getItem: (key) => (items.has(key) ? items.get(key) : null),
+      setItem: (key, value) => items.set(key, String(value)),
+      removeItem: (key) => items.delete(key),
+    }
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', memoryStorage())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('shows a draft saved on this device with the step to pick up from', async () => {
+    window.localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        step: 2,
+        title: 'Bake a focaccia together',
+        price: '20',
+        maxGuests: 4,
+        durationChoice: 90,
+      })
+    )
+    givenData({ listings: [makeMyListing()] })
+    await renderHosting()
+
+    const card = listingCard('Bake a focaccia together')
+    expect(within(card).getByText('Draft')).toBeInTheDocument()
+    expect(within(card).getByText('S$20 · 90 min · up to 4')).toBeInTheDocument()
+    expect(within(card).getByText('Step 3 of 5: price and group size')).toBeInTheDocument()
+    expect(
+      within(card).getByRole('link', { name: 'Continue Bake a focaccia together' })
+    ).toHaveAttribute('href', '/create-listing')
+  })
+
+  it('sends Continue to the wizard with the draft to restore', async () => {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: 1, title: 'Pottery' }))
+    givenData({ listings: [makeMyListing()] })
+    const { user, currentState } = renderWithRouter(
+      <RequireAuth>
+        <Hosting />
+      </RequireAuth>,
+      { route: '/hosting', path: '*', outlivesNavigation: true }
+    )
+
+    await user.click(await screen.findByRole('link', { name: 'Continue Pottery' }))
+
+    expect(currentState()).toEqual({ resumeDraft: true })
+  })
+
+  it('throws the draft away from its menu', async () => {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ title: 'Old idea' }))
+    givenData({ listings: [makeMyListing()] })
+    const { user } = await renderHosting()
+
+    const card = listingCard('Old idea')
+    await user.click(within(card).getByRole('button', { name: 'More actions' }))
+    await user.click(within(card).getByRole('menuitem', { name: 'Discard draft' }))
+
+    expect(screen.queryByText('Old idea')).not.toBeInTheDocument()
+    expect(window.localStorage.getItem(DRAFT_KEY)).toBeNull()
+  })
+})
+
+describe('Hosting photo tips', () => {
+  it('opens the photo tips from the banner', async () => {
+    givenData({ listings: [makeMyListing()] })
+    const { user } = await renderHosting()
+
+    const toggle = screen.getByRole('button', { name: 'See the 4 photo tips' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await user.click(toggle)
+
+    expect(screen.getByRole('button', { name: 'Hide the photo tips' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
+    expect(screen.getByText('Shoot by a window in daylight, with the flash off.')).toBeInTheDocument()
+  })
+})
+
 describe('Dashboard payout setup', () => {
   it('asks a host without payouts enabled to set them up', async () => {
     givenData({ listings: [makeMyListing()], payoutsEnabled: false })
     await renderHosting()
 
-    expect(screen.getByRole('heading', { name: 'Set up payouts' })).toBeInTheDocument()
+    const setup = sectionFor('Get ready for guests')
+    expect(within(setup).getByText('Set up payouts')).toBeInTheDocument()
+    expect(within(setup).getByText('Stripe needs your bank details to pay you.')).toBeInTheDocument()
+    expect(within(setup).getByRole('button', { name: 'Set up payouts' })).toHaveTextContent('Set up')
   })
 
   it('asks Stripe for an account link when payouts are not set up', async () => {
@@ -1332,7 +1578,7 @@ describe('Dashboard payout setup', () => {
         data: { stripe_payouts_enabled: false, url: 'https://connect.stripe.com/setup/fresh' },
         error: null,
       })
-      await user.click(screen.getByRole('button', { name: 'Continue setup' }))
+      await user.click(screen.getByRole('button', { name: 'Continue payout setup' }))
 
       await waitFor(() =>
         expect(supabase.functions.invoke).toHaveBeenCalledWith('create-account-link', {
@@ -1360,7 +1606,7 @@ describe('Dashboard payout setup', () => {
     )
 
     expect(await screen.findByText("Your payout setup isn't finished yet.")).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Continue setup' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue payout setup' })).toHaveTextContent('Continue')
     expect(screen.queryByText(/Payout setup submitted/)).not.toBeInTheDocument()
   })
 })

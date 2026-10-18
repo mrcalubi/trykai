@@ -170,6 +170,15 @@ No photo banner and no persistent search bar for launch (unchanged): with tens o
 ### Hosting, bookings, profile, settings, auth
 Same tokens and components: raised white cards with `--shadow-sm`, display titles, tabs with a navy underline, consistent banners. Inline `style={{…}}` in pages is not allowed; add a class instead.
 
+### Hosting dashboard (built from the canvas "Hosting dashboard · phone" mockup, 18 October 2026)
+- Lives in the profile's Hosting tab (`/hosting` still redirects there). A "Hosting" title with a navy "New listing" button on top.
+- **Get ready for guests:** a checklist card with "N of 4" in mono and a progress bar: ID verified, first listing created (names it), payouts set up (Set up / Continue opens Stripe), first session added (Add opens the session form on the first listing with no dates). Done steps get a green check; open steps get one outlined action. The card disappears once all four are done.
+- **This month:** three stat tiles (Sessions, Guests booked, Earned) in mono, counted over the Singapore calendar month. Earned is what the host takes home from paid bookings.
+- **Upcoming bookings:** booked sessions with Cancel session, shown only when there are any.
+- **Your listings:** a card per listing with thumbnail, a status badge ("Hidden: no sessions" in coral, or "Live" in green), title, "S$23 · 90 min · up to 4" in mono, and a ⋯ menu (View, Edit, Delete). The footer says "No dates yet" in coral-ink with a primary Add sessions, or the next date with a secondary Add sessions. A draft saved in the wizard on this device shows as a Draft card with "Step N of 5: <step>" and Continue, which reopens the wizard at that step with the draft restored; its menu discards it.
+- **Photo tips banner:** a navy card with a coral camera, "Better photos, more bookings", and a toggle that reveals the photo tips.
+- **Phones:** everything stacks in the mockup's order. **From 1024px:** the checklist on the left with This month and the photo tips in a 400px column beside it, then the listings full width in two columns. Without the checklist, This month and the tips share the top row.
+
 ### Create listing (built from the canvas "New listing, step 3 · phone" mockup, 18 October 2026)
 - **Five steps:** *The basics* (title, category as six icon tiles, description), *Add photos* (tips panel, a dashed upload tile, previews with the first marked Cover), *Price and group size*, *Where it happens* (area and full address), *Final touches* (what's provided, a preview of the browse card, cancellation policy, Host terms, Create listing).
 - **Chrome:** close (to Hosting), "New listing" and "Save draft" on top; "Step N of 5" in mono with "Next: <step>" and five progress segments; Back and Continue (Create listing on the last step) at the bottom. Continue checks only the current step and says what is missing; Create listing re-checks every step.
