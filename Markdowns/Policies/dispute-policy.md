@@ -12,7 +12,7 @@ There are three kinds of situations this policy covers: complaints about the qua
 
 If a session did not match what was described, or something about the experience fell short (for example, the host was very late, or the session was cut short), you can raise this with us within 3 days after the session ends. We cannot review complaints raised after that.
 
-To raise a complaint, email us at hello@trykai.sg with your booking reference, a description of what happened, and any evidence that helps us understand the situation, such as photos or messages. Including evidence upfront generally helps us resolve things faster.
+To raise a complaint, open the booking in your TryKai account and tap Report a problem, or email us at hello@trykai.sg with your booking reference. Tell us what happened and add any evidence that helps us understand the situation, such as photos or messages. Including evidence upfront generally helps us resolve things faster. We pause the host's payout while we look into it.
 
 We aim to respond within 2 business days. Once we have reviewed the situation, possible outcomes include a partial or full refund, a warning to the host, a strike against the host's account, or no action if we find the complaint is not supported.
 

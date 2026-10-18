@@ -8,6 +8,9 @@ import {
   bookingConfirmedHostHtml,
   bookingReference,
   cardDetailsFromCharge,
+  complaintOpsHtml,
+  complaintReceivedGuestHtml,
+  complaintReceivedGuestSubject,
   disputeRefundGuestHtml,
   disputeRefundGuestSubject,
   emailSiteUrl,
@@ -30,6 +33,7 @@ import {
   refundTimingCopy,
   resolvePaymentMethod,
   sendCancellationEmails,
+  sendComplaintEmails,
   sendDisputeRefundEmail,
   sendHostSessionCancelledEmail,
   sendResendEmail,
@@ -1088,6 +1092,121 @@ describe('dispute refund emails', () => {
         guestEmail: 'guest@trykai.sg',
         fullRefund: false,
         listingTitle: null as unknown as string,
+      }),
+    ).resolves.toBeUndefined()
+    expect(errorMock).toHaveBeenCalled()
+    errorMock.mockRestore()
+  })
+})
+
+describe('complaint emails', () => {
+  const ops = {
+    bookingId: 'a1b2c3d4-0000',
+    bookingReference: 'A1B2C3D4',
+    listingTitle: 'Latte art',
+    sessionDate: '28 Aug 2026, 7:00 pm',
+    guestName: 'caleb2',
+    guestEmail: 'guest@trykai.sg',
+    description: 'Host was <b>late</b> by 40 minutes',
+    photoPaths: ['a1b2c3d4-0000/c-1/1.jpg'],
+    photoFailures: 0,
+    payoutHeld: true,
+  }
+
+  it('acknowledges the guest and promises a reply in 2 business days', () => {
+    const html = complaintReceivedGuestHtml({
+      bookingReference: 'A1B2C3D4',
+      listingTitle: 'Latte <art>',
+      sessionDate: '28 Aug 2026, 7:00 pm',
+      guestName: 'caleb2',
+    })
+    expect(html).toContain('Hi caleb2,')
+    expect(html).toContain('Thanks for telling us what happened at Latte &lt;art&gt;.')
+    expect(html).toContain('reply by email within 2 business days')
+    expect(html).toContain('Booking reference:</strong> A1B2C3D4')
+    expect(html).toContain('href="https://trykai.sg/dispute-policy"')
+    expect(html.replace('<!DOCTYPE html>', '')).not.toContain('!')
+    expect(complaintReceivedGuestSubject('Latte art')).toBe(
+      "We've received your report about Latte art",
+    )
+  })
+
+  it('gives ops the escaped report, photos and hold state', () => {
+    const html = complaintOpsHtml(ops)
+    expect(html).toContain('Guest reported a problem: A1B2C3D4')
+    expect(html).toContain('Host was &lt;b&gt;late&lt;/b&gt;')
+    expect(html).not.toContain('<b>late</b>')
+    expect(html).toContain('1 in Storage bucket complaint-evidence: a1b2c3d4-0000/c-1/1.jpg')
+    expect(html).toContain('Held automatically')
+    expect(html).not.toContain('upload(s) failed')
+  })
+
+  it('tells ops when photos failed or the payout was not held', () => {
+    const html = complaintOpsHtml({ ...ops, photoPaths: [], photoFailures: 2, payoutHeld: false })
+    expect(html).toContain('<strong>Photos:</strong> None')
+    expect(html).toContain('2 photo upload(s) failed')
+    expect(html).toContain('<strong>Not held.</strong>')
+  })
+
+  it('emails ops (reply-to the guest) and then the guest', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+    await sendComplaintEmails({
+      apiKey: 're_test',
+      opsEmail: 'ops@trykai.sg',
+      guestEmail: 'guest@trykai.sg',
+      guestName: 'caleb2',
+      bookingId: 'a1b2c3d4-0000',
+      listingTitle: 'Latte art',
+      sessionDate: '28 Aug 2026, 7:00 pm',
+      description: 'Host was late by 40 minutes',
+      photoPaths: [],
+      photoFailures: 0,
+      payoutHeld: true,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const first = JSON.parse(fetchMock.mock.calls[0][1].body)
+    const second = JSON.parse(fetchMock.mock.calls[1][1].body)
+    expect(first.to).toBe('ops@trykai.sg')
+    expect(first.reply_to).toBe('guest@trykai.sg')
+    expect(first.subject).toBe('Guest reported a problem: A1B2C3D4 Latte art')
+    expect(second.to).toBe('guest@trykai.sg')
+    expect(second.reply_to).toBe('hello@trykai.sg')
+  })
+
+  it('falls back on missing guest details and never throws', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+    const errorMock = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await sendComplaintEmails({
+      apiKey: 're_test',
+      opsEmail: 'ops@trykai.sg',
+      guestEmail: null,
+      bookingId: 'a1b2c3d4-0000',
+      listingTitle: 'Latte art',
+      sessionDate: '',
+      description: 'Host was late by 40 minutes',
+      photoPaths: [],
+      photoFailures: 0,
+      payoutHeld: false,
+    })
+    const first = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(first.reply_to).toBeUndefined()
+    expect(first.html).toContain('Guest (unknown email)')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await expect(
+      sendComplaintEmails({
+        apiKey: 're_test',
+        opsEmail: 'ops@trykai.sg',
+        guestEmail: 'guest@trykai.sg',
+        bookingId: 'a1b2c3d4-0000',
+        listingTitle: 'Latte art',
+        sessionDate: '',
+        description: null as unknown as string,
+        photoPaths: [],
+        photoFailures: 0,
+        payoutHeld: false,
       }),
     ).resolves.toBeUndefined()
     expect(errorMock).toHaveBeenCalled()
