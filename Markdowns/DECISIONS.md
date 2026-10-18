@@ -550,6 +550,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-18 — Crop every photo; group-discount example under the checkbox.** Every thumb has ← → · Crop · Set as cover (Set as cover hidden on the cover). Cover crop stays 4:3; other photos default to 4:3 with a Free option. Create and Edit listing both mount `ListingPricePanel`. Under "Offer group discounts", one live line: "Group discounts come off your price, e.g. a group of N together pays you $Y instead of $X." Hidden when the checkbox is off.
 
+**2026-10-18 — Photo tiles: drag only; one 4:3 cover ratio.** Arrows and Set as cover are gone. Tiles are photo + Cover + ×; tap opens Crop / Make cover / Remove. Reorder is `@dnd-kit` (touch + keyboard). Cover ratio is 4:3 — `--listing-cover-aspect` in CSS and `LISTING_COVER_ASPECT` in JS — on browse cards, unused `ListingCard`, listing gallery (phone swipe and a lone desktop photo), booking detail, wizard preview, and cover crop. Browse cards had been 1:1 in CSS; DESIGN already specified 4/3 so they now match. Hosting / checkout / editor thumbs stay square and crop from the centre. Open Graph later is 1.91:1, centre-cropped from the cover.
+
 ---
 
 # Analysed but not decided

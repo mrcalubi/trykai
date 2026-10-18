@@ -1,5 +1,7 @@
-/** Browse cards use 4 / 3 (`ui-card__image-wrap`). Cover crop matches that. */
-export const LISTING_COVER_ASPECT = 4 / 3
+/** Same 4:3 as `--listing-cover-aspect` in index.css. Open Graph (later) is 1.91:1. */
+export const LISTING_COVER_W = 4
+export const LISTING_COVER_H = 3
+export const LISTING_COVER_ASPECT = LISTING_COVER_W / LISTING_COVER_H
 
 export function cropImageToBlob(image, croppedAreaPixels, { type = 'image/jpeg', quality = 0.8 } = {}) {
   const canvas = document.createElement('canvas')
