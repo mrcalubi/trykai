@@ -4,6 +4,7 @@ import Input from '../components/ui/Input'
 import Card from '../components/ui/Card'
 import SelectableCard from '../components/ui/SelectableCard'
 import { TopNavAccount } from '../components/ui/TopNav'
+import { LISTING_CATEGORIES } from '../lib/listingCategories'
 import foodIcon from '../assets/categories/food.png'
 import fitnessIcon from '../assets/categories/fitness.png'
 import artsIcon from '../assets/categories/arts.png'
@@ -34,14 +35,14 @@ const CATEGORY_ICONS = {
   // Other: otherIcon,
 }
 
-const BROWSE_CATEGORIES = [
-  { title: 'Food', description: 'Cook, bake, and taste something new' },
-  { title: 'Fitness', description: 'Move, train, and try a workout' },
-  { title: 'Arts', description: 'Make, paint, and create by hand' },
-  { title: 'Music', description: 'Sing, play, or listen together' },
-  { title: 'Language', description: 'Practice conversation and phrases' },
-  { title: 'Other', description: 'Everything that does not fit above' },
-]
+const CATEGORY_BLURBS = {
+  Food: 'Cook, bake, and taste something new',
+  Fitness: 'Move, train, and try a workout',
+  Arts: 'Make, paint, and create by hand',
+  Music: 'Sing, play, or listen together',
+  Language: 'Practice conversation and phrases',
+  Other: 'Everything that does not fit above',
+}
 
 const BUTTON_PREVIEWS = [
   {
@@ -269,19 +270,19 @@ export default function StyleGuide() {
           Browse category cards. Single select, same as Home filter pills. Preview only.
         </p>
         <div className="style-guide-selectable-grid">
-          {BROWSE_CATEGORIES.map((category) => {
-            const image = CATEGORY_ICONS[category.title]
+          {LISTING_CATEGORIES.map((title) => {
+            const image = CATEGORY_ICONS[title]
             const pending = !image
             return (
               <SelectableCard
-                key={category.title}
-                title={category.title}
-                description={category.description}
+                key={title}
+                title={title}
+                description={CATEGORY_BLURBS[title]}
                 image={image}
-                imageAlt={category.title}
+                imageAlt={title}
                 placeholder={pending}
-                selected={selectedCategory === category.title}
-                onSelect={() => setSelectedCategory(category.title)}
+                selected={selectedCategory === title}
+                onSelect={() => setSelectedCategory(title)}
               />
             )
           })}

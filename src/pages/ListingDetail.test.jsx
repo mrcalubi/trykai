@@ -221,9 +221,16 @@ describe('ListingDetail content', () => {
     renderPage()
 
     expect(await screen.findByText('Bedok, Singapore')).toBeInTheDocument()
-    expect(screen.getByText(/^East region\./)).toBeInTheDocument()
-    expect(screen.getByText('Exact address after booking')).toBeInTheDocument()
+    expect(
+      screen.getByText('Exact address sent once your booking is confirmed.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/^East region\./)).not.toBeInTheDocument()
+    expect(screen.queryByText('Exact address after booking')).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.detail-location__icon')).toHaveLength(1)
     expect(screen.queryByRole('link', { name: 'Open in Google Maps' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: /Cancellation: full refund/ }),
+    ).not.toBeInTheDocument()
   })
 
   it('gives a confirmed guest the exact address with a map link', async () => {

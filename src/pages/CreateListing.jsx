@@ -8,6 +8,7 @@ import PhotoTips from '../components/PhotoTips'
 import Card from '../components/ui/Card'
 import Icon from '../components/ui/Icon'
 import { categoryIconName } from '../components/ui/categoryIcon'
+import { LISTING_CATEGORIES } from '../lib/listingCategories'
 import FormattedPrice from '../components/FormattedPrice'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import { formatGuestFacingPrice, hostPriceBreakdown, parsePriceInputCents } from '../lib/pricing'
@@ -15,8 +16,6 @@ import { formatGuestFacingPrice, hostPriceBreakdown, parsePriceInputCents } from
 const MAX_PHOTOS = 5
 const MIN_GUESTS = 1
 const MAX_GUESTS = 50
-
-const CATEGORIES = ['Food', 'Fitness', 'Arts', 'Music', 'Language', 'Other']
 
 const WHATS_PROVIDED_OPTIONS = ['Materials', 'Equipment', 'Food & drinks', 'None']
 
@@ -433,7 +432,7 @@ export default function CreateListing() {
           <fieldset className="wizard-fieldset">
             <legend className="wizard-fieldset__legend">Category</legend>
             <div className="category-choices">
-              {CATEGORIES.map((cat) => (
+              {LISTING_CATEGORIES.map((cat) => (
                 <label
                   key={cat}
                   className={`category-choice${category === cat ? ' category-choice--on' : ''}`}

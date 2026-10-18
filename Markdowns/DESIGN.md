@@ -109,7 +109,7 @@ Fonts load from Google Fonts via `<link>` with `preconnect` in `index.html`, not
 
 - **Hero headline (decided):** *"Singapore's not boring. You just haven't found your thing yet."*
 - **Subhead (decided):** *"Solo, with friends, or on a date — something better than scrolling for the tenth time."*
-- **Trust line under the hero:** three facts that are true in the product today: *ID-verified hosts* (hosts must pass verification before they can list), *Exact address after booking* (the address is revealed only to confirmed guests), *Pay by PayNow or card*. Do not add a claim here unless the code enforces it.
+- **Trust line under the hero:** three chips: *ID-verified hosts* (hosts must pass verification before they can list), *Exact address after booking* (the address is revealed only to confirmed guests), *Most sessions S$15–30* (typical guest-facing band, not a filter or CHECK). Do not add a claim here unless the code enforces it, except this typical-price line.
 - **No "Become a host" in the hero** (unchanged). Supply is recruited lower down: a quiet "Teach what you love" band at the end of Home and a footer link, both pointing at the host entry (`hostEntry()`), plus the post-session email nudge (still KIV).
 - "Skip the course. Just learn the basics." stays banked for Lane 2.
 
@@ -158,8 +158,8 @@ No photo banner and no persistent search bar for launch (unchanged): with tens o
 - **Host card** high on the page at every width: avatar, "Your host", name, "ID verified" (from `users.is_id_verified`), host rating, bio preview, "View <name>'s profile".
 - About this experience, then What's provided as a checklist with coral checks.
 - **Pick a date:** on phones the booking card sits here in the page flow, without card chrome: section title, the month calendar in its own card, the chosen day, and each time as a card with spots left (coral when two or fewer) and Book. From 1024px the same content is the sticky booking card on the right, with the all-in price on top.
-- **Where you'll be:** a two-row card instead of a map, since a map of a general area tells a guest nothing. Row one: the area ("Bedok, Singapore") with its region when it is a planning area, and "The general area, not the exact spot". Row two: "Exact address after booking". A confirmed guest instead sees the real address with an "Open in Google Maps" link, matching booking detail.
-- Reviews last, with a dashed empty state; then two rows: the cancellation summary (links to the policy) and "Report this listing".
+- **Where you'll be:** one row instead of a map, since a map of a general area tells a guest nothing. Title is the area ("Bedok, Singapore"); the subline is "Exact address sent once your booking is confirmed."; one location icon. A confirmed guest instead sees the real address with an "Open in Google Maps" link, matching booking detail.
+- Reviews last, with a dashed empty state; then "Report this listing". The 48-hour refund line lives on the booking card and in the footer, not as a second policy row here.
 - **Phone bottom bar:** all-in price per person, the PayNow price in coral-ink, and "Choose a date". It slides away while the booking card is on screen and during checkout.
 
 ### Checkout ("Confirm and pay", from the canvas "Checkout · phone" mockup)

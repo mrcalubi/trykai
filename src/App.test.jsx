@@ -83,6 +83,36 @@ describe('App routes', () => {
     ).toBeInTheDocument()
   })
 
+  it('scrolls to the top on a new route and leaves back to the browser', async () => {
+    const user = userEvent.setup()
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    try {
+      renderAt('/')
+      await screen.findByRole('heading', {
+        level: 1,
+        name: "Singapore's not boring. You just haven't found your thing yet.",
+      })
+      scrollTo.mockClear()
+
+      await user.click(screen.getByRole('link', { name: 'Refund Policy' }))
+      expect(await screen.findByRole('heading', { name: 'Refund Policy' })).toBeInTheDocument()
+      expect(scrollTo).toHaveBeenCalledWith(0, 0)
+
+      scrollTo.mockClear()
+      await user.click(screen.getByRole('button', { name: 'Back' }))
+      expect(
+        await screen.findByRole('heading', {
+          level: 1,
+          name: "Singapore's not boring. You just haven't found your thing yet.",
+        }),
+      ).toBeInTheDocument()
+      expect(scrollTo).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('uses in-app history for back after navigating inside the app', async () => {
     const user = userEvent.setup()
     renderAt('/')

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import SiteNav from './components/SiteNav'
 import BackButton, { BackSlotProvider } from './components/BackButton'
+import ScrollToTop from './components/ScrollToTop'
 import Footer from './components/Footer'
 import RequireAuth from './components/RequireAuth'
 import RequireAdmin from './components/RequireAdmin'
@@ -28,6 +29,7 @@ import StyleGuide from './pages/StyleGuide'
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <SiteNav />
       <BackSlotProvider>
         <BackButton />

@@ -8,10 +8,9 @@ import { foundingHostFromRpc } from '../lib/foundingHost'
 import { hostListingPriceHint, parsePriceInputCents } from '../lib/pricing'
 import { formatListingSpotsMessage } from '../lib/listingSpots'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
+import { LISTING_CATEGORIES } from '../lib/listingCategories'
 
 const MAX_PHOTOS = 5
-
-const CATEGORIES = ['Food', 'Fitness', 'Arts', 'Music', 'Language', 'Other']
 
 const LISTING_SELECT = `
   id,
@@ -333,7 +332,7 @@ export default function EditListing() {
               className="input"
             >
               <option value="">Select a category</option>
-              {CATEGORIES.map((cat) => (
+              {LISTING_CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
