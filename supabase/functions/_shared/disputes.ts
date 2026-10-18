@@ -1,4 +1,5 @@
 import { formatCents } from './email.ts'
+import { cleanNote } from './money-events.ts'
 
 // Rules for admin-dispute-booking. Pure so vitest and `deno check` cover them
 // without Stripe or Supabase.
@@ -20,7 +21,13 @@ export type DisputeAction = 'hold' | 'release_hold' | 'partial_refund'
 
 export type DisputeRefusal = { ok: false; status: number; error: string }
 
-export const MAX_HOLD_REASON_LENGTH = 200
+/**
+ * The only values bookings.payout_hold_reason may hold (00030 CHECK). The
+ * guest and host can read the column, so details go in the admin-only
+ * booking_money_events note instead.
+ */
+export const HOLD_CODES = ['dispute', 'chargeback'] as const
+export type HoldCode = (typeof HOLD_CODES)[number]
 
 export function parseDisputeAction(value: unknown): DisputeAction | null {
   if (value === 'hold' || value === 'release_hold' || value === 'partial_refund') return value
@@ -31,20 +38,25 @@ function isWholeCents(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value)
 }
 
-/** Only a confirmed booking whose payout has not gone out can be held. */
+/**
+ * Only a confirmed booking whose payout has not gone out can be held.
+ * `reason` is a neutral code (default 'dispute'); `note` is the free-text
+ * why, required, and stored only in booking_money_events.
+ */
 export function checkHold(
   booking: DisputeBooking,
-  reason: unknown,
-): { ok: true; reason: string } | DisputeRefusal {
-  const clean = typeof reason === 'string' ? reason.trim() : ''
-  if (!clean) return { ok: false, status: 400, error: 'reason is required to place a hold' }
-  if (clean.length > MAX_HOLD_REASON_LENGTH) {
+  input: { reason: unknown; note: unknown },
+): { ok: true; code: HoldCode; note: string } | DisputeRefusal {
+  const code = input.reason ?? 'dispute'
+  if (!HOLD_CODES.includes(code as HoldCode)) {
     return {
       ok: false,
       status: 400,
-      error: `reason must be ${MAX_HOLD_REASON_LENGTH} characters or fewer`,
+      error: `reason must be ${HOLD_CODES.map((c) => `'${c}'`).join(' or ')}. The guest and host can read it; put details in note.`,
     }
   }
+  const note = cleanNote(input.note, { required: true })
+  if (!note.ok) return note
   if (booking.status !== 'confirmed') {
     return { ok: false, status: 409, error: `Booking is ${booking.status}, not confirmed` }
   }
@@ -59,7 +71,7 @@ export function checkHold(
         'Payout was already released to the host; there is nothing to hold. Use partial_refund within what TryKai can absorb, or recover from the host by hand.',
     }
   }
-  return { ok: true, reason: clean }
+  return { ok: true, code: code as HoldCode, note: note.note as string }
 }
 
 export interface PartialRefundPlan {

@@ -564,12 +564,36 @@ GitHub secrets `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAY
 
 Use this for a quality complaint (Dispute Policy: raised within 3 days after the session ends, reply within 2 business days). Decline complaints raised later. The window closes when the 72-hour payout hold does, so place the hold the moment a complaint arrives; one sent on the last day can otherwise miss the hourly payout run. Safety reports follow SAFETY_RESPONSE_PROTOCOL.md first; money is handled the same way. Do not edit `bookings` rows in Table Editor for any of this.
 
-Two functions, both gated by the `ADMIN_FUNCTION_SECRET` Edge Function secret in header `x-admin-secret`:
+Two functions:
 
 - `admin-dispute-booking`: hold the host payout, release the hold, or make a **partial** refund without cancelling the booking.
 - `admin-cancel-booking` with `"reason": "dispute"`: **full** refund and cancel. The guest gets a refund receipt, not "your host had to cancel". No strike, no host email.
 
-Needs migration `00029` applied and both functions deployed. Amounts are **cents** (S$15.50 is `1550`).
+Both run as **you**: they check your own sign-in and that your account has `is_admin`, and every hold, release, partial refund, and admin cancel writes a row to `booking_money_events` with your user id (step 5). Needs migrations `00029` and `00030` applied and both functions deployed. Amounts are **cents** (S$15.50 is `1550`).
+
+## Sign in and get your access token
+
+1. Open the TryKai site for the project you are working on and sign in with your admin account.
+2. Open the browser DevTools console and run:
+
+```js
+JSON.parse(localStorage.getItem(Object.keys(localStorage).find((k) => k.startsWith('sb-') && k.endsWith('-auth-token')))).access_token
+```
+
+3. Copy the long `eyJ...` value. It is your session: treat it like a password, do not paste it in chat, and expect it to expire after about an hour (get a fresh one the same way).
+
+```powershell
+$h = @{ Authorization = "Bearer PASTE_ACCESS_TOKEN"; apikey = "PASTE_ANON_PUBLIC_KEY" }
+```
+
+- `401 Unauthorized`: the token expired or was not pasted whole. Get a fresh one.
+- `403 Not authorised`: your account does not have `is_admin`.
+
+**Break-glass (only if no admin can sign in).** The old shared secret still works, but the log cannot tell who used it, so it needs your name in `x-admin-operator`. Tell the team afterwards. Unsetting `ADMIN_FUNCTION_SECRET` turns this off.
+
+```powershell
+$h = @{ Authorization = "Bearer PASTE_ANON_PUBLIC_KEY"; apikey = "PASTE_ANON_PUBLIC_KEY"; "x-admin-secret" = "PASTE_ADMIN_FUNCTION_SECRET"; "x-admin-operator" = "Your name" }
+```
 
 ## 0. Find the booking
 
@@ -587,21 +611,15 @@ where id::text ilike 'a1b2c3d4%';
 Payouts go out 72 hours after the session ends. Hold first, investigate second.
 
 ```powershell
-$h = @{ Authorization = "Bearer PASTE_ANON_PUBLIC_KEY"; apikey = "PASTE_ANON_PUBLIC_KEY"; "x-admin-secret" = "PASTE_ADMIN_FUNCTION_SECRET" }
 $url = "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/admin-dispute-booking"
-Invoke-RestMethod -Method Post -Uri $url -ContentType "application/json" -Headers $h -Body '{"action":"hold","booking_id":"FULL-BOOKING-UUID","reason":"dispute: quality complaint 2026-10-19"}'
+Invoke-RestMethod -Method Post -Uri $url -ContentType "application/json" -Headers $h -Body '{"action":"hold","booking_id":"FULL-BOOKING-UUID","reason":"dispute","note":"Quality complaint: guest says the host arrived 40 minutes late. Support thread 2026-10-19."}'
 ```
 
 ```bash
-curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/admin-dispute-booking' \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer PASTE_ANON_PUBLIC_KEY" \
-  -H "apikey: PASTE_ANON_PUBLIC_KEY" \
-  -H "x-admin-secret: PASTE_ADMIN_FUNCTION_SECRET" \
-  -d '{"action":"hold","booking_id":"FULL-BOOKING-UUID","reason":"dispute: quality complaint 2026-10-19"}'
+curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/admin-dispute-booking'   -H 'Content-Type: application/json'   -H "Authorization: Bearer PASTE_ACCESS_TOKEN"   -H "apikey: PASTE_ANON_PUBLIC_KEY"   -d '{"action":"hold","booking_id":"FULL-BOOKING-UUID","reason":"dispute","note":"Quality complaint: guest says the host arrived 40 minutes late. Support thread 2026-10-19."}'
 ```
 
-The **guest and host can both read `payout_hold_reason`** on their own booking. Keep it neutral ("dispute: quality complaint" plus a date). No names, evidence, or opinions; those go in the support thread.
+`reason` is a code, `"dispute"` (the default) or `"chargeback"`, and is the only thing written to the booking. The **guest and host can both read it** on their own booking, so the database refuses anything else. `note` is required and goes only to the admin-only `booking_money_events` log: say what happened and where the support thread is. It is kept permanently and cannot be edited, so keep it factual; evidence stays in the support thread.
 
 - `409 ... already released`: the host was already paid. Skip to step 3, "After release".
 - `release-payout` logs the booking as `dispute_hold` from the next hourly run.
@@ -613,17 +631,17 @@ Agree an outcome with the team: no action, partial refund, or full refund. Note 
 ## 3a. No refund
 
 ```json
-{"action":"release_hold","booking_id":"FULL-BOOKING-UUID"}
+{"action":"release_hold","booking_id":"FULL-BOOKING-UUID","note":"No action: host showed the session started on time."}
 ```
 
-Same headers and URL as step 1. If the 72 hours have passed, the next hourly run pays the host.
+Same headers and URL as step 1. `note` is optional but say why. If the 72 hours have passed, the next hourly run pays the host.
 
 ## 3b. Partial refund (booking stays confirmed)
 
 Pick the guest refund and what the host should still get. Guest refunds plus host payout can never exceed what the guest paid (`total_amount`). The host payout can only go down.
 
 ```json
-{"action":"partial_refund","booking_id":"FULL-BOOKING-UUID","refund_amount_cents":1500,"new_host_payout_cents":2500}
+{"action":"partial_refund","booking_id":"FULL-BOOKING-UUID","refund_amount_cents":1500,"new_host_payout_cents":2500,"note":"Agreed 50/50 on the late start."}
 ```
 
 The function refunds that amount on the original PaymentIntent, adds it to `refund_amount`, lowers `host_payout_amount`, records the Stripe refund id in `stripe_partial_refund_ids`, **clears the hold**, and emails the guest a refund receipt. The host is paid the new amount on the next hourly run once 72 hours have passed. Tell the host by email yourself; there is no automatic host email yet.
@@ -641,7 +659,7 @@ The response shows `total_refunded_cents`, `host_payout_cents`, and `platform_ke
 ## 3c. Full refund and cancel
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/admin-cancel-booking" -ContentType "application/json" -Headers $h -Body '{"booking_id":"FULL-BOOKING-UUID","reason":"dispute"}'
+Invoke-RestMethod -Method Post -Uri "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/admin-cancel-booking" -ContentType "application/json" -Headers $h -Body '{"booking_id":"FULL-BOOKING-UUID","reason":"dispute","note":"Upheld: session did not match the listing."}'
 ```
 
 Refunds whatever is left on the payment (after any earlier partial refund), cancels the booking, clears the hold, and emails the guest a refund receipt. Without `"reason":"dispute"` the guest is told their host cancelled. If the response has `"payout_already_released": true`, the host had been paid and the whole refund came out of TryKai's balance: recover it from the host as in 3b.
@@ -649,7 +667,22 @@ Refunds whatever is left on the payment (after any earlier partial refund), canc
 ## 4. Afterwards
 
 - Strikes or warnings for the host are separate (Dispute Policy); use the existing strike process.
-- Production uses that project's URL, anon key, and admin secret, not the staging ref above.
+- Production uses that project's URL, anon key, your sign-in on the production site, and (break-glass only) that project's admin secret, not the staging ref above.
+
+## 5. Audit trail
+
+Every hold, release, partial refund, and admin cancel is a row in `booking_money_events`: who (`actor_user_id`, or `break_glass` with the operator name in `note`), what, how much, the host payout before and after, and the Stripe refund id. It is admin-only (no app user can read it) and append-only (nobody can edit or delete rows, not even the service role). In **SQL Editor**:
+
+```sql
+select e.created_at, e.action, e.auth_method, u.email as actor, e.amount_cents,
+       e.host_payout_before, e.host_payout_after, e.stripe_object_id, e.note
+from public.booking_money_events e
+left join public.users u on u.id = e.actor_user_id
+where e.booking_id = 'FULL-BOOKING-UUID'
+order by e.created_at;
+```
+
+If a response has `"audit_logged": false`, the action **did** happen but its row was not saved. Do not retry the action (a retried refund refunds twice). Copy the row from the function log line `booking_money_events insert failed` and insert it in SQL Editor, keeping the same values and adding to the note that it was recorded by hand.
 
 ---
 
