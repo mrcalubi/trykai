@@ -155,11 +155,9 @@ describe('EditListing prefill', () => {
     await renderLoaded()
 
     expect(screen.getByLabelText('Price per person (SGD)')).toHaveValue(45)
-    expect(screen.getByText('Guests pay').closest('.price-panel__row')).toHaveTextContent('$51')
-    expect(screen.getByText('You receive per guest').closest('.price-panel__row')).toHaveTextContent(
-      '$45',
-    )
-    expect(screen.getByText(/After your first 3 bookings \(10% host fee\)/)).toBeInTheDocument()
+    expect(screen.getByText('Guests pay').closest('.price-panel__figure')).toHaveTextContent('$51')
+    expect(screen.getByText('You get').closest('.price-panel__figure')).toHaveTextContent('$45')
+    expect(screen.getByText('10% host fee from your 4th booking.')).toBeInTheDocument()
   })
 
   it('clears duration and group pricing when the saved listing has none', async () => {
@@ -175,10 +173,9 @@ describe('EditListing prefill', () => {
     givenListing({ price_per_person: 2500 })
     await renderLoaded()
 
-    expect(screen.getByText('You receive per guest').closest('.price-panel__row')).toHaveTextContent(
-      '$25',
-    )
-    expect(screen.queryByText(/host fee/)).not.toBeInTheDocument()
+    expect(screen.getByText('You get').closest('.price-panel__figure')).toHaveTextContent('$25')
+    expect(screen.getByText('Founding host: no host fee, ever.')).toBeInTheDocument()
+    expect(screen.queryByText('10% host fee from your 4th booking.')).not.toBeInTheDocument()
   })
 
   it('hides the price hint when founding-host status is unknown', async () => {
@@ -188,7 +185,7 @@ describe('EditListing prefill', () => {
 
     expect(screen.getByLabelText('Price per person (SGD)')).toHaveValue(25)
     expect(screen.getByText('Guests pay')).toBeInTheDocument()
-    expect(screen.queryByText('You receive per guest')).not.toBeInTheDocument()
+    expect(screen.queryByText('You get')).not.toBeInTheDocument()
     expect(screen.queryByText(/host fee/)).not.toBeInTheDocument()
   })
 

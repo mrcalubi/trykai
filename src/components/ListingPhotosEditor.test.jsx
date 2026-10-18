@@ -39,6 +39,10 @@ describe('ListingPhotosEditor', () => {
     const onChange = vi.fn()
     const { rerender } = render(<ListingPhotosEditor photos={photos} onChange={onChange} />)
 
+    expect(screen.getByText('Cover')).toBeInTheDocument()
+    expect(document.querySelector('.preview-item__cover')).toBeTruthy()
+    expect(document.querySelector('.preview-item__strip')).toBeTruthy()
+
     const items = document.querySelectorAll('.preview-item')
     fireEvent.dragStart(items[1])
     fireEvent.dragOver(items[0])

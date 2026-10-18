@@ -62,9 +62,9 @@ describe('compressImage', () => {
     restore()
   })
 
-  it('encodes a large image as JPEG and shrinks the long edge', async () => {
+  it('encodes a large image as JPEG 0.82 and shrinks the long edge to 1600', async () => {
     const file = imageFile('latte.png')
-    const restore = stubImage({ width: 3200, height: 1600 })
+    const restore = stubImage({ width: 4032, height: 3024 })
     stubCanvas()
 
     const next = await compressImage(file)
@@ -72,7 +72,35 @@ describe('compressImage', () => {
     expect(next).not.toBe(file)
     expect(next.type).toBe('image/jpeg')
     expect(next.name).toBe('latte.jpg')
+    expect(HTMLCanvasElement.prototype.toBlob).toHaveBeenCalledWith(
+      expect.any(Function),
+      'image/jpeg',
+      0.82,
+    )
+    expect(HTMLCanvasElement.prototype.toBlob.mock.instances[0].width).toBe(1600)
+    expect(HTMLCanvasElement.prototype.toBlob.mock.instances[0].height).toBe(1200)
     restore()
+  })
+
+  it('uses createImageBitmap on the main thread when it is available', async () => {
+    const file = imageFile('phone.png')
+    const close = vi.fn()
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => ({
+        width: 4032,
+        height: 3024,
+        close,
+      })),
+    )
+    stubCanvas()
+
+    const next = await compressImage(file)
+
+    expect(createImageBitmap).toHaveBeenCalledWith(file)
+    expect(next.type).toBe('image/jpeg')
+    expect(HTMLCanvasElement.prototype.toBlob.mock.instances[0].width).toBe(1600)
+    expect(close).toHaveBeenCalled()
   })
 
   it('returns the original file when encoding fails', async () => {

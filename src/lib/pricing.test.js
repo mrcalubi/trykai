@@ -98,21 +98,27 @@ describe('pricing.js matches booking.ts', () => {
     const founding = hostPriceBreakdown(2500, true, 4, true)
     expect(founding.afterFeeCents).toBeNull()
     expect(founding.youReceiveCents).toBe(2500)
+    expect(founding.isFoundingHost).toBe(true)
+    expect(founding.togetherCents).toBe(8500)
     expect(founding.fullSessionLowCents).toBe(8500)
     expect(founding.fullSessionHighCents).toBe(10000)
 
     const feePaying = hostPriceBreakdown(2500, false, 4, true)
     expect(feePaying.afterFeeCents).toBe(2250)
+    expect(feePaying.togetherCents).toBe(8500)
     expect(feePaying.fullSessionLowCents).toBe(8500)
 
     const off = hostPriceBreakdown(2500, false, 4, false)
+    expect(off.togetherCents).toBe(10000)
     expect(off.fullSessionLowCents).toBeNull()
     expect(off.fullSessionHighCents).toBe(10000)
 
     const unknown = hostPriceBreakdown(2500, null, 4, true)
     expect(unknown.youReceiveCents).toBeNull()
     expect(unknown.afterFeeCents).toBeNull()
-    expect(unknown.fullSessionHighCents).toBeNull()
+    expect(unknown.isFoundingHost).toBeNull()
+    expect(unknown.fullSessionHighCents).toBe(10000)
+    expect(unknown.togetherCents).toBe(8500)
   })
 
   it('hints the next group tier when one is still available', () => {

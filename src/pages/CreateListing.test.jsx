@@ -381,15 +381,20 @@ describe('CreateListing price panel', () => {
 
     await user.type(screen.getByLabelText('Your price per guest'), '25')
 
-    const row = (label) => screen.getByText(label).closest('.price-panel__row')
-    expect(row('Guests pay')).toHaveTextContent('$28')
-    expect(row('You receive per guest')).toHaveTextContent('$25')
-    expect(row(/After your first 3 bookings \(10% host fee\)/)).toHaveTextContent('$22.50')
-    expect(row('A full session of 4 pays you')).toHaveTextContent('$85–$100')
-    expect(screen.getByText('depending on how guests book')).toBeInTheDocument()
+    expect(screen.getByText('Guests pay').closest('.price-panel__figure')).toHaveTextContent('$28')
+    expect(screen.getByText('You get').closest('.price-panel__figure')).toHaveTextContent('$25')
+    expect(screen.getByText(/Full session of 4/)).toHaveTextContent('up to $100')
+    expect(screen.getByText('10% host fee from your 4th booking.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'How these numbers work' }))
+    expect(screen.getByText('2 guests: 5% off the lesson')).toBeInTheDocument()
+    expect(screen.getByText(/One group of 4: \$85 before any host fee/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/After the 10% host fee \(from your 4th booking\): \$22.50 per person/),
+    ).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'More guests' }))
-    expect(row('A full session of 5 pays you')).toHaveTextContent('$100–$125')
+    expect(screen.getByText(/Full session of 5/)).toHaveTextContent('up to $125')
   })
 
   it('shows one full-session number when group discounts are off', async () => {
@@ -401,9 +406,11 @@ describe('CreateListing price panel', () => {
     await user.type(screen.getByLabelText('Your price per guest'), '25')
     await user.click(screen.getByRole('checkbox', { name: /Offer group discounts/ }))
 
-    const row = (label) => screen.getByText(label).closest('.price-panel__row')
-    expect(row('A full session of 4 pays you')).toHaveTextContent('$100')
-    expect(screen.queryByText('depending on how guests book')).not.toBeInTheDocument()
+    expect(screen.getByText(/Full session of 4/)).toHaveTextContent('up to $100')
+    await user.click(screen.getByRole('button', { name: 'How these numbers work' }))
+    expect(
+      screen.getByText('Group discounts are off. Guests pay the same per person at every group size.'),
+    ).toBeInTheDocument()
   })
 
   it('omits the host fee for a founding host', async () => {
@@ -414,8 +421,9 @@ describe('CreateListing price panel', () => {
 
     await user.type(screen.getByLabelText('Your price per guest'), '25')
 
-    expect(screen.getByText('You receive per guest')).toBeInTheDocument()
-    expect(screen.queryByText(/host fee/)).not.toBeInTheDocument()
+    expect(screen.getByText('You get')).toBeInTheDocument()
+    expect(screen.getByText('Founding host: no host fee, ever.')).toBeInTheDocument()
+    expect(screen.queryByText('10% host fee from your 4th booking.')).not.toBeInTheDocument()
   })
 
   it('shows only the guest price when founding-host status is unknown', async () => {
@@ -429,7 +437,7 @@ describe('CreateListing price panel', () => {
     await user.type(screen.getByLabelText('Your price per guest'), '25')
 
     expect(screen.getByText('Guests pay')).toBeInTheDocument()
-    expect(screen.queryByText('You receive per guest')).not.toBeInTheDocument()
+    expect(screen.queryByText('You get')).not.toBeInTheDocument()
     expect(screen.queryByText(/host fee/)).not.toBeInTheDocument()
   })
 })
@@ -569,12 +577,17 @@ describe('CreateListing "what is provided"', () => {
     await user.click(screen.getByRole('checkbox', { name: 'None' }))
 
     expect(screen.getByRole('checkbox', { name: 'Materials' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Materials' })).toBeDisabled()
     expect(screen.getByRole('checkbox', { name: 'None' })).toBeChecked()
+    expect(screen.getByLabelText('Add your own')).toBeDisabled()
   })
 
   it('drops "None" again when a real option is picked', async () => {
     const { user } = renderPage()
     await fillValidForm(user)
+    await user.click(screen.getByRole('checkbox', { name: 'None' }))
+    expect(screen.getByRole('checkbox', { name: 'Food & drinks' })).toBeDisabled()
+
     await user.click(screen.getByRole('checkbox', { name: 'None' }))
     await user.click(screen.getByRole('checkbox', { name: 'Food & drinks' }))
 
