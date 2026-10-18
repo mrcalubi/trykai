@@ -60,7 +60,7 @@ describe('Cancellation Policy page', () => {
   })
 
   it('tells guests to cancel from their profile, not a dashboard', () => {
-    expect(screen.getByText(/Cancel anytime from your profile/)).toBeInTheDocument()
+    expect(screen.getByText(/Cancel anytime from the Bookings tab on your profile/)).toBeInTheDocument()
     expect(screen.queryByText(/Dashboard/)).not.toBeInTheDocument()
   })
 

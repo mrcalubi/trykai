@@ -42,8 +42,8 @@ export default function CancellationPolicy() {
         </li>
       </ul>
       <p>
-        Cancel anytime from your profile. The refund amount is calculated
-        automatically and shown to you before you confirm.
+        Cancel anytime from the Bookings tab on your profile. The refund amount
+        is calculated automatically and shown to you before you confirm.
       </p>
 
       <h2>If you are a host</h2>
