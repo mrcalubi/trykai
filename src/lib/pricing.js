@@ -109,10 +109,16 @@ export function groupPriceLabel(
   return `${each} each · ${Math.round(rate * 100)}% group discount`
 }
 
+/**
+ * Typo guard, not the S$10 to S$40 guidance band. Matches the
+ * listings_price_ceiling CHECK in migration 00028.
+ */
+export const MAX_PRICE_PER_PERSON_CENTS = 50000
+
 export function parsePriceInputCents(value) {
   if (value == null || String(value).trim() === '') return null
   const cents = Math.round(Number.parseFloat(String(value)) * 100)
-  if (!Number.isFinite(cents) || cents < 1) return null
+  if (!Number.isFinite(cents) || cents < 1 || cents > MAX_PRICE_PER_PERSON_CENTS) return null
   return cents
 }
 

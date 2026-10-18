@@ -48,7 +48,7 @@ Week 8 of the original plan (15–21 September) is ending. The week-by-week sect
 - Confirm the two test cancellations were refunded on Stripe. API PATCH 204s are the expected service-role writes from `cancel-booking`, not proof of a client bypass.
 
 **Open in the app:**
-- P0.4: browse and Book ignore `is_suspended`. INSERT is already gated by `00008`.
+- P0.4: browse and Book ignore `is_suspended`. INSERT is already gated by `00008`. (18 October: fixed in code by `00027` plus a `create-payment-intent` check; apply `00027` per environment.)
 - Forgot password is not built.
 
 **P0.7 done:** `00025` grants SELECT on every `listings` column except `full_address`. `listing_address(listing_id)` returns the address to the host or a confirmed guest. `get_listing_address` is dropped. Emails still SELECT the column with the service role.
@@ -693,7 +693,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 ## Infrastructure
 - [x] trykai.sg pointing at Vercel
 - [x] SSL active
-- [ ] 404 page exists
+- [x] 404 page exists (catch-all route, `NotFound.jsx`)
 - [ ] Basic meta tags on key pages
 - [x] Favicon showing
 

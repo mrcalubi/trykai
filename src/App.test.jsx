@@ -41,6 +41,12 @@ describe('App chrome', () => {
     expect(screen.getByRole('link', { name: 'Dispute Policy' })).toBeInTheDocument()
   })
 
+  it('shows a not-found page on an unknown path', async () => {
+    renderAt('/does-not-exist')
+
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+  })
+
   it('mounts exactly one nav on the style-guide route', async () => {
     renderAt('/style-guide')
 

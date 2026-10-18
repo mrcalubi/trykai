@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
     }
 
     const host = asRecord(listing?.users)
-    if (!host?.stripe_payouts_enabled) {
+    if (!host?.stripe_payouts_enabled || host?.is_suspended) {
       return jsonResponse({ error: 'This host cannot take bookings yet.' }, 400)
     }
 

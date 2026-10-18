@@ -262,6 +262,16 @@ describe('EditListing validation', () => {
     expect(await screen.findByText(LISTING_FIELD_HINTS.price)).toBeInTheDocument()
   })
 
+  it('rejects a price above the ceiling', async () => {
+    const { user } = await renderLoaded()
+    await user.clear(screen.getByLabelText('Price per person (SGD)'))
+    await user.type(screen.getByLabelText('Price per person (SGD)'), '7580')
+
+    submitForm()
+
+    expect(await screen.findByText(LISTING_FIELD_HINTS.price)).toBeInTheDocument()
+  })
+
   it('rejects an empty price', async () => {
     const { user } = await renderLoaded()
     await user.clear(screen.getByLabelText('Price per person (SGD)'))
