@@ -11,7 +11,7 @@ import ListingPricePanel from '../components/ListingPricePanel'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
 import FieldHint from '../components/FieldHint'
 import { foundingHostFromRpc } from '../lib/foundingHost'
-import { hostPriceBreakdown, parsePriceInputCents } from '../lib/pricing'
+import { groupDiscountExampleLine, hostPriceBreakdown, parsePriceInputCents } from '../lib/pricing'
 import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
 import { providedForSave } from '../lib/whatsProvided'
 import { formatListingSpotsMessage } from '../lib/listingSpots'
@@ -67,12 +67,14 @@ export default function EditListing() {
   const [loading, setLoading] = useState(false)
   const priceCents = parsePriceInputCents(price)
   const guests = parseInt(maxGuests, 10)
+  const guestCount = Number.isInteger(guests) ? guests : 1
   const breakdown = hostPriceBreakdown(
     priceCents,
     isFoundingHost,
-    Number.isInteger(guests) ? guests : 1,
+    guestCount,
     groupPricing,
   )
+  const discountExample = groupPricing ? groupDiscountExampleLine(priceCents, guestCount) : ''
 
   useEffect(() => {
     photosRef.current = photos
@@ -323,7 +325,7 @@ export default function EditListing() {
             </label>
           </div>
 
-          <ListingPricePanel breakdown={breakdown} groupSize={Number.isInteger(guests) ? guests : 1} />
+          <ListingPricePanel breakdown={breakdown} groupSize={guestCount} />
 
           <label className="label">
             Duration (mins)
@@ -347,12 +349,13 @@ export default function EditListing() {
               checked={groupPricing}
               onChange={(e) => setGroupPricing(e.target.checked)}
             />
-            Offer group pricing
+            Offer group discounts
           </label>
           <span className="hint">
             5% off for 2 guests, up to 20% for 5 or more. Applies to the lesson
             price per person.
           </span>
+          {discountExample ? <p className="hint group-discount-example">{discountExample}</p> : null}
 
           <h2 className="form-section__title">Location</h2>
           <label className="label">

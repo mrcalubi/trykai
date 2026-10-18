@@ -1462,15 +1462,24 @@ a {
   bottom: 4px;
   z-index: 1;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
+}
+
+.preview-item__dot {
+  flex: 0 0 auto;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--cream);
+  text-shadow: 0 0 3px var(--navy);
 }
 
 .preview-item__tool {
   flex: 0 0 auto;
-  padding: 4px 7px;
-  font-size: 11px;
+  padding: 3px 6px;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1.2;
   color: var(--navy);
@@ -1481,7 +1490,7 @@ a {
 }
 
 .preview-item__tool--action {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   white-space: nowrap;
 }
@@ -6042,11 +6051,21 @@ body.lightbox-open {
   margin-top: 8px;
 }
 
+.crop-aspect {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.group-discount-example {
+  margin: 8px 0 0;
+}
+
 .preview-item__cover {
   position: absolute;
   top: 6px;
   left: 6px;
-  z-index: 1;
+  z-index: 2;
   padding: 2px 7px;
   font-family: var(--mono);
   font-size: 10px;

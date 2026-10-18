@@ -6,6 +6,7 @@ import {
   formatGuestFacingPrice,
   groupPriceLabel,
   guestFacingPriceCents,
+  groupDiscountExampleLine,
   hostPriceBreakdown,
   nextGroupTierHint,
   parsePriceInputCents,
@@ -94,31 +95,40 @@ describe('pricing.js matches booking.ts', () => {
     expect(parsePriceInputCents('abc')).toBeNull()
   })
 
-  it('ranges a full session when group discounts come off the lesson price', () => {
+  it('shows a full session as N times the lesson, never a range', () => {
     const founding = hostPriceBreakdown(2500, true, 4, true)
     expect(founding.afterFeeCents).toBeNull()
     expect(founding.youReceiveCents).toBe(2500)
     expect(founding.isFoundingHost).toBe(true)
     expect(founding.togetherCents).toBe(8500)
-    expect(founding.fullSessionLowCents).toBe(8500)
+    expect(founding.fullSessionCents).toBe(10000)
+    expect(founding.fullSessionLowCents).toBeNull()
     expect(founding.fullSessionHighCents).toBe(10000)
 
     const feePaying = hostPriceBreakdown(2500, false, 4, true)
     expect(feePaying.afterFeeCents).toBe(2250)
     expect(feePaying.togetherCents).toBe(8500)
-    expect(feePaying.fullSessionLowCents).toBe(8500)
+    expect(feePaying.fullSessionCents).toBe(10000)
+    expect(feePaying.fullSessionLowCents).toBeNull()
 
     const off = hostPriceBreakdown(2500, false, 4, false)
     expect(off.togetherCents).toBe(10000)
+    expect(off.fullSessionCents).toBe(10000)
     expect(off.fullSessionLowCents).toBeNull()
-    expect(off.fullSessionHighCents).toBe(10000)
 
     const unknown = hostPriceBreakdown(2500, null, 4, true)
     expect(unknown.youReceiveCents).toBeNull()
     expect(unknown.afterFeeCents).toBeNull()
     expect(unknown.isFoundingHost).toBeNull()
-    expect(unknown.fullSessionHighCents).toBe(10000)
+    expect(unknown.fullSessionCents).toBe(10000)
     expect(unknown.togetherCents).toBe(8500)
+  })
+
+  it('explains the group discount off the host lesson price', () => {
+    expect(groupDiscountExampleLine(2500, 4)).toBe(
+      'Group discounts come off your price, e.g. a group of 4 together pays you $85 instead of $100.',
+    )
+    expect(groupDiscountExampleLine(null, 4)).toBe('')
   })
 
   it('hints the next group tier when one is still available', () => {

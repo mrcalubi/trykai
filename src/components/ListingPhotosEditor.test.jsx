@@ -49,8 +49,9 @@ describe('ListingPhotosEditor', () => {
     fireEvent.drop(items[0])
     expect(onChange).toHaveBeenCalledWith([photos[1], photos[0]])
 
-    await user.click(screen.getByRole('button', { name: 'Crop cover' }))
+    await user.click(screen.getAllByRole('button', { name: 'Crop' })[0])
     expect(screen.getByText('Crop the cover to the listing card')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Free' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Use this crop' }))
     await waitFor(() => expect(onChange).toHaveBeenCalledTimes(2))
@@ -59,9 +60,24 @@ describe('ListingPhotosEditor', () => {
     expect(next[0].file.name).toBe('cover.jpg')
 
     rerender(<ListingPhotosEditor photos={photos} onChange={onChange} />)
-    await user.click(screen.getByRole('button', { name: 'Crop cover' }))
+    await user.click(screen.getAllByRole('button', { name: 'Crop' })[0])
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByText('Crop the cover to the listing card')).not.toBeInTheDocument()
+  })
+
+  it('crops a non-cover photo and offers a Free aspect', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<ListingPhotosEditor photos={photos} onChange={onChange} />)
+
+    expect(screen.getByRole('button', { name: 'Set as cover' })).toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: 'Crop' })[1])
+    expect(screen.getByText('Crop this photo')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '4:3' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Free' }))
+    await user.click(screen.getByRole('button', { name: 'Use this crop' }))
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    expect(onChange.mock.calls[0][0][1].file.name).toBe('photo.jpg')
   })
 
   it('keeps selected files after the input is reset, and shows an upload error', async () => {

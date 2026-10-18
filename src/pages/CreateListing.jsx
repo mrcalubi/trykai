@@ -18,7 +18,12 @@ import { LISTING_CATEGORIES } from '../lib/listingCategories'
 import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
 import { providedForSave } from '../lib/whatsProvided'
 import { foundingHostFromRpc } from '../lib/foundingHost'
-import { formatGuestFacingPrice, hostPriceBreakdown, parsePriceInputCents } from '../lib/pricing'
+import {
+  formatGuestFacingPrice,
+  groupDiscountExampleLine,
+  hostPriceBreakdown,
+  parsePriceInputCents,
+} from '../lib/pricing'
 
 const MAX_PHOTOS = 5
 const MIN_GUESTS = 1
@@ -120,6 +125,7 @@ export default function CreateListing() {
 
   const priceCents = parsePriceInputCents(price)
   const breakdown = hostPriceBreakdown(priceCents, isFoundingHost, maxGuests, groupPricing)
+  const discountExample = groupPricing ? groupDiscountExampleLine(priceCents, maxGuests) : ''
   const durationMins = durationChoice === 'other' ? parseInt(otherMins, 10) : durationChoice
 
   useEffect(() => {
@@ -565,6 +571,7 @@ export default function CreateListing() {
               </span>
             </span>
           </label>
+          {discountExample ? <p className="hint group-discount-example">{discountExample}</p> : null}
         </>
       )
     }

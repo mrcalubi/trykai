@@ -22,7 +22,11 @@ export default function ListingPhotosEditor({
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [croppedArea, setCroppedArea] = useState(null)
+  const [freeCrop, setFreeCrop] = useState(false)
   const [adding, setAdding] = useState(false)
+
+  const croppingCover = cropping ? photos.findIndex((photo) => photo.id === cropping.id) === 0 : false
+  const cropAspect = croppingCover || !freeCrop ? LISTING_COVER_ASPECT : undefined
 
   async function handleFiles(event) {
     const remaining = max - photos.length
@@ -63,11 +67,20 @@ export default function ListingPhotosEditor({
     onChange(movePhoto(photos, index, index + direction))
   }
 
+  function startCrop(photo) {
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setCroppedArea(null)
+    setFreeCrop(false)
+    setCropping(photo)
+  }
+
   async function applyCrop() {
     if (!cropping || !croppedArea) return
     const image = await loadImage(cropping.previewUrl)
     const blob = await cropImageToBlob(image, croppedArea)
-    const file = new File([blob], 'cover.jpg', { type: 'image/jpeg', lastModified: Date.now() })
+    const name = croppingCover ? 'cover.jpg' : 'photo.jpg'
+    const file = new File([blob], name, { type: 'image/jpeg', lastModified: Date.now() })
     const compressed = await compressImage(file)
     const previewUrl = URL.createObjectURL(compressed)
     onChange(
@@ -133,46 +146,48 @@ export default function ListingPhotosEditor({
                   ×
                 </button>
                 <div className="preview-item__strip">
-                <button
-                  type="button"
-                  className="preview-item__tool"
-                  aria-label="Move photo left"
-                  disabled={index === 0}
-                  onClick={() => shift(index, -1)}
-                >
-                  ←
-                </button>
-                <button
-                  type="button"
-                  className="preview-item__tool"
-                  aria-label="Move photo right"
-                  disabled={index === photos.length - 1}
-                  onClick={() => shift(index, 1)}
-                >
-                  →
-                </button>
-                {index === 0 ? (
                   <button
                     type="button"
-                    className="preview-item__tool preview-item__tool--action"
-                    onClick={() => {
-                      setCrop({ x: 0, y: 0 })
-                      setZoom(1)
-                      setCroppedArea(null)
-                      setCropping(photo)
-                    }}
+                    className="preview-item__tool"
+                    aria-label="Move photo left"
+                    disabled={index === 0}
+                    onClick={() => shift(index, -1)}
                   >
-                    Crop cover
+                    ←
                   </button>
-                ) : (
                   <button
                     type="button"
-                    className="preview-item__tool preview-item__tool--action"
-                    onClick={() => setCover(index)}
+                    className="preview-item__tool"
+                    aria-label="Move photo right"
+                    disabled={index === photos.length - 1}
+                    onClick={() => shift(index, 1)}
                   >
-                    Set as cover
+                    →
                   </button>
-                )}
+                  <span className="preview-item__dot" aria-hidden="true">
+                    ·
+                  </span>
+                  <button
+                    type="button"
+                    className="preview-item__tool"
+                    onClick={() => startCrop(photo)}
+                  >
+                    Crop
+                  </button>
+                  {index !== 0 ? (
+                    <>
+                      <span className="preview-item__dot" aria-hidden="true">
+                        ·
+                      </span>
+                      <button
+                        type="button"
+                        className="preview-item__tool preview-item__tool--action"
+                        onClick={() => setCover(index)}
+                      >
+                        Set as cover
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -186,17 +201,45 @@ export default function ListingPhotosEditor({
             className="confirm-dialog confirm-dialog--wide"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="cover-crop-title"
+            aria-labelledby="photo-crop-title"
           >
-            <p id="cover-crop-title" className="confirm-dialog__copy">
-              Crop the cover to the listing card
+            <p id="photo-crop-title" className="confirm-dialog__copy">
+              {croppingCover ? 'Crop the cover to the listing card' : 'Crop this photo'}
             </p>
+            {!croppingCover ? (
+              <div className="crop-aspect" role="group" aria-label="Crop shape">
+                <button
+                  type="button"
+                  className={`choice-chip${freeCrop ? '' : ' choice-chip--on'}`}
+                  aria-pressed={!freeCrop}
+                  onClick={() => {
+                    setFreeCrop(false)
+                    setCrop({ x: 0, y: 0 })
+                    setZoom(1)
+                  }}
+                >
+                  4:3
+                </button>
+                <button
+                  type="button"
+                  className={`choice-chip${freeCrop ? ' choice-chip--on' : ''}`}
+                  aria-pressed={freeCrop}
+                  onClick={() => {
+                    setFreeCrop(true)
+                    setCrop({ x: 0, y: 0 })
+                    setZoom(1)
+                  }}
+                >
+                  Free
+                </button>
+              </div>
+            ) : null}
             <div className="cover-crop">
               <Cropper
                 image={cropping.previewUrl}
                 crop={crop}
                 zoom={zoom}
-                aspect={LISTING_COVER_ASPECT}
+                aspect={cropAspect}
                 onCropChange={setCrop}
                 onZoomChange={setZoom}
                 onCropComplete={(_, area) => setCroppedArea(area)}
