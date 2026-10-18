@@ -1,6 +1,6 @@
 # Dispute Policy
 
-Last updated: 29 July 2026
+Last updated: 19 October 2026
 
 ## What TryKai is
 
@@ -10,7 +10,7 @@ There are three kinds of situations this policy covers: complaints about the qua
 
 ## Quality complaints
 
-If a session did not match what was described, or something about the experience fell short (for example, the host was very late, or the session was cut short), you can raise this with us within 7 days of the session.
+If a session did not match what was described, or something about the experience fell short (for example, the host was very late, or the session was cut short), you can raise this with us within 3 days after the session ends. We cannot review complaints raised after that.
 
 To raise a complaint, email us at hello@trykai.sg with your booking reference, a description of what happened, and any evidence that helps us understand the situation, such as photos or messages. Including evidence upfront generally helps us resolve things faster.
 
@@ -32,7 +32,7 @@ If a host cancellation or no show was caused by something genuinely outside the 
 
 ## If a payout has already been released
 
-Host payouts are normally released 72 hours after a session ends. In rare cases, a dispute may be confirmed after that payout has already gone out, for example if a safety report or complaint comes in a few days later. When this happens, TryKai will refund the guest first, treat the amount as a cost to us in the meantime, and work separately to recover it from the host, including from future payouts where applicable. The host issue itself, such as a strike or suspension, is handled independently of this recovery process.
+Host payouts are normally released 72 hours after a session ends. In rare cases, a dispute may be confirmed after that payout has already gone out, for example if a safety report comes in later, or a complaint raised near the end of the 3 day window is confirmed after the payout has gone out. When this happens, TryKai will refund the guest first, treat the amount as a cost to us in the meantime, and work separately to recover it from the host, including from future payouts where applicable. The host issue itself, such as a strike or suspension, is handled independently of this recovery process.
 
 ## What we can and cannot do
 

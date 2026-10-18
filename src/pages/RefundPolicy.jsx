@@ -4,7 +4,7 @@ export default function RefundPolicy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Refund Policy</h1>
-      <p className="policy-page__updated">Last updated: 17 October 2026</p>
+      <p className="policy-page__updated">Last updated: 19 October 2026</p>
 
       <h2>How refunds work</h2>
       <p>
@@ -56,7 +56,7 @@ export default function RefundPolicy() {
         about the quality of a session you actually attended (for example, the
         host was very late, or the session did not match the listing), that is
         handled as a dispute rather than a cancellation refund. You can raise
-        this within 7 days of your session through our{' '}
+        this within 3 days after your session ends through our{' '}
         <Link to="/dispute-policy">Dispute Policy</Link>.
       </p>
       <p>

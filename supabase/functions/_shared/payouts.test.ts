@@ -22,6 +22,7 @@ function candidate(overrides: Record<string, unknown> = {}) {
     duration_mins: 60,
     stripe_account_id: 'acct_1',
     stripe_payouts_enabled: true,
+    payout_hold_reason: null,
     ...overrides,
   }
 }
@@ -58,6 +59,9 @@ describe('payoutSkipReason', () => {
       'already_released',
     )
     expect(payoutSkipReason(candidate({ stripe_refund_id: 're_1' }))).toBe('refunded')
+    expect(payoutSkipReason(candidate({ payout_hold_reason: 'dispute: quality' }))).toBe(
+      'dispute_hold',
+    )
     expect(payoutSkipReason(candidate({ host_payout_amount: 0 }))).toBe('no_host_share')
     expect(payoutSkipReason(candidate({ stripe_charge_id: null }))).toBe('missing_charge_id')
     expect(payoutSkipReason(candidate({ stripe_account_id: null }))).toBe('host_not_connected')
@@ -67,6 +71,19 @@ describe('payoutSkipReason', () => {
     expect(payoutSkipReason(candidate({ starts_at: 'not-a-date' }))).toBe('invalid_starts_at')
     expect(payoutSkipReason(candidate({ duration_mins: null }))).toBe('invalid_duration')
     expect(payoutSkipReason(candidate({ duration_mins: 0 }))).toBe('invalid_duration')
+  })
+
+  it('holds a disputed booking even after the 72-hour clock has run', () => {
+    const held = candidate({ payout_hold_reason: 'dispute: host late' })
+    expect(payoutSkipReason(held)).toBe('dispute_hold')
+    expect(isPayoutDue(held)).toBe(false)
+    expect(payoutSkipReason(candidate({ payout_hold_reason: '' }))).toBeNull()
+  })
+
+  it('pays a booking that never had the hold column loaded', () => {
+    const legacy = candidate()
+    delete legacy.payout_hold_reason
+    expect(payoutSkipReason(legacy)).toBeNull()
   })
 })
 
