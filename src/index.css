@@ -80,6 +80,11 @@
   --logo: var(--display);
   --mono: 'Space Mono', ui-monospace, monospace;
 
+  /* Cover photos: browse cards, gallery, booking, wizard preview, cover crop. */
+  --listing-cover-w: 4;
+  --listing-cover-h: 3;
+  --listing-cover-aspect: 4 / 3;
+
   font: 16px/1.6 var(--sans);
   color-scheme: light;
   color: var(--text);
@@ -1085,7 +1090,7 @@ a {
 }
 
 .skeleton-card__media {
-  aspect-ratio: 1;
+  aspect-ratio: var(--listing-cover-aspect);
   border-radius: var(--radius-lg);
 }
 
@@ -1259,7 +1264,7 @@ a {
 
 .listing-card__image-wrap {
   position: relative;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--listing-cover-aspect);
   overflow: hidden;
   background: var(--sand);
 }
@@ -1269,6 +1274,7 @@ a {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
 }
 
 .listing-card__placeholder {
@@ -1455,49 +1461,67 @@ a {
   gap: 8px;
 }
 
-.preview-item__strip {
+.photo-reorder-hint {
+  margin: 8px 0 0;
+}
+
+.preview-item__hit {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.preview-item__hit:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.preview-item--dragging {
+  opacity: 0.4;
+}
+
+.preview-item--overlay {
+  cursor: grabbing;
+  box-shadow: var(--shadow-md);
+}
+
+.preview-item__menu {
   position: absolute;
-  left: 4px;
-  right: 4px;
-  bottom: 4px;
-  z-index: 1;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3px;
-  min-width: 0;
-}
-
-.preview-item__dot {
-  flex: 0 0 auto;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--cream);
-  text-shadow: 0 0 3px var(--navy);
-}
-
-.preview-item__tool {
-  flex: 0 0 auto;
-  padding: 3px 6px;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--navy);
+  flex-direction: column;
+  padding: 4px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+
+.preview-item__menu button {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+  color: var(--navy);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
   cursor: pointer;
 }
 
-.preview-item__tool--action {
-  flex: 0 1 auto;
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.preview-item__tool:disabled {
-  opacity: 0.4;
-  cursor: default;
+.preview-item__menu button:hover,
+.preview-item__menu button:focus-visible {
+  background: var(--sand);
 }
 
 .confirm-dialog__copy {
@@ -2152,7 +2176,7 @@ input[type='password']::-webkit-password-reveal-button {
 
 .ui-card__image-wrap {
   position: relative;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--listing-cover-aspect);
   overflow: hidden;
   background: var(--sand);
   border-radius: var(--radius-lg);
@@ -2163,6 +2187,7 @@ input[type='password']::-webkit-password-reveal-button {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   transition: transform 0.4s var(--ease);
 }
 
@@ -2317,7 +2342,7 @@ input[type='password']::-webkit-password-reveal-button {
 }
 
 .ui-card--browse .ui-card__image-wrap {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: var(--listing-cover-aspect);
 }
 
 .ui-card--browse .ui-card__body {
@@ -2514,7 +2539,7 @@ input[type='password']::-webkit-password-reveal-button {
   appearance: none;
   background: transparent;
   cursor: pointer;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--listing-cover-aspect);
   overflow: hidden;
   scroll-snap-align: start;
 }
@@ -2526,6 +2551,7 @@ input[type='password']::-webkit-password-reveal-button {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
 }
 
 .detail-gallery__photo:focus-visible {
@@ -2553,7 +2579,7 @@ input[type='password']::-webkit-password-reveal-button {
 
 .detail-gallery__placeholder {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: var(--listing-cover-aspect);
   background: var(--bg-subtle);
   border-radius: var(--radius-lg);
   margin-bottom: 32px;
@@ -2586,7 +2612,7 @@ input[type='password']::-webkit-password-reveal-button {
   /* A lone photo is framed rather than stretched across the whole page. */
   .detail-gallery__scroller[data-photo-count='1'],
   .detail-gallery__placeholder {
-    max-width: calc(var(--gallery-height) * 3 / 2);
+    max-width: calc(var(--gallery-height) * var(--listing-cover-w) / var(--listing-cover-h));
     margin-inline: auto;
   }
 
@@ -3628,6 +3654,7 @@ body.lightbox-open {
   width: 72px;
   height: 72px;
   object-fit: cover;
+  object-position: center;
   background: var(--tint-food);
   border-radius: var(--radius);
 }
@@ -4166,6 +4193,7 @@ body.lightbox-open {
   width: 64px;
   height: 64px;
   object-fit: cover;
+  object-position: center;
   background: var(--bg-subtle);
   border-radius: var(--radius);
 }
@@ -4598,6 +4626,7 @@ body.lightbox-open {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
 }
@@ -4606,6 +4635,7 @@ body.lightbox-open {
   position: absolute;
   top: -8px;
   right: -8px;
+  z-index: 4;
   width: 24px;
   height: 24px;
   padding: 0;
@@ -5422,8 +5452,9 @@ body.lightbox-open {
 
 .booking-detail__photo {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--listing-cover-aspect);
   object-fit: cover;
+  object-position: center;
   border-radius: var(--radius);
   background: var(--bg-subtle);
   margin-bottom: 16px;
@@ -5716,7 +5747,7 @@ body.lightbox-open {
 
   .page--listing .detail-gallery__placeholder {
     width: auto;
-    aspect-ratio: 4 / 3;
+    aspect-ratio: var(--listing-cover-aspect);
     border-radius: 0;
   }
 

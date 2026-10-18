@@ -1,13 +1,28 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { LISTING_COVER_ASPECT, cropImageToBlob, loadImage } from './coverCrop'
+import { LISTING_COVER_ASPECT, LISTING_COVER_H, LISTING_COVER_W, cropImageToBlob, loadImage } from './coverCrop'
 
 describe('coverCrop', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('matches the browse card image ratio', () => {
+  it('matches the shared CSS cover ratio used on every cover surface', () => {
+    expect(LISTING_COVER_W).toBe(4)
+    expect(LISTING_COVER_H).toBe(3)
     expect(LISTING_COVER_ASPECT).toBe(4 / 3)
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    expect(css).toMatch(/--listing-cover-aspect:\s*4 \/ 3/)
+    expect(css).toMatch(/\.ui-card__image-wrap \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
+    expect(css).toMatch(/\.ui-card--browse \.ui-card__image-wrap \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
+    expect(css).toMatch(/\.listing-card__image-wrap \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
+    expect(css).toMatch(/\.detail-gallery__photo \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
+    expect(css).toMatch(/\.booking-detail__photo \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
+    expect(css).toMatch(/\.skeleton-card__media \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
+    expect(css).toMatch(/\.hosting-listing__thumb \{[\s\S]*?object-position:\s*center/)
+    expect(css).toMatch(/\.checkout-summary__photo \{[\s\S]*?object-position:\s*center/)
+    expect(css).toMatch(/\.preview-image \{[\s\S]*?object-position:\s*center/)
   })
 
   it('draws the chosen pixels onto a canvas and returns a blob', async () => {

@@ -729,11 +729,14 @@ describe('CreateListing photos', () => {
     await goToPhotos(user)
     selectFiles([imageFile('a.png'), imageFile('b.png')])
     await screen.findByText('Maximum of 5 photos (2/5)')
+    expect(screen.getByText('Drag to reorder. The first photo is your cover.')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Set as cover' }))
+    await user.click(screen.getByRole('button', { name: 'Photo 2' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Make cover' }))
 
     const items = document.querySelectorAll('.preview-item')
     expect(items[0].querySelector('.preview-item__cover')).toHaveTextContent('Cover')
+    expect(screen.queryByRole('button', { name: 'Set as cover' })).not.toBeInTheDocument()
   })
 
   it('opens the cover crop dialog', async () => {
@@ -742,23 +745,12 @@ describe('CreateListing photos', () => {
     selectFiles([imageFile('a.png')])
     await screen.findByText('Maximum of 5 photos (1/5)')
 
-    await user.click(screen.getByRole('button', { name: 'Crop' }))
+    await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Crop' }))
 
     expect(screen.getByText('Crop the cover to the listing card')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Free' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Use this crop' })).toBeDisabled()
-  })
-
-  it('moves a photo with the left and right buttons', async () => {
-    const { user } = renderPage()
-    await goToPhotos(user)
-    selectFiles([imageFile('a.png'), imageFile('b.png')])
-    await screen.findByText('Maximum of 5 photos (2/5)')
-
-    await user.click(screen.getAllByRole('button', { name: 'Move photo right' })[0])
-
-    expect(screen.getByRole('button', { name: 'Set as cover' })).toBeInTheDocument()
-    expect(document.querySelector('.preview-item__cover')).toBeInTheDocument()
   })
 
   async function publishWithOnePhoto(user) {
