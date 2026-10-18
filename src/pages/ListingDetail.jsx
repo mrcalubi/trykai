@@ -37,8 +37,8 @@ import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { listingReportSubject, reportMailto } from '../lib/reportMailto'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import { BackRowActions } from '../components/BackButton'
-import OverflowMenu from '../components/ui/OverflowMenu'
 import Icon from '../components/ui/Icon'
+import { regionForPlanningArea } from '../lib/planningAreas'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -94,6 +94,10 @@ function HostBioPreview({ bio, to }) {
       ) : null}
     </p>
   )
+}
+
+function googleMapsUrl(address) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
 }
 
 function visibleAreaLabel(revealedAddress, area) {
@@ -690,6 +694,7 @@ export default function ListingDetail() {
     url: typeof window === 'undefined' ? '' : window.location.href,
     id: listing.id,
   })
+  const areaRegion = regionForPlanningArea(listing.area)
   const duration = formatDuration(listing.duration_mins)
   const maxGuests = Number(listing.max_guests)
   const paynowSaving = cardPrice - paynowPrice
@@ -920,14 +925,6 @@ export default function ListingDetail() {
         <button type="button" className="share-button" aria-label="Share" onClick={shareListing}>
           <Icon name="share" size={18} />
         </button>
-        {isOwnListing ? null : (
-          <OverflowMenu
-            label="More actions"
-            icon="⋮"
-            className="ui-overflow--quiet"
-            items={[{ label: 'Report listing', href: reportHref }]}
-          />
-        )}
       </BackRowActions>
       {shareNote ? (
         <p className="share-note" role="status">
@@ -1129,16 +1126,51 @@ export default function ListingDetail() {
           {areaLabel ? (
             <section className="detail-section">
               <h2 className="detail-section__title">Where you&apos;ll be</h2>
-              <div className="detail-map" aria-hidden="true">
-                <span className="detail-map__pin">
-                  <Icon name="pin" size={24} />
-                </span>
+              <div className="detail-location">
+                <div className="detail-location__row">
+                  <span className="detail-location__icon">
+                    <Icon name="pin" size={20} />
+                  </span>
+                  <div className="detail-location__copy">
+                    {revealedAddress ? (
+                      <>
+                        <p className="detail-location__title">{areaLabel}</p>
+                        <p className="detail-location__note">From your confirmed booking.</p>
+                        <a
+                          href={googleMapsUrl(areaLabel)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="detail-location__link"
+                        >
+                          Open in Google Maps
+                        </a>
+                      </>
+                    ) : (
+                      <>
+                        <p className="detail-location__title">{areaLabel}, Singapore</p>
+                        <p className="detail-location__note">
+                          {areaRegion
+                            ? `${areaRegion} region. The general area, not the exact spot.`
+                            : 'The general area, not the exact spot.'}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {revealedAddress ? null : (
+                  <div className="detail-location__row">
+                    <span className="detail-location__icon">
+                      <Icon name="lock" size={20} />
+                    </span>
+                    <div className="detail-location__copy">
+                      <p className="detail-location__title">Exact address after booking</p>
+                      <p className="detail-location__note">
+                        Sent once your booking is confirmed, with directions in your booking.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-              <p className="detail-location__copy">
-                {revealedAddress
-                  ? `Your booking is at ${areaLabel}.`
-                  : `Sessions are held in ${areaLabel}. The exact address is sent to you once you have booked.`}
-              </p>
             </section>
           ) : null}
 

@@ -138,17 +138,17 @@ describe('ListingDetail loading and failure', () => {
 describe('ListingDetail content', () => {
   it('renders the listing headline details', async () => {
     givenListing(makeListing({ title: 'Latte art', category: 'Food', area: 'Tiong Bahru' }))
-    const { user } = renderPage()
+    renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Latte art', level: 1 })).toBeInTheDocument()
     expect(screen.getByText('Food')).toBeInTheDocument()
     expect(screen.getByText('Tiong Bahru')).toBeInTheDocument()
     expect(screen.getByText('Pull your first rosetta in ninety minutes.')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
-    const more = screen.getByRole('button', { name: 'More actions' })
-    expect(document.querySelector('.page-back__actions')).toContainElement(more)
-    await user.click(more)
-    const report = screen.getByRole('menuitem', { name: 'Report listing' })
+    // Report lives in the rows at the end of the page, not on the photo.
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+    expect(document.querySelector('.page-back__actions .ui-overflow')).not.toBeInTheDocument()
+    const report = screen.getByRole('link', { name: 'Report this listing' })
     expect(report.getAttribute('href')).toContain('mailto:hello@trykai.sg')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: listing Latte art')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('listing-1')
@@ -170,8 +170,36 @@ describe('ListingDetail content', () => {
 
     await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
     expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
-    expect(document.querySelector('.page-back__actions .ui-overflow')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Report this listing' })).not.toBeInTheDocument()
+  })
+
+  it('tells a guest the general area and that the exact address comes after booking', async () => {
+    givenListing(makeListing({ area: 'Bedok' }))
+    renderPage()
+
+    expect(await screen.findByText('Bedok, Singapore')).toBeInTheDocument()
+    expect(screen.getByText(/^East region\./)).toBeInTheDocument()
+    expect(screen.getByText('Exact address after booking')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Open in Google Maps' })).not.toBeInTheDocument()
+  })
+
+  it('gives a confirmed guest the exact address with a map link', async () => {
+    givenListing()
+    givenSignedIn()
+    supabase.__on('bookings', 'select', { data: [{ id: 'booking-1' }], error: null })
+    supabase.rpc.mockImplementation(async (name) =>
+      name === 'get_listing_address'
+        ? { data: '1 Tiong Bahru Road', error: null }
+        : { data: [], error: null }
+    )
+    renderPage()
+
+    const map = await screen.findByRole('link', { name: 'Open in Google Maps' })
+    expect(map).toHaveAttribute(
+      'href',
+      'https://www.google.com/maps/search/?api=1&query=1%20Tiong%20Bahru%20Road'
+    )
+    expect(screen.queryByText('Exact address after booking')).not.toBeInTheDocument()
   })
 
   it('shows the card all-in total, not the raw lesson price', async () => {

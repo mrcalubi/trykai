@@ -153,12 +153,12 @@ All in plain CSS in `src/index.css` (no Tailwind), previewable at `/style-guide`
 No photo banner and no persistent search bar for launch (unchanged): with tens of listings, the category bar and chips find things faster than a search box.
 
 ### Listing detail (built from the canvas "Listing · phone" mockup, 18 October 2026)
-- **Phones and tablets:** the gallery runs edge to edge with the back, share and ⋮ buttons floating on the photo as cream circles, position dots and a "1 / 5" counter on the photo. From 1024px the mosaic is unchanged (capped at `clamp(320px, 34vw, 440px)`), with the buttons above it.
+- **Phones and tablets:** the gallery runs edge to edge with the back and share buttons floating on the photo as small 32px cream circles (each keeps a 44px tap area), position dots and a "1 / 5" counter on the photo. From 1024px the mosaic is unchanged (capped at `clamp(320px, 34vw, 440px)`), with the buttons above it. There is no ⋮ menu on the photo: reporting lives only in the row at the end of the page.
 - Category chip, title, then a facts row with icons: session length, "Up to N guests", area, and the listing's rating when it has reviews.
 - **Host card** high on the page at every width: avatar, "Your host", name, "ID verified" (from `users.is_id_verified`), host rating, bio preview, "View <name>'s profile".
 - About this experience, then What's provided as a checklist with coral checks.
 - **Pick a date:** on phones the booking card sits here in the page flow, without card chrome: section title, the month calendar in its own card, the chosen day, and each time as a card with spots left (coral when two or fewer) and Book. From 1024px the same content is the sticky booking card on the right, with the all-in price on top.
-- **Where you'll be:** a drawn street-grid tile with a coral pin (a stand-in until there is a privacy-safe map) and the line that the exact address arrives after booking.
+- **Where you'll be:** a two-row card instead of a map, since a map of a general area tells a guest nothing. Row one: the area ("Bedok, Singapore") with its region when it is a planning area, and "The general area, not the exact spot". Row two: "Exact address after booking". A confirmed guest instead sees the real address with an "Open in Google Maps" link, matching booking detail.
 - Reviews last, with a dashed empty state; then two rows: the cancellation summary (links to the policy) and "Report this listing".
 - **Phone bottom bar:** all-in price per person, the PayNow price in coral-ink, and "Choose a date". It slides away while the booking card is on screen and during checkout.
 
@@ -170,8 +170,15 @@ No photo banner and no persistent search bar for launch (unchanged): with tens o
 ### Hosting, bookings, profile, settings, auth
 Same tokens and components: raised white cards with `--shadow-sm`, display titles, tabs with a navy underline, consistent banners. Inline `style={{…}}` in pages is not allowed; add a class instead.
 
-### Create and edit listing
-One form (not split into steps for now), grouped into titled sections — *The basics*, *Price and time*, *Location*, *Photos*, *What's provided* — with the photo tip panel in the Photos section.
+### Create listing (built from the canvas "New listing, step 3 · phone" mockup, 18 October 2026)
+- **Five steps:** *The basics* (title, category as six icon tiles, description), *Add photos* (tips panel, a dashed upload tile, previews with the first marked Cover), *Price and group size*, *Where it happens* (area and full address), *Final touches* (what's provided, a preview of the browse card, cancellation policy, Host terms, Create listing).
+- **Chrome:** close (to Hosting), "New listing" and "Save draft" on top; "Step N of 5" in mono with "Next: <step>" and five progress segments; Back and Continue (Create listing on the last step) at the bottom. Continue checks only the current step and says what is missing; Create listing re-checks every step.
+- **Price step:** a large S$ price field, then a sand panel with what guests pay (all in), what the host receives, the price after the first 3 bookings with the 10% host fee (hidden for founding hosts), and "A full session of N pays you up to". When founding-host status cannot be read only the guest price shows. Group size is a round stepper (1 to 50, default 4), session length is four chips (1 hr, 1.5 hr, 2 hr, Other with a minutes field), and group discounts are a checkbox card.
+- **Drafts:** "Save draft" keeps the text answers in this browser (not photos); next time the first step offers Restore draft or Discard. Publishing clears it.
+- **Phones and tablets:** a full-screen flow over the site nav, with Back and Continue pinned to the bottom. **From 1024px:** the steps sit in a white card (max 640px) with a sticky "How guests will see it" preview of the browse card beside it, updating as the host types.
+
+### Edit listing
+Still one form, grouped into titled sections — *The basics*, *Price and time*, *Location*, *Photos*, *What's provided* — with the photo tip panel in the Photos section. Hosts editing want every field at once.
 
 ---
 
@@ -199,6 +206,5 @@ One form (not split into steps for now), grouped into titled sections — *The b
 - Vector logo mark and final lettered wordmark.
 - Lane 2's own small wordmark or section-header treatment (optional, deferred), and its exact spacing and density values.
 - A "Good for two" listing attribute, so Home can show a real "Date ideas" row (the canvas design depends on data we do not store yet).
-- A real map tile on listing detail once there is a privacy-safe approximate location.
 - Compressing the illustrated category PNGs (about 50 KB each) if they move onto a page guests load.
 - Test listings and screenshot-photo listings must be deactivated on production; they undo everything above.
