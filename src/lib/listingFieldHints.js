@@ -12,3 +12,6 @@ export const LISTING_FIELD_HINTS = {
 
 export const PHOTO_SKIP_COPY =
   'Your skill deserves to be seen! Listings with photos get far more bookings.'
+
+export const PHOTO_UPLOAD_ERROR =
+  "That photo didn't upload. Try again or pick a different one."

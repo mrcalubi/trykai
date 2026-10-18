@@ -203,6 +203,7 @@ In this order after warm-contact launch:
 10. **Host-wide session overlap in the database.** Preview already refuses a clash with any of this host’s sessions. The trigger and `add_listing_session` are still per listing. Candidate migration if hosts double-book themselves across listings.
 11. **Revoke client session INSERT.** Hosts still have INSERT on `sessions` for the pre-`00018` duration fallback. A crafted insert can set its own `spots_total`. The product path uses `add_listing_session`.
 12. **`add_listing_session` should ignore client `p_spots`.** Hosting sends `listings.max_guests`, but the RPC still accepts any positive number. After launch, take spots from the locked listing row.
+13. **Add a Content Security Policy in vercel.json** (test against Stripe, Supabase, Resend links). Do not add `unsafe-eval`. Client image work stays on the main thread.
 
 Then: identity and social layer, Date Mode, credit bundles, multi session courses, "this weekend" filter, search, in app notifications, listing performance nudges, listing video, host Pro subscription, payout clawback.
 

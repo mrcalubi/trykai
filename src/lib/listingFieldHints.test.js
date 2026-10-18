@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LISTING_FIELD_HINTS, PHOTO_SKIP_COPY } from './listingFieldHints'
+import { LISTING_FIELD_HINTS, PHOTO_SKIP_COPY, PHOTO_UPLOAD_ERROR } from './listingFieldHints'
 
 describe('listing field hints', () => {
   it('uses the agreed title, description and skip copy', () => {
@@ -11,6 +11,9 @@ describe('listing field hints', () => {
     )
     expect(PHOTO_SKIP_COPY).toBe(
       'Your skill deserves to be seen! Listings with photos get far more bookings.',
+    )
+    expect(PHOTO_UPLOAD_ERROR).toBe(
+      "That photo didn't upload. Try again or pick a different one.",
     )
   })
 })

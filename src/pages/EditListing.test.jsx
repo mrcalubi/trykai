@@ -5,7 +5,7 @@ import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession, makeListing } from '../test/fixtures'
-import { LISTING_FIELD_HINTS } from '../lib/listingFieldHints'
+import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
 
 vi.mock('../lib/supabase')
 
@@ -520,7 +520,7 @@ describe('EditListing photos', () => {
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('storage full')).toBeInTheDocument()
+    expect(await screen.findByText(PHOTO_UPLOAD_ERROR)).toBeInTheDocument()
     expect(supabase.__calls('listings', 'update')).toHaveLength(0)
   })
 })

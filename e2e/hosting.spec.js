@@ -135,8 +135,10 @@ test.describe('verified host create listing', () => {
     await next()
 
     await expect(page.getByRole('heading', { name: 'Add photos' })).toBeVisible()
+    await page.getByLabel('Photos').setInputFiles('src/assets/categories/food.png')
+    await expect(page.getByText('Maximum of 5 photos (1/5)')).toBeVisible()
+    await expect(page.getByText('Cover', { exact: true })).toBeVisible()
     await next()
-    await page.getByRole('button', { name: 'Skip for now' }).click()
 
     await expect(page.getByRole('heading', { name: 'Price and group size' })).toBeVisible()
     await expect(page.getByText('Step 3 of 5')).toBeVisible()
