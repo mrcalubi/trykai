@@ -25,6 +25,7 @@ import DisputePolicy from './pages/DisputePolicy'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
 import StyleGuide from './pages/StyleGuide'
+import NotFound from './pages/NotFound'
 
 export default function App() {
   return (
@@ -120,6 +121,7 @@ export default function App() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/style-guide" element={<StyleGuide />} />
+        <Route path="*" element={<NotFound />} />
         </Routes>
       </BackSlotProvider>
       <Footer />

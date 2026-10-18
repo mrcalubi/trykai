@@ -1,8 +1,10 @@
+import { MAX_PRICE_PER_PERSON_CENTS } from './pricing'
+
 export const LISTING_FIELD_HINTS = {
   title: "Give your session a name. Something like 'Latte art for beginners' works great.",
   description: "Tell guests what they'll do. Even two or three sentences is plenty.",
   category: 'Pick the category that fits best. Guests browse by these.',
-  price: 'Set what you earn per guest. Most sessions are $10 to $40.',
+  price: `Set what you earn per guest, up to $${MAX_PRICE_PER_PERSON_CENTS / 100}. Most sessions are $10 to $40.`,
   spots: 'At least one guest per session.',
   duration: "Choose how long you'll spend with guests.",
   area: 'Pick the area guests will see before they book.',

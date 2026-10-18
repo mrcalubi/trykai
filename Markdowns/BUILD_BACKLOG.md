@@ -53,7 +53,7 @@ Verification approval is now on the platform. Suspension that does not hide list
 Not a calendar. Capacity is 8 hours a week.
 
 1. **Ops (not app code):** confirm `00005`, `00008`, `00009`, `00010`, `00011`, and `00012` on each environment; Vault/GitHub secrets for `release-payout`; Stripe Dashboard webhook + secrets; `RESEND_API_KEY` and current Edge Function deploys on production; platform payouts **manual**; flag eleven `is_founding_host`; one staging test-mode booking; confirm the two test cancellations were refunded on Stripe.
-2. **P0.4** app actually filters `is_suspended` on browse and Book. Listing/session INSERT is already gated by `can_create_listing()` (`00008`). One-click admin can wait if Table Editor plus this filter is reliable.
+2. ~~**P0.4** app actually filters `is_suspended` on browse and Book.~~ In code as `00027` plus a `create-payment-intent` check; apply `00027` on each environment. One-click admin can wait if Table Editor plus this filter is reliable.
 3. ~~**Revoke `listings.full_address`** from anon/authenticated SELECT.~~ Done in `00025` (`listing_address()`).
 4. Browse card rating: the listings fetch does not supply one and there is no aggregate rating column. The card already shows the all-in card price.
 5. **P2.3** review gating is done (`00011`). Then the rest of P2 in listed order.
@@ -67,7 +67,7 @@ Review reminder email, saved listings, host-to-guest reviews then the review fil
 
 ## P0: blocks launch
 
-> **Status, 18 October 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement on browse/Book. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September. P0.9 assets resolved 9 September. `00008` listing gate, `00009` session/booking read, `00010` `release-payout` schedule, `00011` review gate, and `00012` empty-session delete are in the tree.
+> **Status, 18 October 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. P0.4 enforcement on browse/Book is in code (`00027`), not yet applied. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September. P0.9 assets resolved 9 September. `00008` listing gate, `00009` session/booking read, `00010` `release-payout` schedule, `00011` review gate, and `00012` empty-session delete are in the tree.
 
 ### P0.1 — Host payout details — OBSOLETE
 Under Stripe Connect Express, Stripe collects the host's bank details. Do not add `payout_method` / `payout_identifier` columns.
@@ -82,15 +82,15 @@ The copy-paste PayNow queue assumed manual disbursement. `release-payout` Transf
 
 Still manual in the Table Editor: granting `is_admin`, which is a one-time action, and `is_founding_host`.
 
-### P0.4 — Admin: account suspension — FIELDS EXIST, APP DOES NOT ENFORCE
+### P0.4 — Admin: account suspension — ENFORCED IN CODE 18 October, MIGRATION NOT YET APPLIED
 **Flow:** credible safety report → account suspended immediately, pending review
-**Today:** `is_suspended`, `suspended_at`, `suspension_reason` exist. Nothing in `src/` queries them. Home still shows `is_active` listings. ListingDetail still books them. Listing and session INSERT are blocked by `can_create_listing()` (`00008`). SAFETY_RESPONSE_PROTOCOL.md tells Caleb to verify by hand that listings are deactivated.
+**Today:** `is_suspended`, `suspended_at`, `suspension_reason` exist. `00027` makes the public listings read (`"Anyone can view active listings"`) also require `listing_host_in_good_standing(id)`, so setting `is_suspended = true` hides every listing of that host from browse, listing detail and profiles, independent of `host_strikes` and `is_active`. The host still sees their own; a guest who booked still sees the title. `create-payment-intent` refuses checkout for a suspended host. Listing and session INSERT are blocked by `can_create_listing()` (`00008`). Setting the flag back to false restores the listings.
 
-Still to build:
-- Queries and Book path respect `is_suspended` (hide listings, block new bookings, stop host tools)
-- Independent of `host_strikes`, per the published dispute policy
-- Reason recorded, reversible, timestamped (already true at the column level)
-- One-click admin button can follow; the filter is the launch-blocking piece
+Still to do:
+- Apply `00027` on each environment, then suspend a test host and confirm browse hides them
+- Existing confirmed bookings with a suspended host are not cancelled automatically; use `admin-cancel-booking`
+- Host tools (add session, edit) are not yet blocked for a suspended host beyond the INSERT gate
+- One-click admin button can follow
 
 ### P0.5 — Cancellation logic rebuilt to four tiers — DONE
 `calculateGuestRefund` implements 100 / 50 / 25 / 0 at 48, 24, and 6 hours, platform fee forfeited on partial tiers. `cancel-booking` issues the Stripe refund. Spot restore only for confirmed rows. Guests are emailed the refund amount (including $0); the host is emailed only on a guest cancel.
