@@ -36,11 +36,12 @@ describe('SessionCalendar', () => {
     expect(dayButtons()).toHaveLength(31)
   })
 
-  it('shows the session count on each date that has sessions', () => {
+  it('marks dates that have sessions with a dot and keeps the count in the name', () => {
     renderCalendar()
 
     const ninth = screen.getByRole('button', { name: 'Friday, 9 October, 2 sessions' })
-    expect(ninth).toHaveTextContent('92')
+    expect(ninth).toHaveTextContent(/^9$/)
+    expect(ninth.querySelector('.session-calendar__dot')).toBeInTheDocument()
     expect(ninth).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Tuesday, 27 October, 1 session' })).toBeEnabled()
   })

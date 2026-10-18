@@ -159,7 +159,7 @@ export default function CreateListing() {
     }
 
     if (Number.isNaN(guests) || guests < 1) {
-      setError('Max guests must be at least 1.')
+      setError('Spots per session must be at least 1.')
       return
     }
 
@@ -312,7 +312,7 @@ export default function CreateListing() {
             </div>
 
             <label className="label">
-              Max guests
+              Spots per session
               <input
                 type="number"
                 value={maxGuests}

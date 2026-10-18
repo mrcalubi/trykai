@@ -98,8 +98,8 @@ export default function BookingDetail() {
 
     const listingId = data.sessions?.listings?.id
     if (data.status === 'confirmed' && listingId) {
-      const { data: revealed } = await supabase.rpc('get_listing_address', {
-        p_listing_id: listingId,
+      const { data: revealed } = await supabase.rpc('listing_address', {
+        listing_id: listingId,
       })
       setAddress(typeof revealed === 'string' ? revealed : '')
     } else {

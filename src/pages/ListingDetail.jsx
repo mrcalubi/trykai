@@ -290,21 +290,11 @@ export default function ListingDetail() {
       const userId = authResult.data?.session?.user?.id
       setViewerId(userId ?? null)
       if (userId) {
-        const { data: confirmedBookings } = await supabase
-          .from('bookings')
-          .select('id, sessions!inner(listing_id)')
-          .eq('guest_id', userId)
-          .eq('status', 'confirmed')
-          .eq('sessions.listing_id', id)
-          .limit(1)
-
-        if (confirmedBookings?.length) {
-          const { data: address } = await supabase.rpc('get_listing_address', {
-            p_listing_id: id,
-          })
-          if (address) {
-            setRevealedAddress(address)
-          }
+        const { data: address } = await supabase.rpc('listing_address', {
+          listing_id: id,
+        })
+        if (address) {
+          setRevealedAddress(address)
         }
       }
 

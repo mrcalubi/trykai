@@ -17,10 +17,21 @@ function givenSignedIn(userId = HOST_ID) {
   })
 }
 
-function givenFoundingHost(value, error = null) {
+function givenFoundingHost(
+  value,
+  error = null,
+  spots = { updated: 0, held: [] },
+  address = '12 Coffee Road',
+) {
   supabase.rpc.mockImplementation(async (fn) => {
     if (fn === 'my_is_founding_host') {
       return error ? { data: null, error } : { data: value, error: null }
+    }
+    if (fn === 'set_listing_spots') {
+      return { data: spots, error: null }
+    }
+    if (fn === 'listing_address') {
+      return { data: address, error: null }
     }
     return { data: null, error: null }
   })
@@ -35,7 +46,6 @@ function givenListing(overrides = {}) {
       price_per_person: 4500,
       max_guests: 4,
       area: 'Bedok',
-      full_address: '12 Coffee Road',
       whats_provided: ['Materials'],
       photo_urls: ['https://cdn.test/one.jpg'],
       ...overrides,
@@ -79,6 +89,9 @@ describe('EditListing access control', () => {
     const call = supabase.__lastCall('listings', 'select')
     expect(call.filters).toContainEqual({ method: 'eq', column: 'id', value: 'listing-1' })
     expect(call.filters).toContainEqual({ method: 'eq', column: 'host_id', value: HOST_ID })
+    expect(call.chain[0].args[0]).not.toMatch(/full_address/)
+    expect(call.chain[0].args[0]).not.toMatch(/\*/)
+    expect(supabase.rpc).toHaveBeenCalledWith('listing_address', { listing_id: 'listing-1' })
   })
 
   it('shows a not-found message for a listing that is not theirs', async () => {
@@ -107,10 +120,33 @@ describe('EditListing prefill', () => {
     expect(screen.getByLabelText('Title')).toHaveValue('Latte art')
     expect(screen.getByLabelText('Description')).toHaveValue('Pull a rosetta.')
     expect(screen.getByLabelText('Category')).toHaveValue('Food')
-    expect(screen.getByLabelText('Max guests')).toHaveValue(4)
+    expect(screen.getByLabelText('Spots per session')).toHaveValue(4)
     expect(screen.getByLabelText('Area')).toHaveValue('Bedok')
     expect(screen.getByLabelText(/^Full address/)).toHaveValue('12 Coffee Road')
     expect(screen.getByRole('checkbox', { name: 'Offer group pricing' })).toBeChecked()
+  })
+
+  it('loads the address from listing_address, not the listings row', async () => {
+    givenFoundingHost(false, null, { updated: 0, held: [] }, '88 Host Lane')
+    await renderLoaded()
+
+    expect(screen.getByLabelText(/^Full address/)).toHaveValue('88 Host Lane')
+    expect(supabase.rpc).toHaveBeenCalledWith('listing_address', { listing_id: 'listing-1' })
+    expect(supabase.__lastCall('listings', 'select').chain[0].args[0]).not.toMatch(/full_address/)
+  })
+
+  it('surfaces a listing_address error instead of an empty address field', async () => {
+    supabase.rpc.mockImplementation(async (fn) => {
+      if (fn === 'listing_address') return { data: null, error: { message: 'permission denied' } }
+      if (fn === 'my_is_founding_host') return { data: false, error: null }
+      return { data: null, error: null }
+    })
+    renderPage()
+
+    expect(
+      await screen.findByText('Something went wrong loading this page. Please refresh.')
+    ).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Full address/)).not.toBeInTheDocument()
   })
 
   it('converts the stored cents back into dollars', async () => {
@@ -236,12 +272,12 @@ describe('EditListing validation', () => {
 
   it('rejects a guest count below one', async () => {
     const { user } = await renderLoaded()
-    await user.clear(screen.getByLabelText('Max guests'))
-    await user.type(screen.getByLabelText('Max guests'), '0')
+    await user.clear(screen.getByLabelText('Spots per session'))
+    await user.type(screen.getByLabelText('Spots per session'), '0')
 
     submitForm()
 
-    expect(await screen.findByText('Max guests must be at least 1.')).toBeInTheDocument()
+    expect(await screen.findByText('Spots per session must be at least 1.')).toBeInTheDocument()
   })
 })
 
@@ -260,12 +296,12 @@ describe('EditListing saving', () => {
     expect(call.payload).toMatchObject({
       title: 'Latte art, level two',
       price_per_person: 5525,
-      max_guests: 4,
       duration_mins: 90,
       group_pricing: true,
       area: 'Bedok',
       full_address: '12 Coffee Road',
     })
+    expect(call.payload).not.toHaveProperty('max_guests')
     expect(call.filters).toContainEqual({ method: 'eq', column: 'host_id', value: HOST_ID })
   })
 
@@ -286,13 +322,53 @@ describe('EditListing saving', () => {
     })
   })
 
-  it('returns to the dashboard with a confirmation', async () => {
+  it('writes listing spots onto future sessions and returns to hosting', async () => {
+    givenFoundingHost(false, null, {
+      updated: 2,
+      held: [
+        {
+          session_id: 's-held',
+          starts_at: '2099-06-10T02:00:00.000Z',
+          spots_total: 5,
+          booked: 5,
+        },
+      ],
+    })
     const { user, currentPath, currentState } = await renderLoaded()
+    await user.clear(screen.getByLabelText('Spots per session'))
+    await user.type(screen.getByLabelText('Spots per session'), '4')
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
-    await waitFor(() => expect(currentPath()).toBe('/dashboard'))
-    expect(currentState().message).toBe('Listing updated successfully.')
+    await waitFor(() =>
+      expect(supabase.rpc).toHaveBeenCalledWith('set_listing_spots', {
+        p_listing_id: 'listing-1',
+        p_spots: 4,
+      })
+    )
+    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'update').payload).not.toHaveProperty('max_guests')
+    await waitFor(() => expect(currentPath()).toBe('/hosting'))
+    expect(currentState().message).toMatch(/^Listing updated successfully\. Updated 2 future sessions\./)
+    expect(currentState().message).toMatch(/kept 5 spots because of existing bookings/)
+  })
+
+  it('stays on the form when set_listing_spots fails', async () => {
+    supabase.rpc.mockImplementation(async (fn) => {
+      if (fn === 'my_is_founding_host') return { data: false, error: null }
+      if (fn === 'listing_address') return { data: '12 Coffee Road', error: null }
+      if (fn === 'set_listing_spots') {
+        return { data: null, error: { message: 'not allowed' } }
+      }
+      return { data: null, error: null }
+    })
+    const { user, currentPath } = await renderLoaded()
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('not allowed')).toBeInTheDocument()
+    expect(supabase.__calls('listings', 'update')).toHaveLength(0)
+    expect(currentPath()).toBe('/edit-listing/listing-1')
   })
 
   it('reports a rejected update and stays put', async () => {

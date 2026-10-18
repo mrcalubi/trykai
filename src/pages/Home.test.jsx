@@ -189,6 +189,7 @@ describe('Home listing grid', () => {
     })
     const select = call.chain.find((step) => step.method === 'select')?.args[0]
     expect(select).not.toMatch(/full_name/)
+    expect(select).not.toMatch(/full_address/)
     expect(select).not.toMatch(/host:users/)
   })
 

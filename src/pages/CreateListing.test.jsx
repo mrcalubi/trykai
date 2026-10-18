@@ -62,7 +62,7 @@ async function fillValidForm(user, overrides = {}) {
   await user.type(screen.getByLabelText('Description'), values.description)
   await user.selectOptions(screen.getByLabelText('Category'), values.category)
   await user.type(screen.getByLabelText('Price per person (SGD)'), values.price)
-  await user.type(screen.getByLabelText('Max guests'), values.maxGuests)
+  await user.type(screen.getByLabelText('Spots per session'), values.maxGuests)
   await user.type(screen.getByLabelText('Duration (mins)'), values.duration)
   await choosePlanningArea(user, values.area)
   // The address label also wraps a hint span, so it needs a partial match.
@@ -204,7 +204,7 @@ describe('CreateListing validation', () => {
 
     submitForm()
 
-    expect(await screen.findByText('Max guests must be at least 1.')).toBeInTheDocument()
+    expect(await screen.findByText('Spots per session must be at least 1.')).toBeInTheDocument()
   })
 
   it('keeps Create listing disabled until the host agrees to the Host terms', async () => {
@@ -214,7 +214,7 @@ describe('CreateListing validation', () => {
     await user.type(screen.getByLabelText('Description'), 'Pull a rosetta.')
     await user.selectOptions(screen.getByLabelText('Category'), 'Food')
     await user.type(screen.getByLabelText('Price per person (SGD)'), '25')
-    await user.type(screen.getByLabelText('Max guests'), '4')
+    await user.type(screen.getByLabelText('Spots per session'), '4')
     await user.type(screen.getByLabelText('Duration (mins)'), '90')
     await choosePlanningArea(user, 'Bedok')
     await user.type(screen.getByLabelText(/^Full address/), '12 Coffee Road')
