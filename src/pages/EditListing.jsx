@@ -12,7 +12,7 @@ import WhatsProvidedFields from '../components/WhatsProvidedFields'
 import FieldHint from '../components/FieldHint'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import { hostPriceBreakdown, parsePriceInputCents } from '../lib/pricing'
-import { LISTING_FIELD_HINTS } from '../lib/listingFieldHints'
+import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
 import { providedForSave } from '../lib/whatsProvided'
 import { formatListingSpotsMessage } from '../lib/listingSpots'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
@@ -63,6 +63,7 @@ export default function EditListing() {
   const [fieldHints, setFieldHints] = useState({})
   const [photoSkipOpen, setPhotoSkipOpen] = useState(false)
   const [error, setError] = useState('')
+  const [photoError, setPhotoError] = useState('')
   const [loading, setLoading] = useState(false)
   const priceCents = parsePriceInputCents(price)
   const guests = parseInt(maxGuests, 10)
@@ -144,6 +145,7 @@ export default function EditListing() {
 
   async function saveListing() {
     setError('')
+    setPhotoError('')
     setFieldHints({})
     const duration = parseInt(durationMins, 10)
     const provided = providedForSave(whatsProvided)
@@ -154,8 +156,9 @@ export default function EditListing() {
     try {
       photoUrls = await uploadListingPhotos(photos, userId, supabase.storage)
     } catch (uploadError) {
+      console.error('Listing photo upload failed', uploadError)
       setLoading(false)
-      setError(uploadError.message)
+      setPhotoError(PHOTO_UPLOAD_ERROR)
       return
     }
 
@@ -378,6 +381,7 @@ export default function EditListing() {
             onChange={setPhotos}
             max={MAX_PHOTOS}
             pickerRef={photoPickerRef}
+            error={photoError}
           />
 
           <WhatsProvidedFields value={whatsProvided} onChange={setWhatsProvided} />

@@ -4,11 +4,17 @@ import Button from './ui/Button'
 import Icon from './ui/Icon'
 import { compressImage } from '../lib/compressImage'
 import { LISTING_COVER_ASPECT, cropImageToBlob, loadImage } from '../lib/coverCrop'
-import { filesToPhotos, movePhoto } from '../lib/listingPhotos'
+import { filesToPhotos, movePhoto, snapshotImageFiles } from '../lib/listingPhotos'
 
 const MAX_PHOTOS = 5
 
-export default function ListingPhotosEditor({ photos, onChange, max = MAX_PHOTOS, pickerRef }) {
+export default function ListingPhotosEditor({
+  photos,
+  onChange,
+  max = MAX_PHOTOS,
+  pickerRef,
+  error,
+}) {
   const localInputRef = useRef(null)
   const inputRef = pickerRef ?? localInputRef
   const dragFrom = useRef(null)
@@ -20,13 +26,21 @@ export default function ListingPhotosEditor({ photos, onChange, max = MAX_PHOTOS
 
   async function handleFiles(event) {
     const remaining = max - photos.length
-    const files = event.target.files
+    const files = snapshotImageFiles(event.target.files)
     event.target.value = ''
-    if (!files?.length || remaining <= 0) return
+    if (!files.length || remaining <= 0) return
     setAdding(true)
     try {
       const added = await filesToPhotos(files, remaining)
       onChange([...photos, ...added])
+    } catch (error) {
+      console.error('ListingPhotosEditor: could not add photos', error)
+      onChange([...photos, ...files.map((file) => ({
+        id: `${file.name}-${file.lastModified}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        remoteUrl: null,
+      }))])
     } finally {
       setAdding(false)
     }
@@ -84,6 +98,11 @@ export default function ListingPhotosEditor({ photos, onChange, max = MAX_PHOTOS
       <p className="hint photo-drop__count">
         Maximum of {max} photos ({photos.length}/{max})
       </p>
+      {error ? (
+        <p className="field-hint" role="status">
+          {error}
+        </p>
+      ) : null}
 
       {photos.length > 0 ? (
         <div className="preview-grid">

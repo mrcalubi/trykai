@@ -11,50 +11,65 @@ function canvasToBlob(canvas, type, quality) {
   })
 }
 
-function supportsWebp(canvas) {
-  try {
-    return canvas.toDataURL('image/webp').startsWith('data:image/webp')
-  } catch {
-    return false
-  }
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const url = URL.createObjectURL(file)
+    const finish = (fn, arg) => {
+      if (settled) return
+      settled = true
+      URL.revokeObjectURL(url)
+      fn(arg)
+    }
+
+    const image = new Image()
+    image.onload = () => finish(resolve, image)
+    image.onerror = () => finish(reject, new Error('Could not read the photo'))
+    image.src = url
+
+    queueMicrotask(() => {
+      if (settled) return
+      if (image.naturalWidth || image.width) finish(resolve, image)
+      else if (image.complete) finish(reject, new Error('Could not read the photo'))
+    })
+
+    setTimeout(() => {
+      if (settled) return
+      if (image.naturalWidth || image.width) finish(resolve, image)
+      else finish(reject, new Error('Could not read the photo'))
+    }, 50)
+  })
 }
 
 /**
- * Shrink an image before upload: long edge 1600px, JPEG or WebP at ~0.8.
- * Falls back to the original file when the browser cannot draw it.
+ * Shrink an image on the main thread before upload: long edge 1600px, JPEG ~0.8.
+ * No workers, no eval. Any failure returns the original file so upload can proceed.
  */
 export async function compressImage(file, { maxEdge = MAX_EDGE, quality = QUALITY } = {}) {
-  if (!file || !String(file.type || '').startsWith('image/')) return file
-  if (typeof createImageBitmap !== 'function') return file
-
-  let bitmap
   try {
-    bitmap = await createImageBitmap(file)
-  } catch {
-    return file
-  }
+    if (!file || !String(file.type || '').startsWith('image/')) return file
 
-  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
-  const width = Math.max(1, Math.round(bitmap.width * scale))
-  const height = Math.max(1, Math.round(bitmap.height * scale))
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d')
-  if (!ctx) {
-    bitmap.close?.()
-    return file
-  }
-  ctx.drawImage(bitmap, 0, 0, width, height)
-  bitmap.close?.()
+    const image = await loadImageFromFile(file)
+    const sourceWidth = image.naturalWidth || image.width
+    const sourceHeight = image.naturalHeight || image.height
+    if (!sourceWidth || !sourceHeight) return file
 
-  const type = supportsWebp(canvas) ? 'image/webp' : 'image/jpeg'
-  try {
-    const blob = await canvasToBlob(canvas, type, quality)
-    const ext = type === 'image/webp' ? 'webp' : 'jpg'
+    const scale = Math.min(1, maxEdge / Math.max(sourceWidth, sourceHeight))
+    const width = Math.max(1, Math.round(sourceWidth * scale))
+    const height = Math.max(1, Math.round(sourceHeight * scale))
+
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return file
+
+    ctx.drawImage(image, 0, 0, width, height)
+    const blob = await canvasToBlob(canvas, 'image/jpeg', quality)
     const base = String(file.name || 'photo').replace(/\.[^.]+$/, '') || 'photo'
-    return new File([blob], `${base}.${ext}`, { type, lastModified: Date.now() })
-  } catch {
+    return new File([blob], `${base}.jpg`, { type: 'image/jpeg', lastModified: Date.now() })
+  } catch (error) {
+    console.error('compressImage: using the original file', error)
     return file
   }
 }

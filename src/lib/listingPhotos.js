@@ -12,16 +12,27 @@ export function photosFromUrls(urls) {
   return (urls ?? []).filter(Boolean).map(photoFromRemote)
 }
 
+/** Copy the file list before the input is reset — FileList is live and clears with value. */
+export function snapshotImageFiles(fileList) {
+  return Array.from(fileList || []).filter((file) => file?.type?.startsWith('image/'))
+}
+
 export async function filesToPhotos(fileList, remaining) {
-  const selected = Array.from(fileList || []).filter((file) => file.type.startsWith('image/'))
-  const toAdd = selected.slice(0, remaining)
+  const toAdd = snapshotImageFiles(fileList).slice(0, remaining)
   const photos = []
   for (const file of toAdd) {
-    const compressed = await compressImage(file)
+    let compressed
+    try {
+      compressed = await compressImage(file)
+    } catch (error) {
+      console.error('filesToPhotos: using the original file', error)
+      compressed = file
+    }
+    const ready = compressed || file
     photos.push({
       id: newId(),
-      file: compressed,
-      previewUrl: URL.createObjectURL(compressed),
+      file: ready,
+      previewUrl: URL.createObjectURL(ready),
       remoteUrl: null,
     })
   }

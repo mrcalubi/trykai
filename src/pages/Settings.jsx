@@ -121,6 +121,7 @@ export default function Settings() {
       try {
         nextAvatarUrl = await uploadAvatar()
       } catch (uploadError) {
+        console.error('Avatar upload failed', uploadError)
         setSaving(false)
         setError(uploadError.message)
         return

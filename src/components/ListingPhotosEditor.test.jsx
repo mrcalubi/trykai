@@ -59,4 +59,38 @@ describe('ListingPhotosEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByText('Crop the cover to the listing card')).not.toBeInTheDocument()
   })
+
+  it('keeps selected files after the input is reset, and shows an upload error', async () => {
+    const onChange = vi.fn()
+    render(
+      <ListingPhotosEditor
+        photos={[]}
+        onChange={onChange}
+        error={"That photo didn't upload. Try again or pick a different one."}
+      />,
+    )
+
+    const input = screen.getByLabelText('Photos')
+    const file = new File(['x'], 'latte.png', { type: 'image/png' })
+    let current = [file]
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      get: () => current,
+    })
+    Object.defineProperty(input, 'value', {
+      configurable: true,
+      get: () => (current.length ? 'C:\\fakepath\\latte.png' : ''),
+      set: (next) => {
+        if (next === '') current = []
+      },
+    })
+
+    fireEvent.change(input)
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    expect(onChange.mock.calls[0][0][0].file).toBe(file)
+    expect(input.value).toBe('')
+    expect(
+      screen.getByText("That photo didn't upload. Try again or pick a different one."),
+    ).toBeInTheDocument()
+  })
 })

@@ -15,7 +15,7 @@ import Card from '../components/ui/Card'
 import Icon from '../components/ui/Icon'
 import { categoryIconName } from '../components/ui/categoryIcon'
 import { LISTING_CATEGORIES } from '../lib/listingCategories'
-import { LISTING_FIELD_HINTS } from '../lib/listingFieldHints'
+import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
 import { providedForSave } from '../lib/whatsProvided'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import { formatGuestFacingPrice, hostPriceBreakdown, parsePriceInputCents } from '../lib/pricing'
@@ -109,6 +109,7 @@ export default function CreateListing() {
   const [isFoundingHost, setIsFoundingHost] = useState(null)
   const [fieldHints, setFieldHints] = useState({})
   const [error, setError] = useState('')
+  const [photoError, setPhotoError] = useState('')
   const [draftNote, setDraftNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [draftHandled, setDraftHandled] = useState(false)
@@ -265,6 +266,7 @@ export default function CreateListing() {
 
   async function publish() {
     setError('')
+    setPhotoError('')
     for (let index = 0; index < STEPS.length; index += 1) {
       const hints = hintsForStep(STEPS[index].id)
       if (Object.keys(hints).length) {
@@ -284,8 +286,10 @@ export default function CreateListing() {
         photoUrls = await uploadListingPhotos(photos, userId, supabase.storage)
       }
     } catch (uploadError) {
+      console.error('Listing photo upload failed', uploadError)
       setLoading(false)
-      setError(uploadError.message)
+      setPhotoError(PHOTO_UPLOAD_ERROR)
+      goTo(STEPS.findIndex((step) => step.id === 'photos'))
       return
     }
 
@@ -424,6 +428,7 @@ export default function CreateListing() {
             onChange={setPhotos}
             max={MAX_PHOTOS}
             pickerRef={photoPickerRef}
+            error={photoError}
           />
         </>
       )
