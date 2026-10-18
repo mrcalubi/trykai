@@ -8,6 +8,8 @@ import {
   bookingConfirmedHostHtml,
   bookingReference,
   cardDetailsFromCharge,
+  disputeRefundGuestHtml,
+  disputeRefundGuestSubject,
   emailSiteUrl,
   escapeHtml,
   formatCents,
@@ -28,6 +30,7 @@ import {
   refundTimingCopy,
   resolvePaymentMethod,
   sendCancellationEmails,
+  sendDisputeRefundEmail,
   sendHostSessionCancelledEmail,
   sendResendEmail,
   verificationApprovedHtml,
@@ -1024,5 +1027,70 @@ describe('host session cancelled email', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).not.toHaveProperty('reply_to')
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).html).toContain('strike 1 of 3')
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).html).not.toMatch(/\$\d/)
+  })
+})
+
+describe('dispute refund emails', () => {
+  const base = {
+    bookingReference: 'A1B2C3D4',
+    listingTitle: 'Latte <art>',
+    sessionDate: '28 Aug 2026, 7:00 pm',
+    refundAmountCents: 1550,
+    guestName: 'caleb2',
+    siteUrl: 'https://trykai.sg',
+  }
+
+  it('is a refund receipt, not a host cancellation', () => {
+    const html = disputeRefundGuestHtml({ ...base, fullRefund: false, paymentRail: 'card' })
+    expect(html).toContain('Hi caleb2,')
+    expect(html).toContain("We've reviewed your report about Latte &lt;art&gt;.")
+    expect(html).toContain("We're refunding $15.50 to your card.")
+    expect(html).toContain('Card refunds usually take 5 to 10 business days to appear.')
+    expect(html).toContain('Booking reference:</strong> A1B2C3D4')
+    expect(html).toContain('Date and time:</strong> 28 Aug 2026, 7:00 pm')
+    expect(html).not.toMatch(/had to cancel|in full/)
+    expect(html.replace('<!DOCTYPE html>', '')).not.toContain('!')
+  })
+
+  it('says in full when the dispute cancels the booking', () => {
+    const html = disputeRefundGuestHtml({ ...base, fullRefund: true, paymentRail: 'paynow' })
+    expect(html).toContain("We've refunded your booking in full. $15.50 is on its way to your PayNow.")
+    expect(html).toContain('PayNow refunds are usually faster than card refunds.')
+    expect(html).not.toContain('had to cancel')
+  })
+
+  it('puts the amount in the subject', () => {
+    expect(disputeRefundGuestSubject('Latte art', 2000)).toBe('Your $20 refund for Latte art')
+  })
+
+  it('sends to the guest with the TryKai reply-to', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+    await sendDisputeRefundEmail({
+      ...base,
+      apiKey: 're_test',
+      guestEmail: 'guest@trykai.sg',
+      fullRefund: false,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.to).toBe('guest@trykai.sg')
+    expect(body.reply_to).toBe('hello@trykai.sg')
+    expect(body.subject).toBe('Your $15.50 refund for Latte <art>')
+  })
+
+  it('never throws when the email cannot be built or sent', async () => {
+    const errorMock = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(
+      sendDisputeRefundEmail({
+        ...base,
+        apiKey: 're_test',
+        guestEmail: 'guest@trykai.sg',
+        fullRefund: false,
+        listingTitle: null as unknown as string,
+      }),
+    ).resolves.toBeUndefined()
+    expect(errorMock).toHaveBeenCalled()
+    errorMock.mockRestore()
   })
 })

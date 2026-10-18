@@ -4,7 +4,7 @@ export default function DisputePolicy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Dispute Policy</h1>
-      <p className="policy-page__updated">Last updated: 29 July 2026</p>
+      <p className="policy-page__updated">Last updated: 19 October 2026</p>
 
       <h2>What TryKai is</h2>
       <p>
@@ -24,8 +24,8 @@ export default function DisputePolicy() {
       <p>
         If a session did not match what was described, or something about the
         experience fell short (for example, the host was very late, or the
-        session was cut short), you can raise this with us within 7 days of the
-        session.
+        session was cut short), you can raise this with us within 3 days after
+        the session ends. We cannot review complaints raised after that.
       </p>
       <p>
         To raise a complaint, email us at{' '}
@@ -79,8 +79,9 @@ export default function DisputePolicy() {
       <p>
         Host payouts are normally released 72 hours after a session ends. In
         rare cases, a dispute may be confirmed after that payout has already
-        gone out, for example if a safety report or complaint comes in a few
-        days later. When this happens, TryKai will refund the guest first, treat
+        gone out, for example if a safety report comes in later, or a complaint
+        raised near the end of the 3 day window is confirmed after the payout
+        has gone out. When this happens, TryKai will refund the guest first, treat
         the amount as a cost to us in the meantime, and work separately to
         recover it from the host, including from future payouts where
         applicable. The host issue itself, such as a strike or suspension, is

@@ -1,6 +1,6 @@
 # Refund Policy
 
-Last updated: 17 October 2026
+Last updated: 19 October 2026
 
 ## How refunds work
 
@@ -26,7 +26,7 @@ If a payment fails or is declined at checkout, no booking is confirmed and no ch
 
 ## If you have a complaint about the session itself
 
-This policy covers refunds tied to cancellations. If your concern is about the quality of a session you actually attended (for example, the host was very late, or the session did not match the listing), that is handled as a dispute rather than a cancellation refund. You can raise this within 7 days of your session through our [Dispute Policy](/dispute-policy).
+This policy covers refunds tied to cancellations. If your concern is about the quality of a session you actually attended (for example, the host was very late, or the session did not match the listing), that is handled as a dispute rather than a cancellation refund. You can raise this within 3 days after your session ends through our [Dispute Policy](/dispute-policy).
 
 If your concern involves your safety or someone else's safety, there is no time limit on raising it, and you should contact us immediately. If you are in immediate danger, please contact the police first, then let us know.
 

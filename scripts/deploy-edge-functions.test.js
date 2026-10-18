@@ -19,6 +19,7 @@ const STAGING_REF = 'hzgybclfvpuxkmytdoos'
 const FUNCTIONS = [
   'abandon-checkout',
   'admin-cancel-booking',
+  'admin-dispute-booking',
   'admin-verifications',
   'cancel-booking',
   'create-account-link',

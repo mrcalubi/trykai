@@ -542,6 +542,73 @@ export async function sendHostSessionCancelledEmail(options: {
   })
 }
 
+export function disputeRefundGuestSubject(listingTitle: string, refundAmountCents: number): string {
+  return `Your ${formatCents(refundAmountCents)} refund for ${listingTitle}`
+}
+
+/**
+ * Outcome of a guest dispute (admin-dispute-booking partial refund, or
+ * admin-cancel-booking with reason 'dispute'). Never says the host cancelled.
+ */
+export function disputeRefundGuestHtml(options: {
+  bookingReference: string
+  listingTitle: string
+  sessionDate: string
+  refundAmountCents: number
+  fullRefund: boolean
+  paymentRail?: string | null
+  guestName?: string | null
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const refund = escapeHtml(formatCents(options.refundAmountCents))
+  const method = escapeHtml(refundMethodNoun(options.paymentRail))
+  const timing = escapeHtml(refundTimingCopy(options.paymentRail))
+  const outcome = options.fullRefund
+    ? `We've refunded your booking in full. ${refund} is on its way to your ${method}. ${timing}`
+    : `We're refunding ${refund} to your ${method}. ${timing}`
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
+    <p style="margin:0 0 16px;">Thanks for telling us what happened. We've reviewed your report about ${escapeHtml(options.listingTitle)}.</p>
+    <p style="margin:0 0 16px;">${outcome}</p>
+    <p style="margin:0 0 8px;"><strong>Listing:</strong> ${escapeHtml(options.listingTitle)}</p>
+    <p style="margin:0 0 16px;"><strong>Date and time:</strong> ${escapeHtml(options.sessionDate)}</p>
+    <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
+    <p style="margin:0 0 16px;">Questions about this refund? Reply to this email.</p>
+    <p style="margin:0;"><a href="${siteUrl}" style="color:#111;">Browse other experiences</a></p>
+    ${emailSignOff('take-care')}
+    `,
+    siteUrl,
+  )
+}
+
+/** Never throws: a Resend failure must not undo a refund that already happened. */
+export async function sendDisputeRefundEmail(options: {
+  apiKey: string | undefined
+  guestEmail: string | null | undefined
+  bookingReference: string
+  listingTitle: string
+  sessionDate: string
+  refundAmountCents: number
+  fullRefund: boolean
+  paymentRail?: string | null
+  guestName?: string | null
+  siteUrl?: string
+}): Promise<void> {
+  try {
+    await sendResendEmail({
+      apiKey: options.apiKey,
+      to: options.guestEmail,
+      subject: disputeRefundGuestSubject(options.listingTitle, options.refundAmountCents),
+      replyTo: GUEST_REPLY_TO,
+      html: disputeRefundGuestHtml(options),
+    })
+  } catch (err) {
+    console.error('sendDisputeRefundEmail failed', err)
+  }
+}
+
 /** Hosts see only their payout, never a guest's payment or refund. */
 export function hostPayoutLine(cents: number): string {
   if (cents > 0) return `You'll receive ${formatCents(cents)}`
