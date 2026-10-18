@@ -7,20 +7,34 @@ import {
   planPartialRefund,
   type DisputeBooking,
 } from '../_shared/disputes.ts'
+import { authenticateAdmin } from '../_shared/admin-auth.ts'
 import {
   bookingReference,
   formatSessionDate,
   publicDisplayName,
   sendDisputeRefundEmail,
 } from '../_shared/email.ts'
-import { asRecord, hasValidSecret, jsonResponse, textResponse } from '../_shared/http.ts'
+import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
+import {
+  cleanNote,
+  holdEvent,
+  partialRefundEvent,
+  recordMoneyEvent,
+  releaseHoldEvent,
+  type MoneyEventRow,
+} from '../_shared/money-events.ts'
 
 // Guest dispute tooling for ops (OPERATIONS.md, Guest dispute refund).
-//   { action: 'hold', booking_id, reason }
-//   { action: 'release_hold', booking_id }
-//   { action: 'partial_refund', booking_id, refund_amount_cents, new_host_payout_cents }
+//   { action: 'hold', booking_id, reason?: 'dispute' | 'chargeback', note }
+//   { action: 'release_hold', booking_id, note? }
+//   { action: 'partial_refund', booking_id, refund_amount_cents, new_host_payout_cents, note? }
 // A full refund that cancels the booking is admin-cancel-booking with
 // reason 'dispute'.
+//
+// The caller is an admin's own JWT (users.is_admin re-checked here), or the
+// x-admin-secret break-glass with x-admin-operator (_shared/admin-auth.ts).
+// Every change writes a booking_money_events row naming who did it; notes
+// live only there because the guest and host can read the booking row.
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
   apiVersion: '2023-10-16',
@@ -51,12 +65,34 @@ function errorMessage(err: unknown): string {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return textResponse('ok')
 
-  const secret = Deno.env.get('ADMIN_FUNCTION_SECRET')
-  if (!hasValidSecret(req, secret, ['x-admin-secret'])) {
-    return textResponse('Unauthorized', 401)
-  }
-
   try {
+    const admin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    )
+    const auth = await authenticateAdmin(req, {
+      breakGlassSecret: Deno.env.get('ADMIN_FUNCTION_SECRET'),
+      getUserId: async (authorization) => {
+        const supabaseAuth = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          { global: { headers: { Authorization: authorization } } },
+        )
+        const {
+          data: { user },
+        } = await supabaseAuth.auth.getUser()
+        return user?.id ?? null
+      },
+      isAdmin: async (userId) => {
+        const { data } = await admin.from('users').select('is_admin').eq('id', userId).maybeSingle()
+        return data?.is_admin === true
+      },
+    })
+    if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status)
+    const actor = auth.actor
+    const logEvent = (event: MoneyEventRow) =>
+      recordMoneyEvent((r) => admin.from('booking_money_events').insert(r), event)
+
     const body = await req.json().catch(() => null)
     if (!body || typeof body !== 'object') {
       return jsonResponse({ error: 'JSON body is required' }, 400)
@@ -70,11 +106,6 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'booking_id is required' }, 400)
     }
 
-    const admin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    )
-
     const { data: booking, error } = await admin
       .from('bookings')
       .select(BOOKING_COLUMNS)
@@ -84,14 +115,14 @@ Deno.serve(async (req) => {
     const row = booking as unknown as DisputeBooking & Record<string, unknown>
 
     if (action === 'hold') {
-      const check = checkHold(row, body.reason)
+      const check = checkHold(row, { reason: body.reason, note: body.note })
       if (!check.ok) return jsonResponse({ error: check.error }, check.status)
       const heldAt = new Date().toISOString()
       // Guarded so a payout that went out since the read above is reported,
       // not silently "held".
       const { data: updated, error: updateError } = await admin
         .from('bookings')
-        .update({ payout_hold_reason: check.reason, payout_held_at: heldAt })
+        .update({ payout_hold_reason: check.code, payout_held_at: heldAt })
         .eq('id', row.id)
         .is('payout_released_at', null)
         .select('id')
@@ -99,24 +130,32 @@ Deno.serve(async (req) => {
       if (!updated || updated.length === 0) {
         return jsonResponse({ error: 'Payout was released while placing the hold' }, 409)
       }
+      const audit = await logEvent(holdEvent(row, actor, { code: check.code, note: check.note }))
       return jsonResponse({
         ok: true,
         booking_id: row.id,
-        payout_hold_reason: check.reason,
+        payout_hold_reason: check.code,
         payout_held_at: heldAt,
+        ...audit,
       })
     }
 
     if (action === 'release_hold') {
+      const note = cleanNote(body.note)
+      if (!note.ok) return jsonResponse({ error: note.error }, note.status)
+      // A no-op moves no money and writes no event.
       if (!row.payout_hold_reason) return jsonResponse({ ok: true, already_released: true })
       const { error: updateError } = await admin
         .from('bookings')
         .update({ payout_hold_reason: null, payout_held_at: null })
         .eq('id', row.id)
       if (updateError) return jsonResponse({ error: updateError.message }, 500)
-      return jsonResponse({ ok: true, booking_id: row.id })
+      const audit = await logEvent(releaseHoldEvent(row, actor, note.note))
+      return jsonResponse({ ok: true, booking_id: row.id, ...audit })
     }
 
+    const note = cleanNote(body.note)
+    if (!note.ok) return jsonResponse({ error: note.error }, note.status)
     const plan = planPartialRefund(row, {
       refundCents: body.refund_amount_cents,
       newHostPayoutCents: body.new_host_payout_cents,
@@ -156,6 +195,15 @@ Deno.serve(async (req) => {
       )
     }
 
+    const audit = await logEvent(
+      partialRefundEvent(row, actor, {
+        refundCents: plan.refundCents,
+        newHostPayoutCents: plan.newHostPayoutCents,
+        stripeRefundId: refund.id,
+        note: note.note,
+      }),
+    )
+
     const session = asRecord(row.sessions as { starts_at?: string; listings?: unknown } | null)
     const listing = asRecord(session?.listings as { title?: string } | null)
     try {
@@ -191,6 +239,7 @@ Deno.serve(async (req) => {
       host_payout_cents: plan.newHostPayoutCents,
       platform_keeps_cents: plan.platformKeepsCents,
       payout_released: plan.payoutReleased,
+      ...audit,
     })
   } catch (err) {
     const message = errorMessage(err)

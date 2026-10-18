@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_NOTE_LENGTH } from './money-events.ts'
 import {
-  MAX_HOLD_REASON_LENGTH,
+  HOLD_CODES,
   checkHold,
   parseDisputeAction,
   partialRefundPatch,
@@ -19,7 +20,7 @@ function booking(overrides: Partial<DisputeBooking> = {}): DisputeBooking {
     stripe_payment_id: 'pi_1',
     stripe_refund_id: null,
     payout_released_at: null,
-    payout_hold_reason: 'dispute: host 40 min late',
+    payout_hold_reason: 'dispute',
     stripe_partial_refund_ids: [],
     ...overrides,
   }
@@ -40,36 +41,51 @@ describe('parseDisputeAction', () => {
 })
 
 describe('checkHold', () => {
-  it('trims and accepts a reason on a confirmed, unpaid booking', () => {
-    expect(checkHold(booking({ payout_hold_reason: null }), '  dispute: quality  ')).toEqual({
-      ok: true,
-      reason: 'dispute: quality',
-    })
+  const note = 'Guest says the host arrived 40 minutes late'
+
+  it('accepts a neutral code and a trimmed note on a confirmed, unpaid booking', () => {
+    expect(
+      checkHold(booking({ payout_hold_reason: null }), { reason: 'chargeback', note: `  ${note}  ` }),
+    ).toEqual({ ok: true, code: 'chargeback', note })
   })
 
-  it('requires a short reason', () => {
-    expect(checkHold(booking(), '')).toMatchObject({ ok: false, status: 400 })
-    expect(checkHold(booking(), 42)).toMatchObject({ ok: false, status: 400 })
-    expect(checkHold(booking(), 'x'.repeat(MAX_HOLD_REASON_LENGTH + 1))).toMatchObject({
-      ok: false,
-      status: 400,
-    })
+  it("defaults the code to 'dispute'", () => {
+    expect(checkHold(booking(), { reason: undefined, note })).toMatchObject({ ok: true, code: 'dispute' })
+    expect(HOLD_CODES).toEqual(['dispute', 'chargeback'])
+  })
+
+  it('refuses free text as the code, because the guest and host can read it', () => {
+    const result = checkHold(booking(), { reason: 'dispute: host 40 min late', note })
+    expect(result).toMatchObject({ ok: false, status: 400 })
+    expect(!result.ok && result.error).toMatch(/put details in note/)
+    expect(checkHold(booking(), { reason: 42, note })).toMatchObject({ ok: false, status: 400 })
+  })
+
+  it('requires a note of bounded length', () => {
+    expect(checkHold(booking(), { reason: 'dispute', note: '' })).toMatchObject({ ok: false, status: 400 })
+    expect(checkHold(booking(), { reason: 'dispute', note: 42 })).toMatchObject({ ok: false, status: 400 })
+    expect(
+      checkHold(booking(), { reason: 'dispute', note: 'x'.repeat(MAX_NOTE_LENGTH + 1) }),
+    ).toMatchObject({ ok: false, status: 400 })
   })
 
   it('refuses bookings that are not payable', () => {
-    expect(checkHold(booking({ status: 'cancelled' }), 'r')).toMatchObject({
+    expect(checkHold(booking({ status: 'cancelled' }), { reason: 'dispute', note: 'r' })).toMatchObject({
       ok: false,
       status: 409,
       error: 'Booking is cancelled, not confirmed',
     })
-    expect(checkHold(booking({ stripe_refund_id: 're_1' }), 'r')).toMatchObject({
+    expect(checkHold(booking({ stripe_refund_id: 're_1' }), { reason: 'dispute', note: 'r' })).toMatchObject({
       ok: false,
       status: 409,
     })
   })
 
   it('explains that a released payout cannot be held', () => {
-    const result = checkHold(booking({ payout_released_at: '2026-10-01T00:00:00Z' }), 'r')
+    const result = checkHold(booking({ payout_released_at: '2026-10-01T00:00:00Z' }), {
+      reason: 'dispute',
+      note: 'r',
+    })
     expect(result).toMatchObject({ ok: false, status: 409 })
     expect(!result.ok && result.error).toMatch(/already released/)
   })
