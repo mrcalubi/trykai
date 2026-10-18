@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
         host_payout_amount,
         stripe_charge_id,
         stripe_payment_id,
+        payout_hold_reason,
         sessions!inner (
           starts_at,
           duration_mins,
@@ -75,6 +76,7 @@ Deno.serve(async (req) => {
         host_payout_amount: row.host_payout_amount,
         stripe_charge_id: row.stripe_charge_id,
         stripe_payment_id: row.stripe_payment_id,
+        payout_hold_reason: row.payout_hold_reason,
         starts_at: typeof session?.starts_at === 'string' ? session.starts_at : '',
         duration_mins: typeof session?.duration_mins === 'number' ? session.duration_mins : null,
         stripe_account_id: host?.stripe_account_id ?? null,
@@ -114,6 +116,26 @@ Deno.serve(async (req) => {
 
     for (const booking of due) {
       try {
+        // A dispute hold placed after the scan above still has to win.
+        const { data: fresh, error: freshError } = await admin
+          .from('bookings')
+          .select('status, payout_hold_reason, host_payout_amount, stripe_refund_id, payout_released_at')
+          .eq('id', booking.id)
+          .single()
+        if (freshError || !fresh) {
+          failed.push({ id: booking.id, error: freshError?.message ?? 'booking not found' })
+          continue
+        }
+        booking.status = fresh.status
+        booking.payout_hold_reason = fresh.payout_hold_reason
+        booking.host_payout_amount = fresh.host_payout_amount
+        booking.stripe_refund_id = fresh.stripe_refund_id
+        booking.payout_released_at = fresh.payout_released_at
+        const lateReason = payoutSkipReason(booking)
+        if (lateReason) {
+          skipped.push({ id: booking.id, reason: lateReason })
+          continue
+        }
         const transfer = await stripe.transfers.create(transferCreateParams(booking), {
           idempotencyKey: booking.id,
         })

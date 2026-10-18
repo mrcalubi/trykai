@@ -20,12 +20,15 @@ export interface PayoutCandidate {
   duration_mins: number | null
   stripe_account_id: string | null
   stripe_payouts_enabled: boolean | null
+  /** Set by admin-dispute-booking while a guest dispute is under review. */
+  payout_hold_reason?: string | null
 }
 
 export type PayoutSkipReason =
   | 'not_confirmed'
   | 'already_released'
   | 'refunded'
+  | 'dispute_hold'
   | 'no_host_share'
   | 'missing_charge_id'
   | 'host_not_connected'
@@ -41,6 +44,7 @@ export function payoutSkipReason(
   if (booking.status !== 'confirmed') return 'not_confirmed'
   if (booking.payout_released_at) return 'already_released'
   if (booking.stripe_refund_id) return 'refunded'
+  if (booking.payout_hold_reason) return 'dispute_hold'
   if (!booking.host_payout_amount || booking.host_payout_amount <= 0) return 'no_host_share'
   if (!booking.stripe_charge_id) return 'missing_charge_id'
   if (!booking.stripe_account_id) return 'host_not_connected'

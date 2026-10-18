@@ -39,7 +39,7 @@ Week 8 of the original plan (15–21 September) is ending. The week-by-week sect
 - trykai.sg is verified in Resend. From-address is `TryKai <no-reply@trykai.sg>`. `notify-verification-pending` is secret-gated. `notify-verification-result` is gone. Staging booking confirmation emails confirmed arriving.
 - `cancel-booking` emails the guest the refund amount (including $0) and the host only on a guest cancel. `/bookings` and `/hosting` invoke that function.
 - StyleGuide category PNGs and `public/trykai.png` are in the repo.
-- Edge Functions: `create-payment-intent`, `stripe-webhook`, `create-connect-account`, `create-account-link`, `cancel-booking`, `admin-cancel-booking`, `admin-verifications`, `create-identity-session`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`.
+- Edge Functions: `create-payment-intent`, `stripe-webhook`, `create-connect-account`, `create-account-link`, `cancel-booking`, `admin-cancel-booking`, `admin-dispute-booking`, `admin-verifications`, `create-identity-session`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`.
 
 **Still ops, not app code:**
 - Confirm `00005`, `00008`, `00009`, `00010`, `00011`, and `00012` on each environment. Confirm production has `RESEND_API_KEY` and current function deploys. This repo cannot see production.
@@ -551,11 +551,105 @@ Also open **Edge Functions → release-payout → Logs** and look for a line sta
 |---|---|
 | `hold_not_elapsed` | Session ended less than 72 hours ago (end = `starts_at` + `duration_mins`). Expected. |
 | `invalid_duration` | Session has no positive `duration_mins`, so its end time is unknown. Fix the row; the next run pays it. |
+| `dispute_hold` | Ops placed a guest dispute hold (`payout_hold_reason`). Not paid until the hold is released or a partial refund clears it. See **Guest dispute refund**. |
 | `missing_charge_id` | Stripe PaymentIntent has no `latest_charge` yet. |
 | `host_not_connected` / `host_payouts_disabled` | Host has not finished Connect onboarding. |
 | `failed` + insufficient available funds | Platform available balance is too low (automatic payouts already sent it to the bank). Two Transfers can succeed and the rest fail in the same run. In **test mode**, Stripe's own message is the fix: create a charge with card `4000000000000077` (any future expiry and CVC) so funds land in the available balance, then run the same command again. Bookings already in `released` are not paid twice. |
 
 GitHub secrets `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAYOUT_CRON_SECRET` (and `PRODUCTION_*`) are optional on staging because of the database cron. They are needed for production once `.github/workflows/release-payout.yml` is on `main`. GitHub **schedule** only runs from `main`. **Actions → Release host payouts → Run workflow** works after that.
+
+---
+
+# Guest dispute refund
+
+Use this for a quality complaint (Dispute Policy: 7 days after the session, reply within 2 business days). Safety reports follow SAFETY_RESPONSE_PROTOCOL.md first; money is handled the same way. Do not edit `bookings` rows in Table Editor for any of this.
+
+Two functions, both gated by the `ADMIN_FUNCTION_SECRET` Edge Function secret in header `x-admin-secret`:
+
+- `admin-dispute-booking`: hold the host payout, release the hold, or make a **partial** refund without cancelling the booking.
+- `admin-cancel-booking` with `"reason": "dispute"`: **full** refund and cancel. The guest gets a refund receipt, not "your host had to cancel". No strike, no host email.
+
+Needs migration `00029` applied and both functions deployed. Amounts are **cents** (S$15.50 is `1550`).
+
+## 0. Find the booking
+
+The guest quotes a booking reference: the first 8 characters of `bookings.id`, uppercase. In **SQL Editor** (read only):
+
+```sql
+select id, status, total_amount, refund_amount, host_payout_amount,
+       payout_released_at, payout_hold_reason, stripe_refund_id, stripe_partial_refund_ids
+from public.bookings
+where id::text ilike 'a1b2c3d4%';
+```
+
+## 1. Hold the payout as soon as the complaint arrives
+
+Payouts go out 72 hours after the session ends. Hold first, investigate second.
+
+```powershell
+$h = @{ Authorization = "Bearer PASTE_ANON_PUBLIC_KEY"; apikey = "PASTE_ANON_PUBLIC_KEY"; "x-admin-secret" = "PASTE_ADMIN_FUNCTION_SECRET" }
+$url = "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/admin-dispute-booking"
+Invoke-RestMethod -Method Post -Uri $url -ContentType "application/json" -Headers $h -Body '{"action":"hold","booking_id":"FULL-BOOKING-UUID","reason":"dispute: quality complaint 2026-10-19"}'
+```
+
+```bash
+curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/admin-dispute-booking' \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer PASTE_ANON_PUBLIC_KEY" \
+  -H "apikey: PASTE_ANON_PUBLIC_KEY" \
+  -H "x-admin-secret: PASTE_ADMIN_FUNCTION_SECRET" \
+  -d '{"action":"hold","booking_id":"FULL-BOOKING-UUID","reason":"dispute: quality complaint 2026-10-19"}'
+```
+
+The **guest and host can both read `payout_hold_reason`** on their own booking. Keep it neutral ("dispute: quality complaint" plus a date). No names, evidence, or opinions; those go in the support thread.
+
+- `409 ... already released`: the host was already paid. Skip to step 3, "After release".
+- `release-payout` logs the booking as `dispute_hold` from the next hourly run.
+
+## 2. Decide, then reply within 2 business days
+
+Agree an outcome with the team: no action, partial refund, or full refund. Note it in the support thread with the booking reference.
+
+## 3a. No refund
+
+```json
+{"action":"release_hold","booking_id":"FULL-BOOKING-UUID"}
+```
+
+Same headers and URL as step 1. If the 72 hours have passed, the next hourly run pays the host.
+
+## 3b. Partial refund (booking stays confirmed)
+
+Pick the guest refund and what the host should still get. Guest refunds plus host payout can never exceed what the guest paid (`total_amount`). The host payout can only go down.
+
+```json
+{"action":"partial_refund","booking_id":"FULL-BOOKING-UUID","refund_amount_cents":1500,"new_host_payout_cents":2500}
+```
+
+The function refunds that amount on the original PaymentIntent, adds it to `refund_amount`, lowers `host_payout_amount`, records the Stripe refund id in `stripe_partial_refund_ids`, **clears the hold**, and emails the guest a refund receipt. The host is paid the new amount on the next hourly run once 72 hours have passed. Tell the host by email yourself; there is no automatic host email yet.
+
+The response shows `total_refunded_cents`, `host_payout_cents`, and `platform_keeps_cents`. Stripe keeps its processing fee, so TryKai's real margin is lower than `platform_keeps_cents`.
+
+**After release** (`payout_released_at` is set): omit `new_host_payout_cents`. The refund has to fit inside TryKai's own share (`total_amount - refund_amount - host_payout_amount`). If it does not, the function refuses with a `409` that names the most TryKai can absorb. Then either refund up to that amount, or recover money from the host first (Stripe Dashboard → the Transfer → **Reverse**, after telling the host), then use 3c or a manual Stripe refund. Note anything done by hand in DECISIONS.md or the support thread.
+
+**Errors**
+
+- `409 Place a dispute hold first`: run step 1, then retry.
+- `400 ... Lower new_host_payout_cents`: the split adds up to more than the guest paid.
+- `500 Stripe refund re_... was created but the booking was not updated`: if `refund_amount` on the row is unchanged, send the **same** request again (the idempotency key returns the same refund, no double refund). If it changed, someone else refunded at the same time; record the `re_` id by hand and check Stripe before anything else.
+
+## 3c. Full refund and cancel
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/admin-cancel-booking" -ContentType "application/json" -Headers $h -Body '{"booking_id":"FULL-BOOKING-UUID","reason":"dispute"}'
+```
+
+Refunds whatever is left on the payment (after any earlier partial refund), cancels the booking, clears the hold, and emails the guest a refund receipt. Without `"reason":"dispute"` the guest is told their host cancelled. If the response has `"payout_already_released": true`, the host had been paid and the whole refund came out of TryKai's balance: recover it from the host as in 3b.
+
+## 4. Afterwards
+
+- Strikes or warnings for the host are separate (Dispute Policy); use the existing strike process.
+- Production uses that project's URL, anon key, and admin secret, not the staging ref above.
 
 ---
 
@@ -621,7 +715,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] 3 strikes deactivates listings
 - [ ] Cancellation policy shown on the listing detail page before booking
 - [ ] Both parties emailed on cancellation
-- [ ] Manual refund process documented and ready
+- [ ] Manual refund process documented and ready (dispute partial and full refunds: **Guest dispute refund** above)
 
 ## Reviews
 - [ ] Guest can review only after a confirmed, completed booking
