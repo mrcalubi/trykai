@@ -384,6 +384,27 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 
 ---
 
+# Platform webhook (`stripe-webhook`)
+
+The platform destination (signing secret `STRIPE_WEBHOOK_SECRET`) carries every event on the TryKai account. `stripe-webhook` answers 200 to anything it does not handle, so a missing event is silent: check this list whenever the function learns a new event.
+
+**Do this once per Stripe mode (test, then live) and once per function project (staging, then production).**
+
+1. Open https://dashboard.stripe.com (Test mode on for staging).
+2. **Developers → Webhooks**, open the **Your account** destination whose URL is `https://YOUR_PROJECT_REF.supabase.co/functions/v1/stripe-webhook` (create it with **Add destination → Your account** if it is missing, then set its `whsec_…` as `STRIPE_WEBHOOK_SECRET`).
+3. **Edit destination → Select events.** It must listen to exactly these:
+   - `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled`: confirm or cancel the booking.
+   - `identity.verification_session.verified`, `identity.verification_session.requires_input`: host verification outcome.
+   - `charge.dispute.created`: hold the host payout and email ops (**Card chargeback** below).
+   - `charge.dispute.closed`: email ops the outcome. The hold is not cleared.
+   - `charge.refunded`: record refunds made in the Stripe Dashboard on the booking.
+4. Save. Adding events keeps the same signing secret, so no secret changes.
+5. Set `ADMIN_NOTIFY_EMAIL` as an Edge Function secret if ops mail should not go to the default (`calebong2002@gmail.com`). The chargeback emails and `notify-verification-pending` both use it.
+
+Check it in test mode with the Stripe CLI: `stripe trigger charge.dispute.created`. That makes a new test payment with no booking, so `stripe-webhook` logs should show `webhook: chargeback opened` with `outcome: 'no_booking'`, and ops should get the email.
+
+---
+
 # Connected accounts webhook (`account.updated`)
 
 The platform webhook (`STRIPE_WEBHOOK_SECRET`) receives payment and Identity events on the TryKai account. Connect `account.updated` for Express hosts is sent to a **Connected accounts** destination, which has its own signing secret. Without that destination, Hosting return still re-reads the account via `create-account-link` `{ refresh: true }`, but later payout capability changes never reach the database.
@@ -401,7 +422,7 @@ The platform webhook (`STRIPE_WEBHOOK_SECRET`) receives payment and Identity eve
 
 `stripe-webhook` tries `STRIPE_WEBHOOK_SECRET` first, then `STRIPE_CONNECT_WEBHOOK_SECRET` if set. A signature that matches neither is rejected. An `account.updated` for an `acct_` that is not in `users.stripe_account_id` is ignored.
 
-Keep the existing platform destination for `payment_intent.*` and Identity events. Do not put those on the Connected-accounts destination.
+Keep the existing platform destination for `payment_intent.*`, Identity, and `charge.*` events (**Platform webhook** above). Do not put those on the Connected-accounts destination.
 
 ---
 
@@ -650,6 +671,34 @@ Refunds whatever is left on the payment (after any earlier partial refund), canc
 
 - Strikes or warnings for the host are separate (Dispute Policy); use the existing strike process.
 - Production uses that project's URL, anon key, and admin secret, not the staging ref above.
+
+---
+
+# Card chargeback
+
+A guest's bank opened a dispute on the card payment. Stripe takes the disputed amount plus a dispute fee from the platform balance immediately, whatever the outcome. This is not the Dispute Policy complaint flow above; the guest went to their bank instead of TryKai.
+
+**What happens automatically** (needs the `charge.dispute.*` events on the platform webhook):
+
+- `charge.dispute.created`: `stripe-webhook` finds the booking by charge id, then PaymentIntent. If the payout has not gone out it sets `payout_hold_reason` to `chargeback: dp_…` (replacing any quality-complaint hold reason) and `release-payout` skips it as `dispute_hold`. Ops get an email at `ADMIN_NOTIFY_EMAIL` with the booking reference, amount, bank reason, evidence deadline, and whether the hold landed, was already in place, came too late (host already paid), or found no booking.
+- `charge.dispute.closed`: ops get the outcome. **The hold is never cleared automatically.**
+
+## 1. Respond in Stripe before the evidence deadline
+
+Use the email's **Respond in Stripe** link. Evidence: the booking confirmation email, session date and address, any guest messages, and the host's account of the session. Ask the host for theirs. Missing the deadline loses the dispute.
+
+Do not refund the guest while the dispute is open, in Stripe or through `admin-dispute-booking` / `admin-cancel-booking`. A won or lost dispute already settles the money, and a refund on top can pay the guest twice.
+
+If the email says the host was **already paid**, decide with the team whether to recover from the host (Stripe Dashboard → the Transfer → **Reverse**, after telling them). Otherwise TryKai carries the loss if the dispute is lost.
+
+## 2. When it closes
+
+- **won** or **warning_closed** (an inquiry that never became a chargeback): `{"action":"release_hold","booking_id":"FULL-BOOKING-UUID"}` (Guest dispute refund, step 1 headers and URL). The host is paid on the next hourly run once 72 hours have passed.
+- **lost**: the guest has their money back from the bank. Leave the hold in place if the host should not be paid (`release-payout` keeps skipping it), or release it if the host delivered and TryKai absorbs the loss. Do not use `partial_refund` or `admin-cancel-booking`; both would refund the guest again. Note the decision in the support thread with the booking reference.
+
+## Refunds made in the Stripe Dashboard
+
+`charge.refunded` raises `refund_amount` to the charge's total refunded and adds the `re_` id to `stripe_partial_refund_ids`. It does **not** lower `host_payout_amount`, set `stripe_refund_id`, or hold the payout, so the host is still paid in full on schedule. Use `admin-dispute-booking` / `admin-cancel-booking` for refunds instead. If a Dashboard refund is unavoidable before the payout, place a hold first (Guest dispute refund, step 1) and fix the split after.
 
 ---
 

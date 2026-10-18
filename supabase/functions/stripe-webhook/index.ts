@@ -34,6 +34,16 @@ import {
   applyConnectedAccountPayouts,
   connectedAccountFromEvent,
 } from '../_shared/connect.ts'
+import {
+  chargebackClosedEmail,
+  chargebackOpenedEmail,
+  planChargebackHold,
+  refundReconcilePatch,
+  stripeObjectId,
+  type ChargebackBooking,
+  type ChargebackHoldOutcome,
+  type StripeDisputeLike,
+} from '../_shared/chargebacks.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
   apiVersion: '2023-10-16',
@@ -330,6 +340,145 @@ async function reviewIdentitySession(
   }
 }
 
+const CHARGEBACK_BOOKING_COLUMNS =
+  'id, payout_released_at, payout_hold_reason, stripe_refund_id, refund_amount, stripe_partial_refund_ids'
+
+/** The booking a charge paid for: by charge id, then by PaymentIntent. */
+async function findBookingForCharge(
+  admin: ReturnType<typeof adminClient>,
+  chargeId: string | null,
+  paymentIntentId: string | null,
+): Promise<ChargebackBooking | null> {
+  for (const [column, value] of [
+    ['stripe_charge_id', chargeId],
+    ['stripe_payment_id', paymentIntentId],
+  ] as const) {
+    if (!value) continue
+    const { data, error } = await admin
+      .from('bookings')
+      .select(CHARGEBACK_BOOKING_COLUMNS)
+      .eq(column, value)
+      .maybeSingle()
+    if (error) throw error
+    if (data) return data as ChargebackBooking
+  }
+  return null
+}
+
+function opsEmail(): string {
+  return Deno.env.get('ADMIN_NOTIFY_EMAIL') ?? 'calebong2002@gmail.com'
+}
+
+/**
+ * A chargeback debits the platform plus a dispute fee at once, so the host
+ * payout is held before the next hourly release-payout run can send it.
+ */
+async function openChargeback(dispute: StripeDisputeLike, livemode: boolean) {
+  const admin = adminClient()
+  const chargeId = stripeObjectId(dispute.charge)
+  const booking = await findBookingForCharge(
+    admin,
+    chargeId,
+    stripeObjectId(dispute.payment_intent),
+  )
+
+  let outcome: ChargebackHoldOutcome = 'no_booking'
+  if (booking) {
+    const plan = planChargebackHold(booking, dispute.id, new Date().toISOString())
+    if (plan.kind === 'hold') {
+      // Guarded like admin-dispute-booking: a payout that went out since the
+      // read is reported, not silently "held".
+      const { data: updated, error } = await admin
+        .from('bookings')
+        .update(plan.patch)
+        .eq('id', booking.id)
+        .is('payout_released_at', null)
+        .select('id')
+      if (error) throw error
+      outcome = updated && updated.length > 0 ? 'held' : 'payout_released'
+    } else {
+      outcome = plan.kind
+    }
+  }
+
+  console.log('webhook: chargeback opened', {
+    dispute: dispute.id,
+    charge: chargeId,
+    booking: booking?.id ?? null,
+    outcome,
+  })
+
+  const email = chargebackOpenedEmail({
+    dispute,
+    bookingId: booking?.id ?? null,
+    outcome,
+    previousHoldReason: booking?.payout_hold_reason,
+    livemode,
+  })
+  await sendResendEmail({ apiKey: Deno.env.get('RESEND_API_KEY'), to: opsEmail(), ...email })
+}
+
+/** Reported only. Ops decide what the host is owed, so the hold stays. */
+async function closeChargeback(dispute: StripeDisputeLike, livemode: boolean) {
+  const chargeId = stripeObjectId(dispute.charge)
+  const booking = await findBookingForCharge(
+    adminClient(),
+    chargeId,
+    stripeObjectId(dispute.payment_intent),
+  )
+
+  console.log('webhook: chargeback closed', {
+    dispute: dispute.id,
+    charge: chargeId,
+    booking: booking?.id ?? null,
+    status: dispute.status,
+    payout_hold_reason: booking?.payout_hold_reason ?? null,
+  })
+
+  const email = chargebackClosedEmail({
+    dispute,
+    bookingId: booking?.id ?? null,
+    payoutHoldReason: booking?.payout_hold_reason ?? null,
+    livemode,
+  })
+  await sendResendEmail({ apiKey: Deno.env.get('RESEND_API_KEY'), to: opsEmail(), ...email })
+}
+
+/**
+ * Brings refund_amount and the refund ids in line with refunds made in the
+ * Stripe Dashboard. Refunds are listed from the API because newer API
+ * versions leave charge.refunds out of the event.
+ */
+async function reconcileRefunds(charge: {
+  id: string
+  payment_intent?: string | { id?: string } | null
+  amount_refunded?: number | null
+}) {
+  const admin = adminClient()
+  const booking = await findBookingForCharge(admin, charge.id, stripeObjectId(charge.payment_intent))
+  if (!booking) {
+    console.error('webhook: no booking for refunded charge', charge.id)
+    return
+  }
+
+  const refunds = await stripe.refunds.list({ charge: charge.id, limit: 100 })
+  const patch = refundReconcilePatch(booking, charge, refunds.data)
+  if (!patch) return
+
+  // Optimistic lock on the refund total, as in admin-dispute-booking. Losing
+  // the race throws, so Stripe redelivers and the next attempt re-reads.
+  let update = admin.from('bookings').update(patch).eq('id', booking.id)
+  update = booking.refund_amount == null
+    ? update.is('refund_amount', null)
+    : update.eq('refund_amount', booking.refund_amount)
+  const { data: updated, error } = await update.select('id')
+  if (error) throw error
+  if (!updated || updated.length === 0) {
+    throw new Error(`booking ${booking.id} changed while reconciling refunds on ${charge.id}`)
+  }
+  console.log('webhook: reconciled refunds', { booking: booking.id, charge: charge.id, ...patch })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return textResponse('ok')
@@ -364,6 +513,12 @@ Deno.serve(async (req) => {
       await syncConnectedAccount(event)
     } else if (action === 'review_identity') {
       await reviewIdentitySession(event.type, event.data.object)
+    } else if (action === 'chargeback_opened') {
+      await openChargeback(event.data.object, event.livemode)
+    } else if (action === 'chargeback_closed') {
+      await closeChargeback(event.data.object, event.livemode)
+    } else if (action === 'reconcile_refund') {
+      await reconcileRefunds(event.data.object)
     }
 
     return jsonResponse({ received: true })
