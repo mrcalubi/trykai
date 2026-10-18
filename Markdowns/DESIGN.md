@@ -1,119 +1,219 @@
 # TryKai (Kai) — Design & Visual Identity
 
-Companion document to DECISIONS.md (product/technical/legal) and BUSINESS.md (business model, positioning, team). This document covers visual identity: palette, typography, logo direction, messaging, and photography policy.
+Companion document to DECISIONS.md (product/technical/legal) and BUSINESS.md (business model, positioning, team). This document is the single source of truth for how TryKai looks and behaves: brand, tokens, components and the layout of each page. When the code and this document disagree, fix one of them in the same change.
+
+**Revision, 18 October 2026 (UI overhaul).** The first identity (sections 1 to 6 of the August version) chose the right ingredients, but the built site read as flat and unfinished next to Airbnb, Carousell and Klook: a centred block of text, a wrap of grey pills, cards with no dates or faces, and a footer of bare links. This revision keeps the palette, fonts and voice and changes how they are used: more contrast and rhythm between sections, people and dates on every card, real depth on surfaces, and finished loading, empty and error states. The redesign mockups live in the "TryKai Redesign" canvas (Claude artifact `XgCC4Xm7DiRhYC2ktAWY9D`).
 
 ---
 
-## 1. Brand vibe (what we're going for)
+## 1. Brand vibe
 
-The brand has to thread a specific needle: casual and approachable enough that a $15 latte-art session doesn't feel over-produced, but credible enough that a stranger trusts handing over money and meeting another stranger in person. Concretely, this means:
+Casual enough that a $15 latte-art session doesn't feel over-produced, credible enough that a stranger hands over money and meets another stranger in person. Concretely:
 
-- **Not** boutique/elegant (script wordmark, serif) — signals price and formality Kai doesn't have
-- **Not** comic/bubble — undermines trust in a platform handling real money and real-world meetups
-- **Not** editorial/fashion-magazine (big cutout display serif) — sets a curated, expensive expectation the actual $10–40 experience won't match
-- **Not** cold/minimal/fintech (mirrored sans wordmark) — no warmth, doesn't signal what the platform is for
-- **Is** warm, local, friendly-but-credible — closer to how Carousell or Grab feel than to Airbnb Experiences or a tutoring platform
+- **Not** boutique/elegant (script wordmark, serif), comic/bubble, editorial/fashion-magazine, or cold fintech minimal.
+- **Is** warm, local, friendly-but-credible: closer to Carousell or Grab than to Airbnb Experiences or a tutoring platform.
+- **And finished.** Polish is a trust signal on a marketplace. Every state a guest can see (loading, empty, error, no photo, no reviews) is designed, not left as a line of grey text.
 
----
+### The bar we measure against
+Airbnb (photo-first cards, faces of hosts, sticky booking), Carousell (dense, scannable browse, local language), Klook (clear price and date on every card). We borrow their *structure*, never their look.
 
-## 2. Color (decided)
-
-- **Core palette: navy + cream**, shared across both lanes as the brand anchor
-- Cream (~#F4F1EA) as the primary background; deep navy (~#16264B) as primary text/UI color
-- A warm accent (coral/terracotta) used **sparingly and functionally**, not decoratively — e.g. tied to the PayNow-savings badge at checkout, not splashed across the hero or used as a generic highlight
-- **Lane 2 ("Build a Skill") gets a quieter, muted variant of the same palette** — same navy anchor, but the coral accent is dialled down or dropped almost entirely, leaning on navy + gray. Not a separate color system.
-
-**Rationale:** navy/cream reads warm-but-credible rather than premium or childish — it's the register that survived rejecting the script, comic, and editorial directions. Sharing the palette across lanes (rather than giving Lane 2 its own colors) keeps Kai feeling like one platform with a quieter section, not two unrelated products glued together.
+### Five principles
+1. **Photo first.** The listing photo is the biggest thing on every card. A listing without one gets a designed category tile, not an empty box.
+2. **People first.** Guests are buying time with a person. The host's face (or initials) appears on the browse card, high on the listing page, and at checkout.
+3. **Honest signals only.** Real "spots left", real PayNow savings, real next date, real reviews. No fake urgency, no "people viewing now", no invented stats.
+4. **Rhythm and contrast.** Cream pages are broken up by deep-navy bands (How it works, footer) and white raised surfaces, so long pages never read as one flat sheet.
+5. **Restrained motion.** Short, purposeful transitions (150 to 250 ms). Everything respects `prefers-reduced-motion`.
 
 ---
 
-## 3. Typography (decided)
+## 2. Color
 
-One type system, shared across both lanes:
+Navy and cream remain the anchor, shared across both lanes. Values are tokens in `src/index.css`; use the token, never the hex.
 
-- **Display** (headlines, hero, listing titles): Bricolage Grotesque — real character without tipping into playful/childish; legible at hero size and small in-app sizes alike
-- **Body / UI** (buttons, filters, dashboard, nav): Manrope — soft terminals keep it warm, stays out of the way; the workhorse face
-- **Utility** (numbers, prices, tags): a monospace (e.g. Space Mono / JetBrains Mono) — gives prices and location tags a "price tag / receipt" feel. This is the one deliberate signature detail in the system, rather than relying on decoration elsewhere.
-- The monospace utility face is **reused for Lane 2's "Skill-verified" badges and credential details** — same typographic device, different job (price tag → credential tag). A deliberate thread connecting the two lanes.
+| Token | Value | Use |
+|---|---|---|
+| `--cream` | `#F4F1EA` | Page background |
+| `--surface` | `#FBFAF6` | Cards, inputs, raised panels |
+| `--sand` | `#EBE5D8` | Quiet fills: chips, skeletons, placeholders |
+| `--navy` | `#16264B` | Text, primary buttons, active states |
+| `--navy-deep` | `#0F1B38` | Contrast bands and the footer |
+| `--muted` | `#4E586C` | Secondary text (6.3:1 on cream, passes AA) |
+| `--subtle` | `#7A8296` | Decorative text only (placeholders, disabled) — never body copy |
+| `--border` | `#E4DED2` | Dividers and outlines |
+| `--border-strong` | `#C9C1B2` | Outlined controls (secondary buttons, chips) |
+| `--coral` | `#D97756` | Brand accent fills and icons |
+| `--coral-ink` | `#A24E2E` | Coral *text* on light backgrounds (5:1, passes AA) |
+| `--coral-soft` | `#F6E3D9` | Coral tint behind coral-ink text |
+| `--success` / `--error` | `#2F7A55` / `#C7382C` | Status text and icons, with `-bg` tints |
 
-**Fonts do not change between Lane 1 and Lane 2.** Swapping fonts between lanes was considered and rejected — it reads as inconsistency, not intentional tiering. Lane 2's "more serious" feeling comes from everything except the typeface: smaller/more restrained headline scale, reduced or absent accent color, tighter spacing and higher information density, and an outcome-oriented copy register. Reference point: Fiverr Pro doesn't run a different font from the main Fiverr site — the restraint is in spacing and tone, not typeface.
+**Changed from August:** secondary text darkened from `#6F778B` (about 4:1 on cream, failed AA) to `#4E586C`. Borders warmed to sit with the cream rather than read grey.
 
-**Reserved, not decided:** a distinct small wordmark/sub-mark for Lane 2 (e.g. the editorial cutout-serif direction rejected for Lane 1) remains a possible exception, since it would appear in only one or two spots (a section header, not body or UI text). Not needed now — revisit once Lane 2 is closer to launching.
+### Coral: wider, still disciplined
+August restricted coral to the PayNow badge. In practice that left the site monochrome. Coral is now the **brand accent**, allowed in small doses:
 
----
+- **Allowed:** the dot in the wordmark, section eyebrows, step numbers, checkmarks in lists, the active underline in the category bar, the PayNow saving, "New" and "spots left" labels (as `--coral-ink` on `--coral-soft`).
+- **Never:** primary buttons (white on coral is 3.1:1, fails AA), large background fills, body text, or decoration with no meaning.
+- **Lane 2** still turns coral down to near zero and leans on navy and grey.
 
-## 4. Logo / wordmark
+### Category tints
+When a listing has no photo, its tile uses the category's tint with a line icon, so a photo-less grid still looks intentional:
 
-### Decided
-- Direction: legible, warm, friendly-but-credible — not script, not comic-bubble, not editorial-cutout, not cold-minimal
-- Locality/"neighbour" language is a strong tagline candidate from early exploration — not finalized as the permanent tagline, but the leading reference point
-- "Skip the course. Just learn the basics." is a strong line, **banked for Lane 2 only** — it's a direct jab at tutoring/Skillshare-style incumbents, which are explicitly Lane 2's competitive set per BUSINESS.md, not Lane 1's
-
-### Open
-Final wordmark execution not yet locked — direction is set; the specific lettering/logo treatment itself still needs to be designed (separately from the Bricolage Grotesque system, though likely related to it).
-
----
-
-## 5. Lane 1 messaging (hero)
-
-### Decided
-- **Headline direction: boredom-as-local-condition.** Reference line: *"Singapore's not boring. You just haven't found your thing yet."*
-- **Subhead carries the "together" angle** the headline alone doesn't cover (solo browsing vs. friends with no plans vs. a couple deciding a date idea). Reference line: *"Solo, with friends, or on a date — something better than scrolling for the tenth time."*
-- **Single primary CTA: "Browse skills."** No secondary "Become a host" CTA on the public hero.
-
-**Rationale:** the shared thread across Kai's actual target users (bored individuals, friend groups with no plans, couples wanting date ideas) isn't "I want to learn a skill" — it's decision fatigue, the "I don't know, what do you want to do" loop. That's sharper and more ownable than generic "try something new" copy, and it isn't claimed by any named competitor (Meetup, ActiveSG, Airbnb Experiences are all positioned around the activity itself, not the pre-decision moment). The headline carries that insight; the subhead covers all three use cases without turning the headline into a list.
-
-### Host CTA — deferred, not deleted
-"Become a host" moves from the public hero to a **post-session email nudge** (KIV — build later), sent to guests after completing a session as a student. Matches the progressive-disclosure logic already used for signup in DECISIONS.md — ask for the thing when it's actually relevant, not upfront to a cold visitor.
+Food `#E6D8C4` · Fitness `#D5DAE3` · Arts `#E7CDBD` · Music `#D9D3E3` · Language `#D3E0D6` · Other `#E4DED2`. Icon ink is the same hue at roughly 45% lightness.
 
 ---
 
-## 6. Photography policy (decided)
+## 3. Typography
 
-- **Real, but as good as the host can make it** — not Airbnb-style professional staging, but genuinely well-taken phone photos: natural light, no clutter, accurately representing the actual experience
-- **Build active guidance into the listing-creation flow**, not just an unstated norm — a host-facing nudge along the lines of *"Good listings get 3x more bookings — here's how to take a great phone photo."* This formalizes DECISIONS.md's existing listing-performance-nudges idea into a photography-specific prompt at creation time, not just a post-launch dashboard stat.
+One type system across both lanes (unchanged):
 
-**Rationale:** "nicer listing wins" is real and worth using — it's literally how Airbnb's own marketplace behaves — but Airbnb's unguided version of that incentive is also what gradually pushed hosts toward professional photography and staging, which is the exact curated, polished feel TryKai's positioning explicitly differentiates against (see DECISIONS.md's competitor table). A five-minute, no-equipment way to take a noticeably better photo gets the quality lift without quietly recreating Airbnb's curation creep, which would erode the "anyone can teach, low barrier to list" promise over time.
+- **Display:** Bricolage Grotesque, 600/700, tight tracking (`-0.02em`). Headlines, listing titles, section titles.
+- **Body / UI:** Manrope, 400 to 700. Everything else.
+- **Utility:** Space Mono, 700. **Decision (closes the August open item): keep it**, but only for prices, dates and times on chips, step numbers and small uppercase eyebrows/category tags. Never for sentences.
 
----
+### Scale
+| Role | Size | Notes |
+|---|---|---|
+| Hero | `clamp(36px, 6vw, 60px)`, 700, line-height 1.04 | Left-aligned |
+| Page title | `clamp(28px, 4vw, 40px)`, 700 | Listing title, dashboard titles |
+| Section title | `clamp(20px, 2.4vw, 26px)`, 700 | With optional eyebrow above |
+| Card title | 15 to 16px, 600, 2-line clamp | |
+| Body | 16px / 1.6 | 15px inside dense cards |
+| Small | 14px | Meta lines |
+| Caption | 12 to 13px | Never below 12px |
+| Eyebrow | 11px mono, 700, uppercase, `0.08em`, coral-ink | |
 
-## 7. Component library and UI decisions (built 24 to 25 August 2026)
-
-A reusable component library now exists in this tree, built in plain CSS matching `index.css` (the project does not use Tailwind), previewable at a private `/style-guide` route. **Partly wired: TopNav and HamburgerMenu are the live chrome, Card browse mode is the live browse grid, Settings uses Button and Input, Hosting listing rows use Button and OverflowMenu, and Login uses Input for email and password.** SelectableCard is still preview only. Components: Button (primary, secondary, destructive), Input (with label, error state, optional floating-label mode, password show/hide), Card (borderless browse mode and boxed booking mode), OverflowMenu (⋯ actions, keyboard and phone), SelectableCard (compact horizontal category bar), TopNav, HamburgerMenu.
-
-**Decisions locked while building these, mobile-first throughout:**
-
-- **Prices and utility text use the monospace face**, as section 3 specifies. Caleb noted he does not love it once seen but it is not wrong; parked, not changed.
-- **Category icons.** Custom flat illustrations, one per category (Food, Fitness, Arts, Music, Language, Other), navy `#16264B` and coral `#D97756` only, transparent background with no circle or border, roughly half navy-dominant and half coral-dominant across the set to avoid a monotone row. AI-generated to a fixed style prompt. StyleGuide imports Food, Fitness, and Arts from `src/assets/categories/`; **those PNGs are not in the repo.** Music, Language, Other imports are commented out. These deliberately avoid ToGatherSG's brighter cartoon palette.
-- **Top nav.** Centered logo with a Mous-style scroll behaviour: at the top it shows the logo mark plus "TryKai" wordmark at full height; on scroll the wordmark hides and the bar shrinks; returns on scroll to top. Hamburger top-left, login top-right. Logged-out shows a "Log in" link; logged-in shows the user's avatar (photo, or initials in a navy/cream circle if no photo) linking to their own `/u/:id`. Settings is a gear on that profile; Log out is on `/settings`. There is no avatar dropdown.
-- **Navigation is top nav, not bottom nav, for launch.** A bottom tab bar was wanted but rejected for now because as a mobile website (not an app) it collides with the browser's own bottom chrome. Revisit a bottom nav when TryKai becomes a native app, which is the right time to get it properly rather than a compromised web version.
-- **Hamburger menu** slides in from the left with a slight staggered fade per row. Signed-in: Browse, Host a session (verified) / Become a host (not yet verified), Verification review for admins. Signed-out: Log in or sign up, Browse, and the three policy links. Bookings and Hosting live as tabs on your own profile, not in the hamburger.
-- **Hosting My Listings** is a heading with “+ New listing” on the right. One card per row below 1024px, two from 1024px. Each card keeps a small square thumbnail plus title on one line (tap opens Edit); the ⋯ OverflowMenu sits in the top-right corner of the card (View listing, Edit, Delete in `--error`, keyboard and 44px phone targets). Add session is a full-width secondary Button below. Phone cards use tighter padding.
-- **Category filter row** sits directly below the top nav as a horizontal band, scrollable sideways, and scrolls away with the content rather than staying pinned.
-
-**Browse experience decided (not all built):**
-- The Lane 1 headline from section 5 sits above the listings grid. No photo banner and no persistent search bar for launch. Two columns on phone (matching Airbnb's mobile browse density), three on tablet, four on desktop.
-- Card shows the category badge overlaid on the image top-left, title, a compact meta line with price on the left and, only if a rating exists, `★ 4.8 (12)` on the right. The rating uses the body font (`--sans`); `★ 4.8` is the text colour and `(12)` is `--muted`. A brand-new listing shows price only, never an empty star, deliberately unlike ToGatherSG's "0 reviews" look.
-- Only honest scarcity and real discounts as conversion nudges (real "spots left", real PayNow saving). No fabricated urgency, no fake "people viewing now".
-
-**Listing detail decided (built 11 September 2026, session calendar 4 October 2026):**
-- One layout does not fit both. Phone gets one 4/3 photo per screen, swiped with CSS scroll-snap and a row of position dots. From 1024px the gallery becomes a mosaic: 1 large + 2x2 for five photos, 1 large + three for four, 1 large + two stacked for three, two equal for two, and a single photo framed at 3/2 rather than stretched across the page.
-- The gallery is capped in height on desktop (`clamp(320px, 34vw, 440px)`) because the title, host and booking card have to be above the fold. A full-width 4:3 photo pushed all of them off screen.
-- Two columns from 1024px, content left and a sticky booking card right. Page content is capped narrower than the browse grid, because a description running the full width of a 1440px screen is unreadable.
-- **The host block stays high, directly under the area, at every width.** On TryKai the guest is buying time with a person, so who is teaching belongs in the first decision, not below the description. Reviews come last.
-- **Sessions are a month calendar, not a list.** Each date with sessions shows the count. Tapping a date lists only that day's times (time, duration, spots left, price, Book). Past dates and empty dates are muted. Month navigation runs from the first upcoming session to the last. Checkout replaces the calendar with the chosen session, and Cancel returns to the same date.
-
-**What Home actually does today (30 September 2026):** the browse decisions above are built, including the Lane 1 headline and subhead. Grid 2 / 3 / 4 at 768px and 1024px, square images with a cream fallback, category badge overlaid on a cream pill, title clamped to two lines without reserving an empty second line, and one meta line with the all-in price on the left and `★ average (count)` on the right when `listing_ratings` returns reviews for that listing (body font; count muted). No reviews means price only. Sort is the soonest upcoming session day, then the listing with more upcoming sessions.
+Fonts load from Google Fonts via `<link>` with `preconnect` in `index.html`, not a CSS `@import`, so text paints sooner.
 
 ---
 
-## 8. Open items / to revisit
+## 4. Space, shape and depth
 
-- Final wordmark/logo execution (direction set, specific design not yet built)
-- Lane 2's own small wordmark or section-header treatment, if any (optional, deferred)
-- The three remaining category icons (Music, Language, Other)
-- Whether to keep the monospace price face (Caleb ambivalent)
-- Exact tagline under the logo (locality/"neighbour" language is the leading candidate, not finalized)
-- Lane 2's exact spacing/density/accent-reduction specifics — direction agreed ("quieter, same system"), precise values not yet defined
-- Wiring the built components into the real pages (Home first). The library is already in this tree; Navbar is still the live chrome
-- Food / Fitness / Arts PNGs that StyleGuide imports, and `/trykai.png` that Navbar and TopNav request
+- **Spacing:** 4px base. Use 4, 8, 12, 16, 20, 24, 32, 48, 64, 96.
+- **Page width:** `--page-max: 1240px`. Gutters 16px on phones, 24px from 768px, 32px from 1024px. Prose (listing description, policies) caps at about 680px.
+- **Section rhythm:** 40px between home sections on phones, 64px on desktop.
+- **Radii:** `--radius-sm` 8px (chips inside cards), `--radius` 12px (buttons, inputs), `--radius-lg` 16px (cards, photos), `--radius-xl` 24px (bands, hero art), pills 999px.
+- **Elevation:** three shadows, all navy-tinted, never grey-black. `--shadow-sm` for resting cards, `--shadow-md` for the booking card and menus, `--shadow-lg` for the sticky mobile bar and dialogs.
+- **Touch targets:** 44px minimum, 48px for primary actions.
+
+---
+
+## 5. Logo and wordmark
+
+- **Mark:** the two high-fiving characters (`/trykai.png`), navy and coral. It carries the "neighbour" warmth on its own and now appears large in the desktop hero as well as in the nav.
+- **Wordmark:** "TryKai" in Bricolage Grotesque 700 beside the mark. On scroll the wordmark hides and the bar shrinks (unchanged).
+- **Open:** a vector version of the mark and a final lettered wordmark. The PNG is fine until then.
+
+---
+
+## 6. Messaging
+
+- **Hero headline (decided):** *"Singapore's not boring. You just haven't found your thing yet."*
+- **Subhead (decided):** *"Solo, with friends, or on a date — something better than scrolling for the tenth time."*
+- **Trust line under the hero:** three chips: *ID-verified hosts* (hosts must pass verification before they can list), *Exact address after booking* (the address is revealed only to confirmed guests), *Most sessions S$15–30* (typical guest-facing band, not a filter or CHECK). Do not add a claim here unless the code enforces it, except this typical-price line.
+- **No "Become a host" in the hero** (unchanged). Supply is recruited lower down: a quiet "Teach what you love" band at the end of Home and a footer link, both pointing at the host entry (`hostEntry()`), plus the post-session email nudge (still KIV).
+- "Skip the course. Just learn the basics." stays banked for Lane 2.
+
+---
+
+## 7. Photography
+
+- **Real, but as good as the host can make it:** natural light, no clutter, accurate to the session. No professional staging.
+- **Guidance at creation time:** create and edit show a panel titled "A few tips for great photos": natural light by a window, lead with the finished thing, hands in action, tidy background. Continue with 0 photos asks before skipping. Cover crop matches the browse card (4/3). No invented conversion stats.
+- **No photo:** category tint tile with the category's line icon (section 2).
+
+---
+
+## 8. Components
+
+All in plain CSS in `src/index.css` (no Tailwind), previewable at `/style-guide`.
+
+- **Buttons.** One visual system. `.ui-button` and the older `.btn` classes now share the same look: 12px radius, 44px minimum (48px for `--lg`/booking CTAs), 600 weight. Primary is navy on cream text; secondary is outlined with `--border-strong`; destructive is error-tinted. Press state scales to 0.98.
+- **Chips.** 36px pill, outlined; active is navy filled. Used for quick filters and session tags.
+- **Category bar.** A horizontal, swipeable row of icon-over-label tabs (Airbnb pattern), not a wrap of pills. Active tab: navy label plus a 2px navy underline. Icons are inline line SVGs in `src/components/CategoryIcon.jsx` so every category, including Language and Other, has one. The illustrated category PNGs are kept for marketing and the style guide; they do not fit a 24px tab.
+- **Browse card.** Square photo, 16px radius, slight zoom on hover. Overlaid on the photo: the category tag (top left, mono on cream) and the host's avatar or initials (bottom left, ringed in cream). Below: title (2 lines), a meta line of *area* and *next date*, then the all-in price (mono) and, only if reviews exist, `★ 4.8 (12)`. A listing with no reviews shows a coral-ink "New" label instead of an empty star.
+- **Skeletons.** Loading states use shimmering placeholder cards in the real layout, with the old status text kept for screen readers.
+- **Empty states.** An icon, a one-line title, a sentence and an action, centred in a dashed `--border-strong` panel.
+- **Section header.** Optional coral eyebrow, display title, optional muted description, optional "See all" link at the right.
+- **Top nav.** Mark and wordmark on the left; on the right, "Log in" as an outlined pill (or the avatar, linking to your profile) followed by a round menu button. Translucent cream background with backdrop blur, aligned to the page width, shrinking on scroll as before. Top nav, not bottom nav, until TryKai is a native app.
+- **Main menu (changed 18 October 2026).** A white card that drops down under the menu button, right-aligned to it (Airbnb pattern), replacing the full-height panel that slid in from the left. Rows have a line icon and are grouped by dividers; the host entry ("Become a host" or "Host a session") is a two-line row with the mascot; Log out sits last. Outside click, Escape, or choosing a row closes it. On phones a light scrim sits behind the card. Items are unchanged.
+- **Footer.** A deep-navy band: mark and tagline, three link columns (Explore, Hosting, Policies), then UEN and the DPO email. Cream text, coral dot in the wordmark.
+
+---
+
+## 9. Pages
+
+### Home
+1. **Hero**, left-aligned on every width. Headline, subhead, the three-item trust line, and a "Browse sessions" button that jumps to the grid. From 1024px the mascot sits on the right in a cream-on-sand panel.
+2. **Category bar** directly above the grid, swipeable sideways, scrolls away with the page.
+3. **Filter row:** quick chips that are computed from real data ("This weekend", "Under $30") plus the region select. Chips only appear when at least one listing would match.
+4. **Grid** of browse cards, 2 / 3 / 4 columns at phone / 768px / 1024px. Sort is unchanged (soonest upcoming session day, then more sessions).
+5. **How TryKai works:** a deep-navy band with three numbered steps (pick, book a verified host, show up).
+6. **Teach what you love:** a quiet bordered band pointing to the host entry.
+
+No photo banner and no persistent search bar for launch (unchanged): with tens of listings, the category bar and chips find things faster than a search box.
+
+### Listing detail (built from the canvas "Listing · phone" mockup, 18 October 2026)
+- **Phones and tablets:** the gallery runs edge to edge with the back and share buttons floating on the photo as small 32px cream circles (each keeps a 44px tap area), position dots and a "1 / 5" counter on the photo. From 1024px the mosaic is unchanged (capped at `clamp(320px, 34vw, 440px)`), with the buttons above it. There is no ⋮ menu on the photo: reporting lives only in the row at the end of the page.
+- Category chip, title, then a facts row with icons: session length, "Up to N guests", area, and the listing's rating when it has reviews.
+- **Host card** high on the page at every width: avatar, "Your host", name, "ID verified" (from `users.is_id_verified`), host rating, bio preview, "View <name>'s profile".
+- About this experience, then What's provided as a checklist with coral checks.
+- **Pick a date:** on phones the booking card sits here in the page flow, without card chrome: section title, the month calendar in its own card, the chosen day, and each time as a card with spots left (coral when two or fewer) and Book. From 1024px the same content is the sticky booking card on the right, with the all-in price on top.
+- **Where you'll be:** one row instead of a map, since a map of a general area tells a guest nothing. Title is the area ("Bedok, Singapore"); the subline is "Exact address sent once your booking is confirmed."; one location icon. A confirmed guest instead sees the real address with an "Open in Google Maps" link, matching booking detail.
+- Reviews last, with a dashed empty state; then "Report this listing". The 48-hour refund line lives on the booking card and in the footer, not as a second policy row here.
+- **Phone bottom bar:** all-in price per person, the PayNow price in coral-ink, and "Choose a date". It slides away while the booking card is on screen and during checkout.
+
+### Checkout ("Confirm and pay", from the canvas "Checkout · phone" mockup)
+- **Phones and tablets:** a full-screen sheet with a back arrow (cancels and returns to the dates). **From 1024px:** the same content inside the booking card, which stops being sticky so the whole checkout scrolls with the page.
+- Session summary card (photo, title, host and area, date and time in mono, "Change"), guests row with spots left and round 44px steppers plus the group-pricing line, "Pay with" PayNow and Card as radio cards (PayNow shows the 5% saving and the struck-through card price), a price breakdown (guests all in, PayNow saving, total, "Booking fee included"), three short promises we can stand behind (host ID check, address after booking, 48-hour full refund), and the agreement line.
+- Choosing a method still creates the payment straight away (unchanged flow, so the server's price check runs before the guest pays). Stripe's payment form then appears with "Pay $X", pinned to the bottom of the screen on phones.
+
+### Hosting, bookings, profile, settings, auth
+Same tokens and components: raised white cards with `--shadow-sm`, display titles, tabs with a navy underline, consistent banners. Inline `style={{…}}` in pages is not allowed; add a class instead.
+
+### Hosting dashboard (built from the canvas "Hosting dashboard · phone" mockup, 18 October 2026)
+- Lives in the profile's Hosting tab (`/hosting` still redirects there). A "Hosting" title with a navy "New listing" button on top.
+- **Get ready for guests:** a checklist card with "N of 4" in mono and a progress bar: ID verified, first listing created (names it), payouts set up (Set up / Continue opens Stripe), first session added (Add opens the session form on the first listing with no dates). Done steps get a green check; open steps get one outlined action. The card disappears once all four are done.
+- **This month:** three stat tiles (Sessions, Guests booked, Earned) in mono, counted over the Singapore calendar month. Earned is what the host takes home from paid bookings.
+- **Upcoming bookings:** booked sessions with Cancel session, shown only when there are any.
+- **Your listings:** a card per listing with thumbnail, a status badge ("Hidden: no sessions" in coral, or "Live" in green), title, "S$23 · 90 min · up to 4" in mono, and a ⋯ menu (View, Edit, Delete). The footer says "No dates yet" in coral-ink with a primary Add sessions, or the next date with a secondary Add sessions. A draft saved in the wizard on this device shows as a Draft card with "Step N of 5: <step>" and Continue, which reopens the wizard at that step with the draft restored; its menu discards it.
+- **Photo tips banner:** a navy card with a coral camera, "Better photos, more bookings", and a toggle that reveals the photo tips.
+- **Phones:** everything stacks in the mockup's order. **From 1024px:** the checklist on the left with This month and the photo tips in a 400px column beside it, then the listings full width, one card per row so the session list under each has room. Without the checklist, This month and the tips share the top row.
+
+### Create listing (built from the canvas "New listing, step 3 · phone" mockup, 18 October 2026)
+- **Five steps:** *The basics* (title, category as six icon tiles, description), *Add photos* (tips panel, a dashed upload tile, square previews with Cover top-left and × top-right; drag to reorder; tap a tile for Crop / Make cover / Remove), *Price and group size*, *Where it happens* (area and full address), *Final touches* (what's provided including custom chips; None clears and disables the rest; a preview of the browse card, cancellation policy, Host terms, Create listing). Cover crop is locked to the 4:3 card (`--listing-cover-aspect`); other photos default to 4:3 with a Free option.
+- **Chrome:** close (to Hosting), "New listing" and "Save draft" on top; "Step N of 5" in mono with "Next: <step>" and five progress segments; Back and Continue (Create listing on the last step) at the bottom. Continue checks only the current step and shows a warm coral-ink hint under the missing field, never a red error box; Create listing re-checks every step.
+- **Price step:** a large S$ price field, then a sand panel with two large figures side by side ("Guests pay $X per person", "You get $Y per person"), a divider, "Full session of N: $X" (N × lesson, no discount, before host fee — never a range), and one muted footnote (`10% host fee from your 4th booking.` or `Founding host: no host fee, ever.`). An ⓘ opens a small popover with the group discount tiers, what one group of N pays together, and the after-fee amount for non-founding hosts. Under "Offer group discounts", one live muted line: "Group discounts come off your price, e.g. a group of N together pays you $Y instead of $X." Hidden when the checkbox is off. When founding-host status cannot be read, "You get" and the footnote hide; the full-session line still shows. Same `ListingPricePanel` on Edit listing. Must fit at phone width. Group size is a round stepper (1 to 50, default 4), session length is four chips (1 hr, 1.5 hr, 2 hr, Other with a minutes field), and group discounts are a checkbox card.
+- **Drafts:** "Save draft" keeps the text answers in this browser (not photos); next time the first step offers Restore draft or Discard. Publishing clears it.
+- **Phones and tablets:** a full-screen flow over the site nav, with Back and Continue pinned to the bottom. **From 1024px:** the steps sit in a white card (max 640px) with a sticky "How guests will see it" preview of the browse card beside it, updating as the host types.
+
+### Edit listing
+Still one form, grouped into titled sections — *The basics*, *Price and time*, *Location*, *Photos*, *What's provided* — with the photo tip panel in the Photos section. Hosts editing want every field at once.
+
+---
+
+## 10. Motion
+
+- Hover: cards lift the photo by scaling it to 1.03 over 250 ms; buttons darken over 150 ms.
+- Press: buttons scale to 0.98.
+- Menus and the hamburger slide and fade over 280 to 320 ms (unchanged).
+- Skeleton shimmer 1.4 s linear.
+- Under `prefers-reduced-motion: reduce` all of the above are off.
+
+---
+
+## 11. Accessibility
+
+- Text meets WCAG AA: 4.5:1 for body, 3:1 for 24px and larger. Coral text always uses `--coral-ink`.
+- Every interactive element is a real `<button>`, `<a>` or form control, with a visible `:focus-visible` ring (2px navy, 2px offset).
+- Icon-only buttons carry `aria-label`; decorative SVGs carry `aria-hidden="true"`.
+- Status that changes without navigation (loading, errors, guest count) is announced.
+
+---
+
+## 12. Open items
+
+- Vector logo mark and final lettered wordmark.
+- Lane 2's own small wordmark or section-header treatment (optional, deferred), and its exact spacing and density values.
+- A "Good for two" listing attribute, so Home can show a real "Date ideas" row (the canvas design depends on data we do not store yet).
+- Compressing the illustrated category PNGs (about 50 KB each) if they move onto a page guests load.
+- Test listings and screenshot-photo listings must be deactivated on production; they undo everything above.

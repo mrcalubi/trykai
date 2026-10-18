@@ -132,26 +132,69 @@ describe('ListingDetail loading and failure', () => {
     expect(listingSelect).toMatch(/users!host_id/)
     expect(listingSelect).toMatch(/display_name/)
     expect(listingSelect).not.toMatch(/full_name/)
+    expect(listingSelect).not.toMatch(/full_address/)
   })
 })
 
 describe('ListingDetail content', () => {
   it('renders the listing headline details', async () => {
     givenListing(makeListing({ title: 'Latte art', category: 'Food', area: 'Tiong Bahru' }))
-    const { user } = renderPage()
+    renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Latte art', level: 1 })).toBeInTheDocument()
     expect(screen.getByText('Food')).toBeInTheDocument()
     expect(screen.getByText('Tiong Bahru')).toBeInTheDocument()
     expect(screen.getByText('Pull your first rosetta in ninety minutes.')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
-    const more = screen.getByRole('button', { name: 'More actions' })
-    expect(document.querySelector('.page-back__actions')).toContainElement(more)
-    await user.click(more)
-    const report = screen.getByRole('menuitem', { name: 'Report listing' })
+    // Report lives in the rows at the end of the page, not on the photo.
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+    expect(document.querySelector('.page-back__actions .ui-overflow')).not.toBeInTheDocument()
+    const report = screen.getByRole('link', { name: 'Report this listing' })
     expect(report.getAttribute('href')).toContain('mailto:hello@trykai.sg')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: listing Latte art')
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('listing-1')
+  })
+
+  it('does not reveal the address to a signed-out visitor', async () => {
+    givenListing(makeListing({ area: 'Tiong Bahru', full_address: '12 Coffee Road' }))
+    renderPage()
+
+    expect(await screen.findByText('Tiong Bahru')).toBeInTheDocument()
+    expect(document.querySelector('.detail-area')).toHaveTextContent('Tiong Bahru')
+    expect(screen.queryByText('12 Coffee Road')).not.toBeInTheDocument()
+    expect(supabase.rpc).not.toHaveBeenCalledWith('listing_address', expect.anything())
+  })
+
+  it('does not reveal the address to a signed-in guest without a confirmed booking', async () => {
+    givenSignedIn()
+    givenListing(makeListing({ area: 'Tiong Bahru' }))
+    supabase.rpc.mockImplementation(async (name) => {
+      if (name === 'listing_address') return { data: null, error: null }
+      return { data: null, error: null }
+    })
+    renderPage()
+
+    expect(await screen.findByText('Tiong Bahru')).toBeInTheDocument()
+    expect(document.querySelector('.detail-area')).toHaveTextContent('Tiong Bahru')
+    expect(screen.queryByText('12 Coffee Road')).not.toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('listing_address', { listing_id: 'listing-1' })
+  })
+
+  it('reveals the address to a guest after listing_address returns it', async () => {
+    givenSignedIn()
+    givenListing(makeListing({ area: 'Tiong Bahru' }))
+    supabase.rpc.mockImplementation(async (name) => {
+      if (name === 'listing_address') return { data: '12 Coffee Road', error: null }
+      return { data: null, error: null }
+    })
+    renderPage()
+
+    expect(await screen.findAllByText('12 Coffee Road')).not.toHaveLength(0)
+    expect(document.querySelector('.detail-area')).toHaveTextContent('12 Coffee Road')
+    expect(document.querySelector('.detail-location__title')).toHaveTextContent('12 Coffee Road')
+    expect(screen.queryByText('Tiong Bahru')).not.toBeInTheDocument()
+    expect(screen.queryByText('Exact address after booking')).not.toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('listing_address', { listing_id: 'listing-1' })
   })
 
   it('does not render a bare 0 in place of the planning area', async () => {
@@ -170,15 +213,49 @@ describe('ListingDetail content', () => {
 
     await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
     expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
-    expect(document.querySelector('.page-back__actions .ui-overflow')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Report this listing' })).not.toBeInTheDocument()
+  })
+
+  it('tells a guest the general area and that the exact address comes after booking', async () => {
+    givenListing(makeListing({ area: 'Bedok' }))
+    renderPage()
+
+    expect(await screen.findByText('Bedok, Singapore')).toBeInTheDocument()
+    expect(
+      screen.getByText('Exact address sent once your booking is confirmed.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/^East region\./)).not.toBeInTheDocument()
+    expect(screen.queryByText('Exact address after booking')).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.detail-location__icon')).toHaveLength(1)
+    expect(screen.queryByRole('link', { name: 'Open in Google Maps' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: /Cancellation: full refund/ }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('gives a confirmed guest the exact address with a map link', async () => {
+    givenListing()
+    givenSignedIn()
+    supabase.rpc.mockImplementation(async (name) =>
+      name === 'listing_address'
+        ? { data: '1 Tiong Bahru Road', error: null }
+        : { data: [], error: null }
+    )
+    renderPage()
+
+    const map = await screen.findByRole('link', { name: 'Open in Google Maps' })
+    expect(map).toHaveAttribute(
+      'href',
+      'https://www.google.com/maps/search/?api=1&query=1%20Tiong%20Bahru%20Road'
+    )
+    expect(screen.queryByText('Exact address after booking')).not.toBeInTheDocument()
   })
 
   it('shows the card all-in total, not the raw lesson price', async () => {
     givenListing(makeListing({ price_per_person: 4500 }))
     renderPage()
 
-    expect(await screen.findByText(/\$51/)).toBeInTheDocument()
+    expect((await screen.findAllByText(/\$51/)).length).toBeGreaterThan(0)
     expect(screen.queryByText('$45')).not.toBeInTheDocument()
   })
 
@@ -464,7 +541,13 @@ describe('ListingDetail content', () => {
     const order = [...document.querySelectorAll('.detail-host, .detail-section__title')].map(
       (node) => (node.className.includes('detail-host') ? 'host' : node.textContent)
     )
-    expect(order).toEqual(['host', 'About this experience', "What's provided", 'Reviews (1)'])
+    expect(order).toEqual([
+      'host',
+      'About this experience',
+      "What's provided",
+      "Where you'll be",
+      'Reviews (1)',
+    ])
   })
 })
 
@@ -759,7 +842,7 @@ describe('ListingDetail booking', () => {
     expect(paynow).toHaveTextContent('$48.45')
     expect(card).toHaveTextContent('$51')
     expect(card).not.toHaveTextContent('Credit or debit card')
-    expect(screen.getAllByRole('heading', { name: 'Complete your booking' })).toHaveLength(1)
+    expect(screen.getAllByRole('heading', { name: 'Confirm and pay' })).toHaveLength(1)
     expect(screen.queryByText('Pick a date, then a time')).not.toBeInTheDocument()
     expect(document.querySelector('.detail-booking-card__note')).not.toBeInTheDocument()
   })
@@ -927,7 +1010,7 @@ describe('ListingDetail booking', () => {
     await waitFor(() =>
       expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$48.45'),
     )
-    expect(document.querySelector('.session-card__price')).toHaveTextContent('$48.45')
+    expect(document.querySelector('.price-breakdown__total')).toHaveTextContent('$48.45')
     expect(screen.getByRole('button', { name: /PayNow/ })).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -1128,7 +1211,7 @@ describe('ListingDetail checkout', () => {
   it('confirms the payment without leaving the page when possible', async () => {
     const { user } = await openCheckout()
 
-    await user.click(screen.getByRole('button', { name: 'Pay now' }))
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
 
     expect(stripe.instance.confirmPayment).toHaveBeenCalledOnce()
     expect(stripe.instance.confirmPayment.mock.calls[0][0]).toMatchObject({
@@ -1142,7 +1225,7 @@ describe('ListingDetail checkout', () => {
   it('sends the guest to the dashboard to wait for the webhook', async () => {
     const { user, currentPath, currentSearch } = await openCheckout()
 
-    await user.click(screen.getByRole('button', { name: 'Pay now' }))
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
 
     await waitFor(() => expect(currentPath()).toBe('/dashboard'))
     expect(currentSearch()).toBe('?booking=booking-1&payment=succeeded')
@@ -1151,7 +1234,7 @@ describe('ListingDetail checkout', () => {
   it('closes the unpaid checkout when the guest backs out', async () => {
     const { user } = await openCheckout()
 
-    await user.click(within(screen.getByTestId('stripe-elements')).getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
     await waitFor(() =>
@@ -1173,7 +1256,7 @@ describe('ListingDetail checkout', () => {
     })
     const { user, currentPath } = await openCheckout()
 
-    await user.click(screen.getByRole('button', { name: 'Pay now' }))
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
 
     expect(
       await screen.findByText('Payment was not completed. You have not been charged.')
@@ -1185,7 +1268,7 @@ describe('ListingDetail checkout', () => {
     stripe.instance.confirmPayment.mockResolvedValue({ error: { message: 'Your card was declined.' } })
     const { user, currentPath } = await openCheckout()
 
-    await user.click(screen.getByRole('button', { name: 'Pay now' }))
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
 
     expect(await screen.findByText('Your card was declined.')).toBeInTheDocument()
     expect(currentPath()).toBe('/listings/listing-1')
@@ -1194,7 +1277,7 @@ describe('ListingDetail checkout', () => {
   it('closes the payment panel when the guest backs out', async () => {
     const { user } = await openCheckout()
 
-    await user.click(within(screen.getByTestId('stripe-elements')).getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
     expect(stripe.instance.confirmPayment).not.toHaveBeenCalled()

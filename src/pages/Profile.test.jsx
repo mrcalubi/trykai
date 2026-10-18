@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -490,10 +490,48 @@ describe('Profile own tabs', () => {
     )
   })
 
+  it('drops a listing from the Listings tab after it is deleted on Hosting', async () => {
+    givenListings([
+      makeListing({
+        id: 'listing-9',
+        title: 'fr',
+        category: 'Food',
+        area: 'Bedok',
+        price_per_person: 350,
+      }),
+    ])
+    const previous = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation(async (name, args) => {
+      if (name === 'delete_listing') return { data: args?.p_listing_id, error: null }
+      if (previous) return previous(name, args)
+      return { data: null, error: null }
+    })
+    const { user } = renderPage({ search: '?tab=listings' })
+
+    expect(await screen.findByRole('heading', { name: 'fr', level: 3 })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: 'Hosting' }))
+    const listingsSection = (
+      await screen.findByRole('heading', { name: 'Your listings' })
+    ).closest('section')
+    const card = within(listingsSection).getByText('fr').closest('.hosting-listing-card')
+    await user.click(within(card).getByRole('button', { name: 'More actions' }))
+    await user.click(within(card).getByRole('menuitem', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    await waitFor(() => expect(screen.queryByText('fr')).not.toBeInTheDocument())
+
+    await user.click(screen.getByRole('link', { name: 'Listings' }))
+
+    expect(await screen.findByText('No listings yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'fr', level: 3 })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /fr/ })).not.toBeInTheDocument()
+  })
+
   it('opens the hosting panel from ?tab=hosting', async () => {
     renderPage({ search: '?tab=hosting' })
 
-    expect(await screen.findByRole('heading', { name: 'My Listings' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Your listings' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Hosting' })).toHaveAttribute(
       'aria-current',
       'page'
@@ -581,7 +619,7 @@ describe('Profile own tabs', () => {
     renderPage({ search: '?tab=hosting' })
 
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'My Listings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Your listings' })).not.toBeInTheDocument()
   })
 
   it('shows your own About when a bio is saved', async () => {

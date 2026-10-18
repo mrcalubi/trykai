@@ -98,8 +98,8 @@ export default function BookingDetail() {
 
     const listingId = data.sessions?.listings?.id
     if (data.status === 'confirmed' && listingId) {
-      const { data: revealed } = await supabase.rpc('get_listing_address', {
-        p_listing_id: listingId,
+      const { data: revealed } = await supabase.rpc('listing_address', {
+        listing_id: listingId,
       })
       setAddress(typeof revealed === 'string' ? revealed : '')
     } else {
@@ -283,8 +283,7 @@ export default function BookingDetail() {
               type="button"
               disabled={cancelLoading}
               onClick={handleCancel}
-              className="btn btn--primary"
-              style={{ padding: '10px 20px', fontSize: '14px', background: 'var(--error)' }}
+              className="btn btn--danger"
             >
               {cancelLoading ? 'Cancelling…' : 'Confirm cancellation'}
             </button>
@@ -292,7 +291,6 @@ export default function BookingDetail() {
               type="button"
               onClick={() => setConfirmCancel(false)}
               className="btn btn--ghost"
-              style={{ padding: '10px 20px', fontSize: '14px' }}
             >
               Keep booking
             </button>

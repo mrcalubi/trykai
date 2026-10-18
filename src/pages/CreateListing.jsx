@@ -1,17 +1,47 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { CancellationPolicyInfo } from '../components/CancellationPolicy'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
+import PhotoTips from '../components/PhotoTips'
+import PhotoSkipDialog from '../components/PhotoSkipDialog'
+import ListingPhotosEditor from '../components/ListingPhotosEditor'
+import { uploadListingPhotos } from '../lib/listingPhotos'
+import ListingPricePanel from '../components/ListingPricePanel'
+import WhatsProvidedFields from '../components/WhatsProvidedFields'
+import FieldHint from '../components/FieldHint'
+import Card from '../components/ui/Card'
+import Icon from '../components/ui/Icon'
+import { categoryIconName } from '../components/ui/categoryIcon'
+import { LISTING_CATEGORIES } from '../lib/listingCategories'
+import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
+import { providedForSave } from '../lib/whatsProvided'
 import { foundingHostFromRpc } from '../lib/foundingHost'
-import { hostListingPriceHint, parsePriceInputCents } from '../lib/pricing'
+import {
+  formatGuestFacingPrice,
+  groupDiscountExampleLine,
+  hostPriceBreakdown,
+  parsePriceInputCents,
+} from '../lib/pricing'
+import {
+  LISTING_STEPS as STEPS,
+  clearDraft,
+  draftKey,
+  draftValues,
+  readDraft,
+} from '../lib/listingDraft'
 
 const MAX_PHOTOS = 5
+const DRAFT_RESTORED = 'Draft restored. Photos are not kept in drafts, so add them again.'
+const MIN_GUESTS = 1
+const MAX_GUESTS = 50
 
-const CATEGORIES = ['Food', 'Fitness', 'Arts', 'Music', 'Language', 'Other']
-
-const WHATS_PROVIDED_OPTIONS = ['Materials', 'Equipment', 'Food & drinks', 'None']
+const DURATIONS = [
+  { label: '1 hr', mins: 60 },
+  { label: '1.5 hr', mins: 90 },
+  { label: '2 hr', mins: 120 },
+]
 
 export default function CreateListing() {
   const navigate = useNavigate()
@@ -19,23 +49,41 @@ export default function CreateListing() {
 
   const [verificationStatus, setVerificationStatus] = useState(null)
   const [verificationChecked, setVerificationChecked] = useState(false)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [category, setCategory] = useState('')
-  const [price, setPrice] = useState('')
-  const [maxGuests, setMaxGuests] = useState('')
-  const [durationMins, setDurationMins] = useState('')
-  const [area, setArea] = useState('')
-  const [fullAddress, setFullAddress] = useState('')
-  const [whatsProvided, setWhatsProvided] = useState([])
+  // Hosting's Continue on a draft opens the wizard with it already restored.
+  const location = useLocation()
+  const [resumed] = useState(() => (location.state?.resumeDraft ? readDraft(userId) : null))
+  const start = draftValues(resumed)
+  const [step, setStep] = useState(start.step)
+  const [title, setTitle] = useState(start.title)
+  const [description, setDescription] = useState(start.description)
+  const [category, setCategory] = useState(start.category)
+  const [price, setPrice] = useState(start.price)
+  const [maxGuests, setMaxGuests] = useState(start.maxGuests)
+  const [durationChoice, setDurationChoice] = useState(start.durationChoice)
+  const [otherMins, setOtherMins] = useState(start.otherMins)
+  const [area, setArea] = useState(start.area)
+  const [fullAddress, setFullAddress] = useState(start.fullAddress)
+  const [whatsProvided, setWhatsProvided] = useState(start.whatsProvided)
   const [photos, setPhotos] = useState([])
   const photosRef = useRef(photos)
-  const [groupPricing, setGroupPricing] = useState(true)
+  const [groupPricing, setGroupPricing] = useState(start.groupPricing)
   const [acceptedHostTerms, setAcceptedHostTerms] = useState(false)
   const [isFoundingHost, setIsFoundingHost] = useState(null)
+  const [fieldHints, setFieldHints] = useState({})
   const [error, setError] = useState('')
+  const [photoError, setPhotoError] = useState('')
+  const [draftNote, setDraftNote] = useState(resumed ? DRAFT_RESTORED : '')
   const [loading, setLoading] = useState(false)
-  const priceHint = hostListingPriceHint(parsePriceInputCents(price), isFoundingHost)
+  const [draftHandled, setDraftHandled] = useState(Boolean(resumed))
+  const [photoSkipOpen, setPhotoSkipOpen] = useState(false)
+  const headingRef = useRef(null)
+  const photoPickerRef = useRef(null)
+  const movedStep = useRef(false)
+
+  const priceCents = parsePriceInputCents(price)
+  const breakdown = hostPriceBreakdown(priceCents, isFoundingHost, maxGuests, groupPricing)
+  const discountExample = groupPricing ? groupDiscountExampleLine(priceCents, maxGuests) : ''
+  const durationMins = durationChoice === 'other' ? parseInt(otherMins, 10) : durationChoice
 
   useEffect(() => {
     photosRef.current = photos
@@ -77,117 +125,135 @@ export default function CreateListing() {
     }
   }, [])
 
-  function handlePhotoChange(e) {
-    const selected = Array.from(e.target.files).filter((file) =>
-      file.type.startsWith('image/')
-    )
-    e.target.value = ''
-
-    if (selected.length === 0) return
-
-    setPhotos((prev) => {
-      const remaining = MAX_PHOTOS - prev.length
-      if (remaining <= 0) return prev
-
-      const toAdd = selected.slice(0, remaining).map((file) => ({
-        file,
-        previewUrl: URL.createObjectURL(file),
-      }))
-
-      return [...prev, ...toAdd]
-    })
+  function restoreDraft() {
+    const draft = readDraft(userId)
+    setDraftHandled(true)
+    if (!draft) return
+    if (typeof draft.title === 'string') setTitle(draft.title)
+    if (typeof draft.description === 'string') setDescription(draft.description)
+    if (typeof draft.category === 'string') setCategory(draft.category)
+    if (typeof draft.price === 'string') setPrice(draft.price)
+    if (Number.isInteger(draft.maxGuests)) setMaxGuests(draft.maxGuests)
+    if (draft.durationChoice !== undefined) setDurationChoice(draft.durationChoice)
+    if (typeof draft.otherMins === 'string') setOtherMins(draft.otherMins)
+    if (typeof draft.groupPricing === 'boolean') setGroupPricing(draft.groupPricing)
+    if (typeof draft.area === 'string') setArea(draft.area)
+    if (typeof draft.fullAddress === 'string') setFullAddress(draft.fullAddress)
+    if (Array.isArray(draft.whatsProvided)) setWhatsProvided(draft.whatsProvided)
+    setDraftNote(DRAFT_RESTORED)
   }
 
-  function removePhoto(index) {
-    setPhotos((prev) => {
-      URL.revokeObjectURL(prev[index].previewUrl)
-      return prev.filter((_, i) => i !== index)
-    })
+  function discardDraft() {
+    clearDraft(userId)
+    setDraftHandled(true)
   }
 
-  async function uploadPhotos() {
-    const urls = []
+  // Each new step announces itself by moving focus to its heading.
+  useEffect(() => {
+    if (!movedStep.current) return
+    headingRef.current?.focus()
+  }, [step])
 
-    for (const photo of photos) {
-      const ext = photo.file.name.split('.').pop() || 'jpg'
-      const path = `${userId}/${crypto.randomUUID()}.${ext}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('listing-photos')
-        .upload(path, photo.file)
-
-      if (uploadError) throw uploadError
-
-      const { data } = supabase.storage.from('listing-photos').getPublicUrl(path)
-      urls.push(data.publicUrl)
+  function saveDraft() {
+    const values = {
+      step,
+      title,
+      description,
+      category,
+      price,
+      maxGuests,
+      durationChoice,
+      otherMins,
+      groupPricing,
+      area,
+      fullAddress,
+      whatsProvided,
     }
-
-    return urls
+    try {
+      window.localStorage.setItem(draftKey(userId), JSON.stringify(values))
+      setDraftHandled(true)
+      setDraftNote('Draft saved on this device. Photos are not kept in drafts.')
+    } catch {
+      setDraftNote('Could not save a draft in this browser.')
+    }
   }
 
-  function handleWhatsProvidedChange(option) {
-    if (option === 'None') {
-      setWhatsProvided((prev) => (prev.includes('None') ? [] : ['None']))
-      return
+  function hintsForStep(stepId) {
+    const hints = {}
+    if (stepId === 'basics') {
+      if (!title.trim()) hints.title = LISTING_FIELD_HINTS.title
+      if (!category) hints.category = LISTING_FIELD_HINTS.category
+      if (!description.trim()) hints.description = LISTING_FIELD_HINTS.description
     }
-
-    setWhatsProvided((prev) => {
-      const withoutNone = prev.filter((item) => item !== 'None')
-      if (withoutNone.includes(option)) {
-        return withoutNone.filter((item) => item !== option)
+    if (stepId === 'price') {
+      if (priceCents == null) hints.price = LISTING_FIELD_HINTS.price
+      if (!Number.isInteger(maxGuests) || maxGuests < MIN_GUESTS) {
+        hints.spots = LISTING_FIELD_HINTS.spots
       }
-      return [...withoutNone, option]
-    })
+      if (durationChoice == null || !Number.isInteger(durationMins) || durationMins < 1) {
+        hints.duration = LISTING_FIELD_HINTS.duration
+      }
+    }
+    if (stepId === 'location') {
+      if (!area) hints.area = LISTING_FIELD_HINTS.area
+      if (!fullAddress.trim()) hints.fullAddress = LISTING_FIELD_HINTS.fullAddress
+    }
+    if (stepId === 'finish' && !acceptedHostTerms) hints.hostTerms = LISTING_FIELD_HINTS.hostTerms
+    return hints
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault()
+  function goTo(index) {
+    movedStep.current = true
     setError('')
+    setFieldHints({})
+    setStep(index)
+    window.scrollTo?.(0, 0)
+  }
 
-    const priceCents = Math.round(parseFloat(price) * 100)
-    const guests = parseInt(maxGuests, 10)
-    const duration = parseInt(durationMins, 10)
-
-    if (!title.trim() || !description.trim() || !category || !area || !fullAddress.trim()) {
-      setError('Please fill in all required fields.')
+  function handleContinue(e) {
+    e.preventDefault()
+    const hints = hintsForStep(STEPS[step].id)
+    if (Object.keys(hints).length) {
+      setFieldHints(hints)
       return
     }
-
-    if (Number.isNaN(priceCents) || priceCents <= 0) {
-      setError('Please enter a valid price.')
+    if (STEPS[step].id === 'photos' && photos.length === 0) {
+      setPhotoSkipOpen(true)
       return
     }
-
-    if (Number.isNaN(guests) || guests < 1) {
-      setError('Max guests must be at least 1.')
+    if (step < STEPS.length - 1) {
+      goTo(step + 1)
       return
     }
+    publish()
+  }
 
-    if (Number.isNaN(duration) || duration < 1) {
-      setError('Duration must be at least 1 minute.')
-      return
+  async function publish() {
+    setError('')
+    setPhotoError('')
+    for (let index = 0; index < STEPS.length; index += 1) {
+      const hints = hintsForStep(STEPS[index].id)
+      if (Object.keys(hints).length) {
+        setStep(index)
+        setFieldHints(hints)
+        return
+      }
     }
 
-    if (!acceptedHostTerms) {
-      setError('Please agree to the Host terms.')
-      return
-    }
-
-    const provided =
-      whatsProvided.includes('None') || whatsProvided.length === 0
-        ? []
-        : whatsProvided
+    const provided = providedForSave(whatsProvided)
 
     setLoading(true)
 
     let photoUrls = []
     try {
       if (photos.length > 0) {
-        photoUrls = await uploadPhotos()
+        photoUrls = await uploadListingPhotos(photos, userId, supabase.storage)
       }
     } catch (uploadError) {
+      console.error('Listing photo upload failed', uploadError)
       setLoading(false)
-      setError(uploadError.message)
+      setPhotoError(PHOTO_UPLOAD_ERROR)
+      goTo(STEPS.findIndex((step) => step.id === 'photos'))
       return
     }
 
@@ -197,8 +263,8 @@ export default function CreateListing() {
       description: description.trim(),
       category,
       price_per_person: priceCents,
-      max_guests: guests,
-      duration_mins: duration,
+      max_guests: maxGuests,
+      duration_mins: durationMins,
       group_pricing: groupPricing,
       area,
       full_address: fullAddress.trim(),
@@ -232,6 +298,7 @@ export default function CreateListing() {
       return
     }
 
+    clearDraft(userId)
     navigate('/hosting', { replace: true })
   }
 
@@ -243,15 +310,28 @@ export default function CreateListing() {
     return <p className="status-message">Loading…</p>
   }
 
-  return (
-    <div className="page page--form">
-      <div className="form-card" style={{ maxWidth: '560px' }}>
-        <h1 className="form-card__title">Create a listing</h1>
-        <p className="form-card__subtitle">
-          Share a skill or experience with guests in Singapore
-        </p>
+  const current = STEPS[step]
+  const next = STEPS[step + 1]
+  const hasSavedDraft = !draftHandled && Boolean(readDraft(userId))
+  const isLast = step === STEPS.length - 1
 
-        <form onSubmit={handleSubmit} className="form">
+  const preview = (
+    <Card
+      mode="browse"
+      image={photos[0]?.previewUrl}
+      badge={category || 'Other'}
+      title={title.trim() || 'Your listing title'}
+      titleLevel={3}
+      metaItems={[area || 'Your area']}
+      price={priceCents ? `${formatGuestFacingPrice(priceCents)}/person` : '$—/person'}
+      flag="New"
+    />
+  )
+
+  function renderStep() {
+    if (current.id === 'basics') {
+      return (
+        <>
           <label className="label">
             Title
             <input
@@ -259,102 +339,208 @@ export default function CreateListing() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Learn latte art with me"
-              required
               className="input"
             />
+            <FieldHint>{fieldHints.title}</FieldHint>
           </label>
+
+          <fieldset className="wizard-fieldset">
+            <legend className="wizard-fieldset__legend">Category</legend>
+            <div className="category-choices">
+              {LISTING_CATEGORIES.map((cat) => (
+                <label
+                  key={cat}
+                  className={`category-choice${category === cat ? ' category-choice--on' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="category"
+                    value={cat}
+                    checked={category === cat}
+                    onChange={() => setCategory(cat)}
+                    className="visually-hidden"
+                  />
+                  <Icon name={categoryIconName(cat)} size={24} strokeWidth={1.6} />
+                  {cat}
+                </label>
+              ))}
+            </div>
+            <FieldHint>{fieldHints.category}</FieldHint>
+          </fieldset>
 
           <label className="label">
             Description
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What will guests learn or experience?"
-              required
-              rows={4}
+              placeholder="What will guests learn, make or do? Who is it for?"
+              rows={6}
               className="input input--textarea"
             />
+            <FieldHint>{fieldHints.description}</FieldHint>
           </label>
+        </>
+      )
+    }
 
-          <label className="label">
-            Category
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              required
-              className="input"
-            >
-              <option value="">Select a category</option>
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </label>
+    if (current.id === 'photos') {
+      return (
+        <>
+          <PhotoTips />
+          <ListingPhotosEditor
+            photos={photos}
+            onChange={setPhotos}
+            max={MAX_PHOTOS}
+            pickerRef={photoPickerRef}
+            error={photoError}
+          />
+        </>
+      )
+    }
 
-          <div className="form__row">
+    if (current.id === 'price') {
+      return (
+        <>
+          <div className="price-field">
+            <label htmlFor="listing-price" className="price-field__label">
+              Your price per guest
+            </label>
+            <div className="price-field__control">
+              <span className="price-field__currency" aria-hidden="true">
+                S$
+              </span>
+              <input
+                id="listing-price"
+                type="number"
+                inputMode="decimal"
+                min="1"
+                step="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="20"
+                className="price-field__input"
+                aria-describedby="listing-price-hint"
+              />
+            </div>
+            <p id="listing-price-hint" className="hint">
+              Sessions on TryKai usually run $10 to $40 per guest.
+            </p>
+            <FieldHint>{fieldHints.price}</FieldHint>
+          </div>
+
+          <ListingPricePanel breakdown={breakdown} groupSize={maxGuests} />
+
+          <div className="wizard-row">
             <div>
-              <label className="label">
-                Price per person (SGD)
+              <p className="wizard-row__label" id="group-size-label">
+                Spots per session
+              </p>
+              <p className="wizard-row__hint">The most guests in one session.</p>
+              <FieldHint>{fieldHints.spots}</FieldHint>
+            </div>
+            <div
+              className="guest-stepper__controls"
+              role="group"
+              aria-labelledby="group-size-label"
+            >
+              <button
+                type="button"
+                className="guest-stepper__btn"
+                aria-label="Fewer guests"
+                disabled={maxGuests <= MIN_GUESTS}
+                onClick={() => setMaxGuests((n) => Math.max(MIN_GUESTS, n - 1))}
+              >
+                −
+              </button>
+              <output className="guest-stepper__count" aria-live="polite">
+                {maxGuests}
+              </output>
+              <button
+                type="button"
+                className="guest-stepper__btn"
+                aria-label="More guests"
+                disabled={maxGuests >= MAX_GUESTS}
+                onClick={() => setMaxGuests((n) => Math.min(MAX_GUESTS, n + 1))}
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <fieldset className="wizard-fieldset">
+            <legend className="wizard-fieldset__legend">How long is each session?</legend>
+            <div className="choice-chips">
+              {DURATIONS.map((option) => (
+                <label
+                  key={option.mins}
+                  className={`choice-chip${durationChoice === option.mins ? ' choice-chip--on' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="duration"
+                    checked={durationChoice === option.mins}
+                    onChange={() => setDurationChoice(option.mins)}
+                    className="visually-hidden"
+                  />
+                  {option.label}
+                </label>
+              ))}
+              <label
+                className={`choice-chip${durationChoice === 'other' ? ' choice-chip--on' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="duration"
+                  checked={durationChoice === 'other'}
+                  onChange={() => setDurationChoice('other')}
+                  className="visually-hidden"
+                />
+                Other
+              </label>
+            </div>
+            {durationChoice === 'other' ? (
+              <label className="label wizard-other">
+                Minutes
                 <input
                   type="number"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="20"
                   min="1"
-                  step="0.01"
-                  required
+                  inputMode="numeric"
+                  value={otherMins}
+                  onChange={(e) => setOtherMins(e.target.value)}
+                  placeholder="45"
                   className="input"
                 />
               </label>
-              {priceHint ? <span className="hint">{priceHint}</span> : null}
-            </div>
+            ) : null}
+            <FieldHint>{fieldHints.duration}</FieldHint>
+          </fieldset>
 
-            <label className="label">
-              Max guests
-              <input
-                type="number"
-                value={maxGuests}
-                onChange={(e) => setMaxGuests(e.target.value)}
-                placeholder="4"
-                min="1"
-                required
-                className="input"
-              />
-            </label>
-          </div>
-
-          <label className="label">
-            Duration (mins)
-            <input
-              type="number"
-              value={durationMins}
-              onChange={(e) => setDurationMins(e.target.value)}
-              placeholder="60"
-              min="1"
-              required
-              className="input"
-            />
-          </label>
-          <span className="hint">How long every session of this listing lasts.</span>
-
-          <label className="checkbox-label">
+          <label className="toggle-card">
             <input
               type="checkbox"
               checked={groupPricing}
               onChange={(e) => setGroupPricing(e.target.checked)}
             />
-            Offer group pricing
+            <span className="toggle-card__copy">
+              <span className="toggle-card__title">Offer group discounts</span>
+              <span className="toggle-card__hint">
+                5% off for 2 guests, up to 20% for 5 or more. Helps friends and couples book
+                together.
+              </span>
+            </span>
           </label>
-          <span className="hint">
-            5% off for 2 guests, up to 20% for 5 or more. Applies to the lesson
-            price per person.
-          </span>
+          {discountExample ? <p className="hint group-discount-example">{discountExample}</p> : null}
+        </>
+      )
+    }
 
+    if (current.id === 'location') {
+      return (
+        <>
           <label className="label">
             Area
-            <PlanningAreaSelect value={area} onChange={setArea} required />
+            <PlanningAreaSelect value={area} onChange={setArea} />
+            <FieldHint>{fieldHints.area}</FieldHint>
           </label>
 
           <label className="label">
@@ -363,86 +549,157 @@ export default function CreateListing() {
               type="text"
               value={fullAddress}
               onChange={(e) => setFullAddress(e.target.value)}
-              placeholder="Only shown to guests after booking"
-              required
+              placeholder="Block, street, unit and postal code"
               className="input"
             />
-            <span className="hint">Hidden from browse — revealed after confirmed booking</span>
+            <span className="hint">Hidden from browse. Revealed only after a confirmed booking.</span>
+            <FieldHint>{fieldHints.fullAddress}</FieldHint>
           </label>
+        </>
+      )
+    }
 
-          <div>
-            <label className="label">
-              Photos
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handlePhotoChange}
-                disabled={photos.length >= MAX_PHOTOS}
-                className="input"
-                style={{ padding: '10px' }}
-              />
-            </label>
-            <span className="hint">
-              Maximum of {MAX_PHOTOS} photos ({photos.length}/{MAX_PHOTOS})
-            </span>
+    return (
+      <>
+        <WhatsProvidedFields value={whatsProvided} onChange={setWhatsProvided} />
 
-            {photos.length > 0 && (
-              <div className="preview-grid">
-                {photos.map((photo, index) => (
-                  <div key={photo.previewUrl} className="preview-item">
-                    <img src={photo.previewUrl} alt="" className="preview-image" />
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(index)}
-                      className="preview-remove"
-                      aria-label="Remove photo"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        <div className="wizard-inline-preview">
+          <p className="wizard-preview__label">How guests will see it</p>
+          {preview}
+        </div>
 
-          <fieldset className="fieldset">
-            <legend className="fieldset__legend">What&apos;s provided</legend>
-            <div className="checkboxes">
-              {WHATS_PROVIDED_OPTIONS.map((option) => (
-                <label key={option} className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={whatsProvided.includes(option)}
-                    onChange={() => handleWhatsProvidedChange(option)}
-                  />
-                  {option}
-                </label>
+        <CancellationPolicyInfo />
+
+        <label className="checkbox-label checkbox-label--agree">
+          <input
+            type="checkbox"
+            checked={acceptedHostTerms}
+            onChange={(e) => setAcceptedHostTerms(e.target.checked)}
+          />
+          <span>
+            I agree to the <Link to="/terms#part-2-hosting">Host terms</Link>
+          </span>
+        </label>
+        <FieldHint>{fieldHints.hostTerms}</FieldHint>
+      </>
+    )
+  }
+
+  return (
+    <div className="wizard">
+      <div className="wizard__main">
+        <header className="wizard__bar">
+          <Link to="/hosting" className="wizard__close" aria-label="Close">
+            <Icon name="close" size={20} />
+          </Link>
+          <p className="wizard__name">New listing</p>
+          <button type="button" className="wizard__save" onClick={saveDraft}>
+            Save draft
+          </button>
+        </header>
+
+        <form onSubmit={handleContinue} className="wizard__form" noValidate>
+          <div className="wizard__progress">
+            <p className="wizard__step-count">
+              <span>
+                Step {step + 1} of {STEPS.length}
+              </span>
+              {next ? <span className="wizard__next">Next: {next.label}</span> : null}
+            </p>
+            <div
+              className="wizard__segments"
+              role="progressbar"
+              aria-label="Listing progress"
+              aria-valuemin={1}
+              aria-valuemax={STEPS.length}
+              aria-valuenow={step + 1}
+            >
+              {STEPS.map((item, index) => (
+                <span
+                  key={item.id}
+                  className={`wizard__segment${index <= step ? ' wizard__segment--done' : ''}`}
+                />
               ))}
             </div>
-          </fieldset>
+          </div>
 
-          {error && <p className="error-message">{error}</p>}
+          <div className="wizard__body">
+            <div className="wizard__intro">
+              <h1 className="wizard__title" ref={headingRef} tabIndex={-1}>
+                {current.title}
+              </h1>
+              <p className="wizard__lede">{current.intro}</p>
+            </div>
 
-          <CancellationPolicyInfo />
+            {hasSavedDraft ? (
+              <div className="wizard__note wizard__note--draft">
+                <p>You have a saved draft on this device.</p>
+                <div className="wizard__note-actions">
+                  <button type="button" className="btn btn--small btn--primary" onClick={restoreDraft}>
+                    Restore draft
+                  </button>
+                  <button type="button" className="btn btn--small btn--ghost" onClick={discardDraft}>
+                    Discard
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            {draftNote ? (
+              <p className="wizard__note" role="status">
+                {draftNote}
+              </p>
+            ) : null}
 
-          <label className="checkbox-label checkbox-label--agree">
-            <input
-              type="checkbox"
-              checked={acceptedHostTerms}
-              onChange={(e) => setAcceptedHostTerms(e.target.checked)}
-              required
-            />
-            <span>
-              I agree to the <Link to="/terms#part-2-hosting">Host terms</Link>
-            </span>
-          </label>
+            {renderStep()}
 
-          <button type="submit" disabled={loading || !acceptedHostTerms} className="btn btn--primary">
-            {loading ? (photos.length > 0 ? 'Uploading…' : 'Creating…') : 'Create listing'}
-          </button>
+            {error ? (
+              <p className="wizard__note" role="status">
+                {error}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="wizard__actions">
+            {step > 0 ? (
+              <button type="button" className="btn btn--ghost" onClick={() => goTo(step - 1)}>
+                Back
+              </button>
+            ) : null}
+            <button
+              type="submit"
+              className="btn btn--primary wizard__continue"
+              disabled={loading || (isLast && !acceptedHostTerms)}
+            >
+              {isLast
+                ? loading
+                  ? photos.length > 0
+                    ? 'Uploading…'
+                    : 'Creating…'
+                  : 'Create listing'
+                : 'Continue'}
+            </button>
+          </div>
         </form>
       </div>
+
+      <aside className="wizard__preview" aria-label="Listing preview">
+        <p className="wizard-preview__label">How guests will see it</p>
+        {preview}
+        <p className="wizard-preview__hint">Updates as you fill in each step.</p>
+      </aside>
+
+      {photoSkipOpen ? (
+        <PhotoSkipDialog
+          onAdd={() => {
+            setPhotoSkipOpen(false)
+            photoPickerRef.current?.click()
+          }}
+          onSkip={() => {
+            setPhotoSkipOpen(false)
+            goTo(step + 1)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

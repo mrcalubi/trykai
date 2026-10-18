@@ -86,14 +86,7 @@ export default function ForgotPassword() {
           </Button>
         </form>
 
-        <p
-          style={{
-            marginTop: '24px',
-            fontSize: '14px',
-            textAlign: 'center',
-            color: 'var(--text)',
-          }}
-        >
+        <p className="form-card__footer">
           <Link to="/login" className="link-btn">
             Back to log in
           </Link>

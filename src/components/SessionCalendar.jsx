@@ -81,7 +81,7 @@ export default function SessionCalendar({
               onClick={() => onSelectDate(cell.dateKey)}
             >
               <span className="session-calendar__day-number">{cell.day}</span>
-              {count > 0 && <span className="session-calendar__count">{count}</span>}
+              {count > 0 && <span className="session-calendar__dot" aria-hidden="true" />}
             </button>
           )
         })}

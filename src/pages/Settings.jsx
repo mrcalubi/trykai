@@ -6,6 +6,7 @@ import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import { getInitials } from '../components/ui/getInitials'
 import { firstAccountRow } from '../lib/myAccount'
+import { compressImage } from '../lib/compressImage'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 
 export default function Settings() {
@@ -78,11 +79,12 @@ export default function Settings() {
   }
 
   async function uploadAvatar() {
-    const ext = avatarFile.name.split('.').pop() || 'jpg'
+    const file = await compressImage(avatarFile)
+    const ext = file.name.split('.').pop() || 'jpg'
     const path = `${userId}/avatar-${crypto.randomUUID()}.${ext}`
     const { error: uploadError } = await supabase.storage
       .from('listing-photos')
-      .upload(path, avatarFile)
+      .upload(path, file)
 
     if (uploadError) throw uploadError
 
@@ -119,6 +121,7 @@ export default function Settings() {
       try {
         nextAvatarUrl = await uploadAvatar()
       } catch (uploadError) {
+        console.error('Avatar upload failed', uploadError)
         setSaving(false)
         setError(uploadError.message)
         return

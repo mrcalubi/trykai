@@ -56,10 +56,33 @@ test.describe('browsing listings', () => {
     await stubAllExternalCalls(page, { listings: [latteNextWeek, boxingTomorrow] })
     await page.goto('/')
 
-    await expect(page.locator('.listings-grid h2')).toHaveText([
+    await expect(page.locator('.listings-grid h3')).toHaveText([
       'Boxing basics',
       'Learn latte art with me',
     ])
+  })
+
+  test('keeps every host category on the homepage, including Music', async ({ page }) => {
+    await stubAllExternalCalls(page, { listings: [LATTE_ART, BOXING] })
+    await page.goto('/')
+    await expect(page.getByRole('heading', { name: 'Boxing basics' })).toBeVisible()
+
+    await expect(page.getByRole('button', { name: 'Music', exact: true })).toBeVisible()
+    await expect(page.getByText('Most sessions S$15–30')).toBeVisible()
+  })
+
+  test('keeps the first listing cards on screen at 1280x800', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'desktop fold only')
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await stubAllExternalCalls(page, { listings: [LATTE_ART, BOXING] })
+    await page.goto('/')
+
+    const card = page.getByRole('link', { name: /Learn latte art with me/ })
+    await expect(card).toBeVisible()
+    const box = await card.boundingBox()
+    expect(box).toBeTruthy()
+    expect(box.y).toBeLessThan(720)
+    expect(box.y + 80).toBeLessThan(800)
   })
 
   test('filters by category', async ({ page }) => {

@@ -101,6 +101,22 @@ export function singaporeDateTime(dateKey, time) {
   return new Date(`${dateKey}T${time}:00+08:00`)
 }
 
+/** `HH:MM` for a date input, Singapore time. */
+export function singaporeTimeValue(iso) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: 'Asia/Singapore',
+  }).formatToParts(date)
+  const hour = parts.find((part) => part.type === 'hour')?.value
+  const minute = parts.find((part) => part.type === 'minute')?.value
+  if (!hour || !minute) return ''
+  return `${hour}:${minute}`
+}
+
 export function buildSessionStarts(dateKeys, times) {
   const starts = []
   for (const dateKey of [...dateKeys].sort()) {

@@ -109,6 +109,33 @@ Deno.serve(async (req) => {
       )
     }
 
+    // The insert trigger locked the session row. Re-read starts_at so an
+    // edit that committed first is what we charge and what PayNow checks.
+    const { data: freshSession, error: freshError } = await admin
+      .from('sessions')
+      .select('status, starts_at, spots_remaining')
+      .eq('id', session_id)
+      .single()
+
+    if (freshError || !freshSession) {
+      await admin.from('bookings').update({ status: 'cancelled' }).eq('id', booking.id)
+      return jsonResponse({ error: 'Session not found' }, 404)
+    }
+
+    if (freshSession.status !== 'open' || new Date(freshSession.starts_at).getTime() <= Date.now()) {
+      await admin.from('bookings').update({ status: 'cancelled' }).eq('id', booking.id)
+      return jsonResponse({ error: 'Session is not available' }, 400)
+    }
+
+    const freshPayNow = rejectPayNowIfTooFarAhead(paymentRail, freshSession.starts_at)
+    if (freshPayNow) {
+      await admin.from('bookings').update({ status: 'cancelled' }).eq('id', booking.id)
+      return jsonResponse(
+        { error: freshPayNow.message, code: freshPayNow.code },
+        freshPayNow.status,
+      )
+    }
+
     let paymentIntent
     try {
       paymentIntent = await stripe.paymentIntents.create(

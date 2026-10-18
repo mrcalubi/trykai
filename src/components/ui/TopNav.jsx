@@ -129,17 +129,6 @@ export default function TopNav({
     <>
       <div className={shellClasses}>
         <header className={barClasses}>
-          <button
-            type="button"
-            className="ui-topnav__menu"
-            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={menuOpen}
-            aria-controls="ui-hamburger-panel"
-            onClick={handleMenuToggle}
-          >
-            {menuOpen ? <CloseIcon /> : <MenuIcon />}
-          </button>
-
           <Link
             to="/"
             className="ui-topnav__brand"
@@ -153,7 +142,7 @@ export default function TopNav({
               height="40"
               className="ui-topnav__mark"
             />
-            <span className="ui-topnav__wordmark">TryKai</span>
+            <span className="ui-topnav__wordmark">TryKai<span className="site-footer__dot">.</span></span>
           </Link>
 
           <div className="ui-topnav__end">
@@ -173,6 +162,16 @@ export default function TopNav({
                 Log in
               </Link>
             )}
+            <button
+              type="button"
+              className={`ui-topnav__menu${menuOpen ? ' ui-topnav__menu--open' : ''}`}
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+              aria-controls="ui-hamburger-panel"
+              onClick={handleMenuToggle}
+            >
+              {menuOpen ? <CloseIcon /> : <MenuIcon />}
+            </button>
           </div>
         </header>
 
