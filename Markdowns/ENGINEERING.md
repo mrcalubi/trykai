@@ -6,7 +6,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 
 > **Read before you start, updated 9 September 2026.**
 >
-> 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 24 hours after `starts_at`. Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
+> 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 72 hours after the session ends (`starts_at` + `duration_mins`). Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). When the guest cancels, the host is emailed their payout only. When the host cancels a session, they get a strike email with no guest amounts.
 > 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00026`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
@@ -37,7 +37,7 @@ Two user types, one account. A user is a guest by default and becomes a host whe
 | Routing                    | React Router v7                                                      |                                                                                                                                                                                                                                                                                                                                              |
 | Backend, DB, Auth, Storage | Supabase                                                             | Handles backend, auth, storage, and RLS out of the box                                                                                                                                                                                                                                                                                       |
 | Hosting                    | Vercel                                                               | Free tier, auto deploy on push                                                                                                                                                                                                                                                                                                               |
-| Payments                   | **Stripe Connect**, separate charges and transfers, Express accounts | Decided 16 August. Supports PayNow in Singapore at 1.3%, platform is merchant of record, Transfers held until 24h after the session. In code: Payment Element + webhook confirmation, Connect onboarding, refunds, hourly Transfer job. Connect account creation uses Stripe Accounts **v2** (`2026-08-26.preview`) in `_shared/connect.ts`. |
+| Payments                   | **Stripe Connect**, separate charges and transfers, Express accounts | Decided 16 August. Supports PayNow in Singapore at 1.3%, platform is merchant of record, Transfers held until 72 hours after the session ends. In code: Payment Element + webhook confirmation, Connect onboarding, refunds, hourly Transfer job. Connect account creation uses Stripe Accounts **v2** (`2026-08-26.preview`) in `_shared/connect.ts`. |
 | Transactional email        | Resend                                                               | From-address is `TryKai <no-reply@trykai.sg>`. trykai.sg is verified in Resend. Booking emails greet by display name and sign off "See you there," / "Take care," then "The TryKai team". Guest confirmation is a receipt (reference, listing, Singapore time, duration, address, What's provided, price lines, payment method, Google Calendar link) with one quiet Cancellation policy line — no refund-tier dates. Guest confirmation and cancellation reply-to is `hello@trykai.sg`. Cancellation emails the guest the refund amount (including $0) and timing from the refund policy. The host is emailed their payout when the guest cancelled, or a strike notice (no guest amounts) when they cancel a session. `admin-cancel-booking` emails the guest the host-cancel copy.                                                                                                                                                                                           |
 | Business email             | Zoho Mail Lite                                                       | caleb@, aakash@, [ruiheng@trykai.sg](mailto:ruiheng@trykai.sg)                                                                                                                                                                                                                                                                               |
 | AI coding                  | Cursor                                                               | Implementation. Claude handles architecture.                                                                                                                                                                                                                                                                                                 |
@@ -293,12 +293,12 @@ Do not hardcode a flat percentage. Worked one-person checks: $10 → $13, $20 �
 
 **Provider decided 16 August 2026: Stripe Connect, separate charges and transfers, Express accounts.** This is implemented in code.
 
-The host's share is released **24 hours after** `starts_at`, not 24 hours after the guest pays. `release-payout` creates a Transfer with `transfer_group = booking_id` and `source_transaction = stripe_charge_id`. Stripe only records that Transfer when the function runs. Two hourly callers:
+The host's share is released **72 hours after the session ends** (`starts_at` + `duration_mins`), not after the guest pays. `release-payout` creates a Transfer with `transfer_group = booking_id` and `source_transaction = stripe_charge_id`. Stripe only records that Transfer when the function runs. Two hourly callers:
 
 - **Staging (and any hosted project):** pg_cron job `invoke-release-payout-hourly` from `00010`, at minute 12 UTC. It POSTs using Vault secrets `release_payout_url`, `release_payout_anon_key`, and `payout_cron_secret`.
 - **Production extra:** GitHub Action `.github/workflows/release-payout.yml` (schedule plus **Run workflow**). GitHub only fires `schedule` from the default branch (`main`).
 
-Both send `x-cron-secret` (`PAYOUT_CRON_SECRET` or `CRON_SECRET`). Stripe idempotency key is the booking id, so overlap is safe. Each run logs JSON `{ scanned, due, released, failed, skipped_by_reason, skipped }`. `skipped` lists rows that are not merely waiting out the 24h hold. A missing `stripe_charge_id` is loaded from the PaymentIntent (`latest_charge`) and stored before eligibility is decided. Do not omit `source_transaction`; after a platform bank payout that would Transfer someone else's funds.
+Both send `x-cron-secret` (`PAYOUT_CRON_SECRET` or `CRON_SECRET`). Stripe idempotency key is the booking id, so overlap is safe. Each run logs JSON `{ scanned, due, released, failed, skipped_by_reason, skipped }`. `skipped` lists rows that are not merely waiting out the 72h hold. A missing `stripe_charge_id` is loaded from the PaymentIntent (`latest_charge`) and stored before eligibility is decided. Do not omit `source_transaction`; after a platform bank payout that would Transfer someone else's funds.
 
 It does **not** check for open disputes. The only money hold besides the 24h timer is `stripe_refund_id IS NULL`.
 
@@ -474,7 +474,7 @@ supabase/functions/
 │   ├── http.ts                  # JSON/CORS/secret helpers
 │   ├── connect.ts               # Express account v2 helpers
 │   ├── email.ts                 # Resend helper + booking receipt, cancel, and host-strike HTML
-│   ├── payouts.ts               # 24h Transfer eligibility, skip reasons, charge backfill
+│   ├── payouts.ts               # 72h-after-session-end Transfer eligibility, skip reasons, charge backfill
 │   └── verification.ts          # Status, Identity params, 30-day retention rules
 ├── create-payment-intent/       # Pending booking + PaymentIntent; refuses PayNow >80 days out
 ├── abandon-checkout/            # Guest JWT only; drop unpaid pending; leave if PI succeeded
@@ -487,7 +487,7 @@ supabase/functions/
 ├── create-identity-session/     # Stripe Identity hosted check; stores only the session id
 ├── notify-verification-pending/ # x-notify-secret; emails Caleb on manual pending
 ├── purge-verification-docs/     # Daily cron; deletes rejected docs after 30 days
-└── release-payout/              # x-cron-secret Transfer 24h after starts_at; pg_cron + GH Action
+└── release-payout/              # x-cron-secret Transfer 72h after session end; pg_cron + GH Action
 ```
 
 
@@ -573,7 +573,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 **8. Confirmation.** `/dashboard?booking=` redirects to `/bookings?booking=`, then to `/u/:id?booking=&tab=bookings`. `Bookings.jsx` polls until status is `confirmed`. Then `listing_address` returns `full_address` to that guest. The confirmation email's View booking button goes to `/bookings/<id>`. The per-person receipt line is that booking's all-in card total divided by guests, with a group-discount note when that rate changed the card total, then any PayNow saving, then Total paid.
 
-**9. Session happens.** Payout releases 24 hours after `starts_at`, via `release-payout` (pg_cron `00010` and the GitHub Action). Sessions are not auto-completed. Review prompts appear on the Bookings tab for `confirmed` bookings after the session ends.
+**9. Session happens.** Payout releases 72 hours after the session ends (`starts_at` + `duration_mins`), via `release-payout` (pg_cron `00010` and the GitHub Action). Sessions are not auto-completed. Review prompts appear on the Bookings tab for `confirmed` bookings after the session ends.
 
 **10. Review.** The Bookings tab allows a review if the session has ended, status is `confirmed`, and this reviewer has not already reviewed. Session end is `starts_at` + `duration_mins` (or `starts_at` + 2 hours if duration is missing). Inserts into `reviews` as `role: 'guest'`. RLS (`00011`) requires the same confirmed-and-ended rule and that `reviewee_id` is the listing host. Unique on `(booking_id, role)`.
 

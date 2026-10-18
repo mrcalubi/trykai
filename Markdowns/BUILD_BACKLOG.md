@@ -38,7 +38,7 @@ Every operational promise still depends on Caleb performing a manual action. Som
 | Promise | How it happens today |
 |---|---|
 | Hosts verified before listings go live | `/admin/verifications`, gated by `is_admin`. Listing and session INSERT require `can_create_listing()` (`00008`). Browse still does not filter `is_suspended`. |
-| Hosts paid 24 hours after their session | `release-payout`, scheduled hourly (`00010` pg_cron + GitHub Action). Vault/GitHub secrets and platform payouts **manual** are still ops. |
+| Hosts paid 72 hours after their session ends | `release-payout`, scheduled hourly (`00010` pg_cron + GitHub Action). Vault/GitHub secrets and platform payouts **manual** are still ops. |
 | Refunds issued per the cancellation policy | `cancel-booking` from `/bookings` and `/hosting`. Guest is emailed the refund amount (including $0); host is emailed only on a guest cancel. |
 | TryKai can cancel a booking | `admin-cancel-booking` with `ADMIN_FUNCTION_SECRET`. No admin UI. Writes `cancelled_by: 'host'`. |
 | Credible safety reports trigger immediate suspension | Table Editor sets `is_suspended`. **The app does not read that flag.** Listings stay visible unless someone also sets `is_active = false`. |
@@ -73,7 +73,7 @@ Review reminder email, saved listings, host-to-guest reviews then the review fil
 Under Stripe Connect Express, Stripe collects the host's bank details. Do not add `payout_method` / `payout_identifier` columns.
 
 ### P0.2 — Admin: payout queue — NOT NEEDED FOR CONNECT LAUNCH
-The copy-paste PayNow queue assumed manual disbursement. `release-payout` Transfers 24h after `starts_at`. Keep a later exception log in mind for clawback and disputes; do not build the clipboard UI for launch.
+The copy-paste PayNow queue assumed manual disbursement. `release-payout` Transfers 72 hours after the session ends. Keep a later exception log in mind for clawback and disputes; do not build the clipboard UI for launch.
 
 ### P0.3 — Admin: verification review — DONE
 **Flow:** host submits ID and selfie → Caleb reviews → approve or reject
@@ -150,7 +150,7 @@ Once per booking, same 48 hour cutoff. Published as available. Recovers bookings
 **Post launch (P3).** Two way reviews are promised. Insert policy is guest-only. No host UI. After that path exists, the browse rating filter can follow.
 
 ### P2.5 — Session auto complete
-`sessions.status` documents `'completed'`. Nothing ever writes it. Payouts key off `starts_at` + 24h, not this status, so launch can survive without it. Reviews and dispute windows were supposed to key off it.
+`sessions.status` documents `'completed'`. Nothing ever writes it. Payouts key off `starts_at` + `duration_mins` + 72h, not this status, so launch can survive without it. Reviews and dispute windows were supposed to key off it.
 
 ### P2.6 — Host strike appeals
 Within 7 days, reviewed manually. Needs a submission form and an admin view.

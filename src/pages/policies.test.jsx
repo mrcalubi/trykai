@@ -132,7 +132,7 @@ describe('Dispute Policy page', () => {
   })
 
   it('states when host payouts are released', () => {
-    expect(screen.getByText(/released 24 hours after a session starts/)).toBeInTheDocument()
+    expect(screen.getByText(/released 72 hours after a session ends/)).toBeInTheDocument()
   })
 
   it('gives a contact address', () => {

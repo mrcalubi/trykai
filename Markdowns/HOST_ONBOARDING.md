@@ -69,7 +69,7 @@ Track everything in the **host management Google Sheet**, not here.
 
 You teach something you already know, to a small group, for 60 to 120 minutes. You set your own price, your own dates, and your own capacity. You are not an employee and there is no commitment beyond the sessions you choose to list.
 
-Guests pay through TryKai when they book. **Your share is transferred to you 24 hours after your session has taken place.** The delay is deliberate: it is what lets us guarantee guests a refund if something goes wrong, which is what makes strangers comfortable booking you.
+Guests pay through TryKai when they book. **Your share is transferred to you 72 hours after your session ends.** The delay is deliberate: it is what lets us guarantee guests a refund if something goes wrong, which is what makes strangers comfortable booking you.
 
 ## Pricing
 
@@ -138,7 +138,7 @@ You set the session price. Guests pay a booking fee on top of that, which is Try
 
 **As a founding host, you pay no host fee, permanently.** Hosts who join later will. That is not a promotional period; it is a permanent term of joining first.
 
-You receive your share 24 hours after your session takes place, transferred to the bank account you set up during onboarding.
+You receive your share 72 hours after your session ends, transferred to the bank account you set up during onboarding.
 
 **Tax:** income you earn through TryKai may be taxable. We are not able to advise on this; IRAS guidelines are the right reference.
 

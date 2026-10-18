@@ -66,7 +66,7 @@ Week 5 of the original plan (25–31 August) is ending. The week-by-week section
 **Payment code (original weeks 5–7 and most of 9) is in the tree:**
 - Fee module matches DECISIONS.md: 12% card fee, S$2.50 floor, round up to a whole dollar, PayNow 5% off that all-in total, host fee 10% from the fourth confirmed booking, founding hosts never
 - `stripe-webhook` confirms bookings, `confirm_paid_booking` decrements spots, `cancel-booking` refunds on the four-tier rule
-- Connect Express onboarding and `release-payout` Transfers 24h after `starts_at`
+- Connect Express onboarding and `release-payout` Transfers 72 hours after the session ends
 - Guest `full_address` reveal via RPC. Column grant on `listings` still too wide
 
 **Still the original week 8:** trykai.sg is not verified in Resend. Notify-verification functions have no shared-secret header.
@@ -549,7 +549,8 @@ Also open **Edge Functions → release-payout → Logs** and look for a line sta
 
 | Log field | Meaning |
 |---|---|
-| `hold_not_elapsed` | Session started less than 24 hours ago. Expected. |
+| `hold_not_elapsed` | Session ended less than 72 hours ago (end = `starts_at` + `duration_mins`). Expected. |
+| `invalid_duration` | Session has no positive `duration_mins`, so its end time is unknown. Fix the row; the next run pays it. |
 | `missing_charge_id` | Stripe PaymentIntent has no `latest_charge` yet. |
 | `host_not_connected` / `host_payouts_disabled` | Host has not finished Connect onboarding. |
 | `failed` + insufficient available funds | Platform available balance is too low (automatic payouts already sent it to the bank). Two Transfers can succeed and the rest fail in the same run. In **test mode**, Stripe's own message is the fix: create a charge with card `4000000000000077` (any future expiry and CVC) so funds land in the available balance, then run the same command again. Bookings already in `released` are not paid twice. |
@@ -571,7 +572,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Platform fee correctly calculated: 12% of lesson, S$2.50 floor, round up to a whole dollar (see DECISIONS.md). Code exists in `_shared/booking.ts`
 - [ ] PayNow 5% off the advertised all-in total at checkout (not 8% versus 10%)
 - [ ] Failed payment handled gracefully, clear error, no ghost booking
-- [ ] Payout flow tested, Transfer 24 hours after the session (`release-payout` scheduled; platform payouts must be manual). See **Host Transfers** above.
+- [ ] Payout flow tested, Transfer 72 hours after the session ends (`release-payout` scheduled; platform payouts must be manual). See **Host Transfers** above.
 - [x] Refund, cancellation, and dispute policy pages live
 - [x] Policy page URLs resolve when typed directly, not just via in site navigation
 

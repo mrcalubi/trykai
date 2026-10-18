@@ -1,6 +1,7 @@
 import { chargeIdFromPaymentIntent } from './http.ts'
 
-export const PAYOUT_HOLD_MS = 24 * 60 * 60 * 1000
+// Held until 72 hours after the session ends (starts_at + duration_mins).
+export const PAYOUT_HOLD_MS = 72 * 60 * 60 * 1000
 
 // Platform Stripe payouts must be manual (ops). Auto-payout would drain the
 // platform balance before these Transfers run. Transfers always pin
@@ -16,6 +17,7 @@ export interface PayoutCandidate {
   stripe_charge_id: string | null
   stripe_payment_id?: string | null
   starts_at: string
+  duration_mins: number | null
   stripe_account_id: string | null
   stripe_payouts_enabled: boolean | null
 }
@@ -29,6 +31,7 @@ export type PayoutSkipReason =
   | 'host_not_connected'
   | 'host_payouts_disabled'
   | 'invalid_starts_at'
+  | 'invalid_duration'
   | 'hold_not_elapsed'
 
 export function payoutSkipReason(
@@ -44,7 +47,10 @@ export function payoutSkipReason(
   if (!booking.stripe_payouts_enabled) return 'host_payouts_disabled'
   const sessionStart = new Date(booking.starts_at).getTime()
   if (Number.isNaN(sessionStart)) return 'invalid_starts_at'
-  if (sessionStart + PAYOUT_HOLD_MS > nowMs) return 'hold_not_elapsed'
+  const durationMins = booking.duration_mins
+  if (typeof durationMins !== 'number' || !(durationMins > 0)) return 'invalid_duration'
+  const sessionEnd = sessionStart + durationMins * 60 * 1000
+  if (sessionEnd + PAYOUT_HOLD_MS > nowMs) return 'hold_not_elapsed'
   return null
 }
 

@@ -46,6 +46,7 @@ Deno.serve(async (req) => {
         stripe_payment_id,
         sessions!inner (
           starts_at,
+          duration_mins,
           listings!inner (
             host_id,
             users:host_id (
@@ -75,6 +76,7 @@ Deno.serve(async (req) => {
         stripe_charge_id: row.stripe_charge_id,
         stripe_payment_id: row.stripe_payment_id,
         starts_at: typeof session?.starts_at === 'string' ? session.starts_at : '',
+        duration_mins: typeof session?.duration_mins === 'number' ? session.duration_mins : null,
         stripe_account_id: host?.stripe_account_id ?? null,
         stripe_payouts_enabled: host?.stripe_payouts_enabled ?? false,
       }

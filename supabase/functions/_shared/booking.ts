@@ -254,7 +254,7 @@ export function isValidGuestsCount(value: unknown): value is number {
 
 /**
  * A host booking their own session would pay themselves through the platform:
- * the guest charge lands in TryKai's balance and the 24h Transfer sends the
+ * the guest charge lands in TryKai's balance and the 72h Transfer sends the
  * host share straight back, so the only real movement is Stripe's processing
  * fee out of TryKai. It also takes a spot off their own listing.
  */
