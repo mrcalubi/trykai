@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  CHARGEBACK_HOLD_CODE,
   chargebackClosedEmail,
-  chargebackHoldReason,
+  chargebackHoldEvent,
   chargebackOpenedEmail,
   disputeClosedOutcome,
   formatDisputeReason,
@@ -56,30 +59,64 @@ describe('stripeObjectId', () => {
 })
 
 describe('planChargebackHold', () => {
-  it('holds an unreleased payout with a neutral chargeback reason', () => {
-    expect(chargebackHoldReason('dp_1')).toBe('chargeback: dp_1')
-    expect(planChargebackHold(booking(), 'dp_1', NOW)).toEqual({
+  it('holds an unreleased payout with the plain code 00030 allows', () => {
+    expect(CHARGEBACK_HOLD_CODE).toBe('chargeback')
+    expect(planChargebackHold(booking(), NOW)).toEqual({
       kind: 'hold',
-      patch: { payout_hold_reason: 'chargeback: dp_1', payout_held_at: NOW },
+      patch: { payout_hold_reason: 'chargeback', payout_held_at: NOW },
     })
   })
 
-  it('replaces an admin dispute hold reason', () => {
-    expect(
-      planChargebackHold(booking({ payout_hold_reason: 'dispute: quality complaint' }), 'dp_1', NOW),
-    ).toMatchObject({ kind: 'hold', patch: { payout_hold_reason: 'chargeback: dp_1' } })
+  it('writes a hold reason the 00030 CHECK accepts', () => {
+    const migration = readFileSync(
+      resolve(import.meta.dirname, '../../migrations/00030_booking_money_events.sql'),
+      'utf8',
+    )
+    const allowed = migration.match(/payout_hold_reason in \(([^)]*)\)/)?.[1] ?? ''
+    expect(allowed).toContain(`'${CHARGEBACK_HOLD_CODE}'`)
+  })
+
+  it('replaces a quality-complaint dispute hold', () => {
+    expect(planChargebackHold(booking({ payout_hold_reason: 'dispute' }), NOW)).toMatchObject({
+      kind: 'hold',
+      patch: { payout_hold_reason: 'chargeback' },
+    })
   })
 
   it('is a no-op on redelivery of the same dispute', () => {
-    expect(
-      planChargebackHold(booking({ payout_hold_reason: 'chargeback: dp_1' }), 'dp_1', NOW),
-    ).toEqual({ kind: 'already_held' })
+    expect(planChargebackHold(booking({ payout_hold_reason: 'chargeback' }), NOW)).toEqual({
+      kind: 'already_held',
+    })
   })
 
   it('reports a payout that already went out instead of holding', () => {
     expect(
-      planChargebackHold(booking({ payout_released_at: '2026-10-18T00:00:00Z' }), 'dp_1', NOW),
+      planChargebackHold(booking({ payout_released_at: '2026-10-18T00:00:00Z' }), NOW),
     ).toEqual({ kind: 'payout_released' })
+  })
+})
+
+describe('chargebackHoldEvent', () => {
+  it('logs the dispute id and bank reason as a system hold', () => {
+    expect(
+      chargebackHoldEvent(booking({ host_payout_amount: 2400, payout_hold_reason: 'dispute' }), dispute()),
+    ).toEqual({
+      booking_id: booking().id,
+      action: 'hold',
+      actor_user_id: null,
+      auth_method: 'system',
+      amount_cents: 2850,
+      host_payout_before: 2400,
+      host_payout_after: 2400,
+      stripe_object_id: 'dp_1',
+      note: '[system: stripe-webhook] chargeback: dp_1, bank reason product not received, replaced hold "dispute"',
+    })
+  })
+
+  it('copes with no payout amount and no earlier hold', () => {
+    const row = chargebackHoldEvent(booking(), dispute({ reason: null }))
+    expect(row.host_payout_before).toBeNull()
+    expect(row.note).toBe('[system: stripe-webhook] chargeback: dp_1, bank reason not given')
   })
 })
 
@@ -207,6 +244,18 @@ describe('chargebackOpenedEmail', () => {
     })
     expect(email.html).toContain('replaced the earlier hold reason "dispute: &lt;late&gt;"')
     expect(email.html).toContain('https://dashboard.stripe.com/disputes/dp_1')
+    expect(email.html).not.toContain('audit row')
+  })
+
+  it('tells ops when the audit row was not saved', () => {
+    const email = chargebackOpenedEmail({
+      dispute: dispute(),
+      bookingId: booking().id,
+      outcome: 'held',
+      auditError: 'The action succeeded but its audit row was not saved (<boom>).',
+      livemode: true,
+    })
+    expect(email.html).toContain('<strong>The action succeeded but its audit row was not saved (&lt;boom&gt;).</strong>')
   })
 
   it('covers the other hold outcomes and missing fields', () => {
@@ -215,7 +264,7 @@ describe('chargebackOpenedEmail', () => {
         dispute: dispute(),
         bookingId: booking().id,
         outcome: 'already_held',
-        previousHoldReason: 'chargeback: dp_1',
+        previousHoldReason: 'chargeback',
         livemode: true,
       }).html,
     ).toContain('already held for this chargeback')
@@ -252,12 +301,12 @@ describe('chargebackClosedEmail', () => {
     const email = chargebackClosedEmail({
       dispute: dispute({ status: 'lost' }),
       bookingId: booking().id,
-      payoutHoldReason: 'chargeback: dp_1',
+      payoutHoldReason: 'chargeback',
       livemode: false,
     })
     expect(email.subject).toBe('Chargeback lost: A1B2C3D4, $28.50 SGD')
     expect(email.html).toContain('TryKai lost')
-    expect(email.html).toContain('("chargeback: dp_1") was not cleared')
+    expect(email.html).toContain('("chargeback") was not cleared')
     expect(email.html).toContain(booking().id)
     expect(email.html).toContain('https://dashboard.stripe.com/test/disputes/dp_1')
   })

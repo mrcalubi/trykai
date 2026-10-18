@@ -1,4 +1,5 @@
 import { bookingReference, escapeHtml, formatCents, formatSessionDate } from './email.ts'
+import { moneyEventRow, type MoneyEventRow, type SystemActor } from './money-events.ts'
 
 // Money that moved in Stripe without a TryKai function starting it: card
 // chargebacks (charge.dispute.*) and refunds made in the Stripe Dashboard
@@ -12,6 +13,7 @@ export interface ChargebackBooking {
   stripe_refund_id: string | null
   refund_amount: number | null
   stripe_partial_refund_ids?: string[] | null
+  host_payout_amount?: number | null
 }
 
 export interface StripeDisputeLike {
@@ -40,9 +42,16 @@ export function stripeObjectId(value: string | { id?: string } | null | undefine
   return null
 }
 
-/** Neutral by design: the guest and host can read the hold reason (00029). */
-export function chargebackHoldReason(disputeId: string): string {
-  return `chargeback: ${disputeId}`
+/**
+ * The guest and host can read payout_hold_reason (00029), and 00030 limits it
+ * to 'dispute' or 'chargeback'. The dispute id goes in booking_money_events.
+ */
+export const CHARGEBACK_HOLD_CODE = 'chargeback'
+
+export const CHARGEBACK_ACTOR: SystemActor = {
+  method: 'system',
+  userId: null,
+  operator: 'stripe-webhook',
 }
 
 export type ChargebackHoldPlan =
@@ -55,15 +64,36 @@ export type ChargebackHoldPlan =
  * held while it is open. It replaces an admin dispute hold's reason, since a
  * chargeback outranks a quality complaint. It is never cleared here.
  */
-export function planChargebackHold(
-  booking: ChargebackBooking,
-  disputeId: string,
-  nowIso: string,
-): ChargebackHoldPlan {
+export function planChargebackHold(booking: ChargebackBooking, nowIso: string): ChargebackHoldPlan {
   if (booking.payout_released_at) return { kind: 'payout_released' }
-  const reason = chargebackHoldReason(disputeId)
-  if (booking.payout_hold_reason === reason) return { kind: 'already_held' }
-  return { kind: 'hold', patch: { payout_hold_reason: reason, payout_held_at: nowIso } }
+  if (booking.payout_hold_reason === CHARGEBACK_HOLD_CODE) return { kind: 'already_held' }
+  return {
+    kind: 'hold',
+    patch: { payout_hold_reason: CHARGEBACK_HOLD_CODE, payout_held_at: nowIso },
+  }
+}
+
+/**
+ * Audit row for a chargeback hold (00030). The note starts with the code and
+ * names the dispute, so the history keeps both after the hold is cleared.
+ */
+export function chargebackHoldEvent(
+  booking: ChargebackBooking,
+  dispute: StripeDisputeLike,
+): MoneyEventRow {
+  const payout = booking.host_payout_amount ?? null
+  return moneyEventRow({
+    bookingId: booking.id,
+    action: 'hold',
+    actor: CHARGEBACK_ACTOR,
+    amountCents: dispute.amount,
+    hostPayoutBefore: payout,
+    hostPayoutAfter: payout,
+    stripeObjectId: dispute.id,
+    note: `${CHARGEBACK_HOLD_CODE}: ${dispute.id}, bank reason ${formatDisputeReason(dispute.reason)}${
+      booking.payout_hold_reason ? `, replaced hold "${booking.payout_hold_reason}"` : ''
+    }`,
+  })
 }
 
 /** A refund that a TryKai function made and records itself (it sets metadata.booking_id). */
@@ -147,9 +177,10 @@ export function chargebackOpenedEmail(options: {
   bookingId: string | null
   outcome: ChargebackHoldOutcome
   previousHoldReason?: string | null
+  auditError?: string | null
   livemode: boolean
 }): { subject: string; html: string } {
-  const { dispute, bookingId, outcome, previousHoldReason, livemode } = options
+  const { dispute, bookingId, outcome, previousHoldReason, auditError, livemode } = options
   const reference = bookingId ? bookingReference(bookingId) : 'no booking found'
   const replaced =
     outcome === 'held' && previousHoldReason
@@ -170,6 +201,7 @@ export function chargebackOpenedEmail(options: {
       </table>
       <p>${escapeHtml(HOLD_OUTCOME_COPY[outcome])}</p>
       ${replaced}
+      ${auditError ? `<p><strong>${escapeHtml(auditError)}</strong></p>` : ''}
       <p><a href="${stripeDisputeUrl(dispute.id, livemode)}">Respond in Stripe</a> before the evidence deadline. Runbook: OPERATIONS.md, Card chargeback.</p>
     `,
   }

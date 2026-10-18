@@ -36,6 +36,7 @@ import {
 } from '../_shared/connect.ts'
 import {
   chargebackClosedEmail,
+  chargebackHoldEvent,
   chargebackOpenedEmail,
   planChargebackHold,
   refundReconcilePatch,
@@ -44,6 +45,7 @@ import {
   type ChargebackHoldOutcome,
   type StripeDisputeLike,
 } from '../_shared/chargebacks.ts'
+import { recordMoneyEvent } from '../_shared/money-events.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
   apiVersion: '2023-10-16',
@@ -341,7 +343,7 @@ async function reviewIdentitySession(
 }
 
 const CHARGEBACK_BOOKING_COLUMNS =
-  'id, payout_released_at, payout_hold_reason, stripe_refund_id, refund_amount, stripe_partial_refund_ids'
+  'id, payout_released_at, payout_hold_reason, stripe_refund_id, refund_amount, stripe_partial_refund_ids, host_payout_amount'
 
 /** The booking a charge paid for: by charge id, then by PaymentIntent. */
 async function findBookingForCharge(
@@ -383,8 +385,9 @@ async function openChargeback(dispute: StripeDisputeLike, livemode: boolean) {
   )
 
   let outcome: ChargebackHoldOutcome = 'no_booking'
+  let auditError: string | null = null
   if (booking) {
-    const plan = planChargebackHold(booking, dispute.id, new Date().toISOString())
+    const plan = planChargebackHold(booking, new Date().toISOString())
     if (plan.kind === 'hold') {
       // Guarded like admin-dispute-booking: a payout that went out since the
       // read is reported, not silently "held".
@@ -396,6 +399,13 @@ async function openChargeback(dispute: StripeDisputeLike, livemode: boolean) {
         .select('id')
       if (error) throw error
       outcome = updated && updated.length > 0 ? 'held' : 'payout_released'
+      if (outcome === 'held') {
+        const audit = await recordMoneyEvent(
+          (row) => admin.from('booking_money_events').insert(row),
+          chargebackHoldEvent(booking, dispute),
+        )
+        if (!audit.audit_logged) auditError = audit.audit_error
+      }
     } else {
       outcome = plan.kind
     }
@@ -413,6 +423,7 @@ async function openChargeback(dispute: StripeDisputeLike, livemode: boolean) {
     bookingId: booking?.id ?? null,
     outcome,
     previousHoldReason: booking?.payout_hold_reason,
+    auditError,
     livemode,
   })
   await sendResendEmail({ apiKey: Deno.env.get('RESEND_API_KEY'), to: opsEmail(), ...email })

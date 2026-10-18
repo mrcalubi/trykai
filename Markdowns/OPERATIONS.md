@@ -724,7 +724,7 @@ A guest's bank opened a dispute on the card payment. Stripe takes the disputed a
 
 **What happens automatically** (needs the `charge.dispute.*` events on the platform webhook):
 
-- `charge.dispute.created`: `stripe-webhook` finds the booking by charge id, then PaymentIntent. If the payout has not gone out it sets `payout_hold_reason` to `chargeback: dp_…` (replacing any quality-complaint hold reason) and `release-payout` skips it as `dispute_hold`. Ops get an email at `ADMIN_NOTIFY_EMAIL` with the booking reference, amount, bank reason, evidence deadline, and whether the hold landed, was already in place, came too late (host already paid), or found no booking.
+- `charge.dispute.created`: `stripe-webhook` finds the booking by charge id, then PaymentIntent. If the payout has not gone out it sets `payout_hold_reason` to `chargeback` (replacing a `dispute` hold) and `release-payout` skips it as `dispute_hold`. The dispute id and bank reason are in `booking_money_events` (`select * from public.booking_money_events where booking_id = '…' order by created_at;`). Ops get an email at `ADMIN_NOTIFY_EMAIL` with the booking reference, amount, bank reason, evidence deadline, and whether the hold landed, was already in place, came too late (host already paid), or found no booking.
 - `charge.dispute.closed`: ops get the outcome. **The hold is never cleared automatically.**
 
 ## 1. Respond in Stripe before the evidence deadline
