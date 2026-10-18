@@ -18,14 +18,16 @@ test.describe('listing detail', () => {
     })
     await page.goto('/listings/listing-latte')
 
-    await expect(page.getByText('Hosted by Mei')).toBeVisible()
-    await expect(page.getByRole('link', { name: "Mei's profile" })).toHaveAttribute(
+    await expect(page.getByText('Your host')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Mei', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: "Mei's profile", exact: true })).toHaveAttribute(
       'href',
       '/u/host-1'
     )
     await expect(page.getByText('Pick a date, then a time')).toBeVisible()
     await expect(page.locator('.detail-area')).toHaveText('Tiong Bahru')
-    await expect(page.getByText('$51').first()).toBeVisible()
+    // Phones show the price in the bottom bar, wider screens in the booking card.
+    await expect(page.getByText('$51').filter({ visible: true }).first()).toBeVisible()
     await expect(page.getByText('No reviews yet.')).toBeVisible()
     await expect(page.locator('.detail-host__rating')).toHaveCount(0)
     await expect(page.getByText('Pull your first rosetta in ninety minutes.')).toBeVisible()

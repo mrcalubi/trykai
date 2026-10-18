@@ -765,7 +765,7 @@ describe('ListingDetail booking', () => {
     expect(paynow).toHaveTextContent('$48.45')
     expect(card).toHaveTextContent('$51')
     expect(card).not.toHaveTextContent('Credit or debit card')
-    expect(screen.getAllByRole('heading', { name: 'Complete your booking' })).toHaveLength(1)
+    expect(screen.getAllByRole('heading', { name: 'Confirm and pay' })).toHaveLength(1)
     expect(screen.queryByText('Pick a date, then a time')).not.toBeInTheDocument()
     expect(document.querySelector('.detail-booking-card__note')).not.toBeInTheDocument()
   })
@@ -933,7 +933,7 @@ describe('ListingDetail booking', () => {
     await waitFor(() =>
       expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$48.45'),
     )
-    expect(document.querySelector('.session-card__price')).toHaveTextContent('$48.45')
+    expect(document.querySelector('.price-breakdown__total')).toHaveTextContent('$48.45')
     expect(screen.getByRole('button', { name: /PayNow/ })).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -1134,7 +1134,7 @@ describe('ListingDetail checkout', () => {
   it('confirms the payment without leaving the page when possible', async () => {
     const { user } = await openCheckout()
 
-    await user.click(screen.getByRole('button', { name: 'Pay now' }))
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
 
     expect(stripe.instance.confirmPayment).toHaveBeenCalledOnce()
     expect(stripe.instance.confirmPayment.mock.calls[0][0]).toMatchObject({
@@ -1148,7 +1148,7 @@ describe('ListingDetail checkout', () => {
   it('sends the guest to the dashboard to wait for the webhook', async () => {
     const { user, currentPath, currentSearch } = await openCheckout()
 
-    await user.click(screen.getByRole('button', { name: 'Pay now' }))
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
 
     await waitFor(() => expect(currentPath()).toBe('/dashboard'))
     expect(currentSearch()).toBe('?booking=booking-1&payment=succeeded')
@@ -1157,7 +1157,7 @@ describe('ListingDetail checkout', () => {
   it('closes the unpaid checkout when the guest backs out', async () => {
     const { user } = await openCheckout()
 
-    await user.click(within(screen.getByTestId('stripe-elements')).getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
     await waitFor(() =>
@@ -1179,7 +1179,7 @@ describe('ListingDetail checkout', () => {
     })
     const { user, currentPath } = await openCheckout()
 
-    await user.click(screen.getByRole('button', { name: 'Pay now' }))
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
 
     expect(
       await screen.findByText('Payment was not completed. You have not been charged.')
@@ -1191,7 +1191,7 @@ describe('ListingDetail checkout', () => {
     stripe.instance.confirmPayment.mockResolvedValue({ error: { message: 'Your card was declined.' } })
     const { user, currentPath } = await openCheckout()
 
-    await user.click(screen.getByRole('button', { name: 'Pay now' }))
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
 
     expect(await screen.findByText('Your card was declined.')).toBeInTheDocument()
     expect(currentPath()).toBe('/listings/listing-1')
@@ -1200,7 +1200,7 @@ describe('ListingDetail checkout', () => {
   it('closes the payment panel when the guest backs out', async () => {
     const { user } = await openCheckout()
 
-    await user.click(within(screen.getByTestId('stripe-elements')).getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
     expect(stripe.instance.confirmPayment).not.toHaveBeenCalled()

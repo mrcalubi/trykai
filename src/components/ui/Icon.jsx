@@ -81,6 +81,21 @@ const PATHS = {
       <path d="M14 3v5h5M9 13h6M9 17h4" />
     </>
   ),
+  chevronLeft: <path d="M15 5l-7 7 7 7" />,
+  chevronRight: <path d="M9 5l7 7-7 7" />,
+  share: (
+    <>
+      <path d="M12 15V3M7 8l5-5 5 5" />
+      <path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+    </>
+  ),
+  camera: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="M21 16l-5-5-8 8" />
+    </>
+  ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   // Categories
   grid: (
