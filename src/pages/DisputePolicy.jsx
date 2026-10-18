@@ -28,11 +28,13 @@ export default function DisputePolicy() {
         the session ends. We cannot review complaints raised after that.
       </p>
       <p>
-        To raise a complaint, email us at{' '}
-        <a href="mailto:hello@trykai.sg">hello@trykai.sg</a> with your
-        booking reference, a description of what happened, and any evidence that
-        helps us understand the situation, such as photos or messages. Including
-        evidence upfront generally helps us resolve things faster.
+        To raise a complaint, open the booking in your TryKai account and tap
+        Report a problem, or email us at{' '}
+        <a href="mailto:hello@trykai.sg">hello@trykai.sg</a> with your booking
+        reference. Tell us what happened and add any evidence that helps us
+        understand the situation, such as photos or messages. Including evidence
+        upfront generally helps us resolve things faster. We pause the
+        host&apos;s payout while we look into it.
       </p>
       <p>
         We aim to respond within 2 business days. Once we have reviewed the

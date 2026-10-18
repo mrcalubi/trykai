@@ -5866,6 +5866,16 @@ body.lightbox-open {
   gap: 12px;
 }
 
+.report-problem {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.report-problem__form {
+  margin-top: 12px;
+}
+
 /* Listing detail, phone mockup (DESIGN.md section 9) ----------------------- */
 
 .detail-host__top {

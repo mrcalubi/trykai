@@ -480,6 +480,14 @@ verify_jwt = false
 import_map = "./functions/abandon-checkout/deno.json"
 entrypoint = "./functions/abandon-checkout/index.ts"
 
+# verify_jwt is false because the function checks the guest's JWT itself and
+# returns readable 401/403/409 bodies (window closed, already reported).
+[functions.report-booking-problem]
+enabled = true
+verify_jwt = false
+import_map = "./functions/report-booking-problem/deno.json"
+entrypoint = "./functions/report-booking-problem/index.ts"
+
 [functions.admin-cancel-booking]
 enabled = true
 verify_jwt = false

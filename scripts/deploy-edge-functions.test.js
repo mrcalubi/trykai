@@ -29,6 +29,7 @@ const FUNCTIONS = [
   'notify-verification-pending',
   'purge-verification-docs',
   'release-payout',
+  'report-booking-problem',
   'stripe-webhook',
 ]
 

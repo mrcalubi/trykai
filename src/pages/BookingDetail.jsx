@@ -15,6 +15,7 @@ import {
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import Button from '../components/ui/Button'
+import ReportProblem from '../components/ReportProblem'
 
 function googleMapsUrl(address) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
@@ -259,6 +260,8 @@ export default function BookingDetail() {
         <strong>Status</strong>{' '}
         <span className={`badge badge--${booking.status}`}>{booking.status}</span>
       </p>
+
+      <ReportProblem booking={booking} />
 
       {cancelError ? <p className="error-message">{cancelError}</p> : null}
 
