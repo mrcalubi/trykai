@@ -1,27 +1,45 @@
 import { Link } from 'react-router-dom'
 import { hostEntry } from '../../lib/hostEntry'
+import Icon from './Icon'
 
-const LOGGED_OUT_LINKS = [
-  { label: 'Log in or sign up', to: '/login' },
-  { label: 'Browse', to: '/' },
-  { label: 'Cancellation policy', to: '/cancellation-policy' },
-  { label: 'Refund policy', to: '/refund-policy' },
-  { label: 'Dispute policy', to: '/dispute-policy' },
+// `divided` draws a rule above the row, so related rows read as groups.
+const LOGGED_OUT_ITEMS = [
+  { label: 'Log in or sign up', to: '/login', icon: 'login', strong: true },
+  { label: 'Browse', to: '/', icon: 'search', divided: true },
+  { label: 'Cancellation policy', to: '/cancellation-policy', icon: 'document', divided: true },
+  { label: 'Refund policy', to: '/refund-policy', icon: 'document' },
+  { label: 'Dispute policy', to: '/dispute-policy', icon: 'document' },
 ]
 
+const HOST_BLURB = {
+  'Become a host': 'Teach what you love, on your own schedule.',
+  'Host a session': 'Create a listing or add new dates.',
+}
+
 function loggedInItems({ isAdmin, verificationStatus, userId }) {
+  const host = hostEntry(verificationStatus)
   return [
-    { label: 'Browse', to: '/' },
-    hostEntry(verificationStatus),
-    ...(isAdmin ? [{ label: 'Verification review', to: '/admin/verifications' }] : []),
-    ...(userId ? [{ label: 'Profile', to: `/u/${userId}` }] : []),
-    { label: 'Settings', to: '/settings' },
-    { label: 'Log out', action: 'logout' },
+    { label: 'Browse', to: '/', icon: 'search' },
+    ...(userId ? [{ label: 'Profile', to: `/u/${userId}`, icon: 'user' }] : []),
+    { label: 'Settings', to: '/settings', icon: 'settings' },
+    { ...host, promo: HOST_BLURB[host.label], divided: true },
+    ...(isAdmin
+      ? [{ label: 'Verification review', to: '/admin/verifications', icon: 'shield', divided: true }]
+      : []),
+    { label: 'Log out', action: 'logout', icon: 'logout', divided: true },
   ]
 }
 
-const STAGGER_MS = 45
+const STAGGER_MS = 18
 
+function itemId(label) {
+  return `ui-hamburger-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+}
+
+/**
+ * The main menu: a card that drops down from the menu button at the right of
+ * the top nav. A transparent backdrop behind it closes it on an outside click.
+ */
 export default function HamburgerMenu({
   open = false,
   onClose,
@@ -34,7 +52,7 @@ export default function HamburgerMenu({
 }) {
   const items = isLoggedIn
     ? loggedInItems({ isAdmin, verificationStatus, userId })
-    : LOGGED_OUT_LINKS
+    : LOGGED_OUT_ITEMS
 
   function handleLinkClick() {
     onClose?.()
@@ -45,11 +63,7 @@ export default function HamburgerMenu({
     await onLogOut?.()
   }
 
-  const classes = [
-    'ui-hamburger',
-    open ? 'ui-hamburger--open' : '',
-    className,
-  ]
+  const classes = ['ui-hamburger', open ? 'ui-hamburger--open' : '', className]
     .filter(Boolean)
     .join(' ')
 
@@ -62,45 +76,68 @@ export default function HamburgerMenu({
         tabIndex={open ? 0 : -1}
         onClick={onClose}
       />
-      <nav
-        id="ui-hamburger-panel"
-        className="ui-hamburger__panel"
-        aria-label="Main menu"
-      >
+      <nav id="ui-hamburger-panel" className="ui-hamburger__panel" aria-label="Main menu">
         <ul className="ui-hamburger__list">
           {items.map((item, index) => {
-            const delayMs = open
-              ? index * STAGGER_MS
-              : (items.length - 1 - index) * STAGGER_MS
             const itemClasses = [
               'ui-hamburger__item',
+              item.divided ? 'ui-hamburger__item--divided' : '',
               item.action === 'logout' ? 'ui-hamburger__item--logout' : '',
             ]
               .filter(Boolean)
               .join(' ')
+            const linkClasses = [
+              'ui-hamburger__link',
+              item.strong ? 'ui-hamburger__link--strong' : '',
+              item.promo ? 'ui-hamburger__link--promo' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')
+            const id = itemId(item.label)
 
             return (
               <li
                 key={item.label}
                 className={itemClasses}
-                style={{ transitionDelay: `${delayMs}ms` }}
+                style={{ transitionDelay: `${open ? index * STAGGER_MS : 0}ms` }}
               >
                 {item.action === 'logout' ? (
                   <button
                     type="button"
-                    className="ui-hamburger__link"
+                    className={linkClasses}
                     tabIndex={open ? 0 : -1}
                     onClick={handleLogOut}
                   >
+                    <Icon name={item.icon} size={20} />
                     {item.label}
                   </button>
+                ) : item.promo ? (
+                  <Link
+                    to={item.to}
+                    className={linkClasses}
+                    tabIndex={open ? 0 : -1}
+                    onClick={handleLinkClick}
+                    aria-labelledby={`${id}-title`}
+                    aria-describedby={`${id}-blurb`}
+                  >
+                    <span className="ui-hamburger__promo-copy">
+                      <span id={`${id}-title`} className="ui-hamburger__promo-title">
+                        {item.label}
+                      </span>
+                      <span id={`${id}-blurb`} className="ui-hamburger__promo-blurb">
+                        {item.promo}
+                      </span>
+                    </span>
+                    <img src="/trykai.png" alt="" className="ui-hamburger__promo-art" />
+                  </Link>
                 ) : (
                   <Link
                     to={item.to}
-                    className="ui-hamburger__link"
+                    className={linkClasses}
                     tabIndex={open ? 0 : -1}
                     onClick={handleLinkClick}
                   >
+                    <Icon name={item.icon} size={20} />
                     {item.label}
                   </Link>
                 )}

@@ -106,7 +106,7 @@ function ListingDeleteDialog({
   )
 }
 
-export default function Hosting({ embedded = false }) {
+export default function Hosting({ embedded = false, onListingDeleted }) {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const userId = useAuthedUserId()
@@ -503,6 +503,7 @@ export default function Hosting({ embedded = false }) {
     if (activeFormId === listingId) {
       closeSessionForm()
     }
+    onListingDeleted?.(listingId)
     setListings((prev) => prev.filter((l) => l.id !== listingId))
     setHostSessions((prev) => prev.filter((s) => s.listing_id !== listingId))
     setSelectedEmptyIds((prev) => {
@@ -542,14 +543,14 @@ export default function Hosting({ embedded = false }) {
         <p className="success-message">{bookingStatusMessage}</p>
       )}
 
-      {error && <p className="error-message" style={{ marginBottom: '20px' }}>{error}</p>}
-      {cancelError && <p className="error-message" style={{ marginBottom: '20px' }}>{cancelError}</p>}
+      {error && <p className="error-message error-message--spaced">{error}</p>}
+      {cancelError && <p className="error-message error-message--spaced">{cancelError}</p>}
       {deleteSessionError && (
-        <p className="error-message" style={{ marginBottom: '20px' }}>{deleteSessionError}</p>
+        <p className="error-message error-message--spaced">{deleteSessionError}</p>
       )}
-      {deleteError && <p className="error-message" style={{ marginBottom: '20px' }}>{deleteError}</p>}
+      {deleteError && <p className="error-message error-message--spaced">{deleteError}</p>}
       {payoutSetupError && (
-        <p className="error-message" style={{ marginBottom: '20px' }}>{payoutSetupError}</p>
+        <p className="error-message error-message--spaced">{payoutSetupError}</p>
       )}
 
       {isAdmin && pendingCount > 0 ? (

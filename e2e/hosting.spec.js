@@ -68,14 +68,9 @@ test.describe('host add sessions', () => {
     )
     await expect(page.getByLabel('Spots total')).toHaveCount(0)
 
-    const selected = page.locator('.session-calendar__day--selected')
-    const thisMonth = await selected.count()
-    if (thisMonth < 4) {
-      await page.getByRole('button', { name: 'Next month' }).click()
-      await expect(selected).toHaveCount(4 - thisMonth)
-    } else {
-      await expect(selected).toHaveCount(4)
-    }
+    // Count every picked date, not the highlighted days: from a Saturday, the
+    // fourth date falls in next month and is off the calendar on screen.
+    await expect(page.getByText(/^4 dates selected\./)).toBeVisible()
 
     await page.getByRole('button', { name: 'Review sessions' }).click()
     await expect(page.getByText('This creates 8 sessions.')).toBeVisible()
@@ -128,18 +123,35 @@ test.describe('verified host create listing', () => {
     await page.getByRole('button', { name: 'Open menu' }).click()
     await page.getByRole('navigation', { name: 'Main menu' }).getByRole('link', { name: 'Host a session' }).click()
     await expect(page).toHaveURL(/\/create-listing$/)
-    await expect(page.getByRole('heading', { name: 'Create a listing' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'The basics' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Identity verified' })).toHaveCount(0)
 
+    const next = () => page.getByRole('button', { name: 'Continue' }).click()
+
     await page.getByLabel('Title').fill('Weekend pottery')
+    await page.getByText('Arts', { exact: true }).click()
     await page.getByLabel('Description').fill('Throw a bowl on the wheel.')
-    await page.getByLabel('Category').selectOption('Arts')
-    await page.getByLabel('Price per person (SGD)').fill('40')
-    await page.getByLabel('Spots per session').fill('6')
-    await page.getByLabel('Duration (mins)').fill('90')
+    await next()
+
+    await expect(page.getByRole('heading', { name: 'Add photos' })).toBeVisible()
+    await next()
+
+    await expect(page.getByRole('heading', { name: 'Price and group size' })).toBeVisible()
+    await expect(page.getByText('Step 3 of 5')).toBeVisible()
+    await page.getByLabel('Your price per guest').fill('40')
+    await page.getByRole('button', { name: 'More guests' }).click()
+    await page.getByRole('button', { name: 'More guests' }).click()
+    await page.getByText('1.5 hr', { exact: true }).click()
+    await expect(page.getByText('Guests pay')).toBeVisible()
+    await next()
+
+    await expect(page.getByRole('heading', { name: 'Where it happens' })).toBeVisible()
     await page.getByLabel('Area').fill('Bedok')
     await page.getByRole('option', { name: 'Bedok' }).click()
     await page.getByLabel(/^Full address/).fill('12 Clay Road')
+    await next()
+
+    await expect(page.getByRole('heading', { name: 'Final touches' })).toBeVisible()
     await page.getByRole('checkbox', { name: /I agree to the Host terms/ }).check()
     await page.getByRole('button', { name: 'Create listing' }).click()
 

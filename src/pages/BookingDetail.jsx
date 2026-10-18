@@ -283,8 +283,7 @@ export default function BookingDetail() {
               type="button"
               disabled={cancelLoading}
               onClick={handleCancel}
-              className="btn btn--primary"
-              style={{ padding: '10px 20px', fontSize: '14px', background: 'var(--error)' }}
+              className="btn btn--danger"
             >
               {cancelLoading ? 'Cancelling…' : 'Confirm cancellation'}
             </button>
@@ -292,7 +291,6 @@ export default function BookingDetail() {
               type="button"
               onClick={() => setConfirmCancel(false)}
               className="btn btn--ghost"
-              style={{ padding: '10px 20px', fontSize: '14px' }}
             >
               Keep booking
             </button>

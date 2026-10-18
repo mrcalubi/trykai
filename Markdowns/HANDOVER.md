@@ -88,9 +88,9 @@ These cost real hours. Treat them as rules.
 
 1. **Verify the branch every time.** Run `git branch --show-current` after every checkout and read the output. Work was stranded on the wrong branch twice this session.
 2. **Commit as soon as something looks right on localhost.** Uncommitted work is work that can vanish.
-3. **Merging does not deploy Edge Functions.** CI only lints, tests and builds. After any merge touching `supabase/functions/`, deploy manually from an up to date `staging` checkout: `npx supabase functions deploy <name> --project-ref hzgybclfvpuxkmytdoos`. Each function bundles `_shared/` at deploy time, so a shared fix needs every dependent function redeployed.
+3. **A push to `staging` or `main` deploys every Edge Function.** CI runs `scripts/deploy-edge-functions.mjs` after the other checks pass. Staging goes to project `hzgybclfvpuxkmytdoos` unless `STAGING_SUPABASE_PROJECT_REF` is set. Production requires `PRODUCTION_SUPABASE_PROJECT_REF`. Both need GitHub secret `SUPABASE_ACCESS_TOKEN`. Pull requests do not deploy. Each function bundles `_shared/` at deploy time, so the script always deploys the full set.
 4. **Deploy from `staging` after merge, never from a feature branch.**
-5. **Never give Cursor a Supabase access token.** Run deploys yourself.
+5. **Never give Cursor a Supabase access token.** Store `SUPABASE_ACCESS_TOKEN` in GitHub Actions secrets.
 6. **Check that secrets actually exist** before debugging code. A missing `RESEND_API_KEY` failed silently for an hour.
 7. **`00005` revoke breakages share a shape:** a policy or write touching a column that was not re granted. Signup, verification, listing creation and sessions all hit it. Worth one systematic sweep rather than finding the next at launch.
 

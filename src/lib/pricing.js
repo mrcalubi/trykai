@@ -11,6 +11,7 @@ import {
   discountedLessonCents,
   discountedPerPersonCents,
   groupDiscountRate,
+  HOST_FEE_FREE_BOOKINGS,
   HOST_FEE_RATE,
   MAX_GUESTS_PER_BOOKING,
   PAYNOW_MAX_DAYS_AHEAD,
@@ -131,6 +132,30 @@ export function hostListingPriceHint(pricePerPersonCents, isFoundingHost) {
   if (isFoundingHost) return line
   const afterFee = formatCents(Math.round(pricePerPersonCents * (1 - HOST_FEE_RATE)))
   return `${line} · ${afterFee} after your first 3 bookings`
+}
+
+/**
+ * The numbers the create-listing price step shows a host. Founding-host status
+ * decides whether the host fee applies, so `null` (unknown) leaves out every
+ * host-side figure rather than promise a cut the host may not get.
+ */
+export function hostPriceBreakdown(pricePerPersonCents, isFoundingHost, groupSize) {
+  if (!Number.isFinite(pricePerPersonCents) || pricePerPersonCents < 1) return null
+  const guestsPayCents = guestFacingPriceCents(pricePerPersonCents)
+  if (isFoundingHost !== true && isFoundingHost !== false) {
+    return { guestsPayCents, youReceiveCents: null, afterFeeCents: null, fullSessionCents: null }
+  }
+  const size = Number.isFinite(groupSize) && groupSize > 0 ? groupSize : 1
+  return {
+    guestsPayCents,
+    youReceiveCents: pricePerPersonCents,
+    afterFeeCents: isFoundingHost
+      ? null
+      : Math.round(pricePerPersonCents * (1 - HOST_FEE_RATE)),
+    feeFreeBookings: HOST_FEE_FREE_BOOKINGS,
+    feePercent: Math.round(HOST_FEE_RATE * 100),
+    fullSessionCents: pricePerPersonCents * size,
+  }
 }
 
 export function nextGroupTierHint(guestsCount, groupPricing, maxGuests) {

@@ -173,14 +173,7 @@ export default function ResetPassword() {
         ) : (
           <>
             <p className="form-card__subtitle">{EXPIRED_MESSAGE}</p>
-            <p
-              style={{
-                marginTop: '24px',
-                fontSize: '14px',
-                textAlign: 'center',
-                color: 'var(--text)',
-              }}
-            >
+            <p className="form-card__footer">
               <Link to="/forgot-password" className="link-btn">
                 Request a new reset link
               </Link>

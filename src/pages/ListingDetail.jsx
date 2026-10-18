@@ -37,7 +37,8 @@ import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { listingReportSubject, reportMailto } from '../lib/reportMailto'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import { BackRowActions } from '../components/BackButton'
-import OverflowMenu from '../components/ui/OverflowMenu'
+import Icon from '../components/ui/Icon'
+import { regionForPlanningArea } from '../lib/planningAreas'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -95,6 +96,10 @@ function HostBioPreview({ bio, to }) {
   )
 }
 
+function googleMapsUrl(address) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+}
+
 function visibleAreaLabel(revealedAddress, area) {
   if (typeof revealedAddress === 'string' && revealedAddress.trim()) return revealedAddress.trim()
   if (typeof area === 'string' && area.trim()) return area.trim()
@@ -115,7 +120,7 @@ async function attachReviewerIds(reviews) {
   }))
 }
 
-function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel, onPaymentFailed }) {
+function CheckoutForm({ totalAmount, bookingId, onSuccess, onPaymentFailed }) {
   const stripe = useStripe()
   const elements = useElements()
   const [error, setError] = useState('')
@@ -157,12 +162,16 @@ function CheckoutForm({ totalAmount, bookingId, onSuccess, onCancel, onPaymentFa
       <PaymentElement />
       {error && <p className="error-message">{error}</p>}
       <div className="payment-form__actions">
-        <button type="button" onClick={onCancel} className="btn btn--ghost">
-          Cancel
-        </button>
         <button type="submit" disabled={!stripe || loading} className="btn btn--primary">
-          {loading ? 'Processing…' : 'Pay now'}
+          {loading ? (
+            'Processing…'
+          ) : (
+            <>
+              Pay <FormattedPrice cents={totalAmount} />
+            </>
+          )}
         </button>
+        <p className="payment-form__secure">Payments are processed securely by Stripe.</p>
       </div>
     </form>
   )
@@ -200,6 +209,10 @@ export default function ListingDetail() {
   const [viewerId, setViewerId] = useState(null)
   const [activePhoto, setActivePhoto] = useState(0)
   const [lightboxIndex, setLightboxIndex] = useState(null)
+  const [hostVerified, setHostVerified] = useState(false)
+  const bookingRef = useRef(null)
+  const [bookingInView, setBookingInView] = useState(false)
+  const [shareNote, setShareNote] = useState('')
 
   useEffect(() => {
     async function fetchListing() {
@@ -216,6 +229,8 @@ export default function ListingDetail() {
           area,
           price_per_person,
           group_pricing,
+          duration_mins,
+          max_guests,
           photo_urls,
           whats_provided,
           host_id,
@@ -247,6 +262,20 @@ export default function ListingDetail() {
       }
 
       setListing(listingData)
+
+      // `is_id_verified` arrives with migration 00023; before that the column
+      // is missing and the badge simply stays hidden.
+      setHostVerified(false)
+      if (listingData.host_id) {
+        supabase
+          .from('users')
+          .select('is_id_verified')
+          .eq('id', listingData.host_id)
+          .maybeSingle()
+          .then(({ data, error: verifiedError }) => {
+            setHostVerified(!verifiedError && data?.is_id_verified === true)
+          })
+      }
 
       const [firstSessionResult, lastSessionResult, reviewsResult, hostReviewsResult, authResult] =
         await Promise.all([
@@ -329,6 +358,45 @@ export default function ListingDetail() {
 
     fetchMonth()
   }, [id, visibleMonth])
+
+  // On phones checkout covers the screen, so the page behind it must not scroll.
+  useEffect(() => {
+    if (!checkoutSessionId) return undefined
+    document.body.classList.add('checkout-open')
+    return () => document.body.classList.remove('checkout-open')
+  }, [checkoutSessionId])
+
+  useEffect(() => {
+    if (!shareNote) return undefined
+    const timer = setTimeout(() => setShareNote(''), 2500)
+    return () => clearTimeout(timer)
+  }, [shareNote])
+
+  async function shareListing() {
+    const url = window.location.href
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: listing?.title ?? 'TryKai', url })
+        return
+      }
+      await navigator.clipboard.writeText(url)
+      setShareNote('Link copied')
+    } catch (shareError) {
+      if (shareError?.name !== 'AbortError') setShareNote('Could not share this link')
+    }
+  }
+
+  // The phone booking bar steps aside once the booking card itself is on screen.
+  useEffect(() => {
+    const node = bookingRef.current
+    if (!node || typeof IntersectionObserver === 'undefined') return undefined
+    const observer = new IntersectionObserver(
+      ([entry]) => setBookingInView(entry.isIntersecting),
+      { rootMargin: '0px 0px -96px 0px' }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [loading, listing])
 
   // CSS scroll-snap does the swiping; this only keeps the position dots in step.
   function trackGalleryPosition(e) {
@@ -544,6 +612,11 @@ export default function ListingDetail() {
     guestsCount,
     groupPricing,
   )
+  const listingRating =
+    reviews.length > 0
+      ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
+      : null
+  const showBookBar = Boolean(sessionRange) && !checkoutSessionId && !isOwnListing
   const nextHint = checkoutSession
     ? nextGroupTierHint(
         guestsCount,
@@ -576,15 +649,18 @@ export default function ListingDetail() {
               <p id={`session-${session.id}-time`} className="session-card__date">
                 {formatSessionTime(session.starts_at)}
               </p>
-              <p className="session-card__meta">
+              <p
+                className={`session-card__meta${
+                  session.spots_remaining > 0 && session.spots_remaining <= 2
+                    ? ' session-card__meta--low'
+                    : ''
+                }`}
+              >
                 {formatDuration(session.duration_mins)} · {session.spots_remaining} spot
                 {session.spots_remaining !== 1 ? 's' : ''} left
               </p>
             </div>
             <div className="session-card__actions">
-              <span className="session-card__price">
-                <FormattedPrice cents={guestFacingPriceCents(listing.price_per_person)} />
-              </span>
               <button
                 type="button"
                 onClick={() => handleBook(session.id)}
@@ -601,27 +677,251 @@ export default function ListingDetail() {
     )
   }
 
+  const hostName = publicName(host) || 'Anonymous'
+  const hostProfile = listing.host_id ? `/u/${listing.host_id}` : null
+  const reportHref = reportMailto({
+    subject: listingReportSubject(listing.title),
+    url: typeof window === 'undefined' ? '' : window.location.href,
+    id: listing.id,
+  })
+  const areaRegion = regionForPlanningArea(listing.area)
+  const duration = formatDuration(listing.duration_mins)
+  const maxGuests = Number(listing.max_guests)
+  const paynowSaving = cardPrice - paynowPrice
+  const showPaynowSaving = displayRail === 'paynow' && paynowSaving > 0
+
+  function renderCheckout() {
+    return (
+      <section className="checkout" aria-labelledby="checkout-title">
+        <header className="checkout__header">
+          <button type="button" className="checkout__back" aria-label="Cancel" onClick={cancelPayment}>
+            <Icon name="chevronLeft" size={22} />
+          </button>
+          <h3 id="checkout-title" className="checkout__title">
+            Confirm and pay
+          </h3>
+        </header>
+
+        <div className="checkout__body">
+          {paymentError && <p className="error-message checkout__error">{paymentError}</p>}
+
+          {checkoutSession && (
+            <div className="checkout-summary">
+              {photos[0] ? (
+                <img src={photos[0]} alt="" className="checkout-summary__photo" />
+              ) : (
+                <span className="checkout-summary__photo" aria-hidden="true" />
+              )}
+              <div className="checkout-summary__copy">
+                <p className="checkout-summary__title">{listing.title}</p>
+                <p className="checkout-summary__meta">
+                  with {hostName}
+                  {listing.area ? ` · ${listing.area}` : ''}
+                </p>
+                <p className="session-card__date">{formatSessionDay(checkoutSession.starts_at)}</p>
+                <p className="session-card__meta">
+                  {formatSessionTime(checkoutSession.starts_at)} ·{' '}
+                  {formatDuration(checkoutSession.duration_mins)}
+                </p>
+              </div>
+              <button type="button" className="checkout-summary__change" onClick={cancelPayment}>
+                Change
+              </button>
+            </div>
+          )}
+
+          {!clientSecret ? (
+            <>
+              {checkoutSession && (
+                <div className="guest-stepper">
+                  <div className="guest-stepper__row">
+                    <div>
+                      <p className="guest-stepper__label">Guests</p>
+                      <p className="guest-stepper__spots">
+                        {checkoutSession.spots_remaining} spot
+                        {checkoutSession.spots_remaining === 1 ? '' : 's'} left in this session
+                      </p>
+                    </div>
+                    <div className="guest-stepper__controls">
+                      <button
+                        type="button"
+                        className="guest-stepper__btn"
+                        aria-label="Fewer guests"
+                        disabled={guestsCount <= 1}
+                        onClick={() => changeGuests(guestsCount - 1)}
+                      >
+                        −
+                      </button>
+                      <span className="guest-stepper__count" aria-live="polite">
+                        {guestsCount}
+                      </span>
+                      <button
+                        type="button"
+                        className="guest-stepper__btn"
+                        aria-label="More guests"
+                        disabled={
+                          guestsCount >=
+                          Math.min(checkoutSession.spots_remaining, MAX_GUESTS_PER_BOOKING)
+                        }
+                        onClick={() => changeGuests(guestsCount + 1)}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <p className="guest-stepper__price">
+                    {groupPriceLabel(listing.price_per_person, guestsCount, groupPricing, displayRail)}
+                  </p>
+                  {nextHint ? (
+                    <button
+                      type="button"
+                      className="guest-stepper__hint"
+                      onClick={() => changeGuests(guestsCount + 1)}
+                    >
+                      {nextHint}
+                    </button>
+                  ) : null}
+                </div>
+              )}
+
+              <div className="payment-rails">
+                <p className="checkout__label">Pay with</p>
+                <button
+                  type="button"
+                  className="payment-rail payment-rail--paynow"
+                  disabled={bookingLoading || paynowBlocked}
+                  aria-pressed={!paynowBlocked && checkoutRail === 'paynow'}
+                  onClick={() => startPayment('paynow')}
+                >
+                  <span className="payment-rail__radio" aria-hidden="true" />
+                  <span className="payment-rail__copy">
+                    <span className="payment-rail__row">
+                      <span className="payment-rail__name">PayNow</span>
+                      {paynowBlocked ? null : <span className="paynow-badge">Save 5%</span>}
+                    </span>
+                    <span className="payment-rail__hint">Scan the QR in your banking app</span>
+                  </span>
+                  <span className="payment-rail__amounts">
+                    {paynowBlocked ? (
+                      <span className="payment-rail__now">
+                        <FormattedPrice cents={cardPrice} />
+                      </span>
+                    ) : (
+                      <>
+                        <s className="payment-rail__was">
+                          <FormattedPrice cents={cardPrice} />
+                        </s>
+                        <span className="payment-rail__now">
+                          <FormattedPrice cents={paynowPrice} />
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </button>
+                {paynowBlocked ? (
+                  <p className="payment-rails__hint">{PAYNOW_TOO_FAR_AHEAD_MESSAGE}</p>
+                ) : null}
+                <button
+                  type="button"
+                  className="payment-rail"
+                  disabled={bookingLoading}
+                  aria-pressed={paynowBlocked || checkoutRail === 'card'}
+                  onClick={() => startPayment('card')}
+                >
+                  <span className="payment-rail__radio" aria-hidden="true" />
+                  <span className="payment-rail__copy">
+                    <span className="payment-rail__row">
+                      <span className="payment-rail__name">Card</span>
+                    </span>
+                  </span>
+                  <span className="payment-rail__amounts">
+                    <span className="payment-rail__now">
+                      <FormattedPrice cents={cardPrice} />
+                    </span>
+                  </span>
+                </button>
+                {bookingLoading ? <p className="hint">Preparing secure payment…</p> : null}
+              </div>
+
+              <div className="price-breakdown">
+                <p className="price-breakdown__row">
+                  <span>
+                    {guestsCount} guest{guestsCount === 1 ? '' : 's'}, all in
+                  </span>
+                  <span className="price-breakdown__amount">
+                    <FormattedPrice cents={cardPrice} />
+                  </span>
+                </p>
+                {showPaynowSaving ? (
+                  <p className="price-breakdown__row price-breakdown__row--saving">
+                    <span>PayNow saving</span>
+                    <span className="price-breakdown__amount">
+                      −<FormattedPrice cents={paynowSaving} />
+                    </span>
+                  </p>
+                ) : null}
+                <p className="price-breakdown__row price-breakdown__row--total">
+                  <span>Total</span>
+                  <span className="price-breakdown__amount price-breakdown__total">
+                    <FormattedPrice cents={checkoutPrice} />
+                  </span>
+                </p>
+                <p className="price-breakdown__note">
+                  Booking fee included. Nothing extra to pay at the door.
+                </p>
+              </div>
+
+              <div className="checkout-promises">
+                <p className="checkout-promises__item">
+                  <Icon name="shield" size={18} />
+                  Your host passed an ID check before listing on TryKai.
+                </p>
+                <p className="checkout-promises__item">
+                  <Icon name="pin" size={18} />
+                  The exact address is shared once your booking is confirmed.
+                </p>
+                <p className="checkout-promises__item">
+                  <Icon name="wallet" size={18} />
+                  Full refund if you cancel 48 or more hours before the session.
+                </p>
+              </div>
+
+              <p className="payment-agree">
+                By booking, you agree to the{' '}
+                <Link to="/terms#part-3-booking">Booking terms</Link> and{' '}
+                <Link to="/cancellation-policy">Cancellation Policy</Link>
+              </p>
+            </>
+          ) : (
+            <Elements stripe={stripePromise} options={{ clientSecret }}>
+              <CheckoutForm
+                totalAmount={totalAmount}
+                bookingId={bookingId}
+                onSuccess={handlePaymentSuccess}
+                onPaymentFailed={() => void abandonUnpaidCheckout(bookingId)}
+              />
+            </Elements>
+          )}
+        </div>
+      </section>
+    )
+  }
+
   return (
-    <div className="page page--detail">
+    <div
+      className={`page page--detail page--listing${showBookBar ? ' page--with-book-bar' : ''}`}
+    >
       <BackRowActions>
-        {isOwnListing ? null : (
-          <OverflowMenu
-            label="More actions"
-            icon="⋮"
-            className="ui-overflow--quiet"
-            items={[
-              {
-                label: 'Report listing',
-                href: reportMailto({
-                  subject: listingReportSubject(listing.title),
-                  url: typeof window === 'undefined' ? '' : window.location.href,
-                  id: listing.id,
-                }),
-              },
-            ]}
-          />
-        )}
+        <button type="button" className="share-button" aria-label="Share" onClick={shareListing}>
+          <Icon name="share" size={18} />
+        </button>
       </BackRowActions>
+      {shareNote ? (
+        <p className="share-note" role="status">
+          {shareNote}
+        </p>
+      ) : null}
+
       {photos.length > 0 ? (
         <div className="detail-gallery">
           <div
@@ -642,18 +942,25 @@ export default function ListingDetail() {
             ))}
           </div>
           {photos.length > 1 && (
-            <div className="detail-gallery__dots" aria-hidden="true">
-              {photos.map((url, i) => (
-                <span
-                  key={url}
-                  className={`detail-gallery__dot${i === activePhoto ? ' detail-gallery__dot--active' : ''}`}
-                />
-              ))}
-            </div>
+            <>
+              <div className="detail-gallery__dots" aria-hidden="true">
+                {photos.map((url, i) => (
+                  <span
+                    key={url}
+                    className={`detail-gallery__dot${i === activePhoto ? ' detail-gallery__dot--active' : ''}`}
+                  />
+                ))}
+              </div>
+              <span className="detail-gallery__count" aria-hidden="true">
+                {activePhoto + 1} / {photos.length}
+              </span>
+            </>
           )}
         </div>
       ) : (
-        <div className="detail-gallery__placeholder" />
+        <div className="detail-gallery__placeholder" aria-hidden="true">
+          <Icon name="camera" size={56} strokeWidth={1.2} />
+        </div>
       )}
 
       {lightboxIndex !== null && (
@@ -667,31 +974,68 @@ export default function ListingDetail() {
 
       <div className="detail-layout">
         <div className="detail-main">
-          <span className="detail-category">{listing.category}</span>
+          {listing.category ? <span className="detail-category">{listing.category}</span> : null}
           <h1 className="detail-title">{listing.title}</h1>
-          {areaLabel ? <p className="detail-area">{areaLabel}</p> : null}
-
-          <div className="detail-host">
-            <HostAvatar host={host} to={listing.host_id ? `/u/${listing.host_id}` : null} />
-            <div className="detail-host__copy">
-              <p className="detail-host__name">
-                Hosted by{' '}
-                {listing.host_id ? (
-                  <Link to={`/u/${listing.host_id}`} className="detail-host__link">
-                    {publicName(host) || 'Anonymous'}
-                  </Link>
-                ) : (
-                  publicName(host) || 'Anonymous'
-                )}
-              </p>
-              <HostRating reviews={hostReviews} />
-              {typeof host?.bio === 'string' && host.bio.trim() ? (
-                <HostBioPreview
-                  bio={host.bio}
-                  to={listing.host_id ? `/u/${listing.host_id}` : null}
-                />
+          {duration || maxGuests > 0 || areaLabel || listingRating ? (
+            <div className="detail-facts">
+              {duration ? (
+                <p className="detail-fact">
+                  <Icon name="clock" size={17} />
+                  {duration}
+                </p>
+              ) : null}
+              {maxGuests > 0 ? (
+                <p className="detail-fact">
+                  <Icon name="users" size={17} />
+                  Up to {maxGuests} guest{maxGuests === 1 ? '' : 's'}
+                </p>
+              ) : null}
+              {areaLabel ? (
+                <p className="detail-fact detail-area">
+                  <Icon name="pin" size={17} />
+                  {areaLabel}
+                </p>
+              ) : null}
+              {listingRating ? (
+                <p className="detail-fact">
+                  <Icon name="star" size={17} />
+                  {listingRating.toFixed(1)} ({reviews.length} review{reviews.length === 1 ? '' : 's'})
+                </p>
               ) : null}
             </div>
+          ) : null}
+
+          <div className="detail-host">
+            <div className="detail-host__top">
+              <HostAvatar host={host} to={hostProfile} />
+              <div className="detail-host__copy">
+                <p className="detail-host__label">Your host</p>
+                <p className="detail-host__name">
+                  {hostProfile ? (
+                    <Link to={hostProfile} className="detail-host__link">
+                      {hostName}
+                    </Link>
+                  ) : (
+                    hostName
+                  )}
+                </p>
+                {hostVerified ? (
+                  <p className="verified-badge">
+                    <Icon name="shield" size={15} />
+                    ID verified
+                  </p>
+                ) : null}
+                <HostRating reviews={hostReviews} />
+              </div>
+            </div>
+            {typeof host?.bio === 'string' && host.bio.trim() ? (
+              <HostBioPreview bio={host.bio} to={hostProfile} />
+            ) : null}
+            {hostProfile ? (
+              <Link to={hostProfile} className="detail-host__profile">
+                View {hostName}&apos;s profile
+              </Link>
+            ) : null}
           </div>
 
           <section className="detail-section">
@@ -702,211 +1046,52 @@ export default function ListingDetail() {
           {listing.whats_provided?.length > 0 && (
             <section className="detail-section">
               <h2 className="detail-section__title">What&apos;s provided</h2>
-              <ul className="detail-list">
+              <ul className="detail-list detail-list--checks">
                 {listing.whats_provided.map((item) => (
-                  <li key={item}>{item}</li>
+                  <li key={item}>
+                    <Icon name="check" size={18} strokeWidth={2.4} />
+                    {item}
+                  </li>
                 ))}
               </ul>
             </section>
           )}
-
-          <section className="detail-section">
-            <h2 className="detail-section__title">
-              Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
-            </h2>
-            {reviews.length === 0 ? (
-              <p className="empty-state">No reviews yet.</p>
-            ) : (
-              <div className="reviews-list">
-                {reviews.map((review) => (
-                  <ReviewCard
-                    key={review.id}
-                    review={review}
-                    listingTitle={listing.title}
-                    viewerId={viewerId}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
         </div>
 
-        <aside className="detail-sidebar">
-          <div className="detail-booking-card">
+        <aside id="booking" ref={bookingRef} className="detail-sidebar">
+          <div className={`detail-booking-card${checkoutSessionId ? ' detail-booking-card--checkout' : ''}`}>
             <p className="detail-booking-card__price">
               <FormattedPrice cents={checkoutPrice} />
-              {!checkoutSessionId && (
-                <span className="detail-booking-card__unit"> / person</span>
-              )}
+              {!checkoutSessionId && <span className="detail-booking-card__unit"> / person</span>}
             </p>
             {!checkoutSessionId && sessionRange && (
               <p className="detail-booking-card__note">Pick a date, then a time</p>
             )}
 
-            {paymentError && (
+            {paymentError && !checkoutSessionId && (
               <p className="error-message detail-booking-card__error">{paymentError}</p>
             )}
 
-            {checkoutSessionId && (
-              <div className="payment-panel">
-                <h3 className="payment-panel__title">Complete your booking</h3>
-                {checkoutSession && (
-                  <div className="payment-panel__session">
-                    <div>
-                      <p className="session-card__date">
-                        {formatSessionDay(checkoutSession.starts_at)}
-                      </p>
-                      <p className="session-card__meta">
-                        {formatSessionTime(checkoutSession.starts_at)} ·{' '}
-                        {formatDuration(checkoutSession.duration_mins)}
-                      </p>
-                    </div>
-                    <span className="session-card__price">
-                      <FormattedPrice cents={checkoutPrice} />
-                    </span>
-                  </div>
-                )}
-                {!clientSecret ? (
-                  <div className="payment-rails">
-                    {checkoutSession && (
-                      <div className="guest-stepper">
-                        <p className="guest-stepper__label">Guests</p>
-                        <div className="guest-stepper__controls">
-                          <button
-                            type="button"
-                            className="guest-stepper__btn"
-                            aria-label="Fewer guests"
-                            disabled={guestsCount <= 1}
-                            onClick={() => changeGuests(guestsCount - 1)}
-                          >
-                            −
-                          </button>
-                          <span className="guest-stepper__count" aria-live="polite">
-                            {guestsCount}
-                          </span>
-                          <button
-                            type="button"
-                            className="guest-stepper__btn"
-                            aria-label="More guests"
-                            disabled={
-                              guestsCount >=
-                              Math.min(
-                                checkoutSession.spots_remaining,
-                                MAX_GUESTS_PER_BOOKING,
-                              )
-                            }
-                            onClick={() => changeGuests(guestsCount + 1)}
-                          >
-                            +
-                          </button>
-                        </div>
-                        <p className="guest-stepper__price">
-                          {groupPriceLabel(
-                            listing.price_per_person,
-                            guestsCount,
-                            groupPricing,
-                            displayRail,
-                          )}
-                        </p>
-                        {nextHint ? (
-                          <button
-                            type="button"
-                            className="guest-stepper__hint"
-                            onClick={() => changeGuests(guestsCount + 1)}
-                          >
-                            {nextHint}
-                          </button>
-                        ) : null}
-                      </div>
-                    )}
-                    <p className="payment-agree">
-                      By booking, you agree to the{' '}
-                      <Link to="/terms#part-3-booking">Booking terms</Link> and{' '}
-                      <Link to="/cancellation-policy">Cancellation Policy</Link>
-                    </p>
-                    <button
-                      type="button"
-                      className="payment-rail payment-rail--paynow"
-                      disabled={bookingLoading || paynowBlocked}
-                      aria-pressed={!paynowBlocked && checkoutRail === 'paynow'}
-                      onClick={() => startPayment('paynow')}
-                    >
-                      <span className="payment-rail__row">
-                        <span className="payment-rail__name">PayNow</span>
-                        <span className="paynow-badge">Save 5%</span>
-                      </span>
-                      <span className="payment-rail__amounts">
-                        {paynowBlocked ? (
-                          <span className="payment-rail__now">
-                            <FormattedPrice cents={cardPrice} />
-                          </span>
-                        ) : (
-                          <>
-                            <s className="payment-rail__was">
-                              <FormattedPrice cents={cardPrice} />
-                            </s>
-                            <span className="payment-rail__now">
-                              <FormattedPrice cents={paynowPrice} />
-                            </span>
-                          </>
-                        )}
-                      </span>
-                    </button>
-                    {paynowBlocked ? (
-                      <p className="payment-rails__hint">{PAYNOW_TOO_FAR_AHEAD_MESSAGE}</p>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="payment-rail"
-                      disabled={bookingLoading}
-                      aria-pressed={paynowBlocked || checkoutRail === 'card'}
-                      onClick={() => startPayment('card')}
-                    >
-                      <span className="payment-rail__row">
-                        <span className="payment-rail__name">Card</span>
-                      </span>
-                      <span className="payment-rail__amounts">
-                        <span className="payment-rail__now">
-                          <FormattedPrice cents={cardPrice} />
-                        </span>
-                      </span>
-                    </button>
-                    <button type="button" onClick={cancelPayment} className="btn btn--ghost">
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <Elements stripe={stripePromise} options={{ clientSecret }}>
-                    <CheckoutForm
-                      totalAmount={totalAmount}
-                      bookingId={bookingId}
-                      onSuccess={handlePaymentSuccess}
-                      onCancel={cancelPayment}
-                      onPaymentFailed={() => void abandonUnpaidCheckout(bookingId)}
-                    />
-                  </Elements>
-                )}
-              </div>
-            )}
+            {checkoutSessionId && renderCheckout()}
 
-            {!sessionRange && (
-              <p className="empty-state">No upcoming sessions yet.</p>
-            )}
+            {!sessionRange && <p className="empty-state">No upcoming sessions yet.</p>}
 
             {sessionRange && !checkoutSessionId && (
               <>
-                <SessionCalendar
-                  monthKey={visibleMonth}
-                  countsByDay={countsByDay}
-                  selectedDateKey={activeDateKey}
-                  todayKey={sessionRange.todayKey}
-                  onSelectDate={setSelectedDateKey}
-                  onPrevMonth={() => showMonth(shiftMonth(visibleMonth, -1))}
-                  onNextMonth={() => showMonth(shiftMonth(visibleMonth, 1))}
-                  canGoPrev={visibleMonth > sessionRange.firstMonth}
-                  canGoNext={visibleMonth < sessionRange.lastMonth}
-                  loading={!monthSessions}
-                />
+                <div className="detail-calendar">
+                  <SessionCalendar
+                    monthKey={visibleMonth}
+                    countsByDay={countsByDay}
+                    selectedDateKey={activeDateKey}
+                    todayKey={sessionRange.todayKey}
+                    onSelectDate={setSelectedDateKey}
+                    onPrevMonth={() => showMonth(shiftMonth(visibleMonth, -1))}
+                    onNextMonth={() => showMonth(shiftMonth(visibleMonth, 1))}
+                    canGoPrev={visibleMonth > sessionRange.firstMonth}
+                    canGoNext={visibleMonth < sessionRange.lastMonth}
+                    loading={!monthSessions}
+                  />
+                </div>
                 <div className="session-day">{renderDaySessions()}</div>
               </>
             )}
@@ -926,7 +1111,113 @@ export default function ListingDetail() {
             <GuestCancellationNote />
           </div>
         </aside>
+
+        <div className="detail-main detail-main--after">
+          {areaLabel ? (
+            <section className="detail-section">
+              <h2 className="detail-section__title">Where you&apos;ll be</h2>
+              <div className="detail-location">
+                <div className="detail-location__row">
+                  <span className="detail-location__icon">
+                    <Icon name="pin" size={20} />
+                  </span>
+                  <div className="detail-location__copy">
+                    {revealedAddress ? (
+                      <>
+                        <p className="detail-location__title">{areaLabel}</p>
+                        <p className="detail-location__note">From your confirmed booking.</p>
+                        <a
+                          href={googleMapsUrl(areaLabel)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="detail-location__link"
+                        >
+                          Open in Google Maps
+                        </a>
+                      </>
+                    ) : (
+                      <>
+                        <p className="detail-location__title">{areaLabel}, Singapore</p>
+                        <p className="detail-location__note">
+                          {areaRegion
+                            ? `${areaRegion} region. The general area, not the exact spot.`
+                            : 'The general area, not the exact spot.'}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {revealedAddress ? null : (
+                  <div className="detail-location__row">
+                    <span className="detail-location__icon">
+                      <Icon name="lock" size={20} />
+                    </span>
+                    <div className="detail-location__copy">
+                      <p className="detail-location__title">Exact address after booking</p>
+                      <p className="detail-location__note">
+                        Sent once your booking is confirmed, with directions in your booking.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="detail-section">
+            <h2 className="detail-section__title">
+              Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
+            </h2>
+            {reviews.length === 0 ? (
+              <div className="empty-state empty-state--boxed">
+                <p>No reviews yet.</p>
+                <p>Your review will help the next guest decide.</p>
+              </div>
+            ) : (
+              <div className="reviews-list">
+                {reviews.map((review) => (
+                  <ReviewCard
+                    key={review.id}
+                    review={review}
+                    listingTitle={listing.title}
+                    viewerId={viewerId}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <nav className="detail-links" aria-label="Policies and reporting">
+            <Link to="/cancellation-policy" className="detail-links__row">
+              Cancellation: full refund 48+ hours before
+              <Icon name="chevronRight" size={18} />
+            </Link>
+            {isOwnListing ? null : (
+              <a href={reportHref} className="detail-links__row">
+                Report this listing
+                <Icon name="chevronRight" size={18} />
+              </a>
+            )}
+          </nav>
+        </div>
       </div>
+
+      {showBookBar ? (
+        <div className={`book-bar${bookingInView ? ' book-bar--away' : ''}`}>
+          <div className="book-bar__price">
+            <p className="book-bar__amount">
+              <FormattedPrice cents={cardPrice} />
+              <span className="book-bar__unit"> / person, all in</span>
+            </p>
+            <p className="book-bar__note">
+              <FormattedPrice cents={paynowPrice} /> with PayNow
+            </p>
+          </div>
+          <a href="#booking" className="btn btn--primary">
+            Choose a date
+          </a>
+        </div>
+      ) : null}
     </div>
   )
 }

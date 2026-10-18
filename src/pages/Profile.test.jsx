@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -96,6 +96,106 @@ describe('Profile loading and failure', () => {
     ).toBeInTheDocument()
     expect(screen.queryByText('not found')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to listings' })).toHaveAttribute('href', '/')
+  })
+
+  it('loads the profile when is_id_verified is not in the database yet', async () => {
+    supabase.__on('users', 'select', (call) => {
+      const columns = call.chain.find((step) => step.method === 'select')?.args[0] ?? ''
+      if (String(columns).includes('is_id_verified')) {
+        return {
+          data: null,
+          error: { code: '42703', message: 'column users.is_id_verified does not exist' },
+        }
+      }
+      return {
+        data: {
+          id: HOST_ID,
+          display_name: 'Mei',
+          bio: null,
+          avatar_url: null,
+          is_host: true,
+        },
+        error: null,
+      }
+    })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Mei', level: 1 })).toBeInTheDocument()
+    expect(
+      screen.queryByText('Something went wrong loading this page. Please refresh.')
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('ID verified')).not.toBeInTheDocument()
+    const selects = supabase.__calls('users', 'select').map((call) => call.chain[0].args[0])
+    expect(selects).toEqual([
+      'id, display_name, bio, avatar_url, is_host, is_id_verified',
+      'id, display_name, bio, avatar_url, is_host',
+    ])
+  })
+
+  it('retries without the badge column when the grant is missing', async () => {
+    supabase.__on('users', 'select', (call) => {
+      const columns = call.chain.find((step) => step.method === 'select')?.args[0] ?? ''
+      if (String(columns).includes('is_id_verified')) {
+        return {
+          data: null,
+          error: { code: '42501', message: 'permission denied for table users' },
+        }
+      }
+      return {
+        data: {
+          id: HOST_ID,
+          display_name: 'Mei',
+          bio: 'I pull rosettas.',
+          avatar_url: null,
+          is_host: true,
+        },
+        error: null,
+      }
+    })
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'About' })).toBeInTheDocument()
+    expect(screen.getByText('I pull rosettas.')).toBeInTheDocument()
+    expect(
+      screen.queryByText('Something went wrong loading this page. Please refresh.')
+    ).not.toBeInTheDocument()
+  })
+
+  it('keeps the ID verified badge from my_account when the public column is missing', async () => {
+    givenSignedIn(HOST_ID)
+    supabase.__on('users', 'select', (call) => {
+      const columns = call.chain.find((step) => step.method === 'select')?.args[0] ?? ''
+      if (String(columns).includes('is_id_verified')) {
+        return {
+          data: null,
+          error: { message: "Could not find the 'is_id_verified' column of 'users' in the schema cache" },
+        }
+      }
+      return {
+        data: {
+          id: HOST_ID,
+          display_name: 'Mei',
+          bio: null,
+          avatar_url: null,
+          is_host: false,
+        },
+        error: null,
+      }
+    })
+    givenRpcs({
+      account: {
+        display_name: 'Mei',
+        bio: null,
+        avatar_url: null,
+        is_host: false,
+        verification_status: 'approved',
+        stripe_payouts_enabled: false,
+      },
+    })
+    renderPage()
+
+    expect(await screen.findByText('ID verified')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Profile' })).toBeInTheDocument()
   })
 })
 
@@ -388,6 +488,41 @@ describe('Profile own tabs', () => {
       'href',
       `/u/${HOST_ID}?tab=hosting`
     )
+  })
+
+  it('drops a listing from the Listings tab after it is deleted on Hosting', async () => {
+    givenListings([
+      makeListing({
+        id: 'listing-9',
+        title: 'fr',
+        category: 'Food',
+        area: 'Bedok',
+        price_per_person: 350,
+      }),
+    ])
+    const previous = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation(async (name, args) => {
+      if (name === 'delete_listing') return { data: args?.p_listing_id, error: null }
+      if (previous) return previous(name, args)
+      return { data: null, error: null }
+    })
+    const { user } = renderPage({ search: '?tab=listings' })
+
+    expect(await screen.findByRole('heading', { name: 'fr', level: 3 })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: 'Hosting' }))
+    const card = (await screen.findByText('fr')).closest('.hosting-listing-card')
+    await user.click(within(card).getByRole('button', { name: 'More actions' }))
+    await user.click(within(card).getByRole('menuitem', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    await waitFor(() => expect(screen.queryByText('fr')).not.toBeInTheDocument())
+
+    await user.click(screen.getByRole('link', { name: 'Listings' }))
+
+    expect(await screen.findByText('No listings yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'fr', level: 3 })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /fr/ })).not.toBeInTheDocument()
   })
 
   it('opens the hosting panel from ?tab=hosting', async () => {

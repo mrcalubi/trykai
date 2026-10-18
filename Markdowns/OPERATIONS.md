@@ -439,6 +439,8 @@ The function checks header `x-cron-secret` against the Edge Function secret `PAY
 3. Add key `PAYOUT_CRON_SECRET` and paste the string from your password note. Save.
 4. You do not need to redeploy just for the secret. You **do** need to deploy for the new code.
 
+A push to `staging` or `main` deploys every function in `supabase/functions/` through `.github/workflows/ci.yml` (`scripts/deploy-edge-functions.mjs`). That needs the `SUPABASE_ACCESS_TOKEN` GitHub secret, created at https://supabase.com/dashboard/account/tokens for an account that can deploy Edge Functions. Do not commit the token. Production also needs `PRODUCTION_SUPABASE_PROJECT_REF`. Pull requests only check that each function directory matches `config.toml`. The commands below are the manual path for one function.
+
 **Deploy the function (CLI; this function imports `_shared`, so do not paste it into the Dashboard editor):**
 
 ```bash

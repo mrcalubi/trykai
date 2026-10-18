@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { AuthedUserContext } from '../lib/authedUser'
@@ -17,6 +17,28 @@ import Bookings from './Bookings'
 import Hosting from './Hosting'
 
 const OWN_TABS = ['bookings', 'hosting', 'listings', 'reviews']
+const PROFILE_COLUMNS = 'id, display_name, bio, avatar_url, is_host, is_id_verified'
+const PROFILE_COLUMNS_WITHOUT_BADGE = 'id, display_name, bio, avatar_url, is_host'
+
+/**
+ * 00023 adds generated `is_id_verified`. Until that migration is applied,
+ * selecting the column fails the whole profile read. Checkout never asks
+ * for it, so a guest can book and only then hit this page.
+ */
+function verifiedColumnUnavailable(error) {
+  const message = String(error?.message ?? '')
+  const code = String(error?.code ?? '')
+  return (
+    code === '42703' ||
+    code === 'PGRST204' ||
+    code === '42501' ||
+    /is_id_verified|schema cache|does not exist|permission denied/i.test(message)
+  )
+}
+
+function loadPublicProfile(userId, columns) {
+  return supabase.from('users').select(columns).eq('id', userId).single()
+}
 
 function tabSearch(searchParams, tab) {
   const params = new URLSearchParams(searchParams)
@@ -108,6 +130,20 @@ export default function Profile() {
   const [error, setError] = useState('')
   const [viewerId, setViewerId] = useState(null)
   const [viewerReady, setViewerReady] = useState(false)
+  // Delete on the Hosting tab soft-deletes the row. A profile fetch that
+  // started before that delete can still return the listing; drop those ids.
+  const removedListingIds = useRef(new Set())
+
+  function forgetListing(listingId) {
+    removedListingIds.current.add(listingId)
+    setListings((current) => current.filter((listing) => listing.id !== listingId))
+    setRatings((current) => {
+      if (!(listingId in current)) return current
+      const next = { ...current }
+      delete next[listingId]
+      return next
+    })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -133,13 +169,15 @@ export default function Profile() {
       setRatings({})
       setReviews([])
 
-      const { data: userData, error: userError } = await withIssuedAtRetry(() =>
-        supabase
-          .from('users')
-          .select('id, display_name, bio, avatar_url, is_host, is_id_verified')
-          .eq('id', id)
-          .single()
+      let { data: userData, error: userError } = await withIssuedAtRetry(() =>
+        loadPublicProfile(id, PROFILE_COLUMNS)
       )
+
+      if (userError && verifiedColumnUnavailable(userError)) {
+        const fallback = await loadPublicProfile(id, PROFILE_COLUMNS_WITHOUT_BADGE)
+        userData = fallback.data
+        userError = fallback.error
+      }
 
       if (userError || !userData) {
         setError(userError ? PAGE_LOAD_ERROR : 'Profile not found.')
@@ -176,7 +214,9 @@ export default function Profile() {
         setListings([])
         setRatings({})
       } else {
-        const rows = listingsResult.data ?? []
+        const rows = (listingsResult.data ?? []).filter(
+          (listing) => !removedListingIds.current.has(listing.id),
+        )
         setListings(rows)
         const listingIds = rows.map((listing) => listing.id)
         if (listingIds.length > 0) {
@@ -213,7 +253,10 @@ export default function Profile() {
   }
 
   const givenName = publicName(profile) || 'Anonymous'
-  const verified = Boolean(profile.is_id_verified)
+  const verified =
+    typeof profile.is_id_verified === 'boolean'
+      ? profile.is_id_verified
+      : profile.verification_status === 'approved'
   const isOwn = viewerId === id
   const about = typeof profile.bio === 'string' ? profile.bio.trim() : ''
   const isHost = Boolean(profile.is_host)
@@ -313,7 +356,7 @@ export default function Profile() {
           {activeTab === 'hosting' ? (
             <div className="profile-tab-panel">
               <AuthedUserContext.Provider value={viewerId}>
-                <Hosting embedded />
+                <Hosting embedded onListingDeleted={forgetListing} />
               </AuthedUserContext.Provider>
             </div>
           ) : null}

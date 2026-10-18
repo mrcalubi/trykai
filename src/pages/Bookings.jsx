@@ -402,8 +402,8 @@ export default function Bookings({ embedded = false }) {
         </p>
       )}
 
-      {error && <p className="error-message" style={{ marginBottom: '20px' }}>{error}</p>}
-      {cancelError && <p className="error-message" style={{ marginBottom: '20px' }}>{cancelError}</p>}
+      {error && <p className="error-message error-message--spaced">{error}</p>}
+      {cancelError && <p className="error-message error-message--spaced">{cancelError}</p>}
 
       <section className="dashboard-section">
         <h2 className="dashboard-section__title">My Bookings</h2>
@@ -456,8 +456,7 @@ export default function Bookings({ embedded = false }) {
                         setCancelError('')
                         setConfirmCancelBookingId(booking.id)
                       }}
-                      className="btn btn--ghost"
-                      style={{ padding: '6px 14px', fontSize: '13px', color: 'var(--error)' }}
+                      className="btn btn--ghost btn--small btn--danger-quiet"
                     >
                       Cancel booking
                     </button>
@@ -472,13 +471,12 @@ export default function Bookings({ embedded = false }) {
                     <p className="cancel-confirm__note">
                       {guestCancellationNote(booking)}
                     </p>
-                    <div style={{ display: 'flex', gap: '12px' }}>
+                    <div className="button-row">
                       <button
                         type="button"
                         disabled={cancelLoading}
                         onClick={() => handleGuestCancelBooking(booking)}
-                        className="btn btn--primary"
-                        style={{ padding: '10px 20px', fontSize: '14px', background: 'var(--error)' }}
+                        className="btn btn--danger"
                       >
                         {cancelLoading ? 'Cancelling…' : 'Confirm cancellation'}
                       </button>
@@ -486,7 +484,6 @@ export default function Bookings({ embedded = false }) {
                         type="button"
                         onClick={() => setConfirmCancelBookingId(null)}
                         className="btn btn--ghost"
-                        style={{ padding: '10px 20px', fontSize: '14px' }}
                       >
                         Keep booking
                       </button>
@@ -514,12 +511,11 @@ export default function Bookings({ embedded = false }) {
                       />
                     </label>
                     {reviewError && <p className="error-message">{reviewError}</p>}
-                    <div style={{ display: 'flex', gap: '12px' }}>
+                    <div className="button-row">
                       <button
                         type="submit"
                         disabled={reviewLoading}
                         className="btn btn--primary"
-                        style={{ padding: '10px 20px', fontSize: '14px' }}
                       >
                         {reviewLoading ? 'Submitting…' : 'Submit review'}
                       </button>
@@ -527,7 +523,6 @@ export default function Bookings({ embedded = false }) {
                         type="button"
                         onClick={closeReviewForm}
                         className="btn btn--ghost"
-                        style={{ padding: '10px 20px', fontSize: '14px' }}
                       >
                         Cancel
                       </button>

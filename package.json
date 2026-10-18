@@ -14,7 +14,8 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "verify": "npm run lint && npm run test:coverage && npm run build"
+    "verify": "npm run lint && npm run test:coverage && npm run build",
+    "functions:deploy": "node scripts/deploy-edge-functions.mjs"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^6.6.0",
