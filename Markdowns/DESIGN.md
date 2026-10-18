@@ -134,8 +134,8 @@ All in plain CSS in `src/index.css` (no Tailwind), previewable at `/style-guide`
 - **Skeletons.** Loading states use shimmering placeholder cards in the real layout, with the old status text kept for screen readers.
 - **Empty states.** An icon, a one-line title, a sentence and an action, centred in a dashed `--border-strong` panel.
 - **Section header.** Optional coral eyebrow, display title, optional muted description, optional "See all" link at the right.
-- **Top nav.** Unchanged pattern (hamburger left, centred mark and wordmark, Log in or avatar right, shrinks on scroll), now with a translucent cream background and backdrop blur, and "Log in" rendered as an outlined pill. Top nav, not bottom nav, until TryKai is a native app.
-- **Hamburger menu.** Unchanged items and stagger; rows gain 52px height and a hover tint.
+- **Top nav.** Mark and wordmark on the left; on the right, "Log in" as an outlined pill (or the avatar, linking to your profile) followed by a round menu button. Translucent cream background with backdrop blur, aligned to the page width, shrinking on scroll as before. Top nav, not bottom nav, until TryKai is a native app.
+- **Main menu (changed 18 October 2026).** A white card that drops down under the menu button, right-aligned to it (Airbnb pattern), replacing the full-height panel that slid in from the left. Rows have a line icon and are grouped by dividers; the host entry ("Become a host" or "Host a session") is a two-line row with the mascot; Log out sits last. Outside click, Escape, or choosing a row closes it. On phones a light scrim sits behind the card. Items are unchanged.
 - **Footer.** A deep-navy band: mark and tagline, three link columns (Explore, Hosting, Policies), then UEN and the DPO email. Cream text, coral dot in the wordmark.
 
 ---
@@ -152,18 +152,20 @@ All in plain CSS in `src/index.css` (no Tailwind), previewable at `/style-guide`
 
 No photo banner and no persistent search bar for launch (unchanged): with tens of listings, the category bar and chips find things faster than a search box.
 
-### Listing detail
-- Gallery unchanged (swipe with dots on phones, mosaic capped at `clamp(320px, 34vw, 440px)` from 1024px).
-- Under the title: area and rating as a meta row with icons.
-- **Host card** high on the page at every width: avatar, "Hosted by", rating, an "ID verified" badge, bio preview.
-- **What's provided** as a checklist with coral checks.
-- **Where you'll be:** the area and the line "The exact address is shared after you book" (or the real address once booked).
-- Reviews last.
-- From 1024px the booking card is sticky on the right. **On phones a bottom bar** pins the all-in price and the PayNow saving next to a "Choose a date" button that scrolls to the calendar. It hides while checkout is open.
-- Calendar unchanged (month grid, counts per day, times for the chosen day).
+### Listing detail (built from the canvas "Listing · phone" mockup, 18 October 2026)
+- **Phones and tablets:** the gallery runs edge to edge with the back, share and ⋮ buttons floating on the photo as cream circles, position dots and a "1 / 5" counter on the photo. From 1024px the mosaic is unchanged (capped at `clamp(320px, 34vw, 440px)`), with the buttons above it.
+- Category chip, title, then a facts row with icons: session length, "Up to N guests", area, and the listing's rating when it has reviews.
+- **Host card** high on the page at every width: avatar, "Your host", name, "ID verified" (from `users.is_id_verified`), host rating, bio preview, "View <name>'s profile".
+- About this experience, then What's provided as a checklist with coral checks.
+- **Pick a date:** on phones the booking card sits here in the page flow, without card chrome: section title, the month calendar in its own card, the chosen day, and each time as a card with spots left (coral when two or fewer) and Book. From 1024px the same content is the sticky booking card on the right, with the all-in price on top.
+- **Where you'll be:** a drawn street-grid tile with a coral pin (a stand-in until there is a privacy-safe map) and the line that the exact address arrives after booking.
+- Reviews last, with a dashed empty state; then two rows: the cancellation summary (links to the policy) and "Report this listing".
+- **Phone bottom bar:** all-in price per person, the PayNow price in coral-ink, and "Choose a date". It slides away while the booking card is on screen and during checkout.
 
-### Checkout (inside the booking card)
-Session summary at the top, then guests (44px round stepper buttons), then PayNow and Card as radio-style cards with the saving shown, then the Stripe element. The agreement line sits directly above the pay button.
+### Checkout ("Confirm and pay", from the canvas "Checkout · phone" mockup)
+- **Phones and tablets:** a full-screen sheet with a back arrow (cancels and returns to the dates). **From 1024px:** the same content inside the booking card, which stops being sticky so the whole checkout scrolls with the page.
+- Session summary card (photo, title, host and area, date and time in mono, "Change"), guests row with spots left and round 44px steppers plus the group-pricing line, "Pay with" PayNow and Card as radio cards (PayNow shows the 5% saving and the struck-through card price), a price breakdown (guests all in, PayNow saving, total, "Booking fee included"), three short promises we can stand behind (host ID check, address after booking, 48-hour full refund), and the agreement line.
+- Choosing a method still creates the payment straight away (unchanged flow, so the server's price check runs before the guest pays). Stripe's payment form then appears with "Pay $X", pinned to the bottom of the screen on phones.
 
 ### Hosting, bookings, profile, settings, auth
 Same tokens and components: raised white cards with `--shadow-sm`, display titles, tabs with a navy underline, consistent banners. Inline `style={{…}}` in pages is not allowed; add a class instead.
