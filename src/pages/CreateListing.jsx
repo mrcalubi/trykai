@@ -279,7 +279,7 @@ export default function CreateListing() {
     if (stepId === 'price') {
       if (priceCents == null) return 'Please enter a valid price.'
       if (!Number.isInteger(maxGuests) || maxGuests < MIN_GUESTS) {
-        return 'Max guests must be at least 1.'
+        return 'Spots per session must be at least 1.'
       }
       if (durationChoice == null) return 'Choose how long each session lasts.'
       if (!Number.isInteger(durationMins) || durationMins < 1) {
@@ -581,7 +581,7 @@ export default function CreateListing() {
           <div className="wizard-row">
             <div>
               <p className="wizard-row__label" id="group-size-label">
-                Group size
+                Spots per session
               </p>
               <p className="wizard-row__hint">The most guests in one session.</p>
             </div>
@@ -599,7 +599,7 @@ export default function CreateListing() {
               >
                 −
               </button>
-              <output className="guest-stepper__count" aria-live="polite" aria-label="Max guests">
+              <output className="guest-stepper__count" aria-live="polite">
                 {maxGuests}
               </output>
               <button

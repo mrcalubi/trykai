@@ -6,11 +6,27 @@ import PlanningAreaSelect from '../components/PlanningAreaSelect'
 import PhotoTips from '../components/PhotoTips'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import { hostListingPriceHint, parsePriceInputCents } from '../lib/pricing'
+import { formatListingSpotsMessage } from '../lib/listingSpots'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 
 const MAX_PHOTOS = 5
 
 const CATEGORIES = ['Food', 'Fitness', 'Arts', 'Music', 'Language', 'Other']
+
+const LISTING_SELECT = `
+  id,
+  title,
+  description,
+  category,
+  price_per_person,
+  max_guests,
+  duration_mins,
+  group_pricing,
+  area,
+  whats_provided,
+  photo_urls,
+  host_id
+`
 
 const WHATS_PROVIDED_OPTIONS = ['Materials', 'Equipment', 'Food & drinks', 'None']
 
@@ -51,15 +67,22 @@ export default function EditListing() {
 
   useEffect(() => {
     async function fetchListing() {
-      const [{ data, error: fetchError }, founding] = await Promise.all([
+      const [{ data, error: fetchError }, founding, addressResult] = await Promise.all([
         withIssuedAtRetry(() =>
-          supabase.from('listings').select('*').eq('id', id).eq('host_id', userId).single()
+          supabase.from('listings').select(LISTING_SELECT).eq('id', id).eq('host_id', userId).single()
         ),
         supabase.rpc('my_is_founding_host'),
+        supabase.rpc('listing_address', { listing_id: id }),
       ])
 
       if (fetchError || !data) {
         setError(fetchError ? PAGE_LOAD_ERROR : 'Listing not found.')
+        setFetching(false)
+        return
+      }
+
+      if (addressResult.error) {
+        setError(PAGE_LOAD_ERROR)
         setFetching(false)
         return
       }
@@ -74,7 +97,7 @@ export default function EditListing() {
       setDurationMins(data.duration_mins != null ? String(data.duration_mins) : '')
       setGroupPricing(data.group_pricing !== false)
       setArea(data.area ?? '')
-      setFullAddress(data.full_address)
+      setFullAddress(typeof addressResult.data === 'string' ? addressResult.data : '')
       setWhatsProvided(data.whats_provided?.length ? data.whats_provided : [])
       setExistingPhotos(data.photo_urls ?? [])
       setFetching(false)
@@ -175,7 +198,7 @@ export default function EditListing() {
     }
 
     if (Number.isNaN(guests) || guests < 1) {
-      setError('Max guests must be at least 1.')
+      setError('Spots per session must be at least 1.')
       return
     }
 
@@ -203,12 +226,22 @@ export default function EditListing() {
       return
     }
 
+    const { data: spotsData, error: spotsError } = await supabase.rpc('set_listing_spots', {
+      p_listing_id: id,
+      p_spots: guests,
+    })
+
+    if (spotsError) {
+      setLoading(false)
+      setError(spotsError.message)
+      return
+    }
+
     const listingPayload = {
       title: title.trim(),
       description: description.trim(),
       category,
       price_per_person: priceCents,
-      max_guests: guests,
       duration_mins: duration,
       group_pricing: groupPricing,
       area,
@@ -239,9 +272,11 @@ export default function EditListing() {
       return
     }
 
-    navigate('/dashboard', {
+    navigate('/hosting', {
       replace: true,
-      state: { message: 'Listing updated successfully.' },
+      state: {
+        message: `Listing updated successfully. ${formatListingSpotsMessage(spotsData)}`,
+      },
     })
   }
 
@@ -326,7 +361,7 @@ export default function EditListing() {
             </div>
 
             <label className="label">
-              Max guests
+              Spots per session
               <input
                 type="number"
                 value={maxGuests}

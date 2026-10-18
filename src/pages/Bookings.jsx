@@ -116,8 +116,8 @@ export default function Bookings({ embedded = false }) {
               booking.sessions?.listings?.id
           )
           .map(async (booking) => {
-            const { data: address } = await supabase.rpc('get_listing_address', {
-              p_listing_id: booking.sessions.listings.id,
+            const { data: address } = await supabase.rpc('listing_address', {
+              listing_id: booking.sessions.listings.id,
             })
             return address ? [booking.id, address] : null
           })

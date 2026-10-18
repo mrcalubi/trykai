@@ -99,6 +99,7 @@ function makeMyListing(overrides = {}) {
     category: 'Food',
     photo_urls: ['https://cdn.test/latte.jpg'],
     duration_mins: 90,
+    max_guests: 4,
     ...overrides,
   }
 }
@@ -424,6 +425,8 @@ describe('Dashboard listings', () => {
     expect(add?.[0]).toMatch(/width:\s*100%/)
     expect(card?.[0]).toMatch(/padding:\s*12px/)
     expect(listings?.[0]).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/)
+    expect(listings?.[0]).toMatch(/align-items:\s*start/)
+    expect(css).toMatch(/\.add-sessions__repeat select\.input \{[^}]*padding-right:\s*36px/)
     expect(css).toMatch(
       /@media \(min-width: 1024px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
     )
@@ -581,11 +584,10 @@ describe('Dashboard add session', () => {
     await user.click(screen.getByRole('button', { name: 'Add session' }))
   }
 
-  async function fillSession(user, { daysAhead = 1, time = '10:30', spots = '4' } = {}) {
+  async function fillSession(user, { daysAhead = 1, time = '10:30' } = {}) {
     const dateKey = dateKeyFromToday(daysAhead)
     await selectCalendarDate(user, dateKey)
     fireEvent.change(screen.getByLabelText('Time'), { target: { value: time } })
-    fireEvent.change(screen.getByLabelText('Spots total'), { target: { value: spots } })
     return dateKey
   }
 
@@ -632,7 +634,13 @@ describe('Dashboard add session', () => {
     await openSessionForm(user)
 
     expect(screen.getByText('Each session is 1 hr 30 min.')).toBeInTheDocument()
+    expect(screen.getByText(/4 spots per session/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'change in listing settings' })).toHaveAttribute(
+      'href',
+      '/edit-listing/listing-1'
+    )
     expect(screen.queryByLabelText('Duration (mins)')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Spots total')).not.toBeInTheDocument()
   })
 
   it('stores the start time as UTC converted from Singapore time', async () => {
@@ -652,10 +660,11 @@ describe('Dashboard add session', () => {
     expect(supabase.__calls('sessions', 'insert')).toHaveLength(0)
   })
 
-  it('sends the spot count and lets the database set the length', async () => {
+  it('sends the listing spots and lets the database set the length', async () => {
+    givenData({ listings: [makeMyListing({ max_guests: 6 })] })
     const { user } = await renderHosting()
     await openSessionForm(user)
-    await fillSession(user, { spots: '6' })
+    await fillSession(user)
 
     await reviewAndCreate(user)
 
@@ -725,13 +734,16 @@ describe('Dashboard add session', () => {
     if (blocked) expect(blocked).toBeDisabled()
   })
 
-  it('rejects a session with no spots', async () => {
+  it('asks the host to set listing spots when max_guests is missing', async () => {
+    givenData({ listings: [makeMyListing({ max_guests: null })] })
     const { user } = await renderHosting()
     await openSessionForm(user)
-    await fillSession(user, { spots: '0' })
+    await fillSession(user)
     fireEvent.submit(document.querySelector('.dashboard-card__form'))
 
-    expect(await screen.findByText('Spots total must be at least 1.')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Set spots per session in listing settings first.')
+    ).toBeInTheDocument()
   })
 
   it('closes the form after a successful save', async () => {
@@ -800,7 +812,6 @@ describe('Dashboard add session', () => {
     fireEvent.change(screen.getByLabelText('Time'), { target: { value: '10:00' } })
     await user.click(screen.getByRole('button', { name: '+ add time' }))
     fireEvent.change(screen.getByLabelText('Time 2'), { target: { value: '14:00' } })
-    fireEvent.change(screen.getByLabelText('Spots total'), { target: { value: '4' } })
 
     await user.click(screen.getByRole('button', { name: 'Review sessions' }))
 
@@ -985,7 +996,8 @@ describe('Dashboard host cancellation', () => {
     await renderHosting()
 
     expect(within(sectionFor('Upcoming')).getByText('No upcoming bookings yet.')).toBeInTheDocument()
-    expect(screen.getByText(/0 active booking\(s\) · 0 guests booked/)).toBeInTheDocument()
+    expect(screen.queryByText(/active booking/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel session' })).not.toBeInTheDocument()
   })
@@ -1041,7 +1053,7 @@ describe('Dashboard host cancellation', () => {
 
     expect(await screen.findByText('not allowed')).toBeInTheDocument()
     expect(within(listingCard('Latte art')).getByRole('button', { name: 'Confirm delete' })).toBeInTheDocument()
-    expect(within(listingCard('Latte art')).getByText(/active booking/)).toBeInTheDocument()
+    expect(within(listingCard('Latte art')).queryByText(/active booking/)).not.toBeInTheDocument()
   })
 
   it('does not offer Delete on a session with a confirmed booking', async () => {
@@ -1049,8 +1061,54 @@ describe('Dashboard host cancellation', () => {
     await renderHosting()
 
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
     expect(within(sectionFor('Upcoming')).getByRole('button', { name: 'Cancel session' })).toBeInTheDocument()
     expect(supabase.rpc.mock.calls.some(([name]) => name === 'delete_empty_session')).toBe(false)
+  })
+
+  it('moves an empty session through edit_open_session', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [makeHostSession({ bookings: [] })],
+    })
+    givenRpc(async (name) => {
+      if (name === 'edit_open_session') return { data: 'session-1', error: null }
+      return { data: null, error: null }
+    })
+    const { user } = await renderHosting()
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const dateKey = dateKeyFromToday(2)
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: dateKey } })
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '15:00' } })
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(supabase.rpc).toHaveBeenCalledWith('edit_open_session', {
+        p_session_id: 'session-1',
+        p_starts_at: `${dateKey}T07:00:00.000Z`,
+      })
+    )
+  })
+
+  it('keeps the session and explains when a booking wins the race', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [makeHostSession({ bookings: [] })],
+    })
+    givenRpc(async (name) => {
+      if (name === 'edit_open_session') {
+        return { data: null, error: { message: 'session_has_bookings' } }
+      }
+      return { data: null, error: null }
+    })
+    const { user } = await renderHosting()
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(
+      await screen.findByText("Someone just started booking this session, so it can't be edited.")
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
   })
 
   it('names a single guest in the cancel warning without an amount', async () => {

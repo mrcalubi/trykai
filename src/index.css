@@ -3408,15 +3408,15 @@ body.lightbox-open {
   border-color: var(--primary);
 }
 
-.session-calendar__count {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text);
+.session-calendar__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
-.session-calendar__day--selected .session-calendar__count {
-  color: var(--cream);
+.session-calendar__day--selected .session-calendar__dot {
+  background: var(--cream);
 }
 
 .session-day__title {
@@ -4103,6 +4103,10 @@ body.lightbox-open {
   border-color: var(--primary);
 }
 
+.add-sessions__repeat select.input {
+  padding-right: 36px;
+}
+
 .add-sessions__times {
   display: flex;
   flex-direction: column;
@@ -4159,10 +4163,19 @@ body.lightbox-open {
   border-top: 1px solid var(--border);
 }
 
+.hosting-session {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
 .hosting-session__main {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 
 .hosting-session__text {
@@ -4179,7 +4192,23 @@ body.lightbox-open {
 .hosting-session__action {
   padding: 6px 14px;
   font-size: 13px;
+}
+
+.hosting-session__action--danger {
   color: var(--error);
+}
+
+.hosting-session__edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hosting-session__edit .input {
+  width: auto;
+  min-height: 36px;
+  padding: 6px 10px;
 }
 
 .hosting-sessions__more {
@@ -4331,6 +4360,7 @@ body.lightbox-open {
 .dashboard-list--listings {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  align-items: start;
 }
 
 @media (min-width: 1024px) {

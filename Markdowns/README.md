@@ -24,7 +24,7 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 - Signup profile row is created by `handle_new_user` (`00004`), not by Login.jsx
 - Host verification: Stripe Identity default, manual fallback, review at `/admin/verifications`. Listing and session INSERT require `can_create_listing()`
 - Atomic `spots_remaining` decrement via `confirm_paid_booking` (service role only)
-- Guest address reveal via `get_listing_address` (confirmed guest only). `listings.full_address` is still granted SELECT
+- Address reveal via `listing_address()` (host or confirmed guest). `00025` grants SELECT on every `listings` column except `full_address`. `get_listing_address` is dropped.
 - Four tier cancellation refunds via `cancel-booking` (guest emailed the refund amount, including $0). `/bookings` and `/hosting` invoke that function; they do not PATCH bookings from the browser
 - CI: Vitest coverage floors 92% / 90% / 87%, money files 100%, Playwright desktop + phone, Deno type-check of shared Edge modules. A push to `staging` or `main` deploys every Edge Function after those checks pass. Pull requests do not deploy.
 - Global chrome is `SiteNav` → `TopNav`. `Navbar.jsx` is deleted. Browse uses the kit `Card`. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only
@@ -38,7 +38,6 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 - Two test cancellations: confirm Stripe refunds and `cancel-booking invoked` in function logs
 - Apply `00010` plus Vault/`PAYOUT_CRON_SECRET` on each environment. Platform payouts must stay manual
 - P0.4: `is_suspended` exists; listing/session INSERT is blocked by `00008`, but browse and Book still ignore the flag
-- P0.7 grant: `listings.full_address` is still selectable via a crafted query
 
 **Open and unstarted**
 - Forgot password: not built

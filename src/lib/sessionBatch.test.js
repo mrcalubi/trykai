@@ -16,6 +16,7 @@ import {
   previewSessionBatch,
   selectableDateWindow,
   singaporeDateTime,
+  singaporeTimeValue,
   singaporeWeekday,
   skipReasonFromRpcMessage,
 } from './sessionBatch'
@@ -112,6 +113,7 @@ describe('previewSessionBatch', () => {
   it('builds one start per date × time', () => {
     expect(buildSessionStarts(['2026-10-18', '2026-10-24'], ['10:00', '14:00'])).toHaveLength(4)
     expect(singaporeDateTime('2026-10-18', '10:30').toISOString()).toBe('2026-10-18T02:30:00.000Z')
+    expect(singaporeTimeValue('2026-10-18T02:30:00.000Z')).toBe('10:30')
   })
 
   it('allows back-to-back sessions and treats an overlap as a clash', () => {

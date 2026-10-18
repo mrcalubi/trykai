@@ -54,7 +54,7 @@ Not a calendar. Capacity is 8 hours a week.
 
 1. **Ops (not app code):** confirm `00005`, `00008`, `00009`, `00010`, `00011`, and `00012` on each environment; Vault/GitHub secrets for `release-payout`; Stripe Dashboard webhook + secrets; `RESEND_API_KEY` and current Edge Function deploys on production; platform payouts **manual**; flag eleven `is_founding_host`; one staging test-mode booking; confirm the two test cancellations were refunded on Stripe.
 2. **P0.4** app actually filters `is_suspended` on browse and Book. Listing/session INSERT is already gated by `can_create_listing()` (`00008`). One-click admin can wait if Table Editor plus this filter is reliable.
-3. **Revoke `listings.full_address`** from anon/authenticated SELECT. Public pages already omit the column; the grant is the remaining leak.
+3. ~~**Revoke `listings.full_address`** from anon/authenticated SELECT.~~ Done in `00025` (`listing_address()`).
 4. Browse card rating: the listings fetch does not supply one and there is no aggregate rating column. The card already shows the all-in card price.
 5. **P2.3** review gating is done (`00011`). Then the rest of P2 in listed order.
 6. JWT "issued at future" on browse: retry once, friendly error, never show raw error text.
@@ -67,7 +67,7 @@ Review reminder email, saved listings, host-to-guest reviews then the review fil
 
 ## P0: blocks launch
 
-> **Status, 21 September 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, guest address reveal path of P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement on browse/Book, `full_address` column grant. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September. P0.9 assets resolved 9 September. `00008` listing gate, `00009` session/booking read, `00010` `release-payout` schedule, `00011` review gate, and `00012` empty-session delete are in the tree.
+> **Status, 18 October 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. Still open: P0.4 enforcement on browse/Book. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September. P0.9 assets resolved 9 September. `00008` listing gate, `00009` session/booking read, `00010` `release-payout` schedule, `00011` review gate, and `00012` empty-session delete are in the tree.
 
 ### P0.1 — Host payout details — OBSOLETE
 Under Stripe Connect Express, Stripe collects the host's bank details. Do not add `payout_method` / `payout_identifier` columns.
@@ -98,10 +98,8 @@ Still to build:
 ### P0.6 — Spots decrement, atomically — DONE
 `confirm_paid_booking` decrements `spots_remaining` by `guests_count` under a row lock in the same operation that flips the booking to confirmed. CHECK constraint `spots_remaining >= 0`. Stripe webhook is the caller. Guest-callable `confirm_booking` from `00002` was dropped; the wrapper in `00005` is service_role only.
 
-### P0.7 — Full address reveal — GUEST PATH DONE, GRANT STILL OPEN
-**Done:** `get_listing_address(listing_id)` returns `full_address` only to a guest with a confirmed booking. ListingDetail and `/bookings` call it. Public selects omit the column. Hosts read `full_address` via listings SELECT (the RPC does not return it to the owning host).
-
-**Not done:** `00001` still `GRANT ALL` on `listings` to anon and authenticated. A crafted query on an active listing can read `full_address`. Revoke the column (or all direct SELECT of it) so the RPC is the only guest path.
+### P0.7 — Full address reveal — DONE 18 October
+`00025` grants SELECT on every `listings` column except `full_address`. `listing_address(listing_id)` returns the address to the host or a confirmed guest, otherwise null. ListingDetail, BookingDetail, Bookings, and Edit listing call it. Emails and Edge Functions use the service role and still SELECT the column.
 
 ### P0.8 — Real email delivery — DONE 14 September
 **Flow:** anything happens → the relevant person is told
@@ -203,6 +201,8 @@ In this order after warm-contact launch:
 8. **Sessions beyond 80 days (closed).** PayNow checkout and the host add-sessions calendar both stop at `PAYNOW_MAX_DAYS_AHEAD` (80). Direct INSERT could still write a later row; no product path does.
 9. **Refund Stripe fees after 100 bookings.** Launch absorbs Stripe’s kept processing fee on full refunds (~S$1.45 card / ~S$0.35 PayNow). Review then; leaning towards making the booking fee non-refundable on 48h+ guest cancellations, with notice.
 10. **Host-wide session overlap in the database.** Preview already refuses a clash with any of this host’s sessions. The trigger and `add_listing_session` are still per listing. Candidate migration if hosts double-book themselves across listings.
+11. **Revoke client session INSERT.** Hosts still have INSERT on `sessions` for the pre-`00018` duration fallback. A crafted insert can set its own `spots_total`. The product path uses `add_listing_session`.
+12. **`add_listing_session` should ignore client `p_spots`.** Hosting sends `listings.max_guests`, but the RPC still accepts any positive number. After launch, take spots from the locked listing row.
 
 Then: identity and social layer, Date Mode, credit bundles, multi session courses, "this weekend" filter, search, in app notifications, listing performance nudges, listing video, host Pro subscription, payout clawback.
 

@@ -59,7 +59,7 @@ async function completeBasics(user, values) {
 }
 
 async function setGroupSize(user, target) {
-  const count = () => Number(screen.getByLabelText('Max guests').textContent)
+  const count = () => Number(document.querySelector('.guest-stepper__count').textContent)
   while (count() < target) await user.click(screen.getByRole('button', { name: 'More guests' }))
   while (count() > target && count() > 1) {
     await user.click(screen.getByRole('button', { name: 'Fewer guests' }))
@@ -313,7 +313,8 @@ describe('CreateListing validation', () => {
 
     await setGroupSize(user, 1)
 
-    expect(screen.getByLabelText('Max guests')).toHaveTextContent('1')
+    expect(screen.getByText('Spots per session')).toBeInTheDocument()
+    expect(document.querySelector('.guest-stepper__count')).toHaveTextContent('1')
     expect(screen.getByRole('button', { name: 'Fewer guests' })).toBeDisabled()
   })
 
