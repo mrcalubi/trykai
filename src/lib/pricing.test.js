@@ -6,7 +6,7 @@ import {
   formatGuestFacingPrice,
   groupPriceLabel,
   guestFacingPriceCents,
-  hostListingPriceHint,
+  hostPriceBreakdown,
   nextGroupTierHint,
   parsePriceInputCents,
   paynowPriceCents,
@@ -85,21 +85,34 @@ describe('pricing.js matches booking.ts', () => {
     expect(discountedPerPersonCents(2500, 4)).toBe(2125)
   })
 
-  it('shows hosts the public price and their payout, never a guest total', () => {
-    expect(hostListingPriceHint(2500, true)).toBe('Guests see $28 · You receive $25')
-    expect(hostListingPriceHint(2500, false)).toBe(
-      'Guests see $28 · You receive $25 · $22.50 after your first 3 bookings',
-    )
-    expect(hostListingPriceHint(2500, null)).toBe('')
-    expect(hostListingPriceHint(2500)).toBe('')
-    expect(hostListingPriceHint(0)).toBe('')
+  it('parses a dollar price into cents and rejects empty or invalid values', () => {
     expect(parsePriceInputCents('25')).toBe(2500)
     expect(parsePriceInputCents('')).toBeNull()
     expect(parsePriceInputCents(null)).toBeNull()
     expect(parsePriceInputCents('   ')).toBeNull()
     expect(parsePriceInputCents('0')).toBeNull()
     expect(parsePriceInputCents('abc')).toBeNull()
-    expect(hostListingPriceHint(Number.NaN)).toBe('')
+  })
+
+  it('ranges a full session when group discounts come off the lesson price', () => {
+    const founding = hostPriceBreakdown(2500, true, 4, true)
+    expect(founding.afterFeeCents).toBeNull()
+    expect(founding.youReceiveCents).toBe(2500)
+    expect(founding.fullSessionLowCents).toBe(8500)
+    expect(founding.fullSessionHighCents).toBe(10000)
+
+    const feePaying = hostPriceBreakdown(2500, false, 4, true)
+    expect(feePaying.afterFeeCents).toBe(2250)
+    expect(feePaying.fullSessionLowCents).toBe(8500)
+
+    const off = hostPriceBreakdown(2500, false, 4, false)
+    expect(off.fullSessionLowCents).toBeNull()
+    expect(off.fullSessionHighCents).toBe(10000)
+
+    const unknown = hostPriceBreakdown(2500, null, 4, true)
+    expect(unknown.youReceiveCents).toBeNull()
+    expect(unknown.afterFeeCents).toBeNull()
+    expect(unknown.fullSessionHighCents).toBeNull()
   })
 
   it('hints the next group tier when one is still available', () => {

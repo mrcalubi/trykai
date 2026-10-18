@@ -118,7 +118,7 @@ Fonts load from Google Fonts via `<link>` with `preconnect` in `index.html`, not
 ## 7. Photography
 
 - **Real, but as good as the host can make it:** natural light, no clutter, accurate to the session. No professional staging.
-- **Guidance at creation time:** the create and edit listing forms show a short photo tip panel beside the upload ("shoot by a window, show hands mid-activity, lead with the finished thing"). No invented conversion stats in the copy.
+- **Guidance at creation time:** create and edit show a panel titled "A few tips for great photos": natural light by a window, lead with the finished thing, hands in action, tidy background. Continue with 0 photos asks before skipping. Cover crop matches the browse card (4/3). No invented conversion stats.
 - **No photo:** category tint tile with the category's line icon (section 2).
 
 ---
@@ -171,9 +171,9 @@ No photo banner and no persistent search bar for launch (unchanged): with tens o
 Same tokens and components: raised white cards with `--shadow-sm`, display titles, tabs with a navy underline, consistent banners. Inline `style={{…}}` in pages is not allowed; add a class instead.
 
 ### Create listing (built from the canvas "New listing, step 3 · phone" mockup, 18 October 2026)
-- **Five steps:** *The basics* (title, category as six icon tiles, description), *Add photos* (tips panel, a dashed upload tile, previews with the first marked Cover), *Price and group size*, *Where it happens* (area and full address), *Final touches* (what's provided, a preview of the browse card, cancellation policy, Host terms, Create listing).
-- **Chrome:** close (to Hosting), "New listing" and "Save draft" on top; "Step N of 5" in mono with "Next: <step>" and five progress segments; Back and Continue (Create listing on the last step) at the bottom. Continue checks only the current step and says what is missing; Create listing re-checks every step.
-- **Price step:** a large S$ price field, then a sand panel with what guests pay (all in), what the host receives, the price after the first 3 bookings with the 10% host fee (hidden for founding hosts), and "A full session of N pays you up to". When founding-host status cannot be read only the guest price shows. Group size is a round stepper (1 to 50, default 4), session length is four chips (1 hr, 1.5 hr, 2 hr, Other with a minutes field), and group discounts are a checkbox card.
+- **Five steps:** *The basics* (title, category as six icon tiles, description), *Add photos* (tips panel, a dashed upload tile, previews with the first marked Cover, reorder and crop), *Price and group size*, *Where it happens* (area and full address), *Final touches* (what's provided including custom items, a preview of the browse card, cancellation policy, Host terms, Create listing).
+- **Chrome:** close (to Hosting), "New listing" and "Save draft" on top; "Step N of 5" in mono with "Next: <step>" and five progress segments; Back and Continue (Create listing on the last step) at the bottom. Continue checks only the current step and shows a warm coral-ink hint under the missing field, never a red error box; Create listing re-checks every step.
+- **Price step:** a large S$ price field, then a sand panel with what guests pay (all in), what the host receives, the price after the first 3 bookings with the 10% host fee (hidden for founding hosts), and "A full session of N pays you" as a range when group discounts are on (`$68–$80, depending on how guests book`) or one number when they are off. When founding-host status cannot be read only the guest price shows. Group size is a round stepper (1 to 50, default 4), session length is four chips (1 hr, 1.5 hr, 2 hr, Other with a minutes field), and group discounts are a checkbox card.
 - **Drafts:** "Save draft" keeps the text answers in this browser (not photos); next time the first step offers Restore draft or Discard. Publishing clears it.
 - **Phones and tablets:** a full-screen flow over the site nav, with Back and Continue pinned to the bottom. **From 1024px:** the steps sit in a white card (max 640px) with a sticky "How guests will see it" preview of the browse card beside it, updating as the host types.
 
