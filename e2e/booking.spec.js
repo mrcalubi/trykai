@@ -33,8 +33,8 @@ test.describe('listing detail', () => {
     await expect(page.getByText('Pull your first rosetta in ninety minutes.')).toBeVisible()
     await expect(page.getByRole('listitem').filter({ hasText: 'Materials' })).toBeVisible()
     await expect(page.getByRole('link', { name: '⚑ Report' })).toHaveCount(0)
-    await page.getByRole('button', { name: 'More actions' }).click()
-    await expect(page.getByRole('menuitem', { name: 'Report listing' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'More actions' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Report this listing' })).toBeVisible()
   })
 
   test('lists a bookable session with its remaining spots', async ({ page }) => {

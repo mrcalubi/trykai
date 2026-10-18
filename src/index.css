@@ -2732,6 +2732,7 @@ body.lightbox-open {
 /* User-written copy on listing detail, listing cards, and booking cards.
    break-word wraps long tokens without letting flex min-content collapse
    to a single character. */
+.detail-location__title,
 .checkout-summary__title,
 .detail-title,
 .detail-description,
@@ -3093,12 +3094,21 @@ body.lightbox-open {
 
 .detail-location {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
+  flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+}
+
+.detail-location__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+}
+
+.detail-location__row + .detail-location__row {
+  border-top: 1px solid var(--border);
 }
 
 .detail-location__icon {
@@ -3106,17 +3116,38 @@ body.lightbox-open {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   color: var(--coral-ink);
   background: var(--coral-soft);
   border-radius: 50%;
 }
 
 .detail-location__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.detail-location__title {
   font-size: 15px;
-  line-height: 1.5;
+  font-weight: 700;
   color: var(--navy);
+}
+
+.detail-location__note {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.detail-location__link {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  text-underline-offset: 3px;
 }
 
 .empty-state--boxed {
@@ -5431,40 +5462,6 @@ body.lightbox-open {
   }
 }
 
-/* Where you'll be: a drawn street grid until there is a privacy-safe map. */
-.detail-map {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 160px;
-  background-color: #E3DDD0;
-  background-image:
-    linear-gradient(#D6CFC0 1px, transparent 1px),
-    linear-gradient(90deg, #D6CFC0 1px, transparent 1px);
-  background-size: 28px 28px;
-  border-radius: var(--radius-lg);
-}
-
-.detail-map__pin {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 88px;
-  height: 88px;
-  color: var(--coral);
-  background: rgba(217, 119, 86, 0.18);
-  border: 2px solid var(--coral);
-  border-radius: 50%;
-}
-
-.detail-location__copy {
-  margin-top: 12px;
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--navy);
-}
-
 .empty-state--boxed p + p {
   margin-top: 2px;
 }
@@ -5507,8 +5504,8 @@ body.lightbox-open {
   .page-back:has(+ .page--listing) {
     position: relative;
     z-index: 5;
-    height: 64px;
-    margin-bottom: -64px;
+    height: 56px;
+    margin-bottom: -56px;
     padding-top: 12px;
     pointer-events: none;
   }
@@ -5519,17 +5516,31 @@ body.lightbox-open {
   }
 
   .page-back:has(+ .page--listing) .page-back__button,
-  .page-back:has(+ .page--listing) .share-button,
-  .page-back:has(+ .page--listing) .ui-overflow__trigger {
-    width: 40px;
-    min-width: 40px;
-    height: 40px;
-    min-height: 40px;
+  .page-back:has(+ .page--listing) .share-button {
+    position: relative;
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
     color: var(--navy);
     background: var(--cream);
     border: 0;
     border-radius: 50%;
     box-shadow: 0 1px 4px rgba(22, 38, 75, 0.2);
+  }
+
+  .page-back:has(+ .page--listing) .page-back__button svg,
+  .page-back:has(+ .page--listing) .share-button svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  /* Small to look at, still a 44px target to tap. */
+  .page-back:has(+ .page--listing) .page-back__button::after,
+  .page-back:has(+ .page--listing) .share-button::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
   }
 
   .page-back + .page--listing {
