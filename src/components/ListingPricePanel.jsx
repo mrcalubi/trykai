@@ -60,9 +60,9 @@ export default function ListingPricePanel({ breakdown, groupSize }) {
       {breakdown.fullSessionHighCents != null ? (
         <div className="price-panel__session">
           <p className="price-panel__session-line">
-            Full session of {spots}: up to{' '}
+            Full session of {spots}:{' '}
             <span className="price-panel__amount">
-              <FormattedPrice cents={breakdown.fullSessionHighCents} />
+              <FormattedPrice cents={breakdown.fullSessionCents ?? breakdown.fullSessionHighCents} />
             </span>
           </p>
           <button

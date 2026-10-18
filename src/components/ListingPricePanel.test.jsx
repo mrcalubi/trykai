@@ -13,7 +13,8 @@ describe('ListingPricePanel', () => {
 
     expect(screen.getByText('Guests pay').closest('.price-panel__figure')).toHaveTextContent('$28')
     expect(screen.getByText('You get').closest('.price-panel__figure')).toHaveTextContent('$25')
-    expect(screen.getByText(/Full session of 4/)).toHaveTextContent('up to $100')
+    expect(screen.getByText(/Full session of 4/)).toHaveTextContent('Full session of 4: $100')
+    expect(screen.getByText(/Full session of 4/)).not.toHaveTextContent('up to')
     expect(screen.getByText('10% host fee from your 4th booking.')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'How these numbers work' }))

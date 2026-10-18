@@ -124,7 +124,7 @@ describe('EditListing prefill', () => {
     expect(screen.getByLabelText('Spots per session')).toHaveValue(4)
     expect(screen.getByLabelText('Area')).toHaveValue('Bedok')
     expect(screen.getByLabelText(/^Full address/)).toHaveValue('12 Coffee Road')
-    expect(screen.getByRole('checkbox', { name: 'Offer group pricing' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Offer group discounts' })).toBeChecked()
   })
 
   it('loads the address from listing_address, not the listings row', async () => {
@@ -157,7 +157,14 @@ describe('EditListing prefill', () => {
     expect(screen.getByLabelText('Price per person (SGD)')).toHaveValue(45)
     expect(screen.getByText('Guests pay').closest('.price-panel__figure')).toHaveTextContent('$51')
     expect(screen.getByText('You get').closest('.price-panel__figure')).toHaveTextContent('$45')
+    expect(screen.getByText(/Full session of 4/)).toHaveTextContent('Full session of 4: $180')
+    expect(screen.getByText(/Full session of 4/)).not.toHaveTextContent('up to')
     expect(screen.getByText('10% host fee from your 4th booking.')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Group discounts come off your price, e.g. a group of 4 together pays you $153 instead of $180.',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('clears duration and group pricing when the saved listing has none', async () => {
@@ -165,7 +172,8 @@ describe('EditListing prefill', () => {
     await renderLoaded()
 
     expect(screen.getByLabelText('Duration (mins)')).toHaveValue(null)
-    expect(screen.getByRole('checkbox', { name: 'Offer group pricing' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Offer group discounts' })).not.toBeChecked()
+    expect(screen.queryByText(/Group discounts come off your price/)).not.toBeInTheDocument()
   })
 
   it('shows a founding host only the public price and their payout', async () => {

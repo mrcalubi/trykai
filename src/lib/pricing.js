@@ -151,10 +151,19 @@ export function hostPriceBreakdown(
     groupPricing: Boolean(groupPricing),
     groupSize: size,
     togetherCents,
+    fullSessionCents: high,
     fullSessionHighCents: high,
-    fullSessionLowCents:
-      Boolean(groupPricing) && size > 1 && togetherCents !== high ? togetherCents : null,
+    fullSessionLowCents: null,
   }
+}
+
+/** One muted line under “Offer group discounts”. Empty when there is no price. */
+export function groupDiscountExampleLine(pricePerPersonCents, groupSize) {
+  if (!Number.isFinite(pricePerPersonCents) || pricePerPersonCents < 1) return ''
+  const size = Number.isFinite(groupSize) && groupSize > 0 ? groupSize : 1
+  const full = pricePerPersonCents * size
+  const together = discountedLessonCents(pricePerPersonCents, size, true)
+  return `Group discounts come off your price, e.g. a group of ${size} together pays you ${formatCents(together)} instead of ${formatCents(full)}.`
 }
 
 export function nextGroupTierHint(guestsCount, groupPricing, maxGuests) {

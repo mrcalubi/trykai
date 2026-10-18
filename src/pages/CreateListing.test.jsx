@@ -383,8 +383,14 @@ describe('CreateListing price panel', () => {
 
     expect(screen.getByText('Guests pay').closest('.price-panel__figure')).toHaveTextContent('$28')
     expect(screen.getByText('You get').closest('.price-panel__figure')).toHaveTextContent('$25')
-    expect(screen.getByText(/Full session of 4/)).toHaveTextContent('up to $100')
+    expect(screen.getByText(/Full session of 4/)).toHaveTextContent('Full session of 4: $100')
+    expect(screen.getByText(/Full session of 4/)).not.toHaveTextContent('up to')
     expect(screen.getByText('10% host fee from your 4th booking.')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Group discounts come off your price, e.g. a group of 4 together pays you $85 instead of $100.',
+      ),
+    ).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'How these numbers work' }))
     expect(screen.getByText('2 guests: 5% off the lesson')).toBeInTheDocument()
@@ -394,7 +400,12 @@ describe('CreateListing price panel', () => {
     ).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'More guests' }))
-    expect(screen.getByText(/Full session of 5/)).toHaveTextContent('up to $125')
+    expect(screen.getByText(/Full session of 5/)).toHaveTextContent('Full session of 5: $125')
+    expect(
+      screen.getByText(
+        'Group discounts come off your price, e.g. a group of 5 together pays you $100 instead of $125.',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('shows one full-session number when group discounts are off', async () => {
@@ -406,7 +417,10 @@ describe('CreateListing price panel', () => {
     await user.type(screen.getByLabelText('Your price per guest'), '25')
     await user.click(screen.getByRole('checkbox', { name: /Offer group discounts/ }))
 
-    expect(screen.getByText(/Full session of 4/)).toHaveTextContent('up to $100')
+    expect(screen.getByText(/Full session of 4/)).toHaveTextContent('Full session of 4: $100')
+    expect(
+      screen.queryByText(/Group discounts come off your price/),
+    ).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'How these numbers work' }))
     expect(
       screen.getByText('Group discounts are off. Guests pay the same per person at every group size.'),
@@ -728,9 +742,10 @@ describe('CreateListing photos', () => {
     selectFiles([imageFile('a.png')])
     await screen.findByText('Maximum of 5 photos (1/5)')
 
-    await user.click(screen.getByRole('button', { name: 'Crop cover' }))
+    await user.click(screen.getByRole('button', { name: 'Crop' }))
 
     expect(screen.getByText('Crop the cover to the listing card')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Free' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Use this crop' })).toBeDisabled()
   })
 
