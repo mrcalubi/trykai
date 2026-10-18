@@ -107,8 +107,8 @@ describe('Refund Policy page', () => {
     )
   })
 
-  it('gives guests seven days to raise a session-quality complaint', () => {
-    expect(screen.getByText(/within 7 days of your session/)).toBeInTheDocument()
+  it('gives guests three days to raise a session-quality complaint', () => {
+    expect(screen.getByText(/within 3 days after your session ends/)).toBeInTheDocument()
   })
 })
 
@@ -121,6 +121,12 @@ describe('Dispute Policy page', () => {
     expect(screen.getByRole('heading', { name: 'Quality complaints' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Safety reports' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Appealing a host strike' })).toBeInTheDocument()
+  })
+
+  it('gives guests three days after the session to raise a quality complaint', () => {
+    expect(
+      screen.getByText(/within 3 days after\s+the session ends\. We cannot review complaints raised after that\./)
+    ).toBeInTheDocument()
   })
 
   it('commits to a two business day response on complaints', () => {

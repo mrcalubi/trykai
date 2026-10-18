@@ -562,7 +562,7 @@ GitHub secrets `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAY
 
 # Guest dispute refund
 
-Use this for a quality complaint (Dispute Policy: 7 days after the session, reply within 2 business days). Safety reports follow SAFETY_RESPONSE_PROTOCOL.md first; money is handled the same way. Do not edit `bookings` rows in Table Editor for any of this.
+Use this for a quality complaint (Dispute Policy: raised within 3 days after the session ends, reply within 2 business days). Decline complaints raised later. The window closes when the 72-hour payout hold does, so place the hold the moment a complaint arrives; one sent on the last day can otherwise miss the hourly payout run. Safety reports follow SAFETY_RESPONSE_PROTOCOL.md first; money is handled the same way. Do not edit `bookings` rows in Table Editor for any of this.
 
 Two functions, both gated by the `ADMIN_FUNCTION_SECRET` Edge Function secret in header `x-admin-secret`:
 
