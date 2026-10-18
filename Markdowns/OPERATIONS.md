@@ -616,6 +616,17 @@ $h = @{ Authorization = "Bearer PASTE_ACCESS_TOKEN"; apikey = "PASTE_ANON_PUBLIC
 $h = @{ Authorization = "Bearer PASTE_ANON_PUBLIC_KEY"; apikey = "PASTE_ANON_PUBLIC_KEY"; "x-admin-secret" = "PASTE_ADMIN_FUNCTION_SECRET"; "x-admin-operator" = "Your name" }
 ```
 
+## In-app reports (Report a problem)
+
+Most complaints now arrive from the guest's booking page (`report-booking-problem`, migration `00031`). The function refuses anything outside the window (session start to 3 days after the end), saves the text in `booking_complaints`, puts photos in the private Storage bucket `complaint-evidence`, **places the payout hold itself** (`payout_hold_reason = 'dispute'`), and emails `ADMIN_NOTIFY_EMAIL` with the report. Replying to that email goes to the guest. The guest gets an acknowledgement promising a reply within 2 business days.
+
+- If the ops email says **Not held**, the payout had already gone out, was refunded, or was already on hold. Check the booking (step 0) before step 3.
+- Photos: **Storage → complaint-evidence →** `<booking id>/<complaint id>/`. They are deleted 180 days after the report by `purge-verification-docs` (same daily run); the text stays.
+- One report per booking. Anything the guest adds comes by email.
+- Skip step 1 for these; go to step 2.
+
+Emailed complaints still follow every step below. Safety reports have no time limit and never go through the in-app form.
+
 ## 0. Find the booking
 
 The guest quotes a booking reference: the first 8 characters of `bookings.id`, uppercase. In **SQL Editor** (read only):
