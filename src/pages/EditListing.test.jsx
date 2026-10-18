@@ -5,6 +5,7 @@ import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession, makeListing } from '../test/fixtures'
+import { LISTING_FIELD_HINTS } from '../lib/listingFieldHints'
 
 vi.mock('../lib/supabase')
 
@@ -154,9 +155,11 @@ describe('EditListing prefill', () => {
     await renderLoaded()
 
     expect(screen.getByLabelText('Price per person (SGD)')).toHaveValue(45)
-    expect(
-      screen.getByText('Guests see $51 · You receive $45 · $40.50 after your first 3 bookings')
-    ).toBeInTheDocument()
+    expect(screen.getByText('Guests pay').closest('.price-panel__row')).toHaveTextContent('$51')
+    expect(screen.getByText('You receive per guest').closest('.price-panel__row')).toHaveTextContent(
+      '$45',
+    )
+    expect(screen.getByText(/After your first 3 bookings \(10% host fee\)/)).toBeInTheDocument()
   })
 
   it('clears duration and group pricing when the saved listing has none', async () => {
@@ -172,8 +175,10 @@ describe('EditListing prefill', () => {
     givenListing({ price_per_person: 2500 })
     await renderLoaded()
 
-    expect(screen.getByText('Guests see $28 · You receive $25')).toBeInTheDocument()
-    expect(screen.queryByText(/after your first 3 bookings/)).not.toBeInTheDocument()
+    expect(screen.getByText('You receive per guest').closest('.price-panel__row')).toHaveTextContent(
+      '$25',
+    )
+    expect(screen.queryByText(/host fee/)).not.toBeInTheDocument()
   })
 
   it('hides the price hint when founding-host status is unknown', async () => {
@@ -182,8 +187,9 @@ describe('EditListing prefill', () => {
     await renderLoaded()
 
     expect(screen.getByLabelText('Price per person (SGD)')).toHaveValue(25)
-    expect(screen.queryByText(/Guests see/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/after your first 3 bookings/)).not.toBeInTheDocument()
+    expect(screen.getByText('Guests pay')).toBeInTheDocument()
+    expect(screen.queryByText('You receive per guest')).not.toBeInTheDocument()
+    expect(screen.queryByText(/host fee/)).not.toBeInTheDocument()
   })
 
   it('keeps the cents when the stored price is not a whole dollar', async () => {
@@ -213,14 +219,14 @@ describe('EditListing prefill', () => {
     givenListing({ photo_urls: ['https://cdn.test/one.jpg', 'https://cdn.test/two.jpg'] })
     await renderLoaded()
 
-    expect(screen.getByText('Up to 5 images (2/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 5 photos (2/5)')).toBeInTheDocument()
   })
 
   it('copes with a listing that has no photos', async () => {
     givenListing({ photo_urls: null })
     await renderLoaded()
 
-    expect(screen.getByText('Up to 5 images (0/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 5 photos (0/5)')).toBeInTheDocument()
   })
 })
 
@@ -236,7 +242,8 @@ describe('EditListing validation', () => {
 
     submitForm()
 
-    expect(await screen.findByText('Please fill in all required fields.')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_FIELD_HINTS.title)).toBeInTheDocument()
+    expect(document.querySelector('.error-message')).not.toBeInTheDocument()
     expect(supabase.__calls('listings', 'update')).toHaveLength(0)
   })
 
@@ -247,7 +254,7 @@ describe('EditListing validation', () => {
 
     submitForm()
 
-    expect(await screen.findByText('Please enter a valid price.')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_FIELD_HINTS.price)).toBeInTheDocument()
   })
 
   it('rejects an empty price', async () => {
@@ -256,7 +263,7 @@ describe('EditListing validation', () => {
 
     submitForm()
 
-    expect(await screen.findByText('Please enter a valid price.')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_FIELD_HINTS.price)).toBeInTheDocument()
   })
 
   it('rejects a duration below one minute', async () => {
@@ -266,7 +273,7 @@ describe('EditListing validation', () => {
 
     submitForm()
 
-    expect(await screen.findByText('Duration must be at least 1 minute.')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_FIELD_HINTS.duration)).toBeInTheDocument()
     expect(supabase.__calls('listings', 'update')).toHaveLength(0)
   })
 
@@ -277,7 +284,7 @@ describe('EditListing validation', () => {
 
     submitForm()
 
-    expect(await screen.findByText('Spots per session must be at least 1.')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_FIELD_HINTS.spots)).toBeInTheDocument()
   })
 })
 
@@ -391,6 +398,20 @@ describe('EditListing saving', () => {
     expect(supabase.__lastCall('listings', 'update').payload.whats_provided).toEqual([])
   })
 
+  it('saves a custom provided item', async () => {
+    const { user } = await renderLoaded()
+    await user.type(screen.getByLabelText('Add your own'), 'Apron')
+    await user.click(screen.getByRole('button', { name: '+ Add your own' }))
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'update').payload.whats_provided).toEqual([
+      'Materials',
+      'Apron',
+    ])
+  })
+
   it('toggles a provided option back off', async () => {
     const { user } = await renderLoaded()
     await user.click(screen.getByRole('checkbox', { name: 'Materials' }))
@@ -410,7 +431,7 @@ describe('EditListing photos', () => {
   it('keeps the existing photos and appends the newly uploaded ones', async () => {
     const { user } = await renderLoaded()
     selectFiles([imageFile('two.png')])
-    await screen.findByText('Up to 5 images (2/5)')
+    await screen.findByText('Maximum of 5 photos (2/5)')
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
@@ -426,7 +447,7 @@ describe('EditListing photos', () => {
 
     await user.click(screen.getAllByRole('button', { name: 'Remove photo' })[0])
 
-    expect(screen.getByText('Up to 5 images (1/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
   })
 
   it('drops a removed photo from the saved listing', async () => {
@@ -445,11 +466,11 @@ describe('EditListing photos', () => {
   it('lets a newly added photo be removed again', async () => {
     const { user } = await renderLoaded()
     selectFiles([imageFile('two.png')])
-    await screen.findByText('Up to 5 images (2/5)')
+    await screen.findByText('Maximum of 5 photos (2/5)')
 
     await user.click(screen.getAllByRole('button', { name: 'Remove photo' })[1])
 
-    expect(screen.getByText('Up to 5 images (1/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
   })
 
   it('ignores files that are not images', async () => {
@@ -457,7 +478,7 @@ describe('EditListing photos', () => {
 
     selectFiles([new File(['x'], 'notes.txt', { type: 'text/plain' })])
 
-    expect(screen.getByText('Up to 5 images (1/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
   })
 
   it('counts existing photos towards the five photo cap', async () => {
@@ -468,14 +489,31 @@ describe('EditListing photos', () => {
 
     selectFiles([imageFile('e.png'), imageFile('f.png'), imageFile('g.png')])
 
-    expect(await screen.findByText('Up to 5 images (5/5)')).toBeInTheDocument()
+    expect(await screen.findByText('Maximum of 5 photos (5/5)')).toBeInTheDocument()
     expect(screen.getByLabelText('Photos')).toBeDisabled()
+  })
+
+  it('asks before saving with no photos, then lets the host skip', async () => {
+    givenListing({ photo_urls: [] })
+    const { user } = await renderLoaded()
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(
+      screen.getByText('Your skill deserves to be seen! Listings with photos get far more bookings.'),
+    ).toBeInTheDocument()
+    expect(supabase.__calls('listings', 'update')).toHaveLength(0)
+
+    await user.click(screen.getByRole('button', { name: 'Skip for now' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'update').payload.photo_urls).toEqual([])
   })
 
   it('abandons the save when a photo fails to upload', async () => {
     const { user } = await renderLoaded()
     selectFiles([imageFile('two.png')])
-    await screen.findByText('Up to 5 images (2/5)')
+    await screen.findByText('Maximum of 5 photos (2/5)')
     supabase
       .__bucket('listing-photos')
       .upload.mockResolvedValue({ data: null, error: { message: 'storage full' } })

@@ -110,6 +110,7 @@ test.describe('verified host create listing', () => {
           }),
         ],
         'rpc/my_verification': [{ verification_status: 'approved', is_admin: false }],
+        'rpc/my_is_founding_host': false,
       },
       { session: makeAuthSession() },
     )
@@ -135,6 +136,7 @@ test.describe('verified host create listing', () => {
 
     await expect(page.getByRole('heading', { name: 'Add photos' })).toBeVisible()
     await next()
+    await page.getByRole('button', { name: 'Skip for now' }).click()
 
     await expect(page.getByRole('heading', { name: 'Price and group size' })).toBeVisible()
     await expect(page.getByText('Step 3 of 5')).toBeVisible()
@@ -169,6 +171,7 @@ test.describe('listing spots', () => {
       group_pricing: true,
       is_active: true,
       full_address: '12 Coffee Road',
+      photo_urls: ['https://cdn.test/one.jpg'],
     }
     const session = {
       id: 'session-future',

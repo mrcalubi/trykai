@@ -117,35 +117,31 @@ export function parsePriceInputCents(value) {
 }
 
 /**
- * Hosts may see the public all-in listing price next to what they receive.
- * They never see an individual guest's payment. Non-founding hosts also see
- * the 10% fee that starts on the fourth confirmed booking. Unknown
- * founding-host status hides the whole line so we never show that 10%
- * cut to a host who might be grandfathered.
- */
-export function hostListingPriceHint(pricePerPersonCents, isFoundingHost) {
-  if (!Number.isFinite(pricePerPersonCents) || pricePerPersonCents < 1) return ''
-  if (isFoundingHost !== true && isFoundingHost !== false) return ''
-  const guestsSee = formatGuestFacingPrice(pricePerPersonCents)
-  const youReceive = formatCents(pricePerPersonCents)
-  const line = `Guests see ${guestsSee} · You receive ${youReceive}`
-  if (isFoundingHost) return line
-  const afterFee = formatCents(Math.round(pricePerPersonCents * (1 - HOST_FEE_RATE)))
-  return `${line} · ${afterFee} after your first 3 bookings`
-}
-
-/**
  * The numbers the create-listing price step shows a host. Founding-host status
  * decides whether the host fee applies, so `null` (unknown) leaves out every
  * host-side figure rather than promise a cut the host may not get.
  */
-export function hostPriceBreakdown(pricePerPersonCents, isFoundingHost, groupSize) {
+export function hostPriceBreakdown(
+  pricePerPersonCents,
+  isFoundingHost,
+  groupSize,
+  groupPricing = true,
+) {
   if (!Number.isFinite(pricePerPersonCents) || pricePerPersonCents < 1) return null
   const guestsPayCents = guestFacingPriceCents(pricePerPersonCents)
   if (isFoundingHost !== true && isFoundingHost !== false) {
-    return { guestsPayCents, youReceiveCents: null, afterFeeCents: null, fullSessionCents: null }
+    return {
+      guestsPayCents,
+      youReceiveCents: null,
+      afterFeeCents: null,
+      fullSessionLowCents: null,
+      fullSessionHighCents: null,
+    }
   }
   const size = Number.isFinite(groupSize) && groupSize > 0 ? groupSize : 1
+  const high = pricePerPersonCents * size
+  const low = discountedLessonCents(pricePerPersonCents, size, groupPricing)
+  const showRange = Boolean(groupPricing) && size > 1 && low !== high
   return {
     guestsPayCents,
     youReceiveCents: pricePerPersonCents,
@@ -154,7 +150,8 @@ export function hostPriceBreakdown(pricePerPersonCents, isFoundingHost, groupSiz
       : Math.round(pricePerPersonCents * (1 - HOST_FEE_RATE)),
     feeFreeBookings: HOST_FEE_FREE_BOOKINGS,
     feePercent: Math.round(HOST_FEE_RATE * 100),
-    fullSessionCents: pricePerPersonCents * size,
+    fullSessionLowCents: showRange ? low : null,
+    fullSessionHighCents: high,
   }
 }
 

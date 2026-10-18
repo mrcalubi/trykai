@@ -166,7 +166,7 @@ Disputes arrive by email today. At launch volume that is survivable.
 - No catch-all 404
 - No T&C checkboxes at signup, create listing, or checkout
 - Password reset: done (`/forgot-password` and `/reset-password`)
-- No photography guidance on CreateListing (the 5 photo limit copy is not that)
+- ~~No photography guidance on CreateListing~~ Live (`PhotoTips` on create and edit).
 - No sort UI (DECISIONS.md listed newest / price / most reviewed as live; only newest exists)
 - Phone OTP before booking: not built
 

@@ -4,8 +4,16 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
 import PhotoTips from '../components/PhotoTips'
+import PhotoSkipDialog from '../components/PhotoSkipDialog'
+import ListingPhotosEditor from '../components/ListingPhotosEditor'
+import { photosFromUrls, uploadListingPhotos } from '../lib/listingPhotos'
+import ListingPricePanel from '../components/ListingPricePanel'
+import WhatsProvidedFields from '../components/WhatsProvidedFields'
+import FieldHint from '../components/FieldHint'
 import { foundingHostFromRpc } from '../lib/foundingHost'
-import { hostListingPriceHint, parsePriceInputCents } from '../lib/pricing'
+import { hostPriceBreakdown, parsePriceInputCents } from '../lib/pricing'
+import { LISTING_FIELD_HINTS } from '../lib/listingFieldHints'
+import { providedForSave } from '../lib/whatsProvided'
 import { formatListingSpotsMessage } from '../lib/listingSpots'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { LISTING_CATEGORIES } from '../lib/listingCategories'
@@ -26,8 +34,6 @@ const LISTING_SELECT = `
   photo_urls,
   host_id
 `
-
-const WHATS_PROVIDED_OPTIONS = ['Materials', 'Equipment', 'Food & drinks', 'None']
 
 function centsToDollars(cents) {
   const dollars = cents / 100
@@ -50,19 +56,26 @@ export default function EditListing() {
   const [area, setArea] = useState('')
   const [fullAddress, setFullAddress] = useState('')
   const [whatsProvided, setWhatsProvided] = useState([])
-  const [existingPhotos, setExistingPhotos] = useState([])
-  const [newPhotos, setNewPhotos] = useState([])
-  const newPhotosRef = useRef(newPhotos)
+  const [photos, setPhotos] = useState([])
+  const photosRef = useRef(photos)
+  const photoPickerRef = useRef(null)
   const [isFoundingHost, setIsFoundingHost] = useState(null)
+  const [fieldHints, setFieldHints] = useState({})
+  const [photoSkipOpen, setPhotoSkipOpen] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const priceHint = hostListingPriceHint(parsePriceInputCents(price), isFoundingHost)
-
-  const totalPhotos = existingPhotos.length + newPhotos.length
+  const priceCents = parsePriceInputCents(price)
+  const guests = parseInt(maxGuests, 10)
+  const breakdown = hostPriceBreakdown(
+    priceCents,
+    isFoundingHost,
+    Number.isInteger(guests) ? guests : 1,
+    groupPricing,
+  )
 
   useEffect(() => {
-    newPhotosRef.current = newPhotos
-  }, [newPhotos])
+    photosRef.current = photos
+  }, [photos])
 
   useEffect(() => {
     async function fetchListing() {
@@ -98,7 +111,7 @@ export default function EditListing() {
       setArea(data.area ?? '')
       setFullAddress(typeof addressResult.data === 'string' ? addressResult.data : '')
       setWhatsProvided(data.whats_provided?.length ? data.whats_provided : [])
-      setExistingPhotos(data.photo_urls ?? [])
+      setPhotos(photosFromUrls(data.photo_urls))
       setFetching(false)
     }
 
@@ -107,118 +120,39 @@ export default function EditListing() {
 
   useEffect(() => {
     return () => {
-      newPhotosRef.current.forEach((photo) => URL.revokeObjectURL(photo.previewUrl))
+      photosRef.current.forEach((photo) => {
+        if (photo.file && photo.previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(photo.previewUrl)
+        }
+      })
     }
   }, [])
 
-  function handlePhotoChange(e) {
-    const selected = Array.from(e.target.files).filter((file) =>
-      file.type.startsWith('image/')
-    )
-    e.target.value = ''
-
-    if (selected.length === 0) return
-
-    setNewPhotos((prev) => {
-      const remaining = MAX_PHOTOS - existingPhotos.length - prev.length
-      if (remaining <= 0) return prev
-
-      const toAdd = selected.slice(0, remaining).map((file) => ({
-        file,
-        previewUrl: URL.createObjectURL(file),
-      }))
-
-      return [...prev, ...toAdd]
-    })
-  }
-
-  function removeExistingPhoto(index) {
-    setExistingPhotos((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  function removeNewPhoto(index) {
-    setNewPhotos((prev) => {
-      URL.revokeObjectURL(prev[index].previewUrl)
-      return prev.filter((_, i) => i !== index)
-    })
-  }
-
-  async function uploadNewPhotos() {
-    const urls = []
-
-    for (const photo of newPhotos) {
-      const ext = photo.file.name.split('.').pop() || 'jpg'
-      const path = `${userId}/${crypto.randomUUID()}.${ext}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('listing-photos')
-        .upload(path, photo.file)
-
-      if (uploadError) throw uploadError
-
-      const { data } = supabase.storage.from('listing-photos').getPublicUrl(path)
-      urls.push(data.publicUrl)
-    }
-
-    return urls
-  }
-
-  function handleWhatsProvidedChange(option) {
-    if (option === 'None') {
-      setWhatsProvided((prev) => (prev.includes('None') ? [] : ['None']))
-      return
-    }
-
-    setWhatsProvided((prev) => {
-      const withoutNone = prev.filter((item) => item !== 'None')
-      if (withoutNone.includes(option)) {
-        return withoutNone.filter((item) => item !== option)
-      }
-      return [...withoutNone, option]
-    })
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setError('')
-
-    const priceCents = Math.round(parseFloat(price) * 100)
-    const guests = parseInt(maxGuests, 10)
+  function collectHints() {
+    const hints = {}
+    if (!title.trim()) hints.title = LISTING_FIELD_HINTS.title
+    if (!description.trim()) hints.description = LISTING_FIELD_HINTS.description
+    if (!category) hints.category = LISTING_FIELD_HINTS.category
+    if (priceCents == null) hints.price = LISTING_FIELD_HINTS.price
+    if (Number.isNaN(guests) || guests < 1) hints.spots = LISTING_FIELD_HINTS.spots
     const duration = parseInt(durationMins, 10)
+    if (Number.isNaN(duration) || duration < 1) hints.duration = LISTING_FIELD_HINTS.duration
+    if (!area) hints.area = LISTING_FIELD_HINTS.area
+    if (!fullAddress.trim()) hints.fullAddress = LISTING_FIELD_HINTS.fullAddress
+    return hints
+  }
 
-    if (!title.trim() || !description.trim() || !category || !area || !fullAddress.trim()) {
-      setError('Please fill in all required fields.')
-      return
-    }
-
-    if (Number.isNaN(priceCents) || priceCents <= 0) {
-      setError('Please enter a valid price.')
-      return
-    }
-
-    if (Number.isNaN(guests) || guests < 1) {
-      setError('Spots per session must be at least 1.')
-      return
-    }
-
-    if (Number.isNaN(duration) || duration < 1) {
-      setError('Duration must be at least 1 minute.')
-      return
-    }
-
-    const provided =
-      whatsProvided.includes('None') || whatsProvided.length === 0
-        ? []
-        : whatsProvided
+  async function saveListing() {
+    setError('')
+    setFieldHints({})
+    const duration = parseInt(durationMins, 10)
+    const provided = providedForSave(whatsProvided)
 
     setLoading(true)
 
-    let photoUrls = [...existingPhotos]
+    let photoUrls
     try {
-      if (newPhotos.length > 0) {
-        const uploaded = await uploadNewPhotos()
-        photoUrls = [...photoUrls, ...uploaded]
-      }
+      photoUrls = await uploadListingPhotos(photos, userId, supabase.storage)
     } catch (uploadError) {
       setLoading(false)
       setError(uploadError.message)
@@ -279,6 +213,20 @@ export default function EditListing() {
     })
   }
 
+  async function handleSubmit(e) {
+    e.preventDefault()
+    const hints = collectHints()
+    if (Object.keys(hints).length) {
+      setFieldHints(hints)
+      return
+    }
+    if (photos.length === 0) {
+      setPhotoSkipOpen(true)
+      return
+    }
+    await saveListing()
+  }
+
   if (fetching) {
     return <p className="status-message">Loading…</p>
   }
@@ -297,7 +245,7 @@ export default function EditListing() {
         <h1 className="form-card__title">Edit listing</h1>
         <p className="form-card__subtitle">Update your experience details</p>
 
-        <form onSubmit={handleSubmit} className="form">
+        <form onSubmit={handleSubmit} className="form" noValidate>
           <h2 className="form-section__title">The basics</h2>
           <label className="label">
             Title
@@ -306,9 +254,9 @@ export default function EditListing() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Learn latte art with me"
-              required
               className="input"
             />
+            <FieldHint>{fieldHints.title}</FieldHint>
           </label>
 
           <label className="label">
@@ -317,10 +265,10 @@ export default function EditListing() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What will guests learn or experience?"
-              required
               rows={4}
               className="input input--textarea"
             />
+            <FieldHint>{fieldHints.description}</FieldHint>
           </label>
 
           <label className="label">
@@ -328,7 +276,6 @@ export default function EditListing() {
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              required
               className="input"
             >
               <option value="">Select a category</option>
@@ -338,6 +285,7 @@ export default function EditListing() {
                 </option>
               ))}
             </select>
+            <FieldHint>{fieldHints.category}</FieldHint>
           </label>
 
           <h2 className="form-section__title">Price and time</h2>
@@ -352,11 +300,10 @@ export default function EditListing() {
                   placeholder="20"
                   min="1"
                   step="0.01"
-                  required
                   className="input"
                 />
               </label>
-              {priceHint ? <span className="hint">{priceHint}</span> : null}
+              <FieldHint>{fieldHints.price}</FieldHint>
             </div>
 
             <label className="label">
@@ -367,11 +314,13 @@ export default function EditListing() {
                 onChange={(e) => setMaxGuests(e.target.value)}
                 placeholder="4"
                 min="1"
-                required
                 className="input"
               />
+              <FieldHint>{fieldHints.spots}</FieldHint>
             </label>
           </div>
+
+          <ListingPricePanel breakdown={breakdown} groupSize={Number.isInteger(guests) ? guests : 1} />
 
           <label className="label">
             Duration (mins)
@@ -381,13 +330,13 @@ export default function EditListing() {
               onChange={(e) => setDurationMins(e.target.value)}
               placeholder="60"
               min="1"
-              required
               className="input"
             />
           </label>
           <span className="hint">
             New sessions use this length. Sessions already added keep theirs.
           </span>
+          <FieldHint>{fieldHints.duration}</FieldHint>
 
           <label className="checkbox-label">
             <input
@@ -405,7 +354,8 @@ export default function EditListing() {
           <h2 className="form-section__title">Location</h2>
           <label className="label">
             Area
-            <PlanningAreaSelect value={area} onChange={setArea} required />
+            <PlanningAreaSelect value={area} onChange={setArea} />
+            <FieldHint>{fieldHints.area}</FieldHint>
           </label>
 
           <label className="label">
@@ -415,85 +365,47 @@ export default function EditListing() {
               value={fullAddress}
               onChange={(e) => setFullAddress(e.target.value)}
               placeholder="Only shown to guests after booking"
-              required
               className="input"
             />
             <span className="hint">Hidden from browse — revealed after confirmed booking</span>
+            <FieldHint>{fieldHints.fullAddress}</FieldHint>
           </label>
 
           <h2 className="form-section__title">Photos</h2>
           <PhotoTips />
-          <div>
-            <label className="label">
-              Photos
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handlePhotoChange}
-                disabled={totalPhotos >= MAX_PHOTOS}
-                className="input input--file"
-              />
-            </label>
-            <span className="hint">
-              Up to {MAX_PHOTOS} images ({totalPhotos}/{MAX_PHOTOS})
-            </span>
+          <ListingPhotosEditor
+            photos={photos}
+            onChange={setPhotos}
+            max={MAX_PHOTOS}
+            pickerRef={photoPickerRef}
+          />
 
-            {totalPhotos > 0 && (
-              <div className="preview-grid">
-                {existingPhotos.map((url, index) => (
-                  <div key={url} className="preview-item">
-                    <img src={url} alt="" className="preview-image" />
-                    <button
-                      type="button"
-                      onClick={() => removeExistingPhoto(index)}
-                      className="preview-remove"
-                      aria-label="Remove photo"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                {newPhotos.map((photo, index) => (
-                  <div key={photo.previewUrl} className="preview-item">
-                    <img src={photo.previewUrl} alt="" className="preview-image" />
-                    <button
-                      type="button"
-                      onClick={() => removeNewPhoto(index)}
-                      className="preview-remove"
-                      aria-label="Remove photo"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <WhatsProvidedFields value={whatsProvided} onChange={setWhatsProvided} />
 
-          <fieldset className="fieldset">
-            <legend className="fieldset__legend">What&apos;s provided</legend>
-            <div className="checkboxes">
-              {WHATS_PROVIDED_OPTIONS.map((option) => (
-                <label key={option} className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={whatsProvided.includes(option)}
-                    onChange={() => handleWhatsProvidedChange(option)}
-                  />
-                  {option}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          {error && <p className="error-message">{error}</p>}
+          {error ? (
+            <p className="wizard__note" role="status">
+              {error}
+            </p>
+          ) : null}
 
           <button type="submit" disabled={loading} className="btn btn--primary">
-            {loading ? (newPhotos.length > 0 ? 'Uploading…' : 'Saving…') : 'Save changes'}
+            {loading ? (photos.some((photo) => photo.file) ? 'Uploading…' : 'Saving…') : 'Save changes'}
           </button>
         </form>
       </div>
+
+      {photoSkipOpen ? (
+        <PhotoSkipDialog
+          onAdd={() => {
+            setPhotoSkipOpen(false)
+            photoPickerRef.current?.click()
+          }}
+          onSkip={() => {
+            setPhotoSkipOpen(false)
+            saveListing()
+          }}
+        />
+      ) : null}
     </div>
   )
 }

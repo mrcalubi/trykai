@@ -698,7 +698,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [x] Favicon showing
 
 ## Host onboarding experience
-- [ ] Photography guidance shown during listing creation
+- [x] Photography guidance shown during listing creation
 - [ ] Creation flow is clear to a non technical host
 - [ ] Host knows what to expect after submitting verification
 - [ ] Host knows what to expect once the listing is live

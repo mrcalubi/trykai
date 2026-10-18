@@ -5,19 +5,24 @@ import { useAuthedUserId } from '../lib/authedUser'
 import { CancellationPolicyInfo } from '../components/CancellationPolicy'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
 import PhotoTips from '../components/PhotoTips'
+import PhotoSkipDialog from '../components/PhotoSkipDialog'
+import ListingPhotosEditor from '../components/ListingPhotosEditor'
+import { uploadListingPhotos } from '../lib/listingPhotos'
+import ListingPricePanel from '../components/ListingPricePanel'
+import WhatsProvidedFields from '../components/WhatsProvidedFields'
+import FieldHint from '../components/FieldHint'
 import Card from '../components/ui/Card'
 import Icon from '../components/ui/Icon'
 import { categoryIconName } from '../components/ui/categoryIcon'
 import { LISTING_CATEGORIES } from '../lib/listingCategories'
-import FormattedPrice from '../components/FormattedPrice'
+import { LISTING_FIELD_HINTS } from '../lib/listingFieldHints'
+import { providedForSave } from '../lib/whatsProvided'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import { formatGuestFacingPrice, hostPriceBreakdown, parsePriceInputCents } from '../lib/pricing'
 
 const MAX_PHOTOS = 5
 const MIN_GUESTS = 1
 const MAX_GUESTS = 50
-
-const WHATS_PROVIDED_OPTIONS = ['Materials', 'Equipment', 'Food & drinks', 'None']
 
 const DURATIONS = [
   { label: '1 hr', mins: 60 },
@@ -102,15 +107,18 @@ export default function CreateListing() {
   const [groupPricing, setGroupPricing] = useState(true)
   const [acceptedHostTerms, setAcceptedHostTerms] = useState(false)
   const [isFoundingHost, setIsFoundingHost] = useState(null)
+  const [fieldHints, setFieldHints] = useState({})
   const [error, setError] = useState('')
   const [draftNote, setDraftNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [draftHandled, setDraftHandled] = useState(false)
+  const [photoSkipOpen, setPhotoSkipOpen] = useState(false)
   const headingRef = useRef(null)
+  const photoPickerRef = useRef(null)
   const movedStep = useRef(false)
 
   const priceCents = parsePriceInputCents(price)
-  const breakdown = hostPriceBreakdown(priceCents, isFoundingHost, maxGuests)
+  const breakdown = hostPriceBreakdown(priceCents, isFoundingHost, maxGuests, groupPricing)
   const durationMins = durationChoice === 'other' ? parseInt(otherMins, 10) : durationChoice
 
   useEffect(() => {
@@ -205,106 +213,47 @@ export default function CreateListing() {
     }
   }
 
-  function handlePhotoChange(e) {
-    const selected = Array.from(e.target.files).filter((file) =>
-      file.type.startsWith('image/')
-    )
-    e.target.value = ''
-
-    if (selected.length === 0) return
-
-    setPhotos((prev) => {
-      const remaining = MAX_PHOTOS - prev.length
-      if (remaining <= 0) return prev
-
-      const toAdd = selected.slice(0, remaining).map((file) => ({
-        file,
-        previewUrl: URL.createObjectURL(file),
-      }))
-
-      return [...prev, ...toAdd]
-    })
-  }
-
-  function removePhoto(index) {
-    setPhotos((prev) => {
-      URL.revokeObjectURL(prev[index].previewUrl)
-      return prev.filter((_, i) => i !== index)
-    })
-  }
-
-  async function uploadPhotos() {
-    const urls = []
-
-    for (const photo of photos) {
-      const ext = photo.file.name.split('.').pop() || 'jpg'
-      const path = `${userId}/${crypto.randomUUID()}.${ext}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('listing-photos')
-        .upload(path, photo.file)
-
-      if (uploadError) throw uploadError
-
-      const { data } = supabase.storage.from('listing-photos').getPublicUrl(path)
-      urls.push(data.publicUrl)
-    }
-
-    return urls
-  }
-
-  function handleWhatsProvidedChange(option) {
-    if (option === 'None') {
-      setWhatsProvided((prev) => (prev.includes('None') ? [] : ['None']))
-      return
-    }
-
-    setWhatsProvided((prev) => {
-      const withoutNone = prev.filter((item) => item !== 'None')
-      if (withoutNone.includes(option)) {
-        return withoutNone.filter((item) => item !== option)
-      }
-      return [...withoutNone, option]
-    })
-  }
-
-  /** The first problem with a step's answers, or '' when the step is complete. */
-  function stepProblem(stepId) {
+  function hintsForStep(stepId) {
+    const hints = {}
     if (stepId === 'basics') {
-      if (!title.trim()) return 'Give your listing a title.'
-      if (!category) return 'Choose a category.'
-      if (!description.trim()) return 'Describe what guests will do.'
+      if (!title.trim()) hints.title = LISTING_FIELD_HINTS.title
+      if (!category) hints.category = LISTING_FIELD_HINTS.category
+      if (!description.trim()) hints.description = LISTING_FIELD_HINTS.description
     }
     if (stepId === 'price') {
-      if (priceCents == null) return 'Please enter a valid price.'
+      if (priceCents == null) hints.price = LISTING_FIELD_HINTS.price
       if (!Number.isInteger(maxGuests) || maxGuests < MIN_GUESTS) {
-        return 'Spots per session must be at least 1.'
+        hints.spots = LISTING_FIELD_HINTS.spots
       }
-      if (durationChoice == null) return 'Choose how long each session lasts.'
-      if (!Number.isInteger(durationMins) || durationMins < 1) {
-        return 'Duration must be at least 1 minute.'
+      if (durationChoice == null || !Number.isInteger(durationMins) || durationMins < 1) {
+        hints.duration = LISTING_FIELD_HINTS.duration
       }
     }
     if (stepId === 'location') {
-      if (!area) return 'Pick the area from the list.'
-      if (!fullAddress.trim()) return 'Enter the full address.'
+      if (!area) hints.area = LISTING_FIELD_HINTS.area
+      if (!fullAddress.trim()) hints.fullAddress = LISTING_FIELD_HINTS.fullAddress
     }
-    if (stepId === 'finish' && !acceptedHostTerms) return 'Please agree to the Host terms.'
-    return ''
+    if (stepId === 'finish' && !acceptedHostTerms) hints.hostTerms = LISTING_FIELD_HINTS.hostTerms
+    return hints
   }
 
   function goTo(index) {
     movedStep.current = true
     setError('')
+    setFieldHints({})
     setStep(index)
     window.scrollTo?.(0, 0)
   }
 
   function handleContinue(e) {
     e.preventDefault()
-    const problem = stepProblem(STEPS[step].id)
-    if (problem) {
-      setError(problem)
+    const hints = hintsForStep(STEPS[step].id)
+    if (Object.keys(hints).length) {
+      setFieldHints(hints)
+      return
+    }
+    if (STEPS[step].id === 'photos' && photos.length === 0) {
+      setPhotoSkipOpen(true)
       return
     }
     if (step < STEPS.length - 1) {
@@ -317,25 +266,22 @@ export default function CreateListing() {
   async function publish() {
     setError('')
     for (let index = 0; index < STEPS.length; index += 1) {
-      const problem = stepProblem(STEPS[index].id)
-      if (problem) {
+      const hints = hintsForStep(STEPS[index].id)
+      if (Object.keys(hints).length) {
         setStep(index)
-        setError(problem)
+        setFieldHints(hints)
         return
       }
     }
 
-    const provided =
-      whatsProvided.includes('None') || whatsProvided.length === 0
-        ? []
-        : whatsProvided
+    const provided = providedForSave(whatsProvided)
 
     setLoading(true)
 
     let photoUrls = []
     try {
       if (photos.length > 0) {
-        photoUrls = await uploadPhotos()
+        photoUrls = await uploadListingPhotos(photos, userId, supabase.storage)
       }
     } catch (uploadError) {
       setLoading(false)
@@ -427,6 +373,7 @@ export default function CreateListing() {
               placeholder="e.g. Learn latte art with me"
               className="input"
             />
+            <FieldHint>{fieldHints.title}</FieldHint>
           </label>
 
           <fieldset className="wizard-fieldset">
@@ -450,6 +397,7 @@ export default function CreateListing() {
                 </label>
               ))}
             </div>
+            <FieldHint>{fieldHints.category}</FieldHint>
           </fieldset>
 
           <label className="label">
@@ -461,6 +409,7 @@ export default function CreateListing() {
               rows={6}
               className="input input--textarea"
             />
+            <FieldHint>{fieldHints.description}</FieldHint>
           </label>
         </>
       )
@@ -470,42 +419,12 @@ export default function CreateListing() {
       return (
         <>
           <PhotoTips />
-          <div>
-            <label className="photo-drop">
-              <Icon name="camera" size={28} strokeWidth={1.5} />
-              <span className="photo-drop__title">Photos</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handlePhotoChange}
-                disabled={photos.length >= MAX_PHOTOS}
-                className="visually-hidden"
-              />
-            </label>
-            <p className="hint photo-drop__count">
-              Maximum of {MAX_PHOTOS} photos ({photos.length}/{MAX_PHOTOS})
-            </p>
-
-            {photos.length > 0 && (
-              <div className="preview-grid">
-                {photos.map((photo, index) => (
-                  <div key={photo.previewUrl} className="preview-item">
-                    <img src={photo.previewUrl} alt="" className="preview-image" />
-                    {index === 0 ? <span className="preview-item__cover">Cover</span> : null}
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(index)}
-                      className="preview-remove"
-                      aria-label="Remove photo"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ListingPhotosEditor
+            photos={photos}
+            onChange={setPhotos}
+            max={MAX_PHOTOS}
+            pickerRef={photoPickerRef}
+          />
         </>
       )
     }
@@ -537,45 +456,10 @@ export default function CreateListing() {
             <p id="listing-price-hint" className="hint">
               Sessions on TryKai usually run $10 to $40 per guest.
             </p>
+            <FieldHint>{fieldHints.price}</FieldHint>
           </div>
 
-          {breakdown ? (
-            <div className="price-panel" aria-live="polite">
-              <p className="price-panel__row">
-                <span>Guests pay</span>
-                <span className="price-panel__amount">
-                  <FormattedPrice cents={breakdown.guestsPayCents} />
-                </span>
-              </p>
-              {breakdown.youReceiveCents != null ? (
-                <p className="price-panel__row">
-                  <span>You receive per guest</span>
-                  <span className="price-panel__amount">
-                    <FormattedPrice cents={breakdown.youReceiveCents} />
-                  </span>
-                </p>
-              ) : null}
-              {breakdown.afterFeeCents != null ? (
-                <p className="price-panel__row price-panel__row--small">
-                  <span>
-                    After your first {breakdown.feeFreeBookings} bookings ({breakdown.feePercent}%
-                    host fee)
-                  </span>
-                  <span className="price-panel__amount">
-                    <FormattedPrice cents={breakdown.afterFeeCents} />
-                  </span>
-                </p>
-              ) : null}
-              {breakdown.fullSessionCents != null ? (
-                <p className="price-panel__row price-panel__row--total">
-                  <span>A full session of {maxGuests} pays you up to</span>
-                  <span className="price-panel__amount">
-                    <FormattedPrice cents={breakdown.fullSessionCents} />
-                  </span>
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+          <ListingPricePanel breakdown={breakdown} groupSize={maxGuests} />
 
           <div className="wizard-row">
             <div>
@@ -583,6 +467,7 @@ export default function CreateListing() {
                 Spots per session
               </p>
               <p className="wizard-row__hint">The most guests in one session.</p>
+              <FieldHint>{fieldHints.spots}</FieldHint>
             </div>
             <div
               className="guest-stepper__controls"
@@ -658,6 +543,7 @@ export default function CreateListing() {
                 />
               </label>
             ) : null}
+            <FieldHint>{fieldHints.duration}</FieldHint>
           </fieldset>
 
           <label className="toggle-card">
@@ -684,6 +570,7 @@ export default function CreateListing() {
           <label className="label">
             Area
             <PlanningAreaSelect value={area} onChange={setArea} />
+            <FieldHint>{fieldHints.area}</FieldHint>
           </label>
 
           <label className="label">
@@ -696,6 +583,7 @@ export default function CreateListing() {
               className="input"
             />
             <span className="hint">Hidden from browse. Revealed only after a confirmed booking.</span>
+            <FieldHint>{fieldHints.fullAddress}</FieldHint>
           </label>
         </>
       )
@@ -703,21 +591,7 @@ export default function CreateListing() {
 
     return (
       <>
-        <fieldset className="fieldset">
-          <legend className="fieldset__legend">What&apos;s provided</legend>
-          <div className="checkboxes">
-            {WHATS_PROVIDED_OPTIONS.map((option) => (
-              <label key={option} className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={whatsProvided.includes(option)}
-                  onChange={() => handleWhatsProvidedChange(option)}
-                />
-                {option}
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <WhatsProvidedFields value={whatsProvided} onChange={setWhatsProvided} />
 
         <div className="wizard-inline-preview">
           <p className="wizard-preview__label">How guests will see it</p>
@@ -736,6 +610,7 @@ export default function CreateListing() {
             I agree to the <Link to="/terms#part-2-hosting">Host terms</Link>
           </span>
         </label>
+        <FieldHint>{fieldHints.hostTerms}</FieldHint>
       </>
     )
   }
@@ -807,11 +682,11 @@ export default function CreateListing() {
 
             {renderStep()}
 
-            {error && (
-              <p className="error-message wizard__error" role="alert">
+            {error ? (
+              <p className="wizard__note" role="status">
                 {error}
               </p>
-            )}
+            ) : null}
           </div>
 
           <div className="wizard__actions">
@@ -842,6 +717,19 @@ export default function CreateListing() {
         {preview}
         <p className="wizard-preview__hint">Updates as you fill in each step.</p>
       </aside>
+
+      {photoSkipOpen ? (
+        <PhotoSkipDialog
+          onAdd={() => {
+            setPhotoSkipOpen(false)
+            photoPickerRef.current?.click()
+          }}
+          onSkip={() => {
+            setPhotoSkipOpen(false)
+            goTo(step + 1)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
