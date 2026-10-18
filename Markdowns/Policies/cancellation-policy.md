@@ -13,7 +13,7 @@ Refunds are calculated based on how far in advance you cancel, measured from the
 - **Between 6 and 24 hours before the session starts:** 25% of the lesson fee refunded. The platform fee is not refunded in this case.
 - **Less than 6 hours before the session starts, or a no show:** no refund. This applies the same whether you cancel at the last minute or simply do not turn up.
 
-Cancel anytime from your profile. The refund amount is calculated automatically and shown to you before you confirm.
+Cancel anytime from the Bookings tab on your profile. The refund amount is calculated automatically and shown to you before you confirm.
 
 ## If you are a host
 
