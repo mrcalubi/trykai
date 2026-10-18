@@ -511,7 +511,10 @@ describe('Profile own tabs', () => {
     expect(await screen.findByRole('heading', { name: 'fr', level: 3 })).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Hosting' }))
-    const card = (await screen.findByText('fr')).closest('.hosting-listing-card')
+    const listingsSection = (
+      await screen.findByRole('heading', { name: 'Your listings' })
+    ).closest('section')
+    const card = within(listingsSection).getByText('fr').closest('.hosting-listing-card')
     await user.click(within(card).getByRole('button', { name: 'More actions' }))
     await user.click(within(card).getByRole('menuitem', { name: 'Delete' }))
     await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
@@ -528,7 +531,7 @@ describe('Profile own tabs', () => {
   it('opens the hosting panel from ?tab=hosting', async () => {
     renderPage({ search: '?tab=hosting' })
 
-    expect(await screen.findByRole('heading', { name: 'My Listings' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Your listings' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Hosting' })).toHaveAttribute(
       'aria-current',
       'page'
@@ -616,7 +619,7 @@ describe('Profile own tabs', () => {
     renderPage({ search: '?tab=hosting' })
 
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'My Listings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Your listings' })).not.toBeInTheDocument()
   })
 
   it('shows your own About when a bio is saved', async () => {

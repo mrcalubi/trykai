@@ -40,6 +40,7 @@ const PATHS = {
     </>
   ),
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  plus: <path d="M12 5v14M5 12h14" />,
   star: <path d="M12 3.8l2.5 5.2 5.7.7-4.2 3.9 1.1 5.6L12 16.4l-5.1 2.8 1.1-5.6-4.2-3.9 5.7-.7L12 3.8z" />,
   arrowRight: <path d="M5 12h14M13 6l6 6-6 6" />,
   arrowDown: <path d="M12 5v14M6 13l6 6 6-6" />,

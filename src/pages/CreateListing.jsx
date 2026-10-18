@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { CancellationPolicyInfo } from '../components/CancellationPolicy'
@@ -24,8 +24,16 @@ import {
   hostPriceBreakdown,
   parsePriceInputCents,
 } from '../lib/pricing'
+import {
+  LISTING_STEPS as STEPS,
+  clearDraft,
+  draftKey,
+  draftValues,
+  readDraft,
+} from '../lib/listingDraft'
 
 const MAX_PHOTOS = 5
+const DRAFT_RESTORED = 'Draft restored. Photos are not kept in drafts, so add them again.'
 const MIN_GUESTS = 1
 const MAX_GUESTS = 50
 
@@ -35,89 +43,38 @@ const DURATIONS = [
   { label: '2 hr', mins: 120 },
 ]
 
-const STEPS = [
-  {
-    id: 'basics',
-    label: 'Basics',
-    title: 'The basics',
-    intro: 'Say what guests will learn, in your own words.',
-  },
-  {
-    id: 'photos',
-    label: 'Photos',
-    title: 'Add photos',
-    intro: 'Real photos of your session, taken on your phone, are perfect.',
-  },
-  {
-    id: 'price',
-    label: 'Price',
-    title: 'Price and group size',
-    intro: 'Small, affordable sessions are what guests come to TryKai for.',
-  },
-  {
-    id: 'location',
-    label: 'Location',
-    title: 'Where it happens',
-    intro: 'Guests see only the area until they book.',
-  },
-  {
-    id: 'finish',
-    label: 'Publish',
-    title: 'Final touches',
-    intro: 'Say what you provide, check the cancellation policy and publish.',
-  },
-]
-
-function draftKey(userId) {
-  return `trykai:listing-draft:${userId}`
-}
-
-function readDraft(userId) {
-  if (!userId) return null
-  try {
-    const raw = window.localStorage.getItem(draftKey(userId))
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-
-function clearDraft(userId) {
-  try {
-    window.localStorage.removeItem(draftKey(userId))
-  } catch {
-    // Storage can be blocked; then there is no draft to clear.
-  }
-}
-
 export default function CreateListing() {
   const navigate = useNavigate()
   const userId = useAuthedUserId()
 
   const [verificationStatus, setVerificationStatus] = useState(null)
   const [verificationChecked, setVerificationChecked] = useState(false)
-  const [step, setStep] = useState(0)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [category, setCategory] = useState('')
-  const [price, setPrice] = useState('')
-  const [maxGuests, setMaxGuests] = useState(4)
-  const [durationChoice, setDurationChoice] = useState(null)
-  const [otherMins, setOtherMins] = useState('')
-  const [area, setArea] = useState('')
-  const [fullAddress, setFullAddress] = useState('')
-  const [whatsProvided, setWhatsProvided] = useState([])
+  // Hosting's Continue on a draft opens the wizard with it already restored.
+  const location = useLocation()
+  const [resumed] = useState(() => (location.state?.resumeDraft ? readDraft(userId) : null))
+  const start = draftValues(resumed)
+  const [step, setStep] = useState(start.step)
+  const [title, setTitle] = useState(start.title)
+  const [description, setDescription] = useState(start.description)
+  const [category, setCategory] = useState(start.category)
+  const [price, setPrice] = useState(start.price)
+  const [maxGuests, setMaxGuests] = useState(start.maxGuests)
+  const [durationChoice, setDurationChoice] = useState(start.durationChoice)
+  const [otherMins, setOtherMins] = useState(start.otherMins)
+  const [area, setArea] = useState(start.area)
+  const [fullAddress, setFullAddress] = useState(start.fullAddress)
+  const [whatsProvided, setWhatsProvided] = useState(start.whatsProvided)
   const [photos, setPhotos] = useState([])
   const photosRef = useRef(photos)
-  const [groupPricing, setGroupPricing] = useState(true)
+  const [groupPricing, setGroupPricing] = useState(start.groupPricing)
   const [acceptedHostTerms, setAcceptedHostTerms] = useState(false)
   const [isFoundingHost, setIsFoundingHost] = useState(null)
   const [fieldHints, setFieldHints] = useState({})
   const [error, setError] = useState('')
   const [photoError, setPhotoError] = useState('')
-  const [draftNote, setDraftNote] = useState('')
+  const [draftNote, setDraftNote] = useState(resumed ? DRAFT_RESTORED : '')
   const [loading, setLoading] = useState(false)
-  const [draftHandled, setDraftHandled] = useState(false)
+  const [draftHandled, setDraftHandled] = useState(Boolean(resumed))
   const [photoSkipOpen, setPhotoSkipOpen] = useState(false)
   const headingRef = useRef(null)
   const photoPickerRef = useRef(null)
@@ -183,7 +140,7 @@ export default function CreateListing() {
     if (typeof draft.area === 'string') setArea(draft.area)
     if (typeof draft.fullAddress === 'string') setFullAddress(draft.fullAddress)
     if (Array.isArray(draft.whatsProvided)) setWhatsProvided(draft.whatsProvided)
-    setDraftNote('Draft restored. Photos are not kept in drafts, so add them again.')
+    setDraftNote(DRAFT_RESTORED)
   }
 
   function discardDraft() {
@@ -199,6 +156,7 @@ export default function CreateListing() {
 
   function saveDraft() {
     const values = {
+      step,
       title,
       description,
       category,
