@@ -12,7 +12,11 @@ import WhatsProvidedFields from '../components/WhatsProvidedFields'
 import FieldHint from '../components/FieldHint'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import { groupDiscountExampleLine, hostPriceBreakdown, parsePriceInputCents } from '../lib/pricing'
-import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
+import {
+  LISTING_FIELD_HINTS,
+  PHOTO_UPLOAD_ERROR,
+  listingSaveProblem,
+} from '../lib/listingFieldHints'
 import { providedForSave } from '../lib/whatsProvided'
 import { formatListingSpotsMessage } from '../lib/listingSpots'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
@@ -145,6 +149,12 @@ export default function EditListing() {
     return hints
   }
 
+  function showSaveProblem(saveError) {
+    const problem = listingSaveProblem(saveError)
+    if (problem.field) setFieldHints({ [problem.field]: problem.hint })
+    setError(problem.message)
+  }
+
   async function saveListing() {
     setError('')
     setPhotoError('')
@@ -161,17 +171,6 @@ export default function EditListing() {
       console.error('Listing photo upload failed', uploadError)
       setLoading(false)
       setPhotoError(PHOTO_UPLOAD_ERROR)
-      return
-    }
-
-    const { data: spotsData, error: spotsError } = await supabase.rpc('set_listing_spots', {
-      p_listing_id: id,
-      p_spots: guests,
-    })
-
-    if (spotsError) {
-      setLoading(false)
-      setError(spotsError.message)
       return
     }
 
@@ -203,10 +202,24 @@ export default function EditListing() {
         .eq('host_id', userId))
     }
 
+    if (updateError) {
+      setLoading(false)
+      showSaveProblem(updateError)
+      return
+    }
+
+    // After the update, not before: set_listing_spots writes this same row, and
+    // the database re-checks every constraint on it. Run first, it tripped over
+    // the old price (say one above the S$500 ceiling) the host was fixing here.
+    const { data: spotsData, error: spotsError } = await supabase.rpc('set_listing_spots', {
+      p_listing_id: id,
+      p_spots: guests,
+    })
+
     setLoading(false)
 
-    if (updateError) {
-      setError(updateError.message)
+    if (spotsError) {
+      showSaveProblem(spotsError)
       return
     }
 

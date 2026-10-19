@@ -1407,6 +1407,8 @@ describe('Hosting this month', () => {
     givenData({
       listings: [makeMyListing()],
       hostSessions: [
+        // Already past and nobody booked: it never ran and the page does not show it.
+        makeHostSession({ id: 'past-empty', starts_at: '2026-10-05T02:00:00Z', bookings: [] }),
         makeHostSession({
           id: 'past',
           starts_at: '2026-10-10T02:00:00Z',
@@ -1427,7 +1429,8 @@ describe('Hosting this month', () => {
 
     const month = sectionFor('This month')
     const stat = (label) => within(month).getByText(label).closest('.hosting-stat')
-    expect(stat('Sessions')).toHaveTextContent('2')
+    expect(stat('Sessions').querySelector('dd')).toHaveTextContent(/^2$/)
+    expect(stat('Sessions').querySelector('.hosting-stat__note')).toHaveTextContent('1 held · 1 to come')
     expect(stat('Guests booked')).toHaveTextContent('3')
     expect(stat('Earned')).toHaveTextContent('S$62')
   })
@@ -1438,6 +1441,25 @@ describe('Hosting this month', () => {
 
     const month = sectionFor('This month')
     expect(within(month).getByText('Earned').closest('.hosting-stat')).toHaveTextContent('S$0')
+    const sessions = within(month).getByText('Sessions').closest('.hosting-stat')
+    expect(sessions.querySelector('dd')).toHaveTextContent(/^0$/)
+    expect(sessions.querySelector('.hosting-stat__note')).toBeNull()
+  })
+
+  it('splits the Sessions total so it matches the dates listed below', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({ id: 'open-1', starts_at: '2026-10-20T02:00:00Z', bookings: [] }),
+        makeHostSession({ id: 'open-2', starts_at: '2026-10-27T02:00:00Z', bookings: [] }),
+      ],
+    })
+    await renderHosting()
+
+    const sessions = within(sectionFor('This month')).getByText('Sessions').closest('.hosting-stat')
+    expect(sessions.querySelector('dd')).toHaveTextContent(/^2$/)
+    expect(sessions.querySelector('.hosting-stat__note')).toHaveTextContent(/^2 to come$/)
+    expect(within(listingCard('Latte art')).getAllByRole('checkbox')).toHaveLength(2)
   })
 })
 
@@ -1457,7 +1479,7 @@ describe('Hosting listing cards', () => {
     )
   })
 
-  it('marks a listing with dates as live and shows the next one', async () => {
+  it('marks a listing with dates as live and counts them instead of repeating the first row', async () => {
     const startsAt = hoursFromNow(30)
     givenData({
       listings: [makeMyListing()],
@@ -1467,8 +1489,31 @@ describe('Hosting listing cards', () => {
 
     const card = listingCard('Latte art')
     expect(within(card).getByText('Live')).toBeInTheDocument()
-    expect(within(card).getByText(`Next: ${formatSessionDateTime(startsAt)}`)).toBeInTheDocument()
+    expect(within(card).getByText('1 open date')).toBeInTheDocument()
+    expect(within(card).getAllByText(formatSessionDateTime(startsAt))).toHaveLength(1)
+    expect(within(card).queryByText(/^Next:/)).not.toBeInTheDocument()
     expect(within(card).queryByText('Hidden: no sessions')).not.toBeInTheDocument()
+  })
+
+  it('counts a booked date, which sits under Upcoming bookings rather than the card', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({ id: 'booked', starts_at: hoursFromNow(30) }),
+        makeHostSession({ id: 'open', starts_at: hoursFromNow(60), bookings: [] }),
+      ],
+    })
+    await renderHosting()
+
+    expect(within(listingCard('Latte art')).getByText('1 open date · 1 booked')).toBeInTheDocument()
+    expect(within(sectionFor('Upcoming bookings')).getByText('Latte art')).toBeInTheDocument()
+  })
+
+  it('says when every date is booked', async () => {
+    givenData({ listings: [makeMyListing()], hostSessions: [makeHostSession()] })
+    await renderHosting()
+
+    expect(within(listingCard('Latte art')).getByText('1 booked · no open dates')).toBeInTheDocument()
   })
 })
 
@@ -1544,20 +1589,13 @@ describe('Hosting draft listing', () => {
   })
 })
 
-describe('Hosting photo tips', () => {
-  it('opens the photo tips from the banner', async () => {
+describe('Hosting without photo tips', () => {
+  it('leaves the photo tips to the listing forms', async () => {
     givenData({ listings: [makeMyListing()] })
-    const { user } = await renderHosting()
+    await renderHosting()
 
-    const toggle = screen.getByRole('button', { name: 'See the 4 photo tips' })
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    await user.click(toggle)
-
-    expect(screen.getByRole('button', { name: 'Hide the photo tips' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
-    )
-    expect(screen.getByText('Natural light is your best friend. A window beats any flash.')).toBeInTheDocument()
+    expect(screen.queryByText('Better photos, more bookings')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /photo tips/ })).not.toBeInTheDocument()
   })
 })
 
