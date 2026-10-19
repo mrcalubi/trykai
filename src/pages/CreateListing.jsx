@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { CancellationPolicyInfo } from '../components/CancellationPolicy'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
+import PostalAddressFields from '../components/PostalAddressFields'
 import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
@@ -539,22 +540,12 @@ export default function CreateListing() {
         <>
           <label className="label">
             Area
-            <PlanningAreaSelect value={area} onChange={setArea} />
+            <PlanningAreaSelect value={area} onChange={setArea} hideUninhabited />
             <FieldHint>{fieldHints.area}</FieldHint>
           </label>
 
-          <label className="label">
-            Full address
-            <input
-              type="text"
-              value={fullAddress}
-              onChange={(e) => setFullAddress(e.target.value)}
-              placeholder="Block, street, unit and postal code"
-              className="input"
-            />
-            <span className="hint">Hidden from browse. Revealed only after a confirmed booking.</span>
-            <FieldHint>{fieldHints.fullAddress}</FieldHint>
-          </label>
+          <PostalAddressFields value={fullAddress} onChange={setFullAddress} />
+          <FieldHint>{fieldHints.fullAddress}</FieldHint>
         </>
       )
     }

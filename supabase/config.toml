@@ -505,3 +505,11 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/purge-verification-docs/deno.json"
 entrypoint = "./functions/purge-verification-docs/index.ts"
+
+# verify_jwt is false because the function checks the caller's JWT itself.
+# OneMap search needs a token; credentials stay in Vault, not the client.
+[functions.lookup-postal-code]
+enabled = true
+verify_jwt = false
+import_map = "./functions/lookup-postal-code/deno.json"
+entrypoint = "./functions/lookup-postal-code/index.ts"

@@ -425,7 +425,7 @@ describe('Dashboard listings', () => {
     expect(foot?.[0]).toMatch(/justify-content:\s*space-between/)
     expect(listings?.[0]).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/)
     expect(listings?.[0]).toMatch(/align-items:\s*start/)
-    expect(css).toMatch(/\.add-sessions__repeat select\.input \{[^}]*padding-right:\s*36px/)
+    expect(css).toMatch(/\.add-sessions__repeat select\.input \{[^}]*padding-right:\s*42px/)
     expect(css).not.toMatch(
       /@media \(min-width: 1024px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
     )

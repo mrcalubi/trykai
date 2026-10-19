@@ -2,7 +2,7 @@ export default function Privacy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Privacy Policy</h1>
-      <p className="policy-page__updated">Last updated: 7 October 2026</p>
+      <p className="policy-page__updated">Last updated: 18 October 2026</p>
 
       <p>
         This policy explains how TryKai collects, uses, shares and protects your
@@ -127,6 +127,10 @@ export default function Privacy() {
         </li>
         <li>
           <strong>Vercel:</strong> hosting the website
+        </li>
+        <li>
+          <strong>OneMap (Singapore Land Authority):</strong> look up and
+          verify listing addresses from a postal code
         </li>
       </ul>
       <p>

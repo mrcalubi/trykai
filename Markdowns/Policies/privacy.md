@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 7 October 2026
+Last updated: 18 October 2026
 
 This policy explains how TryKai collects, uses, shares and protects your personal data, in line with Singapore's Personal Data Protection Act 2012 (PDPA).
 
@@ -48,6 +48,7 @@ We share personal data only with the service providers we need to run TryKai:
 - **Supabase:** our database, file storage and logins
 - **Resend:** sending our emails
 - **Vercel:** hosting the website
+- **OneMap (Singapore Land Authority):** look up and verify listing addresses from a postal code
 
 Some of these providers store data outside Singapore. We use providers who protect personal data to a standard comparable to the PDPA.
 

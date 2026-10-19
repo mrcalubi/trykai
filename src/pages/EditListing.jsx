@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
+import PostalAddressFields from '../components/PostalAddressFields'
 import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
@@ -360,22 +361,12 @@ export default function EditListing() {
           <h2 className="form-section__title">Location</h2>
           <label className="label">
             Area
-            <PlanningAreaSelect value={area} onChange={setArea} />
+            <PlanningAreaSelect value={area} onChange={setArea} hideUninhabited />
             <FieldHint>{fieldHints.area}</FieldHint>
           </label>
 
-          <label className="label">
-            Full address
-            <input
-              type="text"
-              value={fullAddress}
-              onChange={(e) => setFullAddress(e.target.value)}
-              placeholder="Only shown to guests after booking"
-              className="input"
-            />
-            <span className="hint">Hidden from browse — revealed after confirmed booking</span>
-            <FieldHint>{fieldHints.fullAddress}</FieldHint>
-          </label>
+          <PostalAddressFields value={fullAddress} onChange={setFullAddress} />
+          <FieldHint>{fieldHints.fullAddress}</FieldHint>
 
           <h2 className="form-section__title">Photos</h2>
           <PhotoTips />

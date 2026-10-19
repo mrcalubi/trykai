@@ -96,8 +96,18 @@ async function choosePlanningArea(user, name) {
 
 async function completeLocation(user, values) {
   await choosePlanningArea(user, values.area)
-  // The address label also wraps a hint span, so it needs a partial match.
-  if (values.fullAddress) await user.type(screen.getByLabelText(/^Full address/), values.fullAddress)
+  if (values.fullAddress?.trim()) {
+    supabase.functions.invoke.mockImplementation(async (name) => {
+      if (name !== 'lookup-postal-code') return { data: null, error: null }
+      return {
+        data: { results: [{ address: values.fullAddress, postal: '470012' }] },
+        error: null,
+      }
+    })
+    await user.type(screen.getByLabelText('Postal code'), '470012')
+    await user.click(screen.getByRole('button', { name: 'Find addresses' }))
+    expect(await screen.findByLabelText(/^Full address/)).toHaveValue(values.fullAddress)
+  }
   await next(user)
 }
 
@@ -334,6 +344,25 @@ describe('CreateListing validation', () => {
     expect(screen.getByText('Spots per session')).toBeInTheDocument()
     expect(document.querySelector('.guest-stepper__count')).toHaveTextContent('1')
     expect(screen.getByRole('button', { name: 'Fewer guests' })).toBeDisabled()
+  })
+
+  it('rejects a postal code OneMap cannot find', async () => {
+    const { user } = renderPage()
+    await goToPrice(user)
+    await completePrice(user, VALID)
+    await stepHeading('Where it happens')
+
+    await choosePlanningArea(user, VALID.area)
+    supabase.functions.invoke.mockResolvedValue({
+      data: { error: 'No address matches that postal code.', results: [] },
+      error: { message: 'Edge Function returned a non-2xx status code' },
+    })
+    await user.type(screen.getByLabelText('Postal code'), '000000')
+    await user.click(screen.getByRole('button', { name: 'Find addresses' }))
+    expect(await screen.findByText('No address matches that postal code.')).toBeInTheDocument()
+    await next(user)
+
+    expect(await screen.findByText(LISTING_FIELD_HINTS.fullAddress)).toBeInTheDocument()
   })
 
   it('rejects a blank address', async () => {
