@@ -145,7 +145,7 @@ All in plain CSS in `src/index.css` (no Tailwind), previewable at `/style-guide`
 ### Home
 1. **Hero**, left-aligned on every width. Headline, subhead, the three-item trust line, and a "Browse sessions" button that jumps to the grid. From 1024px the mascot sits on the right in a cream-on-sand panel.
 2. **Category bar** directly above the grid, swipeable sideways, scrolls away with the page.
-3. **Filter row:** quick chips that are computed from real data ("This weekend", "Under $30") plus the region select. Chips only appear when at least one listing would match.
+3. **Filter row:** quick chips that are computed from real data ("This weekend", "Under $30") plus the region select and a searchable area combobox (neighbourhood aliases resolve to a planning area). Chips only appear when at least one listing would match. Every `<select>` uses the shared chevron in `index.css` (`appearance: none`, SVG 16px from the right).
 4. **Grid** of browse cards, 2 / 3 / 4 columns at phone / 768px / 1024px. Sort is unchanged (soonest upcoming session day, then more sessions).
 5. **How TryKai works:** a deep-navy band with three numbered steps (pick, book a verified host, show up).
 6. **Teach what you love:** a quiet bordered band pointing to the host entry.

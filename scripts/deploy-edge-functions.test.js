@@ -26,6 +26,7 @@ const FUNCTIONS = [
   'create-connect-account',
   'create-identity-session',
   'create-payment-intent',
+  'lookup-postal-code',
   'notify-verification-pending',
   'purge-verification-docs',
   'release-payout',

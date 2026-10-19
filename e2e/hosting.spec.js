@@ -68,6 +68,21 @@ test.describe('host add sessions', () => {
       `/edit-listing/${LATTE_ART.id}`,
     )
     await expect(page.getByLabel('Spots total')).toHaveCount(0)
+    const repeatSelects = page.locator('.add-sessions__repeat select')
+    await expect(repeatSelects).toHaveCount(2)
+    for (const index of [0, 1]) {
+      const style = await repeatSelects.nth(index).evaluate((el) => {
+        const computed = getComputedStyle(el)
+        return {
+          appearance: computed.appearance,
+          paddingRight: computed.paddingRight,
+          backgroundImage: computed.backgroundImage,
+        }
+      })
+      expect(style.appearance).toBe('none')
+      expect(parseFloat(style.paddingRight)).toBeGreaterThanOrEqual(36)
+      expect(style.backgroundImage).toContain('data:image/svg+xml')
+    }
 
     // Count every picked date, not the highlighted days: from a Saturday, the
     // fourth date falls in next month and is off the calendar on screen.
@@ -113,7 +128,14 @@ test.describe('verified host create listing', () => {
         'rpc/my_verification': [{ verification_status: 'approved', is_admin: false }],
         'rpc/my_is_founding_host': false,
       },
-      { session: makeAuthSession() },
+      {
+        session: makeAuthSession(),
+        functions: {
+          'lookup-postal-code': {
+            results: [{ address: '12 CLAY ROAD SINGAPORE 470012', postal: '470012' }],
+          },
+        },
+      },
     )
 
     await page.goto('/login')
@@ -160,7 +182,9 @@ test.describe('verified host create listing', () => {
     await expect(page.getByRole('heading', { name: 'Where it happens' })).toBeVisible()
     await page.getByLabel('Area').fill('Bedok')
     await page.getByRole('option', { name: 'Bedok' }).click()
-    await page.getByLabel(/^Full address/).fill('12 Clay Road')
+    await page.getByLabel('Postal code').fill('470012')
+    await page.getByRole('button', { name: 'Find addresses' }).click()
+    await expect(page.getByLabel(/^Full address/)).toHaveValue('12 CLAY ROAD SINGAPORE 470012')
     await next()
 
     await expect(page.getByRole('heading', { name: 'Final touches' })).toBeVisible()

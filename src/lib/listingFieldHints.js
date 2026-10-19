@@ -8,7 +8,7 @@ export const LISTING_FIELD_HINTS = {
   spots: 'At least one guest per session.',
   duration: "Choose how long you'll spend with guests.",
   area: 'Pick the area guests will see before they book.',
-  fullAddress: 'The exact address. We only send this after a booking is confirmed.',
+  fullAddress: 'Look up the postal code. We only send the full address after a booking is confirmed.',
   hostTerms: 'Tick this to agree to the Host terms.',
 }
 

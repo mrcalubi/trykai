@@ -347,6 +347,19 @@ describe('Home filters', () => {
     expect(listingTitles()).toEqual(['Latte art', 'Boxing basics'])
   })
 
+  it('resolves a neighbourhood alias to the planning area', async () => {
+    givenListings([LATTE, BOXING, POTTERY])
+    const { user } = renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    await user.click(screen.getByLabelText('Filter by area'))
+    await user.type(screen.getByLabelText('Filter by area'), 'Kembangan')
+    await user.click(screen.getByRole('option', { name: 'Bedok (Kembangan)' }))
+
+    expect(listingTitles()).toEqual(['Boxing basics', 'Pottery hour'])
+    expect(screen.getByLabelText('Filter by area')).toHaveValue('Bedok')
+  })
+
   it('always offers All plus the five regions', async () => {
     givenListings([LATTE, BOXING, POTTERY])
     renderWithRouter(<Home />)

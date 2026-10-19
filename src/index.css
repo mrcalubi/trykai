@@ -18,6 +18,7 @@
   --error: #C7382C;         /* error text and icons */
   --error-bg: #F8EAE8;      /* error banner background */
   --star: #16264B;          /* rating stars use the text colour */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2316264B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   --scrim: rgba(15, 27, 56, 0.45);  /* dimmed backdrop behind overlays */
   --lightbox-backdrop: rgba(0, 0, 0, 0.92); /* photo viewer; page behind should disappear */
   --lightbox-chrome: #F4F1EA;               /* light controls on the dark overlay */
@@ -1011,26 +1012,43 @@ a {
   pointer-events: none;
 }
 
-.region-select__chevron {
-  position: absolute;
-  right: 12px;
-  pointer-events: none;
+.browse-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.browse-area {
+  position: relative;
+  min-width: 180px;
+}
+
+.browse-area .input {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
 }
 
 .filter-area {
   min-width: 170px;
   min-height: 36px;
-  padding: 0 36px 0 34px;
+  padding: 0 42px 0 34px;
   font-size: 13px;
   font-family: inherit;
   font-weight: 600;
   color: var(--navy);
-  background: var(--surface);
+  background-color: var(--surface);
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 16px 16px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   outline: none;
   cursor: pointer;
-  appearance: none;
 }
 
 .filter-area:hover {
@@ -1625,6 +1643,18 @@ a {
   box-shadow: 0 0 0 3px rgba(22, 38, 75, 0.12);
 }
 
+select,
+select.input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: #fff;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 16px 16px;
+  padding-right: 42px;
+}
+
 .input--file {
   padding: 10px;
   background: var(--surface);
@@ -1687,6 +1717,40 @@ input[type='radio'] {
 
 .planning-area-select .input[aria-invalid='true'] {
   border-color: var(--error);
+}
+
+.postal-address {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.postal-address__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.postal-address__option {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--text-h);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.postal-address__option:hover,
+.postal-address__option--on {
+  border-color: var(--navy);
+  background: var(--primary-bg);
 }
 
 .input--textarea {
@@ -4551,7 +4615,7 @@ body.lightbox-open {
 }
 
 .add-sessions__repeat select.input {
-  padding-right: 36px;
+  padding-right: 42px;
 }
 
 .add-sessions__times {

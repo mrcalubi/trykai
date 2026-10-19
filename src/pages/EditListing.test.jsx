@@ -336,8 +336,13 @@ describe('EditListing saving', () => {
     await user.clear(screen.getByLabelText('Area'))
     await user.type(screen.getByLabelText('Area'), 'Tampines')
     await user.click(screen.getByRole('option', { name: 'Tampines' }))
-    await user.clear(screen.getByLabelText(/^Full address/))
-    await user.type(screen.getByLabelText(/^Full address/), '5 Espresso Lane')
+    supabase.functions.invoke.mockResolvedValue({
+      data: { results: [{ address: '5 Espresso Lane', postal: '520123' }] },
+      error: null,
+    })
+    await user.type(screen.getByLabelText('Postal code'), '520123')
+    await user.click(screen.getByRole('button', { name: 'Find addresses' }))
+    expect(await screen.findByLabelText(/^Full address/)).toHaveValue('5 Espresso Lane')
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 

@@ -85,12 +85,42 @@ test.describe('browsing listings', () => {
     expect(box.y + 80).toBeLessThan(800)
   })
 
+  test('region select uses the shared chevron', async ({ page }) => {
+    await stubAllExternalCalls(page, { listings: [LATTE_ART, BOXING] })
+    await page.goto('/')
+    const select = page.getByLabel('Filter by region')
+    await expect(select).toBeVisible()
+    const style = await select.evaluate((el) => {
+      const computed = getComputedStyle(el)
+      return {
+        appearance: computed.appearance,
+        paddingRight: computed.paddingRight,
+        backgroundImage: computed.backgroundImage,
+      }
+    })
+    expect(style.appearance).toBe('none')
+    expect(parseFloat(style.paddingRight)).toBeGreaterThanOrEqual(36)
+    expect(style.backgroundImage).toContain('data:image/svg+xml')
+  })
+
   test('filters by category', async ({ page }) => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART, BOXING] })
     await page.goto('/')
     await expect(page.getByRole('heading', { name: 'Boxing basics' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Fitness', exact: true }).click()
+
+    await expect(page.getByRole('heading', { name: 'Boxing basics' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Learn latte art with me' })).toBeHidden()
+  })
+
+  test('filters by a neighbourhood alias', async ({ page }) => {
+    await stubAllExternalCalls(page, { listings: [LATTE_ART, BOXING] })
+    await page.goto('/')
+    await expect(page.getByRole('heading', { name: 'Boxing basics' })).toBeVisible()
+
+    await page.getByLabel('Filter by area').fill('Kembangan')
+    await page.getByRole('option', { name: 'Bedok (Kembangan)' }).click()
 
     await expect(page.getByRole('heading', { name: 'Boxing basics' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Learn latte art with me' })).toBeHidden()

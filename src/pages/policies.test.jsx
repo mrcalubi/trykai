@@ -223,4 +223,9 @@ describe('Privacy Policy page', () => {
     expect(screen.getByText(/kept for 5 years/)).toBeInTheDocument()
     expect(screen.getByText(/We do not sell personal data/)).toBeInTheDocument()
   })
+
+  it('names OneMap as the address lookup service', () => {
+    expect(screen.getByText(/OneMap \(Singapore Land Authority\)/)).toBeInTheDocument()
+    expect(screen.getByText(/look up and verify listing addresses/)).toBeInTheDocument()
+  })
 })

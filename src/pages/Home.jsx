@@ -8,6 +8,7 @@ import { ratingsByListingId } from '../lib/listingRatings'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { sortListingsForBrowse } from '../lib/listingSort'
 import { BROWSE_CATEGORIES } from '../lib/listingCategories'
+import PlanningAreaSelect from '../components/PlanningAreaSelect'
 import { REGIONS, regionForPlanningArea } from '../lib/planningAreas'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { publicName } from '../lib/publicName'
@@ -88,6 +89,7 @@ export default function Home() {
   const [error, setError] = useState('')
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || 'All')
   const [regionFilter, setRegionFilter] = useState('All')
+  const [areaFilter, setAreaFilter] = useState('')
   const [quickFilter, setQuickFilter] = useState(null)
 
   useEffect(() => {
@@ -163,10 +165,11 @@ export default function Home() {
         activeCategory === 'All' || listing.category === activeCategory
       const matchesRegion =
         regionFilter === 'All' || regionForPlanningArea(listing.area) === regionFilter
+      const matchesArea = !areaFilter || listing.area === areaFilter
       const matchesQuick = !activeQuick || activeQuick.matches(listing)
-      return matchesCategory && matchesRegion && matchesQuick
+      return matchesCategory && matchesRegion && matchesArea && matchesQuick
     })
-  }, [listings, activeCategory, regionFilter, activeQuick])
+  }, [listings, activeCategory, regionFilter, areaFilter, activeQuick])
 
   function chooseCategory(category) {
     setCategoryFilter(category)
@@ -179,6 +182,7 @@ export default function Home() {
   function clearFilters() {
     chooseCategory('All')
     setRegionFilter('All')
+    setAreaFilter('')
     setQuickFilter(null)
   }
 
@@ -286,22 +290,32 @@ export default function Home() {
                     ))}
                   </div>
                 ) : null}
-                <div className="region-select">
-                  <Icon name="pin" size={16} />
-                  <select
-                    value={regionFilter}
-                    onChange={(e) => setRegionFilter(e.target.value)}
-                    className="filter-area"
-                    aria-label="Filter by region"
-                  >
-                    <option value="All">All regions</option>
-                    {REGIONS.map((region) => (
-                      <option key={region} value={region}>
-                        {region}
-                      </option>
-                    ))}
-                  </select>
-                  <Icon name="chevronDown" size={16} className="region-select__chevron" />
+                <div className="browse-filters">
+                  <div className="region-select">
+                    <Icon name="pin" size={16} />
+                    <select
+                      value={regionFilter}
+                      onChange={(e) => setRegionFilter(e.target.value)}
+                      className="filter-area"
+                      aria-label="Filter by region"
+                    >
+                      <option value="All">All regions</option>
+                      {REGIONS.map((region) => (
+                        <option key={region} value={region}>
+                          {region}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <label className="browse-area">
+                    <span className="visually-hidden">Filter by area</span>
+                    <PlanningAreaSelect
+                      allowEmpty
+                      value={areaFilter}
+                      onChange={setAreaFilter}
+                      placeholder="All areas"
+                    />
+                  </label>
                 </div>
               </div>
             </div>
