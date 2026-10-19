@@ -8,44 +8,30 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 
 ## Current status
 
-*Updated 21 September 2026. This block is updated at every Saturday scrum. Everything else in these documents changes when a decision or an implementation status changes.*
+*Updated 19 October 2026. This block is updated at every Saturday scrum. Everything else in these documents changes when a decision or an implementation status changes. Full state: HANDOVER.md.*
 
 | | |
 |---|---|
-| **Phase** | Pre launch, week 8 of 13 just closed (15–21 September). Week of 22–28 September is week 9. |
-| **Soft launch target** | Week of 20 October 2026, warm contacts only, 15 to 20 listings |
+| **Phase** | Pre launch. Production sync this week; warm host onboarding from Wednesday 21 October |
+| **Soft launch target** | Week of 20 October 2026, warm contacts only, 15 to 20 listings. First real paid booking expected within a week of onboarding |
 | **Revenue to date** | Zero |
 | **Entity** | TRYKAI, sole proprietorship, UEN 53526159D |
-| **Banking** | Aspire business account, approved 13 August 2026 |
-| **Payments** | **Stripe Connect**, separate charges and transfers, Express accounts. Guest checkout, webhook confirmation, Connect onboarding, refunds, and `release-payout` are **in this tree**. Remaining is ops: confirm migrations (`00005`, `00008`, `00009`, `00010`, `00011`, `00012`) on each environment, Vault/GitHub secrets for `release-payout`, Stripe Dashboard webhook + secrets, `RESEND_API_KEY` and function deploys on production, platform payouts **manual**, founding-host flags, one test-mode booking. |
-
-**In the repo now (walked 21 September)**
-- Schema is `supabase/migrations/` `00001`–`00012`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` via pg_cron. `00011` is listing-page reviews (`reviews_for_listing`) and guest review INSERT gating (confirmed, session ended, one per booking per role). `00012` is `delete_empty_session` (soft-delete empty upcoming sessions) and `confirm_paid_booking` requiring `status = 'open'`.
-- Signup profile row is created by `handle_new_user` (`00004`), not by Login.jsx
-- Host verification: Stripe Identity default, manual fallback, review at `/admin/verifications`. Listing and session INSERT require `can_create_listing()`
-- Atomic `spots_remaining` decrement via `confirm_paid_booking` (service role only)
-- Address reveal via `listing_address()` (host or confirmed guest). `00025` grants SELECT on every `listings` column except `full_address`. `get_listing_address` is dropped.
-- Four tier cancellation refunds via `cancel-booking` (guest emailed the refund amount, including $0). `/bookings` and `/hosting` invoke that function; they do not PATCH bookings from the browser
-- CI: Vitest coverage floors 92% / 90% / 87%, money files 100%, Playwright desktop + phone, Deno type-check of shared Edge modules. A push to `staging` or `main` deploys every Edge Function after those checks pass. Pull requests do not deploy.
-- Global chrome is `SiteNav` → `TopNav`. `Navbar.jsx` is deleted. Browse uses the kit `Card`. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only
-- Avatar goes to your own `/u/:id`. Signed-in hamburger is Browse, Host a session (verified) / Become a host (not yet verified), Verification review for admins. `/bookings` and `/hosting` redirect to profile tabs. `/settings` is Profile + Account, with Log out. `/dashboard` still redirects. Login uses the kit Input with floating labels
-- Resend from-address is `TryKai <no-reply@trykai.sg>`. trykai.sg is verified. Staging booking confirmation emails confirmed arriving
-- StyleGuide category PNGs (`food`, `fitness`, `arts`, `music`) are in `src/assets/categories/`. `public/trykai.png` exists
-- Edge Functions: `create-payment-intent`, `stripe-webhook`, `create-connect-account`, `create-account-link`, `cancel-booking`, `admin-cancel-booking`, `admin-verifications`, `create-identity-session`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`. `notify-verification-result` is gone
+| **Banking** | Aspire business account. All TryKai money goes through it from 19 October (BUSINESS.md, How money moves) |
+| **Payments** | Stripe Connect, separate charges and transfers, Express accounts. Built. Remaining is production ops (OPERATIONS.md, Production sync, October 2026) |
+| **Infrastructure** | Supabase production on Pro (daily backups) from 19 October; staging on its own free organisation. Migrations `00001` to `00031` on both. Production sits in Mumbai; moving it to Singapore is post launch |
 
 **Blocked or in flight**
-- Production vs staging is unconfirmed from this repo. Confirm production has `00008` through `00012`, `RESEND_API_KEY`, and current Edge Function deploys
-- Two test cancellations: confirm Stripe refunds and `cancel-booking invoked` in function logs
-- Apply `00010` plus Vault/`PAYOUT_CRON_SECRET` on each environment. Platform payouts must stay manual
-- P0.4: `is_suspended` exists; listing/session INSERT is blocked by `00008`, but browse and Book still ignore the flag
+- Production sync (Rui Heng): deploy secrets, OneMap secrets on production, live Connected accounts webhook, one real card booking and refund, cron timeout
+- Production end to end and mobile testing before Wednesday
+- No SQL on production until the first daily backup appears
+- Claude's build queue: docs consolidation, link previews and Share fallback, email receipt, host nudge (BUILD_BACKLOG.md, Next builds)
 
-**Open and unstarted**
-- Forgot password: not built
-- Internal safety response protocol, drafted (`SAFETY_RESPONSE_PROTOCOL.md`), not ratified, not enforced in the app
-- Public liability insurance, still not quoted
-- Terms of Service and Privacy Policy, drafted but not lawyer reviewed or published
+**Carried, status not rechecked on 19 October**
+- Internal safety response protocol, drafted (`SAFETY_RESPONSE_PROTOCOL.md`), not ratified
+- Public liability insurance, not quoted
+- Terms of Service and Privacy Policy published in the app; lawyer review not recorded
 - Founders' agreement, not yet signed
-- Ruiheng still not told about the three way equal profit share
+- Rui Heng not yet told about the three way equal profit share
 
 ---
 
@@ -56,14 +42,14 @@ Peer to peer skill and experience marketplace for Singapore. Anyone with a skill
 | **README.md** | This file. Orientation and current status. |
 | **BUSINESS.md** | Positioning, the two lanes, competition, business model, growth philosophy, team, equity, profit sharing, legal entity. |
 | **DECISIONS.md** | Dated log of every decision made, plus the KIV list of things deliberately deferred. |
-| **ENGINEERING.md** | Tech stack, database schema, business rules, file map, and end to end user flows. The document Cursor and Ruiheng work from. |
+| **ENGINEERING.md** | Tech stack, database schema, business rules, file map, and end to end user flows. The document anyone building works from, human or AI. |
 | **OPERATIONS.md** | Week by week execution plan and the pre launch checklist. |
-| **BUILD_BACKLOG.md** | What to build next and in what order, derived from walking every user flow. Ruiheng's work queue. |
+| **BUILD_BACKLOG.md** | What to build next and in what order, derived from walking every user flow. The build queue for Rui Heng and Claude. |
 | **HOST_ONBOARDING.md** | Internal onboarding process, plus host facing guidelines on pricing, photos, and policies. |
 | **DESIGN.md** | Visual identity. Component library lives in-repo at `/style-guide`; browse Card, Settings Button/Input, and Login Input are wired into live pages. |
 | **FOUNDERS_AGREEMENT.md** | The signed record of equity, profit sharing, roles, and how disputes between founders are handled. |
 | **SAFETY_RESPONSE_PROTOCOL.md** | Internal process behind the public promise to suspend on a credible safety report. Drafted 23 August, not yet ratified. |
-| **HANDOVER.md** | Session handover. Current copy is 21 September 2026. |
+| **HANDOVER.md** | Session handover. Current copy is 19 October 2026. Read it first in a new chat. |
 
 Published website content, kept separate because it is public facing:
 `cancellation-policy.md`, `refund-policy.md`, `dispute-policy.md`
@@ -91,8 +77,8 @@ These files drifted badly once already, because the same fact was written in thr
 
 ## Working with AI on this project
 
-Claude acts as architect: schema, decisions, strategy, corrections.
-Cursor acts as builder: implementation.
-Caleb is product owner: testing, direction, final call.
+Claude acts as architect and, from 19 October, as builder: Claude Code in the TryKai Project chat attaches `mrcalubi/trykai`, branches from `staging`, runs lint and tests, and opens a PR into `staging`. It never pushes to `staging` or `main`.
+Caleb is product owner: testing, direction, review, merging, final call. Caleb applies migrations and sets secrets; no AI tool holds a Supabase access token or sees a secret.
+Cursor is used for small edits when credits allow.
 
-Start every Cursor session with: *"Read ENGINEERING.md and DECISIONS.md first, then..."*
+Start every build session, Claude or Cursor, with: *"Read ENGINEERING.md and DECISIONS.md first, then..."* For Cursor: one scope per prompt, name the branch, end with "Report anything unmapped".
