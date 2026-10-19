@@ -410,6 +410,10 @@ The remaining admin actions (set `is_founding_host`, suspend, grant `is_admin`) 
 ## 8. File map
 
 ```
+api/                             # Vercel serverless functions (plain Node, not bundled)
+├── listing-preview.js           # Link-preview HTML for /listings/:id, crawlers only (vercel.json UA rewrite)
+└── _lib/linkPreview.js          # Self-contained tag builder; price parity-tested against pricing.js
+vercel.json                      # Crawler rewrite to api/listing-preview, then SPA catch-all
 src/
 ├── lib/
 │   ├── supabase.js              # Supabase client init
@@ -431,6 +435,7 @@ src/
 │   ├── listingSpots.js          # Listing spots copy, capacity floor, session_has_bookings
 │   ├── listingCategories.js     # Shared host/browse category list + area line
 │   ├── reportMailto.js          # Report links to hello@trykai.sg
+│   ├── share.js                 # Share sheet, else clipboard, else execCommand copy
 │   └── edgeFunctionError.js     # Read Edge Function error bodies
 ├── data/
 │   └── areaAliases.js           # URA MP2019 subzones + extra aliases (one name may map to several areas)
