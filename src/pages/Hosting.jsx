@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useLocation, useSearchParams, Link, Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
@@ -26,12 +26,13 @@ import { singaporeDateKey } from '../lib/sessionCalendar'
 import { LISTING_STEPS, clearDraft, draftValues, readDraft } from '../lib/listingDraft'
 import {
   formatSgd,
-  isThisMonth,
+  listingDatesLine,
   listingFacts,
+  monthSessionsNote,
+  monthSessionsToCount,
   monthStartIso,
   monthStats,
 } from '../lib/hostingDashboard'
-import { PHOTO_TIPS } from '../lib/photoTips'
 import { parsePriceInputCents } from '../lib/pricing'
 
 function activeBookingsOn(session) {
@@ -240,7 +241,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
         const now = Date.now()
         const rows = sessionsData ?? []
         setHostSessions(rows.filter((session) => new Date(session.starts_at).getTime() > now))
-        setMonthSessions(rows.filter((session) => isThisMonth(session.starts_at, now)))
+        setMonthSessions(monthSessionsToCount(rows, now))
       }
     } else {
       setHostSessions([])
@@ -580,6 +581,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
   // Listings come newest first, so the first one the host made is last.
   const firstListing = listings[listings.length - 1]
   const stats = monthStats(monthSessions)
+  const sessionsNote = monthSessionsNote(stats)
   const TitleTag = embedded ? 'h2' : 'h1'
 
   const setupSteps = [
@@ -750,6 +752,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
             <div className="hosting-stat">
               <dt>Sessions</dt>
               <dd>{stats.sessions}</dd>
+              {sessionsNote ? <dd className="hosting-stat__note">{sessionsNote}</dd> : null}
             </div>
             <div className="hosting-stat">
               <dt>Guests booked</dt>
@@ -812,6 +815,9 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                   (session) => session.listing_id === listing.id,
                 )
                 const hasDates = upcoming.length > 0
+                const bookedCount = upcoming.filter(
+                  (session) => activeBookingsOn(session).length > 0,
+                ).length
                 const formOpen = activeFormId === listing.id
                 return (
                   <article
@@ -877,9 +883,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                               : 'hosting-listing__status hosting-listing__status--empty'
                           }
                         >
-                          {hasDates
-                            ? `Next: ${formatSessionDateTime(upcoming[0].starts_at)}`
-                            : 'No dates yet'}
+                          {listingDatesLine(upcoming.length - bookedCount, bookedCount)}
                         </p>
                         <Button
                           className="hosting-listing__add"
@@ -957,7 +961,6 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
           )}
         </section>
 
-        <PhotoTipsBanner />
       </div>
 
       {confirmListing && confirmStats ? (
@@ -1025,42 +1028,6 @@ function DraftListingCard({ draft, onDiscard }) {
         </div>
       </div>
     </article>
-  )
-}
-
-function PhotoTipsBanner() {
-  const [open, setOpen] = useState(false)
-  const id = useId()
-
-  return (
-    <aside className="hosting-tips" aria-labelledby={`${id}-title`}>
-      <Icon name="camera" size={22} className="hosting-tips__icon" />
-      <div className="hosting-tips__copy">
-        <p id={`${id}-title`} className="hosting-tips__title">
-          Better photos, more bookings
-        </p>
-        <p className="hosting-tips__lede">
-          Natural light, a clear table, and your hands mid-task. Five minutes with your phone
-          is enough.
-        </p>
-        <button
-          type="button"
-          className="hosting-tips__toggle"
-          aria-expanded={open}
-          aria-controls={`${id}-list`}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? 'Hide the photo tips' : `See the ${PHOTO_TIPS.length} photo tips`}
-        </button>
-        {open ? (
-          <ul id={`${id}-list`} className="hosting-tips__list">
-            {PHOTO_TIPS.map((tip) => (
-              <li key={tip}>{tip}</li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
-    </aside>
   )
 }
 

@@ -15,7 +15,11 @@ import Card from '../components/ui/Card'
 import Icon from '../components/ui/Icon'
 import { categoryIconName } from '../components/ui/categoryIcon'
 import { LISTING_CATEGORIES } from '../lib/listingCategories'
-import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
+import {
+  LISTING_FIELD_HINTS,
+  PHOTO_UPLOAD_ERROR,
+  listingSaveProblem,
+} from '../lib/listingFieldHints'
 import { providedForSave } from '../lib/whatsProvided'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import {
@@ -282,7 +286,12 @@ export default function CreateListing() {
 
     if (listingError) {
       setLoading(false)
-      setError(listingError.message)
+      const problem = listingSaveProblem(listingError)
+      if (problem.field === 'price') {
+        goTo(STEPS.findIndex((item) => item.id === 'price'))
+        setFieldHints({ price: problem.hint })
+      }
+      setError(problem.message)
       return
     }
 
@@ -294,7 +303,7 @@ export default function CreateListing() {
     setLoading(false)
 
     if (hostError) {
-      setError(hostError.message)
+      setError(listingSaveProblem(hostError).message)
       return
     }
 

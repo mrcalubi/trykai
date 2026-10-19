@@ -4288,8 +4288,7 @@ body.lightbox-open {
 
 .hosting-stat {
   display: flex;
-  flex-direction: column-reverse;
-  justify-content: flex-end;
+  flex-direction: column;
   gap: 6px;
   min-width: 0;
   padding: 14px 10px 14px 12px;
@@ -4304,7 +4303,9 @@ body.lightbox-open {
   white-space: nowrap;
 }
 
+/* The figure sits above its label; any note follows the label. */
 .hosting-stat dd {
+  order: -1;
   margin: 0;
   overflow: hidden;
   font-family: var(--mono);
@@ -4314,6 +4315,16 @@ body.lightbox-open {
   color: var(--navy);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.hosting-stat dd.hosting-stat__note {
+  order: 0;
+  margin-top: -2px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: normal;
 }
 
 .hosting-listings__empty {
@@ -4375,115 +4386,47 @@ body.lightbox-open {
   color: var(--coral-ink);
 }
 
-.hosting-tips {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 20px;
-  color: var(--cream);
-  background: var(--navy);
-  border-radius: var(--radius-lg);
-}
-
-.hosting-tips__icon {
-  flex-shrink: 0;
-  margin-top: 1px;
-  color: var(--coral);
-}
-
-.hosting-tips__copy {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.hosting-tips__title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.hosting-tips__lede {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
-  color: rgba(244, 241, 234, 0.85);
-}
-
-.hosting-tips__toggle {
-  align-self: flex-start;
-  padding: 4px 0;
-  font: 700 14px var(--sans);
-  color: var(--cream);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  background: none;
-  border: 0;
-  cursor: pointer;
-}
-
-.hosting-tips__toggle:focus-visible {
-  outline: 2px solid var(--cream);
-  outline-offset: 2px;
-}
-
-.hosting-tips__list {
-  margin: 4px 0 0;
-  padding-left: 18px;
-  font-size: 14px;
-  line-height: 1.6;
-  color: rgba(244, 241, 234, 0.9);
-}
-
-/* Desktop: the checklist beside This month and the photo tips, then the
-   listings across the full width. */
+/* Desktop: the checklist beside This month, then the listings across the full
+   width. Once setup is done everything is one column. */
 @media (min-width: 1024px) {
   .hosting__layout {
-    grid-template-columns: minmax(0, 1fr) 400px;
-    grid-template-areas:
-      'month tips'
-      'upcoming upcoming'
-      'listings listings';
-    column-gap: 32px;
     row-gap: 40px;
   }
 
+  .hosting-month__stats {
+    max-width: 720px;
+  }
+
   .hosting__layout--setup {
+    grid-template-columns: minmax(0, 1fr) 400px;
     grid-template-areas:
       'setup month'
-      'setup tips'
       'upcoming upcoming'
       'listings listings';
-    grid-template-rows: auto 1fr;
+    column-gap: 32px;
     row-gap: 28px;
   }
 
-  .hosting-setup {
+  .hosting__layout--setup .hosting-setup {
     grid-area: setup;
     align-self: start;
-    padding: 24px 28px;
   }
 
-  .hosting-month {
+  .hosting__layout--setup .hosting-month {
     grid-area: month;
+    align-self: start;
   }
 
-  .hosting-upcoming {
+  .hosting__layout--setup .hosting-upcoming {
     grid-area: upcoming;
   }
 
-  .hosting-listings {
+  .hosting__layout--setup .hosting-listings {
     grid-area: listings;
   }
 
-  .hosting-tips {
-    grid-area: tips;
-    align-self: start;
-  }
-
-  .hosting__layout:not(.hosting__layout--setup) .hosting-tips {
-    align-self: stretch;
+  .hosting-setup {
+    padding: 24px 28px;
   }
 }
 
