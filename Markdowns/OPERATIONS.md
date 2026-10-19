@@ -2,7 +2,9 @@
 
 Week by week execution plan and the pre launch checklist. Updated live at the Saturday scrum.
 
-**Target: soft launch, week of 20 October 2026.** Warm contacts only, 15 to 20 listings across two or three categories.
+**Target: soft launch, week of 20 October 2026.** Warm contacts only, 15 to 20 listings across two or three categories. **Warm host onboarding starts Wednesday 21 October**; first real paid booking expected within a week.
+
+**Before touching either Supabase project, read Environments and production SQL below.**
 
 ---
 
@@ -27,9 +29,29 @@ Each week has three sections, one per founder, tagged **[CRITICAL]**, **[HIGH]**
 
 ---
 
+## Progress snapshot, 19 October 2026
+
+Week 13 of the original plan. Read this snapshot first. HANDOVER.md has the full state; this block is what ops needs.
+
+**Migrations.** `00022` to `00031` verified on both staging and production (18 and 19 October). See Environments and production SQL for the per environment table.
+
+**Branches.** `main` has everything through PR #129. `staging` is ahead by #130, #131 and #132 (location batch C, including the `lookup-postal-code` Edge Function).
+
+**Edge Functions in the tree:** `abandon-checkout`, `admin-cancel-booking`, `admin-dispute-booking`, `admin-verifications`, `cancel-booking`, `create-account-link`, `create-connect-account`, `create-identity-session`, `create-payment-intent`, `lookup-postal-code`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`, `report-booking-problem`, `stripe-webhook`.
+
+**This week (agreed at the 18 October scrum):**
+- Production sync (Rui Heng): see Production sync, October 2026 below
+- Production end to end testing without real checkout, then mobile testing
+- Wednesday 21 October: warm host onboarding begins (HOST_ONBOARDING.md)
+- First real paid booking within a week of onboarding
+
+**Open decision: Supabase Pro on production.** About US$25 a month for daily backups and no inactivity pause. Recommendation: upgrade production before host onboarding or the first paid booking, and keep staging on a separate free org. Caleb is deferring. Until it is decided, take a manual dump before any production SQL and after each onboarding day.
+
+---
+
 ## Progress snapshot, 21 September 2026
 
-Week 8 of the original plan (15–21 September) is ending. The week-by-week sections below stay as the historical plan. Read this snapshot first.
+*History. Superseded by the 19 October snapshot.* Week 8 of the original plan (15–21 September) was ending.
 
 **In the tree now (not true of the 31 August snapshot):**
 - Schema is `00001`–`00012`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` hourly via pg_cron. `00011` is `reviews_for_listing` plus guest review INSERT (confirmed, session ended, one per booking per role). `00012` is `delete_empty_session` (soft-delete empty upcoming sessions) and `confirm_paid_booking` requiring `status = 'open'`. Not yet applied on staging.
@@ -353,6 +375,8 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 
 **Goal:** TryKai is live to warm contacts. Real friends booking real sessions with real payment.
 
+**Revised at the 18 October scrum:** production sync and production testing first; warm host onboarding from Wednesday 21 October; first real paid booking within a week of that.
+
 ### CALEB
 - [CRITICAL] Launch day, personal messages to warm contacts, not a group blast
 - [CRITICAL] Monitor the Supabase dashboard actively for the first 48 hours
@@ -381,6 +405,69 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 | A founder disengages over a longer runway | Low | High | Monthly check ins make this visible early. |
 | Yide day trading listing creates liability | Low | High | Frame as experience sharing only, explicit disclaimer, law student review. |
 | Off platform leakage | Low at this scale | Medium | Reviews only through TryKai, brief hosts during onboarding. |
+| SQL run on the wrong Supabase project | Happened 18 October | High | Both dashboards show "PRODUCTION". Check the ref in the URL every time. Staging first. See Environments and production SQL. |
+| Production data lost with no backup | Low | **Critical** | Production is on the Free plan (no daily backups). Manual dump before any production SQL and after each onboarding day until Supabase Pro is decided. |
+| A new Edge Function goes live on production without its secret | Medium | Medium | Merging to `main` deploys every function. Set the secrets on production first. |
+
+---
+
+# Environments and production SQL
+
+| | Staging | Production |
+|---|---|---|
+| Supabase project | `trykai-staging` | "Kai" (Free plan) |
+| Project ref | `hzgybclfvpuxkmytdoos` | `dqqlwofluvhikebtjune` |
+| Dashboard | https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos | https://supabase.com/dashboard/project/dqqlwofluvhikebtjune |
+| Site | trykai.vercel.app | trykai.sg |
+| Git branch | `staging` | `main` |
+| Edge Function deploy | Automatic on push to `staging` | Automatic on push to `main` (`PRODUCTION_SUPABASE_PROJECT_REF` GitHub secret, required) |
+| Migrations | By hand, SQL Editor | By hand, SQL Editor |
+
+**Both dashboards show the "PRODUCTION" label.** It is not a guide. The ref in the URL is. The runbooks below are written against staging; for production, swap in `dqqlwofluvhikebtjune`.
+
+Who does what: Caleb applies migrations and sets secrets. Claude and Cursor never hold a Supabase access token, and nobody pastes secrets into chat. `SUPABASE_ACCESS_TOKEN` lives only in GitHub Actions secrets.
+
+## Production SQL
+
+Every migration, and any other SQL that writes on production.
+
+1. **Apply on staging first.** Open the SQL Editor, confirm the URL contains `hzgybclfvpuxkmytdoos`, run the migration, test the flows it touches.
+2. **Dump production.** From your own machine, outside the repo folder (the repo's `.gitignore` does not ignore `.sql` files):
+   ```
+   npx supabase link --project-ref dqqlwofluvhikebtjune
+   npx supabase db dump -f prod-schema.sql
+   npx supabase db dump --data-only -f prod-data.sql
+   ```
+   `link` asks for the production database password. `db dump` runs `pg_dump` in a container, so Docker Desktop must be running. Keep the dumps private. Never commit them, never upload them to chat.
+3. **Apply on production in the same sitting.** Confirm the URL contains `dqqlwofluvhikebtjune`, then run.
+4. **Record it.** Update the migration table below.
+
+Also dump production after each host onboarding day until production has daily backups.
+
+## Migration state
+
+| Migrations | Staging | Production | Checked |
+|---|---|---|---|
+| `00022` to `00026` | Applied | Applied | 18 October (production was applied first, by mistake) |
+| `00027` to `00031` | Applied | Applied | 19 October, read-only check query |
+
+Earlier migrations are assumed applied on both, since these build on them.
+
+---
+
+# Production sync, October 2026
+
+Merging `staging` into `main` so production runs the current tree. Owner: Rui Heng. PR #129 (19 October) brought `main` up to `00031` and the dispute, complaint and chargeback functions. #130 to #132 are still on `staging` only.
+
+**Before the next merge into `main`:**
+- [ ] GitHub secrets `PRODUCTION_SUPABASE_PROJECT_REF` and `SUPABASE_ACCESS_TOKEN` valid (the deploy step fails without them)
+- [ ] `ONEMAP_EMAIL` and `ONEMAP_PASSWORD` set as production Edge Function secrets (`lookup-postal-code`, from #132)
+
+**After the merge:**
+- [ ] Live Stripe "Connected accounts" webhook destination for `account.updated`, and `STRIPE_CONNECT_WEBHOOK_SECRET` on production (see Connected accounts webhook below)
+- [ ] One real card booking on production, then refund it
+- [ ] Production cron `pg_net` timeout raised to about 30 seconds (the hourly `release-payout` call)
+- [ ] Production end to end test without real checkout, then on a phone
 
 ---
 
