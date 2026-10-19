@@ -28,6 +28,9 @@ import {
   paymentMethodFromIntent,
   publicDisplayName,
   receiptPriceLines,
+  receiptRows,
+  EMAIL_COLORS,
+  EMAIL_LOGO_URL,
   refundDeadlineLines,
   refundMethodNoun,
   refundTimingCopy,
@@ -53,7 +56,7 @@ describe('verification result emails', () => {
   })
 
   it('greets an approved host without a name on file', () => {
-    expect(verificationApprovedHtml({ hostName: null })).toContain("You're verified!")
+    expect(verificationApprovedHtml({ hostName: null })).toContain('You&#39;re verified!')
   })
 
   it('tells a rejected host what to fix and where to resubmit', () => {
@@ -93,6 +96,21 @@ describe('escapeHtml', () => {
 })
 
 const SESSION_STARTS = '2026-08-28T11:00:00.000Z'
+
+/** A label/value row in the details table, ignoring the inline styles. */
+function hasDetail(html: string, label: string, value: string): boolean {
+  // Leaf cells only: a cell that opens another table is layout, not a detail.
+  const cells = [...html.matchAll(/<td[^>]*>((?:(?!<td)[\s\S])*?)<\/td>/g)].map((m) => m[1].trim())
+  return cells.some((cell, i) => cell === label && cells[i + 1] === value)
+}
+
+/** Receipt rows as [label, amount] pairs. */
+function receiptCells(html: string): string[][] {
+  const block = html.slice(html.indexOf('>Receipt<'))
+  return [...block.matchAll(/<tr>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<\/tr>/g)].map(
+    (m) => [m[1].trim(), m[2].replace(/<[^>]+>/g, '').trim()],
+  )
+}
 
 function guestReceipt(overrides = {}) {
   return bookingConfirmedGuestHtml({
@@ -478,18 +496,20 @@ describe('booking confirmation emails', () => {
     const html = guestReceipt()
     expect(html).toContain('Hi caleb2,')
     expect(html).toContain("You're booked with Mei Ling. Here's everything you need.")
-    expect(html).toContain('Booking reference:</strong> A1B2C3D4')
-    expect(html).toContain(formatSessionDate(SESSION_STARTS))
-    expect(html).toContain('1 hr 30 min')
-    expect(html).toContain('12 Club Street, Singapore 069410')
-    expect(html).toContain('Guests:</strong> 4 guests')
-    expect(html).toContain("What's provided:</strong> Apron, Coffee beans")
-    expect(html).toContain('$24 per person x 4 guests')
-    expect(html).toContain('Group discount (15%)')
+    expect(hasDetail(html, 'Booking reference', 'A1B2C3D4')).toBe(true)
+    expect(hasDetail(html, 'Date and time', formatSessionDate(SESSION_STARTS))).toBe(true)
+    expect(hasDetail(html, 'Duration', '1 hr 30 min')).toBe(true)
+    expect(hasDetail(html, 'Address', '12 Club Street, Singapore 069410')).toBe(true)
+    expect(hasDetail(html, 'Guests', '4 guests')).toBe(true)
+    expect(hasDetail(html, "What&#39;s provided", 'Apron, Coffee beans')).toBe(true)
+    expect(receiptCells(html)).toEqual([
+      ['$24 per person x 4 guests', '$96'],
+      ['Group discount (15%)', 'Included'],
+      ['PayNow saving', '−$4.80'],
+      ['Total paid', '$91.20'],
+    ])
     expect(html).not.toContain('−$16')
-    expect(html).toContain('PayNow saving $4.80')
-    expect(html).toContain('Total paid $91.20')
-    expect(html).toContain('Payment method:</strong> PayNow')
+    expect(html).toContain('Paid with PayNow')
     expect(html).toContain('Your bank will show this payment as Stripe Payments Singapore.')
     expect(html).not.toMatch(/booking fee|platform fee/i)
     expect(html).not.toMatch(/Full refund if you cancel/)
@@ -523,14 +543,14 @@ describe('booking confirmation emails', () => {
       whatsProvided: [],
     })
     expect(html).toContain("You're booked with your host. Here's everything you need.")
-    expect(html).not.toContain('Duration:')
-    expect(html).not.toContain('Address:')
-    expect(html).not.toContain("What's provided:")
+    expect(html).not.toContain('>Duration<')
+    expect(html).not.toContain('>Address<')
+    expect(html).not.toContain('>What&#39;s provided<')
   })
 
   it('skips What\'s provided when the only item is None', () => {
-    expect(guestReceipt({ whatsProvided: ['None'] })).not.toContain("What's provided:")
-    expect(guestReceipt({ whatsProvided: null })).not.toContain("What's provided:")
+    expect(guestReceipt({ whatsProvided: ['None'] })).not.toContain('>What&#39;s provided<')
+    expect(guestReceipt({ whatsProvided: null })).not.toContain('>What&#39;s provided<')
   })
 
   it('names the card brand and last 4 when the guest paid by card', () => {
@@ -540,10 +560,12 @@ describe('booking confirmation emails', () => {
       totalPaidCents: 2800,
       paymentMethod: 'Visa ending in 4242',
     })
-    expect(html).toContain('Guests:</strong> 1 guest')
-    expect(html).toContain('$28 per person x 1 guest')
-    expect(html).toContain('Total paid $28')
-    expect(html).toContain('Visa ending in 4242')
+    expect(hasDetail(html, 'Guests', '1 guest')).toBe(true)
+    expect(receiptCells(html)).toEqual([
+      ['$28 per person x 1 guest', '$28'],
+      ['Total paid', '$28'],
+    ])
+    expect(html).toContain('Paid with Visa ending in 4242')
     expect(html).not.toMatch(/group discount/i)
     expect(html).not.toMatch(/PayNow saving/)
     expect(html).not.toMatch(/booking fee|platform fee/i)
@@ -1211,5 +1233,73 @@ describe('complaint emails', () => {
     ).resolves.toBeUndefined()
     expect(errorMock).toHaveBeenCalled()
     errorMock.mockRestore()
+  })
+})
+
+describe('branded receipt', () => {
+  it('shows only the total when the rows would not add up to what was paid', () => {
+    const html = guestReceipt({ totalPaidCents: 9999 })
+    expect(receiptCells(html)).toEqual([['Total paid', '$99.99']])
+    expect(html).not.toContain('per person x')
+  })
+
+  it('reports whether the receipt rows add up', () => {
+    const base = { pricePerPersonCents: 2500, guestsCount: 4, groupPricing: true }
+    expect(receiptRows({ ...base, paymentRail: 'card', totalPaidCents: 9600 }).addsUp).toBe(true)
+    expect(receiptRows({ ...base, paymentRail: 'paynow', totalPaidCents: 9120 }).addsUp).toBe(true)
+    expect(receiptRows({ ...base, paymentRail: 'card', totalPaidCents: 9120 }).addsUp).toBe(false)
+    const { rows } = receiptRows({ ...base, paymentRail: 'paynow', totalPaidCents: 9120 })
+    const sum = rows.reduce((total, row) => total + (row.amountCents ?? 0), 0)
+    expect(sum).toBe(9120)
+  })
+
+  it('has the brand frame: production logo, wordmark, cream page, inbox preview', () => {
+    const html = guestReceipt({ siteUrl: 'https://trykai.vercel.app' })
+    expect(html).toContain(`src="${EMAIL_LOGO_URL}"`)
+    expect(EMAIL_LOGO_URL).toBe('https://trykai.sg/trykai.png')
+    expect(html).toContain(`TryKai<span style="color:${EMAIL_COLORS.coral};">.</span>`)
+    expect(html).toContain(`background:${EMAIL_COLORS.cream}`)
+    expect(html).toContain('<meta name="color-scheme" content="light">')
+    expect(html).toMatch(/display:none[^>]*>Latte art · .* · Ref A1B2C3D4/)
+    // Links follow the environment; only the logo is pinned to production.
+    expect(html).toContain('href="https://trykai.vercel.app/bookings/booking-1"')
+  })
+
+  it('puts the listing title in the heading, escaped', () => {
+    expect(guestReceipt()).toMatch(/<h1[^>]*>Latte art<\/h1>/)
+    expect(guestReceipt({ listingTitle: 'Tea & <b>' })).toMatch(/<h1[^>]*>Tea &amp; &lt;b&gt;<\/h1>/)
+  })
+
+  it('never uses coral for text or buttons', () => {
+    const html = guestReceipt()
+    const coralUses = html.match(new RegExp(EMAIL_COLORS.coral, 'g')) ?? []
+    expect(coralUses).toHaveLength(1)
+    expect(html).toContain(`background:${EMAIL_COLORS.navy};border-radius:12px;`)
+  })
+
+  it('wraps every email in the same frame', () => {
+    const emails = [
+      verificationApprovedHtml({ hostName: 'Mei' }),
+      verificationRejectedHtml({ hostName: 'Mei', reason: 'blurry' }),
+      bookingConfirmedHostHtml({
+        bookingReference: 'A1B2C3D4',
+        guestName: 'Sarah',
+        listingTitle: 'Latte art',
+        sessionDate: 'x',
+        guestsCount: 1,
+        hostPayoutCents: 2500,
+      }),
+    ]
+    for (const html of emails) {
+      expect(html).toContain(`src="${EMAIL_LOGO_URL}"`)
+      expect(html).toContain('UEN 53526159D')
+      expect(html).not.toMatch(/#111|#666|#f4f4f5/)
+    }
+  })
+
+  it('escapes the host name in the approval email', () => {
+    const html = verificationApprovedHtml({ hostName: '<img src=x onerror=alert(1)>' })
+    expect(html).not.toContain('<img src=x')
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
   })
 })

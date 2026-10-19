@@ -8,6 +8,32 @@ const RESEND_FROM = 'TryKai <no-reply@trykai.sg>'
 export const GUEST_REPLY_TO = 'hello@trykai.sg'
 const DEFAULT_SITE_URL = 'https://trykai.sg'
 
+/**
+ * Brand colours from DESIGN.md section 2, inlined because email clients drop
+ * <style> blocks and CSS variables. Coral is for the wordmark dot only; it is
+ * never text or a button (3.1:1 on white).
+ */
+export const EMAIL_COLORS = {
+  navy: '#16264B',
+  cream: '#F4F1EA',
+  surface: '#FBFAF6',
+  white: '#FFFFFF',
+  coral: '#D97756',
+  muted: '#4E586C',
+  border: '#E4DED2',
+} as const
+
+/**
+ * Always the production asset. Staging sits behind Vercel login, so an image
+ * served from it would show as broken in every inbox.
+ */
+export const EMAIL_LOGO_URL = `${DEFAULT_SITE_URL}/trykai.png`
+
+const FONT_STACK = "Manrope,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+const DISPLAY_STACK = "'Bricolage Grotesque',Manrope,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+const LINK_STYLE = `color:${EMAIL_COLORS.navy};font-weight:600;`
+const QUIET_LINK_STYLE = `color:${EMAIL_COLORS.muted};`
+
 export function formatCents(cents: number): string {
   const dollars = Number(cents) / 100
   if (!Number.isFinite(dollars)) return '$0'
@@ -127,9 +153,31 @@ function emailSignOff(kind: 'see-you' | 'take-care'): string {
 }
 
 function primaryButton(href: string, label: string): string {
-  return `<p style="margin:24px 0 8px;">
-      <a href="${href}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:600;">${escapeHtml(label)}</a>
-    </p>`
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 8px;">
+      <tr><td style="background:${EMAIL_COLORS.navy};border-radius:12px;">
+        <a href="${href}" style="display:inline-block;padding:14px 24px;color:${EMAIL_COLORS.white};text-decoration:none;font-weight:700;font-size:16px;line-height:20px;">${escapeHtml(label)}</a>
+      </td></tr>
+    </table>`
+}
+
+/** Label and value rows. Values arrive already escaped. */
+function detailRows(rows: Array<[string, string] | null | false | undefined>): string {
+  const cells = rows
+    .filter((row): row is [string, string] => Boolean(row && row[1]))
+    .map(
+      ([label, value]) => `<tr>
+          <td style="padding:6px 16px 6px 0;vertical-align:top;white-space:nowrap;font-size:14px;color:${EMAIL_COLORS.muted};">${escapeHtml(label)}</td>
+          <td style="padding:6px 0;vertical-align:top;font-size:15px;color:${EMAIL_COLORS.navy};">${value}</td>
+        </tr>`,
+    )
+    .join('\n')
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
+        ${cells}
+      </table>`
+}
+
+function emailHeading(text: string): string {
+  return `<h1 style="margin:0 0 8px;font-family:${DISPLAY_STACK};font-size:24px;line-height:30px;font-weight:700;letter-spacing:-0.02em;color:${EMAIL_COLORS.navy};">${escapeHtml(text)}</h1>`
 }
 
 function whatsProvidedCopy(items?: string[] | null): string {
@@ -222,18 +270,24 @@ export function refundDeadlineLines(sessionStartsAt: string): string[] {
   ]
 }
 
+export type ReceiptRow = { label: string; amountCents: number | null }
+
 /**
- * Guest-facing receipt lines. The advertised all-in card price is the unit
- * price so a booking fee never appears as its own row. Group discount and
- * PayNow saving are the only reductions.
+ * Guest-facing receipt. The advertised all-in card price is the unit price so
+ * a booking fee never appears as its own row. Group discount (already inside
+ * the unit price) and PayNow saving are the only reductions.
+ *
+ * `addsUp` is false when the rows would not sum to what the guest actually
+ * paid (an older booking, a price edited after booking). The email then shows
+ * only the total, never a breakdown that does not add up.
  */
-export function receiptPriceLines(options: {
+export function receiptRows(options: {
   pricePerPersonCents: number
   guestsCount: number
   groupPricing?: boolean
   paymentRail?: string | null
   totalPaidCents: number
-}): string[] {
+}): { rows: ReceiptRow[]; totalCents: number; addsUp: boolean } {
   const guestsCount = Math.max(1, Number(options.guestsCount) || 1)
   const groupPricing = options.groupPricing !== false
   const listLesson = options.pricePerPersonCents * guestsCount
@@ -246,17 +300,78 @@ export function receiptPriceLines(options: {
   const cardDiscountedTotal = calculateGuestCharge(discountedLesson, 'card').totalAmount
   const perPerson = Math.round(cardDiscountedTotal / guestsCount)
   const rate = groupDiscountRate(guestsCount, groupPricing)
-  const lines = [`${formatCents(perPerson)} per person x ${guestCountLabel(guestsCount)}`]
+
+  const rows: ReceiptRow[] = [
+    {
+      label: `${formatCents(perPerson)} per person x ${guestCountLabel(guestsCount)}`,
+      amountCents: cardDiscountedTotal,
+    },
+  ]
   if (rate > 0 && cardListTotal > cardDiscountedTotal) {
-    lines.push(`Group discount (${Math.round(rate * 100)}%)`)
+    rows.push({ label: `Group discount (${Math.round(rate * 100)}%)`, amountCents: null })
   }
+  let expectedTotal = cardDiscountedTotal
   if (options.paymentRail === 'paynow') {
     const paynowTotal = calculateGuestCharge(discountedLesson, 'paynow').totalAmount
     const saving = cardDiscountedTotal - paynowTotal
-    if (saving > 0) lines.push(`PayNow saving ${formatCents(saving)}`)
+    if (saving > 0) rows.push({ label: 'PayNow saving', amountCents: -saving })
+    expectedTotal = paynowTotal
   }
-  lines.push(`Total paid ${formatCents(options.totalPaidCents)}`)
+  return {
+    rows,
+    totalCents: options.totalPaidCents,
+    addsUp: expectedTotal === options.totalPaidCents,
+  }
+}
+
+/** Plain-text form of the receipt, one line per row. */
+export function receiptPriceLines(options: {
+  pricePerPersonCents: number
+  guestsCount: number
+  groupPricing?: boolean
+  paymentRail?: string | null
+  totalPaidCents: number
+}): string[] {
+  const { rows, totalCents } = receiptRows(options)
+  const lines = rows.map((row) =>
+    row.amountCents !== null && row.amountCents < 0
+      ? `${row.label} ${formatCents(-row.amountCents)}`
+      : row.label,
+  )
+  lines.push(`Total paid ${formatCents(totalCents)}`)
   return lines
+}
+
+function receiptAmount(cents: number): string {
+  return cents < 0 ? `−${escapeHtml(formatCents(-cents))}` : escapeHtml(formatCents(cents))
+}
+
+function receiptBlock(receipt: { rows: ReceiptRow[]; totalCents: number; addsUp: boolean }, paymentMethod: string): string {
+  const lineRows = receipt.addsUp
+    ? receipt.rows
+        .map(
+          (row) => `<tr>
+              <td style="padding:6px 0;font-size:15px;color:${EMAIL_COLORS.navy};">${escapeHtml(row.label)}</td>
+              <td align="right" style="padding:6px 0;font-size:15px;color:${EMAIL_COLORS.navy};white-space:nowrap;">${row.amountCents === null ? '<span style="color:' + EMAIL_COLORS.muted + ';">Included</span>' : receiptAmount(row.amountCents)}</td>
+            </tr>`,
+        )
+        .join('\n')
+    : ''
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px;background:${EMAIL_COLORS.surface};border:1px solid ${EMAIL_COLORS.border};border-radius:16px;">
+        <tr><td style="padding:16px 20px;">
+          <p style="margin:0 0 8px;font-size:11px;line-height:16px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${EMAIL_COLORS.muted};">Receipt</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            ${lineRows}
+            <tr>
+              <td style="padding:10px 0 4px;border-top:1px solid ${EMAIL_COLORS.border};font-size:16px;font-weight:700;color:${EMAIL_COLORS.navy};">Total paid</td>
+              <td align="right" style="padding:10px 0 4px;border-top:1px solid ${EMAIL_COLORS.border};font-size:16px;font-weight:700;color:${EMAIL_COLORS.navy};white-space:nowrap;">${escapeHtml(formatCents(receipt.totalCents))}</td>
+            </tr>
+            <tr>
+              <td colspan="2" style="padding:4px 0 0;font-size:13px;color:${EMAIL_COLORS.muted};">Paid with ${escapeHtml(paymentMethod)}</td>
+            </tr>
+          </table>
+        </td></tr>
+      </table>`
 }
 
 export async function sendResendEmail(options: {
@@ -320,13 +435,6 @@ export function bookingConfirmedGuestHtml(options: {
   const siteUrl = emailSiteUrl(options.siteUrl)
   const hostName = escapeHtml(options.hostName || 'your host')
   const provided = whatsProvidedCopy(options.whatsProvided)
-  const priceLines = receiptPriceLines({
-    pricePerPersonCents: options.pricePerPersonCents,
-    guestsCount: options.guestsCount,
-    groupPricing: options.groupPricing,
-    paymentRail: options.paymentRail,
-    totalPaidCents: options.totalPaidCents,
-  })
   const duration = options.duration ? escapeHtml(options.duration) : ''
   const address = options.fullAddress ? escapeHtml(options.fullAddress) : ''
   const calendar = googleCalendarUrl({
@@ -336,27 +444,38 @@ export function bookingConfirmedGuestHtml(options: {
     address: options.fullAddress,
   })
 
+  const receipt = receiptRows({
+    pricePerPersonCents: options.pricePerPersonCents,
+    guestsCount: options.guestsCount,
+    groupPricing: options.groupPricing,
+    paymentRail: options.paymentRail,
+    totalPaidCents: options.totalPaidCents,
+  })
+
   return wrapEmail(
     `
     <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
-    <p style="margin:0 0 16px;">You're booked with ${hostName}. Here's everything you need.</p>
-    <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
-    <p style="margin:0 0 8px;"><strong>Date and time:</strong> ${escapeHtml(options.sessionDate)}</p>
-    ${duration ? `<p style="margin:0 0 8px;"><strong>Duration:</strong> ${duration}</p>` : ''}
-    ${address ? `<p style="margin:0 0 8px;"><strong>Address:</strong> ${address}</p>` : ''}
-    <p style="margin:0 0 8px;"><strong>Guests:</strong> ${guestCountLabel(options.guestsCount)}</p>
-    ${provided ? `<p style="margin:0 0 8px;"><strong>What's provided:</strong> ${escapeHtml(provided)}</p>` : ''}
-    ${priceLines.map((line) => `<p style="margin:0 0 8px;">${escapeHtml(line)}</p>`).join('\n    ')}
-    <p style="margin:0 0 16px;"><strong>Payment method:</strong> ${escapeHtml(options.paymentMethod)}</p>
-    ${options.paymentRail === 'paynow' ? '<p style="margin:0 0 16px;">Your bank will show this payment as Stripe Payments Singapore.</p>' : ''}
-    ${calendar ? `<p style="margin:0 0 8px;"><a href="${escapeHtml(calendar)}" style="color:#111;">Add to Google Calendar</a></p>` : ''}
+    ${emailHeading(options.listingTitle)}
+    <p style="margin:0 0 20px;color:${EMAIL_COLORS.muted};">You're booked with ${hostName}. Here's everything you need.</p>
+    ${detailRows([
+      ['Date and time', escapeHtml(options.sessionDate)],
+      ['Duration', duration],
+      ['Address', address],
+      ['Guests', guestCountLabel(options.guestsCount)],
+      ["What's provided", provided ? escapeHtml(provided) : ''],
+      ['Booking reference', escapeHtml(options.bookingReference)],
+    ])}
+    ${receiptBlock(receipt, options.paymentMethod)}
+    ${options.paymentRail === 'paynow' ? `<p style="margin:0 0 16px;font-size:14px;color:${EMAIL_COLORS.muted};">Your bank will show this payment as Stripe Payments Singapore.</p>` : ''}
+    ${calendar ? `<p style="margin:0 0 8px;"><a href="${escapeHtml(calendar)}" style="${LINK_STYLE}">Add to Google Calendar</a></p>` : ''}
     ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
     <p style="margin:0 0 8px;">Questions for your host? Reply to this email.</p>
-    <p style="margin:0 0 16px;"><a href="${siteUrl}" style="color:#111;">Browse more experiences</a></p>
-    <p style="margin:0;font-size:13px;color:#666;">Need to change plans? <a href="${siteUrl}/cancellation-policy" style="color:#666;">Cancellation policy</a></p>
+    <p style="margin:0 0 16px;"><a href="${siteUrl}" style="${LINK_STYLE}">Browse more experiences</a></p>
+    <p style="margin:0;font-size:13px;color:${EMAIL_COLORS.muted};">Need to change plans? <a href="${siteUrl}/cancellation-policy" style="${QUIET_LINK_STYLE}">Cancellation policy</a></p>
     ${emailSignOff('see-you')}
     `,
     siteUrl,
+    `${options.listingTitle} · ${options.sessionDate} · Ref ${options.bookingReference}`,
   )
 }
 
@@ -387,12 +506,17 @@ export function bookingConfirmedHostHtml(options: {
 }
 
 export function verificationApprovedHtml(options: { hostName?: string | null }): string {
-  const greeting = options.hostName ? `You're verified, ${options.hostName}!` : "You're verified!"
-  return `
-    <h2>${greeting}</h2>
-    <p>Your identity verification has been approved. You can now create listings on TryKai.</p>
-    <p><a href="https://trykai.sg/create-listing">Create your first listing</a></p>
-  `
+  const name = (options.hostName || '').trim()
+  const greeting = name ? `You're verified, ${name}!` : "You're verified!"
+  return wrapEmail(
+    `
+    ${emailHeading(greeting)}
+    <p style="margin:0 0 16px;">Your identity verification has been approved. You can now create listings on TryKai.</p>
+    ${primaryButton(`${DEFAULT_SITE_URL}/create-listing`, 'Create your first listing')}
+    ${emailSignOff('see-you')}
+    `,
+    DEFAULT_SITE_URL,
+  )
 }
 
 /**
@@ -403,14 +527,17 @@ export function verificationRejectedHtml(options: {
   hostName?: string | null
   reason: string
 }): string {
-  const greeting = options.hostName ? `Hi ${options.hostName},` : 'Hi,'
-  return `
-    <h2>${escapeHtml(greeting)}</h2>
-    <p>We were unable to verify your identity with the documents provided.</p>
-    <p><strong>What we found:</strong> ${escapeHtml(options.reason)}</p>
-    <p>You can submit new documents whenever you are ready.</p>
-    <p><a href="https://trykai.sg/verify-identity">Resubmit verification</a></p>
-  `
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    <p style="margin:0 0 16px;">We were unable to verify your identity with the documents provided.</p>
+    <p style="margin:0 0 16px;"><strong>What we found:</strong> ${escapeHtml(options.reason)}</p>
+    <p style="margin:0 0 16px;">You can submit new documents whenever you are ready.</p>
+    ${primaryButton(`${DEFAULT_SITE_URL}/verify-identity`, 'Resubmit verification')}
+    ${emailSignOff('take-care')}
+    `,
+    DEFAULT_SITE_URL,
+  )
 }
 
 export function bookingCancelledGuestHtml(options: {
@@ -464,7 +591,7 @@ export function bookingCancelledGuestHtml(options: {
     <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
     <p style="margin:0 0 16px;"><strong>Guests:</strong> ${guestCountLabel(options.guestsCount)}</p>
     ${cta}
-    <p style="margin:0;"><a href="${siteUrl}" style="color:#111;">Browse other experiences</a></p>
+    <p style="margin:0;"><a href="${siteUrl}" style="${LINK_STYLE}">Browse other experiences</a></p>
     ${emailSignOff('take-care')}
     `,
     siteUrl,
@@ -510,7 +637,7 @@ export function hostSessionCancelledHtml(options: {
     `
     <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
     <p style="margin:0 0 16px;">You cancelled ${escapeHtml(options.listingTitle)} on ${escapeHtml(options.sessionDate)}. ${escapeHtml(hostRefundedGuestsLine(options.guestCount))} This is strike ${options.strikeCount} of 3; at 3 your listings are paused.</p>
-    <p style="margin:0;"><a href="${siteUrl}/cancellation-policy#appeals" style="color:#111;">Appeal this strike</a></p>
+    <p style="margin:0;"><a href="${siteUrl}/cancellation-policy#appeals" style="${LINK_STYLE}">Appeal this strike</a></p>
     ${emailSignOff('take-care')}
     `,
     siteUrl,
@@ -576,7 +703,7 @@ export function disputeRefundGuestHtml(options: {
     <p style="margin:0 0 16px;"><strong>Date and time:</strong> ${escapeHtml(options.sessionDate)}</p>
     <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
     <p style="margin:0 0 16px;">Questions about this refund? Reply to this email.</p>
-    <p style="margin:0;"><a href="${siteUrl}" style="color:#111;">Browse other experiences</a></p>
+    <p style="margin:0;"><a href="${siteUrl}" style="${LINK_STYLE}">Browse other experiences</a></p>
     ${emailSignOff('take-care')}
     `,
     siteUrl,
@@ -629,7 +756,7 @@ export function complaintReceivedGuestHtml(options: {
     <p style="margin:0 0 16px;"><strong>Date and time:</strong> ${escapeHtml(options.sessionDate)}</p>
     <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
     <p style="margin:0 0 16px;">Anything to add, such as more photos or messages? Reply to this email.</p>
-    <p style="margin:0;"><a href="${siteUrl}/dispute-policy" style="color:#111;">How we handle disputes</a></p>
+    <p style="margin:0;"><a href="${siteUrl}/dispute-policy" style="${LINK_STYLE}">How we handle disputes</a></p>
     ${emailSignOff('take-care')}
     `,
     siteUrl,
@@ -847,30 +974,57 @@ function shiftHours(date: Date, hours: number): string {
   return new Date(date.getTime() + hours * 60 * 60 * 1000).toISOString()
 }
 
-function wrapEmail(body: string, siteUrl: string): string {
+/** Hidden inbox preview text. Padded so clients do not pull body text in after it. */
+function preheaderHtml(text?: string): string {
+  if (!text) return ''
+  return `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${escapeHtml(text)}${'&nbsp;&zwnj;'.repeat(40)}</div>`
+}
+
+/**
+ * Every TryKai email. Table-based with inline styles so Gmail, iOS Mail and
+ * Outlook render it the same: cream page, logo and wordmark, white card, then
+ * the legal footer.
+ */
+function wrapEmail(body: string, siteUrl: string, preheader?: string): string {
   const base = emailSiteUrl(siteUrl)
+  const c = EMAIL_COLORS
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
   <title>TryKai</title>
 </head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#111;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 12px;">
+<body style="margin:0;padding:0;background:${c.cream};font-family:${FONT_STACK};color:${c.navy};-webkit-text-size-adjust:100%;">
+  ${preheaderHtml(preheader)}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${c.cream};">
     <tr>
-      <td align="center">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;padding:28px 24px;border-radius:8px;">
+      <td align="center" style="padding:24px 12px 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
           <tr>
-            <td style="font-size:16px;line-height:1.5;">
+            <td style="padding:0 8px 16px;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align:middle;padding-right:10px;"><img src="${EMAIL_LOGO_URL}" width="36" height="36" alt="" style="display:block;border:0;width:36px;height:36px;"></td>
+                  <td style="vertical-align:middle;font-family:${DISPLAY_STACK};font-size:22px;line-height:26px;font-weight:700;letter-spacing:-0.02em;color:${c.navy};">TryKai<span style="color:${c.coral};">.</span></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:${c.white};border:1px solid ${c.border};border-radius:16px;padding:28px 24px;font-size:16px;line-height:1.5;color:${c.navy};">
               ${body}
-              <p style="margin:32px 0 0;padding-top:20px;border-top:1px solid #e5e5e5;font-size:13px;line-height:1.6;color:#666;">
-                TryKai<br>
-                UEN 53526159D<br>
-                <a href="${base}/terms" style="color:#666;">Terms</a>
-                &nbsp;·&nbsp;
-                <a href="${base}/privacy" style="color:#666;">Privacy</a>
-              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 8px 0;font-size:13px;line-height:1.6;color:${c.muted};">
+              TryKai<br>
+              UEN 53526159D<br>
+              <a href="${base}/terms" style="${QUIET_LINK_STYLE}">Terms</a>
+              &nbsp;·&nbsp;
+              <a href="${base}/privacy" style="${QUIET_LINK_STYLE}">Privacy</a>
             </td>
           </tr>
         </table>
