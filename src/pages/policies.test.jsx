@@ -60,7 +60,7 @@ describe('Cancellation Policy page', () => {
   })
 
   it('tells guests to cancel from their profile, not a dashboard', () => {
-    expect(screen.getByText(/Cancel anytime from your profile/)).toBeInTheDocument()
+    expect(screen.getByText(/Cancel anytime from the Bookings tab on your profile/)).toBeInTheDocument()
     expect(screen.queryByText(/Dashboard/)).not.toBeInTheDocument()
   })
 
@@ -107,8 +107,8 @@ describe('Refund Policy page', () => {
     )
   })
 
-  it('gives guests seven days to raise a session-quality complaint', () => {
-    expect(screen.getByText(/within 7 days of your session/)).toBeInTheDocument()
+  it('gives guests three days to raise a session-quality complaint', () => {
+    expect(screen.getByText(/within 3 days after your session ends/)).toBeInTheDocument()
   })
 })
 
@@ -123,6 +123,12 @@ describe('Dispute Policy page', () => {
     expect(screen.getByRole('heading', { name: 'Appealing a host strike' })).toBeInTheDocument()
   })
 
+  it('gives guests three days after the session to raise a quality complaint', () => {
+    expect(
+      screen.getByText(/within 3 days after\s+the session ends\. We cannot review complaints raised after that\./)
+    ).toBeInTheDocument()
+  })
+
   it('commits to a two business day response on complaints', () => {
     expect(screen.getByText(/respond within 2 business days/)).toBeInTheDocument()
   })
@@ -132,7 +138,7 @@ describe('Dispute Policy page', () => {
   })
 
   it('states when host payouts are released', () => {
-    expect(screen.getByText(/released 24 hours after a session starts/)).toBeInTheDocument()
+    expect(screen.getByText(/released 72 hours after a session ends/)).toBeInTheDocument()
   })
 
   it('gives a contact address', () => {

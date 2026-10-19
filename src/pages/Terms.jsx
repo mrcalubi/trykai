@@ -217,8 +217,7 @@ export default function Terms() {
         </li>
         <li>
           Your share (the lesson price, less any Host fee) is transferred to
-          your Stripe account about 24 hours after your session&apos;s start
-          time.
+          your Stripe account about 72 hours after your session ends.
         </li>
         <li>
           We may hold a payout while we look into a dispute, a fraud concern or

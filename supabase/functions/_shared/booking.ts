@@ -254,7 +254,7 @@ export function isValidGuestsCount(value: unknown): value is number {
 
 /**
  * A host booking their own session would pay themselves through the platform:
- * the guest charge lands in TryKai's balance and the 24h Transfer sends the
+ * the guest charge lands in TryKai's balance and the 72h Transfer sends the
  * host share straight back, so the only real movement is Stripe's processing
  * fee out of TryKai. It also takes a spot off their own listing.
  */
@@ -324,6 +324,12 @@ export function prepareBooking(
 /** Fallback only for bookings taken before platform_fee was stored. */
 export const LEGACY_PLATFORM_FEE_RATE = 0.15
 
+/**
+ * The published Cancellation Policy tiers; these decide the actual Stripe
+ * refund. GUEST_REFUND_TIERS in src/lib/cancellationPolicy.js mirrors them to
+ * preview the refund before the guest confirms, and
+ * src/pages/CancellationPolicy.jsx states them. Change all three together.
+ */
 export const GUEST_REFUND_TIER_RULES = [
   { id: 'full', minHoursBefore: 48, lessonFeeShare: 1, refundsPlatformFee: true },
   { id: 'half', minHoursBefore: 24, lessonFeeShare: 0.5, refundsPlatformFee: false },

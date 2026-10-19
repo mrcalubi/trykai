@@ -5,7 +5,11 @@ import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession } from '../test/fixtures'
-import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
+import {
+  LISTING_FIELD_HINTS,
+  LISTING_SAVE_ERROR,
+  PHOTO_UPLOAD_ERROR,
+} from '../lib/listingFieldHints'
 
 vi.mock('../lib/supabase')
 
@@ -563,9 +567,27 @@ describe('CreateListing submission', () => {
 
     await user.click(screen.getByRole('button', { name: 'Create listing' }))
 
-    expect(await screen.findByText('row level security')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_SAVE_ERROR)).toBeInTheDocument()
+    expect(screen.queryByText('row level security')).not.toBeInTheDocument()
     expect(supabase.__calls('users', 'update')).toHaveLength(0)
     expect(currentPath()).toBe('/create-listing')
+  })
+
+  it('takes the host back to the price when the price ceiling check fails', async () => {
+    supabase.__on('listings', 'insert', {
+      error: {
+        message: 'new row for relation "listings" violates check constraint "listings_price_ceiling"',
+      },
+    })
+    const { user } = renderPage()
+    await fillValidForm(user)
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await stepHeading('Price and group size')
+    expect(screen.getByText('Check the price above.')).toBeInTheDocument()
+    expect(screen.getByText(LISTING_FIELD_HINTS.price)).toBeInTheDocument()
+    expect(screen.queryByText(/listings_price_ceiling/)).not.toBeInTheDocument()
   })
 
   it('reports a failure to flag the user as a host', async () => {

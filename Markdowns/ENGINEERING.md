@@ -6,7 +6,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 
 > **Read before you start, updated 9 September 2026.**
 >
-> 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 24 hours after `starts_at`. Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
+> 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 72 hours after the session ends (`starts_at` + `duration_mins`). Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). When the guest cancels, the host is emailed their payout only. When the host cancels a session, they get a strike email with no guest amounts.
 > 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00026`**).** There is no `supabase/schema.sql`. Apply new migrations on staging before production.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
@@ -37,13 +37,13 @@ Two user types, one account. A user is a guest by default and becomes a host whe
 | Routing                    | React Router v7                                                      |                                                                                                                                                                                                                                                                                                                                              |
 | Backend, DB, Auth, Storage | Supabase                                                             | Handles backend, auth, storage, and RLS out of the box                                                                                                                                                                                                                                                                                       |
 | Hosting                    | Vercel                                                               | Free tier, auto deploy on push                                                                                                                                                                                                                                                                                                               |
-| Payments                   | **Stripe Connect**, separate charges and transfers, Express accounts | Decided 16 August. Supports PayNow in Singapore at 1.3%, platform is merchant of record, Transfers held until 24h after the session. In code: Payment Element + webhook confirmation, Connect onboarding, refunds, hourly Transfer job. Connect account creation uses Stripe Accounts **v2** (`2026-08-26.preview`) in `_shared/connect.ts`. |
-| Transactional email        | Resend                                                               | From-address is `TryKai <no-reply@trykai.sg>`. trykai.sg is verified in Resend. Booking emails greet by display name and sign off "See you there," / "Take care," then "The TryKai team". Guest confirmation is a receipt (reference, listing, Singapore time, duration, address, What's provided, price lines, payment method, Google Calendar link) with one quiet Cancellation policy line — no refund-tier dates. Guest confirmation and cancellation reply-to is `hello@trykai.sg`. Cancellation emails the guest the refund amount (including $0) and timing from the refund policy. The host is emailed their payout when the guest cancelled, or a strike notice (no guest amounts) when they cancel a session. `admin-cancel-booking` emails the guest the host-cancel copy.                                                                                                                                                                                           |
+| Payments                   | **Stripe Connect**, separate charges and transfers, Express accounts | Decided 16 August. Supports PayNow in Singapore at 1.3%, platform is merchant of record, Transfers held until 72 hours after the session ends. In code: Payment Element + webhook confirmation, Connect onboarding, refunds, hourly Transfer job. Connect account creation uses Stripe Accounts **v2** (`2026-08-26.preview`) in `_shared/connect.ts`. |
+| Transactional email        | Resend                                                               | From-address is `TryKai <no-reply@trykai.sg>`. trykai.sg is verified in Resend. Booking emails greet by display name and sign off "See you there," / "Take care," then "The TryKai team". Guest confirmation is a receipt (reference, listing, Singapore time, duration, address, What's provided, price lines, payment method, Google Calendar link) with one quiet Cancellation policy line — no refund-tier dates. Guest confirmation and cancellation reply-to is `hello@trykai.sg`. Cancellation emails the guest the refund amount (including $0) and timing from the refund policy. The host is emailed their payout when the guest cancelled, or a strike notice (no guest amounts) when they cancel a session. `admin-cancel-booking` emails the guest the host-cancel copy, or a dispute refund receipt with `reason: 'dispute'`. `admin-dispute-booking` partial refunds email the guest a refund receipt.                                                                                                                                                                                           |
 | Business email             | Zoho Mail Lite                                                       | caleb@, aakash@, [ruiheng@trykai.sg](mailto:ruiheng@trykai.sg)                                                                                                                                                                                                                                                                               |
 | AI coding                  | Cursor                                                               | Implementation. Claude handles architecture.                                                                                                                                                                                                                                                                                                 |
 
 
-**CI** (`.github/workflows/ci.yml`): lint, Vitest with coverage, `vite build`, Playwright (desktop + phone Chromium), Deno type-check of `_shared/{booking,http,connect,email,payouts,verification,onemap}.ts`, and a dry run that every `supabase/functions/<name>/index.ts` matches a `[functions.<name>]` block. Handler type-check is advisory (`continue-on-error`). On push to `staging` or `main`, after those checks pass, `scripts/deploy-edge-functions.mjs` deploys every Edge Function (`supabase functions deploy --use-api`). Staging uses project ref `hzgybclfvpuxkmytdoos` unless `STAGING_SUPABASE_PROJECT_REF` is set. Production requires `PRODUCTION_SUPABASE_PROJECT_REF`. Both require GitHub secret `SUPABASE_ACCESS_TOKEN`. Pull requests do not deploy. Coverage floors: lines 92%, functions 90%, branches 87%; money files 100%.
+**CI** (`.github/workflows/ci.yml`): lint, Vitest with coverage, `vite build`, Playwright (desktop + phone Chromium), Deno type-check of `_shared/{booking,complaints,http,connect,disputes,email,payouts,verification,onemap}.ts`, and a dry run that every `supabase/functions/<name>/index.ts` matches a `[functions.<name>]` block. Handler type-check is advisory (`continue-on-error`). On push to `staging` or `main`, after those checks pass, `scripts/deploy-edge-functions.mjs` deploys every Edge Function (`supabase functions deploy --use-api`). Staging uses project ref `hzgybclfvpuxkmytdoos` unless `STAGING_SUPABASE_PROJECT_REF` is set. Production requires `PRODUCTION_SUPABASE_PROJECT_REF`. Both require GitHub secret `SUPABASE_ACCESS_TOKEN`. Pull requests do not deploy. Coverage floors: lines 92%, functions 90%, branches 87%; money files 100%.
 
 ### Styling
 
@@ -186,12 +186,15 @@ host_payout_amount integer -- cents, lesson minus host_fee, frozen at confirmati
 stripe_payment_id text    -- PaymentIntent id
 stripe_charge_id text     -- Charge id, used as Transfer source_transaction
 stripe_transfer_id text
-stripe_refund_id text
+stripe_refund_id text     -- full refund only; release-payout never pays a row with this set
+stripe_partial_refund_ids text[] default '{}'  -- admin-dispute-booking partial refunds (00029); do not block payout
 payout_released_at timestamptz  -- booking-level; do not use sessions.payout_released_at for this
+payout_hold_reason text   -- 'dispute' | 'chargeback' (CHECK, 00030); release-payout skips as dispute_hold while set. Guest and host can read it, so never free text
+payout_held_at timestamptz
 status text               -- 'pending' | 'confirmed' | 'cancelled'
-cancelled_by text         -- 'guest' | 'host'  (admin-cancel-booking also writes 'host')
+cancelled_by text         -- 'guest' | 'host'  (admin-cancel-booking also writes 'host', including reason 'dispute')
 cancelled_at timestamptz
-refund_amount integer     -- cents
+refund_amount integer     -- cents, cumulative across partial and full refunds
 created_at timestamp
 ```
 
@@ -212,6 +215,20 @@ created_at timestamp
 
 Insert policy (`00011`) is guest-only: reviewer is the guest on that booking, `role = 'guest'`, booking is `confirmed`, `now()` is after `starts_at + duration_mins`, and `reviewee_id` is the listing host. Unique on `(booking_id, role)`. Host→guest reviews have no insert path.
 
+### booking_complaints
+
+```sql
+id uuid PK
+booking_id uuid FK → bookings, unique  -- one report per booking
+guest_id uuid FK → users
+description text           -- 20 to 2000 characters, the guest's words (escape everywhere)
+photo_paths text[]         -- complaint-evidence/{booking_id}/{complaint_id}/{n}.{ext}
+photos_purged_at timestamptz  -- set when the 180-day purge removed the photos
+created_at timestamptz
+```
+
+`00031`. Written only by `report-booking-problem` (service role). The guest can SELECT their own row's `id`, `booking_id`, `created_at` (RLS `guest_id = auth.uid()`) so the booking page shows "You reported a problem on ...". The description and photo paths are not client-readable, and the host has no grant. The `complaint-evidence` bucket is private with no storage policies.
+
 ### verification_reviews
 
 ```sql
@@ -226,7 +243,26 @@ created_at timestamptz
 
 Append-only, service role only, no client grant of any kind. Written by `review_verification` in the same transaction as the status change, so a decision cannot be applied without a record. This is both the PDPA justification trail for holding NRIC copies and the review history the safety protocol assumes.
 
-**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`. Listing-page reviews and guest INSERT gating are `00011_reviews_for_listing.sql` (`reviews_for_listing`, `guest_can_leave_review`, one review per booking per role). Empty-session soft-delete is `00012_delete_empty_session.sql` (`delete_empty_session`). `00012` also redefines `confirm_paid_booking` so a session that is not `open` (including `cancelled`) cannot confirm; the webhook refunds that the same way it refunds an oversell. Host-profile reviews are `00013_reviews_for_host.sql` (`reviews_for_host`): guest reviews this user received as a host, plus listing title, without embedding `bookings`. `00013` also redefines `reviews_for_listing` so both RPCs return the reviewer's first name in `users.full_name`. Display names are `00014_display_name.sql`: `users.display_name`, `handle_new_user` from signup metadata, and both review RPCs return `display_name` in jsonb `users.full_name`. Browse-card averages and owner listing delete are `00015_listing_ratings_and_delete_listing.sql` (`listing_ratings`, `delete_listing`). `00015` also redefines `my_verification` so admins get `pending_count` (everyone else gets 0). Planning areas are `00016_planning_areas.sql`: 55 URA names tagged to five regions, public SELECT, `listings.area` FK. Terms agreement is `00017_terms_accepted_at.sql`: `users.terms_accepted_at`, `handle_new_user` from signup metadata `terms_accepted`, `guard_user_self_update` blocks client writes. No SELECT or UPDATE grant. Storage buckets are `00026_lock_storage_policies.sql`: public `listing-photos` (owner INSERT/UPDATE/DELETE in `{auth.uid()}/`, no client SELECT — public URLs still work; the client only `upload`s and `getPublicUrl`s) and private `verification-docs` (owner SELECT/INSERT/UPDATE in `{auth.uid()}/` so upsert on resubmit works; no client DELETE; admins use service-role signed URLs).
+**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`. Listing-page reviews and guest INSERT gating are `00011_reviews_for_listing.sql` (`reviews_for_listing`, `guest_can_leave_review`, one review per booking per role). Empty-session soft-delete is `00012_delete_empty_session.sql` (`delete_empty_session`). `00012` also redefines `confirm_paid_booking` so a session that is not `open` (including `cancelled`) cannot confirm; the webhook refunds that the same way it refunds an oversell. Host-profile reviews are `00013_reviews_for_host.sql` (`reviews_for_host`): guest reviews this user received as a host, plus listing title, without embedding `bookings`. `00013` also redefines `reviews_for_listing` so both RPCs return the reviewer's first name in `users.full_name`. Display names are `00014_display_name.sql`: `users.display_name`, `handle_new_user` from signup metadata, and both review RPCs return `display_name` in jsonb `users.full_name`. Browse-card averages and owner listing delete are `00015_listing_ratings_and_delete_listing.sql` (`listing_ratings`, `delete_listing`). `00015` also redefines `my_verification` so admins get `pending_count` (everyone else gets 0). Planning areas are `00016_planning_areas.sql`: 55 URA names tagged to five regions, public SELECT, `listings.area` FK. Terms agreement is `00017_terms_accepted_at.sql`: `users.terms_accepted_at`, `handle_new_user` from signup metadata `terms_accepted`, `guard_user_self_update` blocks client writes. No SELECT or UPDATE grant. Storage buckets are `00026_lock_storage_policies.sql`: public `listing-photos` (owner INSERT/UPDATE/DELETE in `{auth.uid()}/`, no client SELECT — public URLs still work; the client only `upload`s and `getPublicUrl`s) and private `verification-docs` (owner SELECT/INSERT/UPDATE in `{auth.uid()}/` so upsert on resubmit works; no client DELETE; admins use service-role signed URLs). Suspension is `00027_hide_suspended_hosts.sql`: the public listings SELECT policy also requires `listing_host_in_good_standing(id)` (security definer, by listing id), so a suspended host's listings drop out of every public read; `create-payment-intent` refuses checkout for a suspended host. Price typo guard is `00028_listing_price_ceiling.sql`: `listings_price_ceiling` CHECK `price_per_person <= 50000` (NOT VALID), matching `MAX_PRICE_PER_PERSON_CENTS` in `src/lib/pricing.js`. Guest dispute tooling is `00029_booking_dispute_hold.sql`: `bookings.payout_hold_reason`, `payout_held_at`, and `stripe_partial_refund_ids`. In-app quality complaints are `00031_booking_complaints.sql` (`booking_complaints`, private `complaint-evidence` bucket). `00030` is reserved for the `booking_money_events` branch.
+### booking_money_events
+
+```sql
+id uuid PK
+booking_id uuid            -- no FK: the history must outlive (and not block) the users → bookings cascade
+action text                -- 'hold' | 'release_hold' | 'partial_refund' | 'admin_cancel'
+actor_user_id uuid         -- admin whose JWT made the call; null only for break_glass / system (CHECK)
+auth_method text           -- 'admin_jwt' | 'break_glass' | 'system'
+amount_cents integer       -- guest refund made by this action; null for hold / release_hold
+host_payout_before integer
+host_payout_after integer  -- what the host will be paid after this action (0 after an admin cancel before release)
+stripe_object_id text      -- re_ for refunds
+note text                  -- free text, 2000 max. Holds start with the code ('dispute: ...'); break-glass starts '[break-glass: <operator>]'
+created_at timestamptz
+```
+
+`00030`. Admin-only: RLS on with no policies, no grant to anon or authenticated; `service_role` has SELECT and INSERT only. A trigger refuses UPDATE, DELETE, and TRUNCATE for every role, so history cannot be rewritten through the API. Read it in SQL Editor. Written by `admin-dispute-booking` (every `hold`, `release_hold`, `partial_refund`) and `admin-cancel-booking` (every cancel) after the action succeeds; a no-op (`already_released`, `already_cancelled`) writes nothing. A failed insert never fails the action, because a retried refund would move money twice: the function logs the full row and returns `audit_logged: false` with `audit_error`. Row builders are `_shared/money-events.ts`. Free-text hold reasons from `00029` were moved here and the booking column reset to `'dispute'`.
+
+**Schema is in** `supabase/migrations/`, starting at `00001_baseline.sql`. Signup trigger is `00004_create_profile_on_signup.sql`. Money columns and `confirm_paid_booking` are in `00005_stripe_connect_payments.sql`. Verification functions, the real listing gate, and the `verification-docs` bucket policies are in `00007_verification_security_foundation.sql`. Dashboard session/listing reads for booked-or-hosted rows, and the drop of leftover booking INSERT/UPDATE policies, are in `00009_booking_session_read_and_cancel_rls.sql`. Hourly `release-payout` via pg_cron is `00010_schedule_release_payout.sql`. Listing-page reviews and guest INSERT gating are `00011_reviews_for_listing.sql` (`reviews_for_listing`, `guest_can_leave_review`, one review per booking per role). Empty-session soft-delete is `00012_delete_empty_session.sql` (`delete_empty_session`). `00012` also redefines `confirm_paid_booking` so a session that is not `open` (including `cancelled`) cannot confirm; the webhook refunds that the same way it refunds an oversell. Host-profile reviews are `00013_reviews_for_host.sql` (`reviews_for_host`): guest reviews this user received as a host, plus listing title, without embedding `bookings`. `00013` also redefines `reviews_for_listing` so both RPCs return the reviewer's first name in `users.full_name`. Display names are `00014_display_name.sql`: `users.display_name`, `handle_new_user` from signup metadata, and both review RPCs return `display_name` in jsonb `users.full_name`. Browse-card averages and owner listing delete are `00015_listing_ratings_and_delete_listing.sql` (`listing_ratings`, `delete_listing`). `00015` also redefines `my_verification` so admins get `pending_count` (everyone else gets 0). Planning areas are `00016_planning_areas.sql`: 55 URA names tagged to five regions, public SELECT, `listings.area` FK. Terms agreement is `00017_terms_accepted_at.sql`: `users.terms_accepted_at`, `handle_new_user` from signup metadata `terms_accepted`, `guard_user_self_update` blocks client writes. No SELECT or UPDATE grant. Storage buckets are `00026_lock_storage_policies.sql`: public `listing-photos` (owner INSERT/UPDATE/DELETE in `{auth.uid()}/`, no client SELECT — public URLs still work; the client only `upload`s and `getPublicUrl`s) and private `verification-docs` (owner SELECT/INSERT/UPDATE in `{auth.uid()}/` so upsert on resubmit works; no client DELETE; admins use service-role signed URLs). Suspension is `00027_hide_suspended_hosts.sql`: the public listings SELECT policy also requires `listing_host_in_good_standing(id)` (security definer, by listing id), so a suspended host's listings drop out of every public read; `create-payment-intent` refuses checkout for a suspended host. Price typo guard is `00028_listing_price_ceiling.sql`: `listings_price_ceiling` CHECK `price_per_person <= 50000` (NOT VALID), matching `MAX_PRICE_PER_PERSON_CENTS` in `src/lib/pricing.js`. Guest dispute tooling is `00029_booking_dispute_hold.sql`: `bookings.payout_hold_reason`, `payout_held_at`, and `stripe_partial_refund_ids`. The money audit log is `00030_booking_money_events.sql`: `booking_money_events` (append-only, admin-only) and the `bookings_payout_hold_reason_code` CHECK (`'dispute'` or `'chargeback'`).
 
 ---
 
@@ -293,14 +329,19 @@ Do not hardcode a flat percentage. Worked one-person checks: $10 → $13, $20 �
 
 **Provider decided 16 August 2026: Stripe Connect, separate charges and transfers, Express accounts.** This is implemented in code.
 
-The host's share is released **24 hours after** `starts_at`, not 24 hours after the guest pays. `release-payout` creates a Transfer with `transfer_group = booking_id` and `source_transaction = stripe_charge_id`. Stripe only records that Transfer when the function runs. Two hourly callers:
+The host's share is released **72 hours after the session ends** (`starts_at` + `duration_mins`), not after the guest pays. `release-payout` creates a Transfer with `transfer_group = booking_id` and `source_transaction = stripe_charge_id`. Stripe only records that Transfer when the function runs. Two hourly callers:
 
 - **Staging (and any hosted project):** pg_cron job `invoke-release-payout-hourly` from `00010`, at minute 12 UTC. It POSTs using Vault secrets `release_payout_url`, `release_payout_anon_key`, and `payout_cron_secret`.
 - **Production extra:** GitHub Action `.github/workflows/release-payout.yml` (schedule plus **Run workflow**). GitHub only fires `schedule` from the default branch (`main`).
 
-Both send `x-cron-secret` (`PAYOUT_CRON_SECRET` or `CRON_SECRET`). Stripe idempotency key is the booking id, so overlap is safe. Each run logs JSON `{ scanned, due, released, failed, skipped_by_reason, skipped }`. `skipped` lists rows that are not merely waiting out the 24h hold. A missing `stripe_charge_id` is loaded from the PaymentIntent (`latest_charge`) and stored before eligibility is decided. Do not omit `source_transaction`; after a platform bank payout that would Transfer someone else's funds.
+Both send `x-cron-secret` (`PAYOUT_CRON_SECRET` or `CRON_SECRET`). Stripe idempotency key is the booking id, so overlap is safe. Each run logs JSON `{ scanned, due, released, failed, skipped_by_reason, skipped }`. `skipped` lists rows that are not merely waiting out the 72h hold. A missing `stripe_charge_id` is loaded from the PaymentIntent (`latest_charge`) and stored before eligibility is decided. Do not omit `source_transaction`; after a platform bank payout that would Transfer someone else's funds.
 
-It does **not** check for open disputes. The only money hold besides the 24h timer is `stripe_refund_id IS NULL`.
+**Dispute hold (`00029`, 19 October 2026).** While `bookings.payout_hold_reason` is set, `payoutSkipReason` returns `dispute_hold` and the row is not paid, however long ago the session ended. Right before each Transfer, `release-payout` re-reads `status`, `payout_hold_reason`, `host_payout_amount`, `stripe_refund_id`, and `payout_released_at`, so a hold placed after the hourly scan still wins. `stripe_refund_id` (full refund) also blocks payout. Partial refunds go in `stripe_partial_refund_ids` instead and leave the reduced `host_payout_amount` payable.
+
+**In-app quality complaints (`00031`).** Booking detail shows **Report a problem** on a confirmed booking from `starts_at` until 3 days after `starts_at + duration_mins` (`canReportProblem` in `_shared/complaints.ts`; listing length, then 120 minutes, when the session has none). `COMPLAINT_WINDOW_MS` is `PAYOUT_HOLD_MS`, so the window closes exactly when the payout becomes due. `report-booking-problem` takes multipart form data (`booking_id`, `description`, up to 3 JPEG/PNG/WebP photos of 5 MB each, compressed client-side), checks the guest's JWT and the window again (`complaintDecision`), inserts `booking_complaints`, places the hold (`payout_hold_reason = 'dispute'`, guarded on unreleased, unrefunded, not already held) before uploading photos, then emails `ADMIN_NOTIFY_EMAIL` (reply-to the guest) and the guest. Safety reports stay on email with no time limit; the page links a prefilled `mailto:` on every confirmed booking. `purge-verification-docs` deletes complaint photos 180 days after the report (`COMPLAINT_EVIDENCE_RETENTION_DAYS`) and keeps the text.
+
+`admin-dispute-booking` (`x-admin-secret`, `ADMIN_FUNCTION_SECRET`) is the ops tool. Actions: `hold` (`reason`, 200 characters, refused after release), `release_hold`, and `partial_refund` (`refund_amount_cents`, `new_host_payout_cents`). Before release a partial refund needs the hold, can only lower the host payout, and refunds plus payout can never exceed `total_amount`. After release the host payout is fixed and the refund must fit in TryKai's own share (`total_amount - refund_amount - host_payout_amount`); otherwise it returns 409 with the absorbable amount. The Stripe refund is on the PaymentIntent (platform balance, no `reverse_transfer`), keyed `dispute-refund:<booking>:<prior refund>:<amount>` so a retry returns the same refund. The row write is guarded on the prior `refund_amount`, adds the refund id, lowers `host_payout_amount` (before release), and clears the hold. Rules live in `_shared/disputes.ts`. Clawback from a host after release is still manual.
+`admin-dispute-booking` is the ops tool. The caller is an admin's own JWT (`users.is_admin` re-checked server-side, as `admin-verifications` does), or break-glass `x-admin-secret` (`ADMIN_FUNCTION_SECRET`) plus `x-admin-operator` (section 7). Actions: `hold` (`reason` is a neutral code, `'dispute'` by default or `'chargeback'`; required `note` up to 1500 characters goes only to `booking_money_events`; refused after release), `release_hold` (optional `note`), and `partial_refund` (`refund_amount_cents`, `new_host_payout_cents`, optional `note`). Every change writes a `booking_money_events` row with the actor. Before release a partial refund needs the hold, can only lower the host payout, and refunds plus payout can never exceed `total_amount`. After release the host payout is fixed and the refund must fit in TryKai's own share (`total_amount - refund_amount - host_payout_amount`); otherwise it returns 409 with the absorbable amount. The Stripe refund is on the PaymentIntent (platform balance, no `reverse_transfer`), keyed `dispute-refund:<booking>:<prior refund>:<amount>` so a retry returns the same refund. The row write is guarded on the prior `refund_amount`, adds the refund id, lowers `host_payout_amount` (before release), and clears the hold. Rules live in `_shared/disputes.ts`, caller auth in `_shared/admin-auth.ts`, event rows in `_shared/money-events.ts`. Clawback from a host after release is still manual.
 
 **Ops (click-by-click in OPERATIONS.md):** Vault secrets, GitHub secrets, deploy `release-payout`, set platform Stripe payouts to **manual** (or keep a reserve covering outstanding host liability). Automatic platform payouts to Aspire would leave nothing to Transfer.
 
@@ -357,7 +398,9 @@ Supabase built in auth, email and password for MVP. Session handling is Supabase
 
 **Verification review is on the platform** at `/admin/verifications`, gated by `is_admin`. The hamburger shows a link to it only after `my_verification()` reports that the signed-in user is an admin. Hosting shows a one-line banner (`N verifications waiting · Review`) only to admins and only when `pending_count > 0`. `admin-verifications` authenticates the reviewer's own JWT and then re-checks `is_admin` server-side, because a shared secret cannot be shipped to a browser. Document images are served through signed URLs minted with the service role and valid for `SIGNED_URL_TTL_SECONDS`, so they are never reachable from a public or authenticated non-admin route. The result email, including the rejection reason, is sent from that function rather than a database webhook, the same way booking emails moved into `stripe-webhook`.
 
-The remaining admin actions (set `is_founding_host`, suspend, grant `is_admin`) still run as the service role via the Supabase Table Editor. `admin-cancel-booking` exists and is secret-gated; it writes `cancelled_by: 'host'`.
+The remaining admin actions (set `is_founding_host`, suspend, grant `is_admin`) still run as the service role via the Supabase Table Editor. `admin-cancel-booking` writes `cancelled_by: 'host'` and takes optional `reason: 'host_cancelled' | 'dispute'` (email wording only) and `note`. `admin-dispute-booking` holds payouts and makes partial dispute refunds (section 6). Neither has a UI; OPERATIONS.md has the curl commands.
+
+**Money actions are attributable (`00030`, 19 October 2026).** `admin-dispute-booking` and `admin-cancel-booking` authenticate the caller's own Supabase JWT and re-check `users.is_admin` with the service role, the same way `admin-verifications` does (`_shared/admin-auth.ts`). A signed-in non-admin gets 403 even if they also send the secret. Each action writes a `booking_money_events` row with `actor_user_id`. **Break-glass:** with no user JWT, `x-admin-secret` matching `ADMIN_FUNCTION_SECRET` still works but needs `x-admin-operator` (a name, 100 characters max); the row is `auth_method = 'break_glass'`, `actor_user_id` null, and the note starts `[break-glass: <operator>]`. The secret is only accepted in `x-admin-secret`, never as a bearer token. Unset `ADMIN_FUNCTION_SECRET` to turn break-glass off.
 
 ---
 
@@ -468,30 +511,40 @@ supabase/migrations/
 ├── 00023_lock_user_pii.sql
 ├── 00024_session_edit_and_listing_spots.sql
 ├── 00025_tighten_table_grants.sql
-└── 00026_lock_storage_policies.sql
+├── 00026_lock_storage_policies.sql
+├── 00027_hide_suspended_hosts.sql
+├── 00028_listing_price_ceiling.sql
+├── 00029_booking_dispute_hold.sql
+└── 00030_booking_money_events.sql
 
 supabase/functions/
 ├── _shared/
 │   ├── booking.ts               # Guest charge, group discount, host fee, refunds
 │   ├── http.ts                  # JSON/CORS/secret helpers
 │   ├── connect.ts               # Express account v2 helpers
-│   ├── email.ts                 # Resend helper + booking receipt, cancel, and host-strike HTML
-│   ├── payouts.ts               # 24h Transfer eligibility, skip reasons, charge backfill
+│   ├── complaints.ts            # Report a problem window (start to 3 days after end), validation, evidence retention
+│   ├── disputes.ts              # Dispute hold codes and partial refund rules for admin-dispute-booking
+│   ├── admin-auth.ts            # Admin JWT + users.is_admin, x-admin-secret break-glass with operator name
+│   ├── money-events.ts          # booking_money_events rows (hold, release, partial refund, admin cancel)
+│   ├── email.ts                 # Resend helper + booking receipt, cancel, dispute refund, and host-strike HTML
+│   ├── payouts.ts               # 72h-after-session-end Transfer eligibility, skip reasons, charge backfill
 │   ├── verification.ts          # Status, Identity params, 30-day retention rules
-│   └── onemap.ts                # Postal validation, OneMap token + search
+│   └── onemap.ts                # Postal validation, OneMap token + search, lookup rate limit
 ├── create-payment-intent/       # Pending booking + PaymentIntent; refuses PayNow >80 days out
 ├── abandon-checkout/            # Guest JWT only; drop unpaid pending; leave if PI succeeded
 ├── stripe-webhook/              # Platform or Connect webhook secret → confirm, identity, account.updated
 ├── create-connect-account/      # Express account for the signed-in host
 ├── create-account-link/         # Onboard, or { refresh: true } to re-read payouts_enabled
 ├── cancel-booking/              # Guest or host cancel + Stripe refund + strikes + emails
-├── admin-cancel-booking/        # x-admin-secret full refund; cancelled_by='host'; no UI
+├── admin-cancel-booking/        # Admin JWT (or break-glass) full refund; cancelled_by='host'; reason 'dispute' for wording; logs event; no UI
+├── admin-dispute-booking/       # Admin JWT (or break-glass) payout hold, release, partial refund; logs events; no UI
 ├── admin-verifications/         # JWT + is_admin; signed-URL queue, review + result email
 ├── create-identity-session/     # Stripe Identity hosted check; stores only the session id
 ├── notify-verification-pending/ # x-notify-secret; emails Caleb on manual pending
-├── purge-verification-docs/     # Daily cron; deletes rejected docs after 30 days
+├── purge-verification-docs/     # Daily cron; deletes rejected docs after 30 days and complaint photos after 180
 ├── lookup-postal-code/          # Valid user JWT; 20 lookups / 10 min; OneMap token cached to near expiry
-└── release-payout/              # x-cron-secret Transfer 24h after starts_at; pg_cron + GH Action
+├── release-payout/              # x-cron-secret Transfer 72h after session end; pg_cron + GH Action
+└── report-booking-problem/      # Guest JWT; in-app quality complaint, auto payout hold, ops + guest email
 ```
 
 
@@ -579,7 +632,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 **8. Confirmation.** `/dashboard?booking=` redirects to `/bookings?booking=`, then to `/u/:id?booking=&tab=bookings`. `Bookings.jsx` polls until status is `confirmed`. Then `listing_address` returns `full_address` to that guest. The confirmation email's View booking button goes to `/bookings/<id>`. The per-person receipt line is that booking's all-in card total divided by guests, with a group-discount note when that rate changed the card total, then any PayNow saving, then Total paid.
 
-**9. Session happens.** Payout releases 24 hours after `starts_at`, via `release-payout` (pg_cron `00010` and the GitHub Action). Sessions are not auto-completed. Review prompts appear on the Bookings tab for `confirmed` bookings after the session ends.
+**9. Session happens.** Payout releases 72 hours after the session ends (`starts_at` + `duration_mins`), via `release-payout` (pg_cron `00010` and the GitHub Action). Sessions are not auto-completed. Review prompts appear on the Bookings tab for `confirmed` bookings after the session ends.
 
 **10. Review.** The Bookings tab allows a review if the session has ended, status is `confirmed`, and this reviewer has not already reviewed. Session end is `starts_at` + `duration_mins` (or `starts_at` + 2 hours if duration is missing). Inserts into `reviews` as `role: 'guest'`. RLS (`00011`) requires the same confirmed-and-ended rule and that `reviewee_id` is the listing host. Unique on `(booking_id, role)`.
 
@@ -607,7 +660,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 
 Warning shown: "Cancelling refunds your guest / both guests / all N guests in full and adds a strike to your account" (1 / 2 / 3+). It does not list per-guest payment or refund amounts. Hosts never see an individual guest's payment or refund, only what the host will receive.
 
-On confirmation the Hosting tab calls `cancel-booking` with `session_id`. The function issues Stripe refunds for confirmed bookings (or cancels unpaid PaymentIntents), restores spots only for confirmed rows, sets `cancelled_by = 'host'`, and calls `apply_host_strike`. Each confirmed guest is emailed a full refund plus timing, then a button to the host's other upcoming sessions of that listing or to `/?category=` when there are none. The host is emailed that they cancelled, that guests were refunded in full (no amounts), the new strike count, and a link to `/cancellation-policy#appeals`. `admin-cancel-booking` emails the guest the same host-cancel copy and does not apply a strike or email the host.
+On confirmation the Hosting tab calls `cancel-booking` with `session_id`. The function issues Stripe refunds for confirmed bookings (or cancels unpaid PaymentIntents), restores spots only for confirmed rows, sets `cancelled_by = 'host'`, and calls `apply_host_strike`. Each confirmed guest is emailed a full refund plus timing, then a button to the host's other upcoming sessions of that listing or to `/?category=` when there are none. The host is emailed that they cancelled, that guests were refunded in full (no amounts), the new strike count, and a link to `/cancellation-policy#appeals`. `admin-cancel-booking` emails the guest the same host-cancel copy (or, with `reason: 'dispute'`, a refund receipt that does not mention the host) and does not apply a strike or email the host.
 
 Host upcoming list is every future session on the host's listings that is not `cancelled`, including rows with zero bookings.
 
@@ -695,8 +748,9 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 - ~~Photography guidance on create listing~~ Live on create and edit (`PhotoTips`).
 - Sort by newest / price / most reviewed (DECISIONS.md currently overclaims this as live)
 - Host strike appeals, admin dispute log
-- Admin UI for `admin-cancel-booking`
-- Payout clawback where a dispute is confirmed after release
+- Admin UI for `admin-cancel-booking` and `admin-dispute-booking`
+- Payout clawback where a dispute is confirmed after release. `admin-dispute-booking` refuses a partial refund larger than TryKai's share once the host is paid; recovering from the host is manual (OPERATIONS.md, Guest dispute refund)
+- Host email when a dispute lowers their payout (ops tells them by hand today)
 
 ---
 

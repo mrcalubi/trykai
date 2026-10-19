@@ -47,7 +47,7 @@ Rule that keeps the docs honest: one fact, one home. When two docs disagree, say
 **Stripe live platform account**
 - Category: Other educational services. Description frames TryKai as a marketplace, not the service provider.
 - Statement descriptor `TRYKAI.SG`, shortened `TRYKAI`.
-- Aspire linked for payouts, schedule **manual**. Automatic would sweep funds needed for host transfers 24h after sessions.
+- Aspire linked for payouts, schedule **manual**. Automatic would sweep funds needed for host transfers 72 hours after sessions end.
 
 **Landed on staging from other work**
 - Verification review queue (#32), Stripe Identity (#34). `notify-verification-result` is not in the tree; result mail now from `admin-verifications` and `stripe-webhook`.
