@@ -25,7 +25,7 @@ Each week has three sections, one per founder, tagged **[CRITICAL]**, **[HIGH]**
 
 **Monthly, first Saturday:** contribution log updated by each founder. This is the evidence base for equity refresh conversations.
 
-**Ongoing, Caleb:** every cost logged in EXPENSES.xlsx the day it occurs. The founder loan balance must always be current.
+**Ongoing, Caleb:** every TryKai cost paid from the Aspire card and logged in EXPENSES.xlsx the day it occurs; every transfer into Aspire logged as founder loan the day it lands (BUSINESS.md, How money moves). The founder loan balance must always be current.
 
 ---
 
@@ -45,7 +45,7 @@ Week 13 of the original plan. Read this snapshot first. HANDOVER.md has the full
 - Wednesday 21 October: warm host onboarding begins (HOST_ONBOARDING.md)
 - First real paid booking within a week of onboarding
 
-**Decided 19 October: production moves to Supabase Pro before Wednesday 21 October** (DECISIONS.md). Caleb does the upgrade. Until it is active, run no SQL on production.
+**Production is on Supabase Pro from 19 October** (DECISIONS.md). Staging is in its own free organisation. Run no SQL on production until the first daily backup shows under Database, Backups.
 
 ---
 
@@ -406,7 +406,7 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 | Yide day trading listing creates liability | Low | High | Frame as experience sharing only, explicit disclaimer, law student review. |
 | Off platform leakage | Low at this scale | Medium | Reviews only through TryKai, brief hosts during onboarding. |
 | SQL run on the wrong Supabase project | Happened 18 October | High | Both dashboards show "PRODUCTION". Check the ref in the URL every time. Staging first. See Environments and production SQL. |
-| Production data lost with no backup | Low | **Critical** | Production moves to Supabase Pro (daily backups) before 21 October. No production SQL until it is active. |
+| Production data lost with no backup | Low | **Critical** | Production on Supabase Pro from 19 October (daily backups, kept 7 days). Check a backup from the last 24 hours exists before any production SQL. |
 | A new Edge Function goes live on production without its secret | Medium | Medium | Merging to `main` deploys every function. Set the secrets on production first. |
 
 ---
@@ -415,7 +415,7 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 
 | | Staging | Production |
 |---|---|---|
-| Supabase project | `trykai-staging` (Free plan) | "Kai" (Pro from 21 October; Free until upgraded) |
+| Supabase project | `trykai-staging` (Free plan, "TryKai Staging" org) | "Kai" (Pro, "TryKai" org, region Mumbai `ap-south-1`) |
 | Project ref | `hzgybclfvpuxkmytdoos` | `dqqlwofluvhikebtjune` |
 | Dashboard | https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos | https://supabase.com/dashboard/project/dqqlwofluvhikebtjune |
 | Site | trykai.vercel.app | trykai.sg |

@@ -34,7 +34,7 @@ Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. Pre launch, zero 
 
 | | Staging | Production |
 |---|---|---|
-| Supabase project | `trykai-staging` (Free plan) | "Kai" (Pro from 21 October; Free until upgraded) |
+| Supabase project | `trykai-staging` (Free plan, "TryKai Staging" org) | "Kai" (Pro, "TryKai" org, region Mumbai `ap-south-1`) |
 | Project ref | `hzgybclfvpuxkmytdoos` | `dqqlwofluvhikebtjune` |
 | Site | trykai.vercel.app | trykai.sg |
 | Branch | `staging` | `main` |
@@ -77,7 +77,7 @@ After the merge:
 
 **Plan agreed at the 18 October scrum.** Everything to production now. Production end to end testing (without real checkout) and mobile testing over the next days. Warm host onboarding from 21 October.
 
-**Decided 19 October: production moves to Supabase Pro** (about US$25 a month: daily backups, no inactivity pause). Caleb upgrades before Wednesday 21 October; staging stays on a separate free organisation. No production SQL until Pro is active.
+**Production is on Supabase Pro from 19 October** (about US$25 a month: daily backups, no inactivity pause). Staging is in its own free organisation. No production SQL until the first daily backup appears. Production sits in Mumbai by accident; moving it to Singapore is post-launch (DECISIONS.md, BUILD_BACKLOG.md P3). All TryKai money now goes through Aspire (BUSINESS.md, How money moves).
 
 ---
 
