@@ -34,7 +34,7 @@ Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. Pre launch, zero 
 
 | | Staging | Production |
 |---|---|---|
-| Supabase project | `trykai-staging` | "Kai" (Free plan) |
+| Supabase project | `trykai-staging` (Free plan) | "Kai" (Pro from 21 October; Free until upgraded) |
 | Project ref | `hzgybclfvpuxkmytdoos` | `dqqlwofluvhikebtjune` |
 | Site | trykai.vercel.app | trykai.sg |
 | Branch | `staging` | `main` |
@@ -43,7 +43,7 @@ Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. Pre launch, zero 
 
 **Deploys.** CI (`.github/workflows/ci.yml`) runs lint, unit tests (coverage floors: statements 92%, branches 87%), Playwright, build, and Edge Function checks. A push to `staging` deploys every Edge Function to staging; a push to `main` deploys to production via the `PRODUCTION_SUPABASE_PROJECT_REF` secret. Pull requests never deploy.
 
-**Migrations are not automatic.** Apply by hand in the SQL Editor: staging first, test, then production in the same sitting. Before any SQL on production, take a manual dump (OPERATIONS.md, Production SQL). Dumps stay private and never go in git.
+**Migrations are not automatic.** Apply by hand in the SQL Editor: staging first, test, then production in the same sitting. Before any SQL on production, confirm a backup from the last 24 hours exists (OPERATIONS.md, Production SQL).
 
 ---
 
@@ -77,7 +77,7 @@ After the merge:
 
 **Plan agreed at the 18 October scrum.** Everything to production now. Production end to end testing (without real checkout) and mobile testing over the next days. Warm host onboarding from 21 October.
 
-**Open decision: Supabase Pro for production** (about US$25 a month: daily backups, no inactivity pause). Recommendation: upgrade production before host onboarding or the first paid booking; keep staging on a separate free org. Caleb is deferring. Until then, manual dumps before any production SQL and after each onboarding day.
+**Decided 19 October: production moves to Supabase Pro** (about US$25 a month: daily backups, no inactivity pause). Caleb upgrades before Wednesday 21 October; staging stays on a separate free organisation. No production SQL until Pro is active.
 
 ---
 
@@ -118,7 +118,7 @@ From the 21 September handover. Confirm or close at the next scrum.
 These cost real hours. Treat them as rules.
 
 1. **Check the project ref in the URL before any SQL.** The dashboard label is not enough.
-2. **Dump production before any production SQL.**
+2. **Confirm production has a backup from the last 24 hours before any production SQL.**
 3. **Verify the branch every time.** `git branch --show-current` after every checkout.
 4. **Commit as soon as something looks right on localhost.**
 5. **A push to `staging` or `main` deploys every Edge Function.** Each function bundles `_shared/` at deploy time. Deploy only by merging, never from a feature branch.

@@ -566,6 +566,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-19 — Chargeback holds use the plain `chargeback` code.** The chargeback and audit-log branches were merged separately: `stripe-webhook` wrote `payout_hold_reason = 'chargeback: <dispute id>'`, but `00030` only allows `'dispute'` or `'chargeback'`, so every chargeback hold would have failed on the CHECK and the host could still have been paid. The webhook now writes `'chargeback'` (`CHARGEBACK_HOLD_CODE`) and records the dispute id, bank reason, amount, and any replaced hold in a `booking_money_events` `hold` row (`auth_method = 'system'`, operator `stripe-webhook`, `stripe_object_id` = dispute id). A failed audit insert is named in the ops email. A test reads `00030` and fails if the code ever leaves its CHECK list.
 
+**2026-10-19 — Production moves to Supabase Pro before host onboarding.** Production ("Kai", `dqqlwofluvhikebtjune`) was on the Free plan: no automatic backups and a pause after a week of inactivity. The fallback was a manual `supabase db dump` before every production SQL change and after each onboarding day, which needs Docker, the database password and a terminal, and would be skipped on a busy day. With real hosts creating listings from 21 October, one wrong SQL run (as on 18 October) could lose them for good. Pro is about US$25 a month for the organisation and gives daily backups. Staging stays on a free organisation, separate from production's, so it does not add compute cost to the paid one. Caleb does the upgrade before Wednesday 21 October. Supersedes the 18 October deferral.
+
 ---
 
 # Analysed but not decided

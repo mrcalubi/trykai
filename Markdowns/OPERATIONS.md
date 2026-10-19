@@ -45,7 +45,7 @@ Week 13 of the original plan. Read this snapshot first. HANDOVER.md has the full
 - Wednesday 21 October: warm host onboarding begins (HOST_ONBOARDING.md)
 - First real paid booking within a week of onboarding
 
-**Open decision: Supabase Pro on production.** About US$25 a month for daily backups and no inactivity pause. Recommendation: upgrade production before host onboarding or the first paid booking, and keep staging on a separate free org. Caleb is deferring. Until it is decided, take a manual dump before any production SQL and after each onboarding day.
+**Decided 19 October: production moves to Supabase Pro before Wednesday 21 October** (DECISIONS.md). Caleb does the upgrade. Until it is active, run no SQL on production.
 
 ---
 
@@ -406,7 +406,7 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 | Yide day trading listing creates liability | Low | High | Frame as experience sharing only, explicit disclaimer, law student review. |
 | Off platform leakage | Low at this scale | Medium | Reviews only through TryKai, brief hosts during onboarding. |
 | SQL run on the wrong Supabase project | Happened 18 October | High | Both dashboards show "PRODUCTION". Check the ref in the URL every time. Staging first. See Environments and production SQL. |
-| Production data lost with no backup | Low | **Critical** | Production is on the Free plan (no daily backups). Manual dump before any production SQL and after each onboarding day until Supabase Pro is decided. |
+| Production data lost with no backup | Low | **Critical** | Production moves to Supabase Pro (daily backups) before 21 October. No production SQL until it is active. |
 | A new Edge Function goes live on production without its secret | Medium | Medium | Merging to `main` deploys every function. Set the secrets on production first. |
 
 ---
@@ -415,7 +415,7 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 
 | | Staging | Production |
 |---|---|---|
-| Supabase project | `trykai-staging` | "Kai" (Free plan) |
+| Supabase project | `trykai-staging` (Free plan) | "Kai" (Pro from 21 October; Free until upgraded) |
 | Project ref | `hzgybclfvpuxkmytdoos` | `dqqlwofluvhikebtjune` |
 | Dashboard | https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos | https://supabase.com/dashboard/project/dqqlwofluvhikebtjune |
 | Site | trykai.vercel.app | trykai.sg |
@@ -432,17 +432,11 @@ Who does what: Caleb applies migrations and sets secrets. Claude and Cursor neve
 Every migration, and any other SQL that writes on production.
 
 1. **Apply on staging first.** Open the SQL Editor, confirm the URL contains `hzgybclfvpuxkmytdoos`, run the migration, test the flows it touches.
-2. **Dump production.** From your own machine, outside the repo folder (the repo's `.gitignore` does not ignore `.sql` files):
-   ```
-   npx supabase link --project-ref dqqlwofluvhikebtjune
-   npx supabase db dump -f prod-schema.sql
-   npx supabase db dump --data-only -f prod-data.sql
-   ```
-   `link` asks for the production database password. `db dump` runs `pg_dump` in a container, so Docker Desktop must be running. Keep the dumps private. Never commit them, never upload them to chat.
+2. **Check production has a recent backup.** Production dashboard, Database, Backups: the latest daily backup should be from the last 24 hours. If there is none (still on the Free plan, or the backup failed), stop and do not run the SQL.
 3. **Apply on production in the same sitting.** Confirm the URL contains `dqqlwofluvhikebtjune`, then run.
 4. **Record it.** Update the migration table below.
 
-Also dump production after each host onboarding day until production has daily backups.
+A manual dump gives a restore point from the minute before a risky change, newer than the daily backup. It is optional and needs Docker Desktop and the production database password, so it is for whoever has those set up (Rui Heng): `npx supabase link --project-ref dqqlwofluvhikebtjune`, then `npx supabase db dump -f prod-schema.sql` and `npx supabase db dump --data-only -f prod-data.sql`, run outside the repo folder. Dumps hold users' personal data: never commit them (`.gitignore` blocks `prod-*.sql`) and never upload them to chat.
 
 ## Migration state
 
