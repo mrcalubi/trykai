@@ -360,8 +360,16 @@ At exactly the floor, the distributed half is S$250, or about S$83 each. Small, 
 
 **This is a real exposure**, not a technicality. TryKai involves real money, strangers meeting in person, and physical activity. Converting is planned once traction is demonstrated, alongside finalising the cap table rather than after it. Get proper legal advice for the conversion; do not DIY it the way the sole prop registration was done.
 
+### How money moves (from 19 October 2026)
+The founder loan has to be repaid before any profit is shared three ways, so the books decide when every founder gets paid. They have to be checkable by all three.
+
+- **Every TryKai dollar goes through Aspire, in and out.** Stripe payouts land in Aspire. Every TryKai cost (Supabase, Vercel, domain, email, Resend) is paid with an Aspire card, never a personal one. Nothing personal is paid from Aspire; a mistake is recorded as a withdrawal by Caleb.
+- **Caleb funds Aspire in occasional lump sums**, roughly three months of known costs at a time. Each transfer is one founder loan line in EXPENSES.xlsx, dated the day it lands. Costs paid from Aspire are logged as expenses, not as loans.
+- **Revenue is TryKai's fee only.** A guest payment is mostly the host's money passing through. Revenue is the guest booking fee plus the host fee, less Stripe fees and any refund costs TryKai absorbs. Gross guest payments are never counted as revenue, or the loan will look repaid before it is.
+- **Invoices in the business name.** Tick "purchasing as a business" and add the UEN where offered. Keep every invoice, and attach receipts to card transactions in Aspire.
+
 ### Founder loan
-All costs to date have been paid personally by Caleb and are recorded as a loan to the business, repayable from revenue before any profit is distributed.
+Costs before 19 October 2026 were paid personally by Caleb and are recorded as a loan to the business. From 19 October the loan grows by Caleb's transfers into Aspire instead. It is repayable from revenue before any profit is distributed.
 
 | Item | Cost |
 |---|---|
@@ -369,7 +377,8 @@ All costs to date have been paid personally by Caleb and are recorded as a loan 
 | Business name reservation | 15.00 |
 | Business registration, one year | 100.00 |
 | Business email, Zoho, one year | 65.24 |
-| **Total** | **256.22** |
+| **Total paid personally** | **256.22** |
+| Transfer into Aspire, 19 October 2026 | 100.00 |
 
 Running balance is tracked in EXPENSES.xlsx, not here.
 

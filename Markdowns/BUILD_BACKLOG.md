@@ -2,7 +2,7 @@
 
 Derived by walking every end to end flow the platform promises and marking where it breaks today. Ordered by what blocks launch, then by risk.
 
-**Prepared 16 August 2026. Status rewritten 21 September 2026 against the current tree.** Companion to ENGINEERING.md, which describes how things work. This describes what to build next and why.
+**Prepared 16 August 2026. Status rewritten 21 September 2026; updated 19 October 2026 against `staging` and both databases.** Companion to ENGINEERING.md, which describes how things work. This describes what to build next and why.
 
 ---
 
@@ -50,24 +50,43 @@ Verification approval is now on the platform. Suspension that does not hide list
 
 ## Remaining sequence
 
-Not a calendar. Capacity is 8 hours a week.
+Not a calendar. Updated 19 October 2026.
 
-1. **Ops (not app code):** confirm `00005`, `00008`, `00009`, `00010`, `00011`, and `00012` on each environment; Vault/GitHub secrets for `release-payout`; Stripe Dashboard webhook + secrets; `RESEND_API_KEY` and current Edge Function deploys on production; platform payouts **manual**; flag eleven `is_founding_host`; one staging test-mode booking; confirm the two test cancellations were refunded on Stripe.
-2. ~~**P0.4** app actually filters `is_suspended` on browse and Book.~~ In code as `00027` plus a `create-payment-intent` check; apply `00027` on each environment. One-click admin can wait if Table Editor plus this filter is reliable.
-3. ~~**Revoke `listings.full_address`** from anon/authenticated SELECT.~~ Done in `00025` (`listing_address()`).
-4. Browse card rating: the listings fetch does not supply one and there is no aggregate rating column. The card already shows the all-in card price.
-5. **P2.3** review gating is done (`00011`). Then the rest of P2 in listed order.
-6. JWT "issued at future" on browse: retry once, friendly error, never show raw error text.
-7. Host cancel warning: replace per-guest refund amounts with "Cancelling refunds all N guests in full and adds a strike".
-8. Reword S$10 to S$40 as guidance, not a rule (decided; remaining copy in HOST_ONBOARDING / BUSINESS / HANDOVER).
+1. **Ops (not app code):** production sync checklist in OPERATIONS.md (Production sync, October 2026): GitHub deploy secrets, OneMap secrets on production, live Connected accounts webhook, one real card booking and refund, cron `pg_net` timeout. Migrations `00022` to `00031` are applied on both environments.
+2. **Claude builds, one PR each, in this order:**
+   1. Docs consolidation (this PR)
+   2. Link previews and Share fallback
+   3. Branded email receipt
+   4. Host nudge when a listing has no sessions
+3. **Suspend a test host on staging** and confirm browse, listing detail and Book all hide them (P0.4).
+4. Browse card rating: the listings fetch does not supply one and there is no aggregate rating column.
+5. The rest of P2 in listed order.
 
-Review reminder email, saved listings, host-to-guest reviews then the review filter, and the `full_name` SELECT revoke are post-launch (P3), not this sequence.
+Details of the four builds are under Next builds below.
+
+---
+
+## Next builds (Claude, from 19 October)
+
+Claude attaches the repo, branches from `staging`, runs lint and tests, and opens a PR into `staging`. Caleb reviews and merges.
+
+### B1 — Docs consolidation
+Repo docs brought up to the 19 October state, HOST_ONBOARDING.md replaced with the 19 October version, docs synced back to the Claude Project.
+
+### B2 — Link previews and Share fallback
+Server side Open Graph and Twitter tags for `/listings/:id`: cover photo, title, "S$X per person · Area". Public columns only, anon key, via Vercel middleware or a function. A default preview for the homepage. The existing Share button falls back to clipboard and "Link copied" when `navigator.share` is missing or throws (except `AbortError`). It showed "Could not share this link" in desktop Chrome device mode; check on a real phone.
+
+### B3 — Email receipt
+Branded, mobile friendly shared template in `_shared/email.ts`: logo, colours, a receipt block with the price breakdown, booking details, policy link. Table based with inline styles. Tested by sending real staging emails to Gmail and iOS Mail.
+
+### B4 — Host nudge (no sessions)
+In-app banner on the Hosting tab for active listings with no upcoming sessions. A weekly email to those hosts from a scheduled job (like `release-payout`), with a small migration recording the last nudge so nobody is emailed twice in a week.
 
 ---
 
 ## P0: blocks launch
 
-> **Status, 18 October 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. P0.4 enforcement on browse/Book is in code (`00027`), not yet applied. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September. P0.9 assets resolved 9 September. `00008` listing gate, `00009` session/booking read, `00010` `release-payout` schedule, `00011` review gate, and `00012` empty-session delete are in the tree.
+> **Status, 19 October 2026.** `00027` is applied on staging and production, so P0.4 enforcement is live; what remains is a suspension test. **Status, 18 October 2026.** Payment loop is in code (P1.1–P1.4, Connect onboarding, Transfer job). Done earlier: P0.5, P0.6, P0.7. Obsolete: P0.1. Not needed for Connect launch: P0.2 copy-paste payout queue. P0.4 enforcement on browse/Book is in code (`00027`), not yet applied. P0.3 done 10 September. P0.8 domain and cancellation emails shipped 14 September. P0.9 assets resolved 9 September. `00008` listing gate, `00009` session/booking read, `00010` `release-payout` schedule, `00011` review gate, and `00012` empty-session delete are in the tree.
 
 ### P0.1 — Host payout details — OBSOLETE
 Under Stripe Connect Express, Stripe collects the host's bank details. Do not add `payout_method` / `payout_identifier` columns.
@@ -82,12 +101,12 @@ The copy-paste PayNow queue assumed manual disbursement. `release-payout` Transf
 
 Still manual in the Table Editor: granting `is_admin`, which is a one-time action, and `is_founding_host`.
 
-### P0.4 — Admin: account suspension — ENFORCED IN CODE 18 October, MIGRATION NOT YET APPLIED
+### P0.4 — Admin: account suspension — ENFORCED, `00027` APPLIED ON BOTH ENVIRONMENTS 19 October
 **Flow:** credible safety report → account suspended immediately, pending review
 **Today:** `is_suspended`, `suspended_at`, `suspension_reason` exist. `00027` makes the public listings read (`"Anyone can view active listings"`) also require `listing_host_in_good_standing(id)`, so setting `is_suspended = true` hides every listing of that host from browse, listing detail and profiles, independent of `host_strikes` and `is_active`. The host still sees their own; a guest who booked still sees the title. `create-payment-intent` refuses checkout for a suspended host. Listing and session INSERT are blocked by `can_create_listing()` (`00008`). Setting the flag back to false restores the listings.
 
 Still to do:
-- Apply `00027` on each environment, then suspend a test host and confirm browse hides them
+- Suspend a test host on staging and confirm browse, listing detail and Book hide them
 - Existing confirmed bookings with a suspended host are not cancelled automatically; use `admin-cancel-booking`
 - Host tools (add session, edit) are not yet blocked for a suspended host beyond the INSERT gate
 - One-click admin button can follow
@@ -116,7 +135,7 @@ Still to do:
 
 ## P1: the payment build — DONE IN CODE, 27–31 August 2026
 
-Stripe Connect (separate charges and transfers, Express) is implemented. Do not adapt `hitpay-wip-2026-08`. Remaining work is ops: confirm `00005` / `00008` / `00009` / `00010` / `00011` / `00012`, Vault/GitHub secrets for `release-payout`, Stripe Dashboard webhook + secrets, `RESEND_API_KEY` and function deploys on production, platform payouts manual, founding-host flags, staging test-mode booking.
+Stripe Connect (separate charges and transfers, Express) is implemented. Do not adapt `hitpay-wip-2026-08`. Remaining work is ops and lives in OPERATIONS.md (Production sync, October 2026).
 
 ### P1.1 — Payment confirmation webhook — DONE
 `supabase/functions/stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, emails both parties, refunds on oversell (including a cancelled / not-`open` session), cancels pending on failed/canceled intents, syncs `stripe_payouts_enabled` from `account.updated`.
@@ -162,19 +181,19 @@ Disputes arrive by email today. At launch volume that is survivable.
 **Mostly done, 9–21 September 2026.** TopNav and HamburgerMenu are the live chrome (`Navbar.jsx` is deleted), and Home is the decided browse: Lane 1 headline, 2 / 3 / 4 columns, square images, badge on a cream pill, two-line title clamp, one meta line with the all-in card price. Settings uses Button and Input. Login uses Input (floating + password). Left over: the rating on the browse card needs the listings fetch to supply one (no aggregate rating column exists yet), SelectableCard is still `/style-guide` only, and `ListingCard.jsx` plus its `.listing-card` CSS are dead code waiting on a deletion pass.
 
 ### P2.9 — Checkout and legal gaps visible in the app
-- `guests_count` hardcoded to 1 in ListingDetail
-- No catch-all 404
-- No T&C checkboxes at signup, create listing, or checkout
+- ~~`guests_count` hardcoded to 1 in ListingDetail~~ Group bookings shipped 10 October.
+- ~~No catch-all 404~~ `NotFound` page, 18 October.
+- ~~No T&C checkboxes at signup, create listing, or checkout~~ Checkbox at signup (18+ and Terms) and on create listing; "By booking, you agree to" at checkout.
 - Password reset: done (`/forgot-password` and `/reset-password`)
 - ~~No photography guidance on CreateListing~~ Live (`PhotoTips` on create and edit).
 - No sort UI (DECISIONS.md listed newest / price / most reviewed as live; only newest exists)
 - Phone OTP before booking: not built
 
-### P2.10 — JWT "issued at future" on browse
-Clock skew on the guest JWT can fail the listings fetch. Retry the request once, then show a friendly error. Never surface the raw error text.
+### P2.10 — JWT "issued at future" on browse — DONE 17 October
+`src/lib/pageLoad.js` retries the first load once. Clock skew on the guest JWT can fail the listings fetch. Retry the request once, then show a friendly error. Never surface the raw error text.
 
-### P2.11 — Host cancel warning copy
-Replace the per-guest refund amounts in the Hosting confirm dialog with: "Cancelling refunds all N guests in full and adds a strike".
+### P2.11 — Host cancel warning copy — DONE
+The dialog now says "Cancelling refunds your guest(s) in full and adds a strike to your account." Was: replace the per-guest refund amounts in the Hosting confirm dialog with: "Cancelling refunds all N guests in full and adds a strike".
 
 ### P2.12 — Review reminder email
 **Post launch (P3).** About 3 hours after the session ends, email the guest if they have not left a review.
@@ -183,7 +202,7 @@ Replace the per-guest refund amounts in the Hosting confirm dialog with: "Cancel
 **Post launch (P3).** Public surfaces show `display_name` (`00014`). Review RPCs return it in jsonb `users.full_name`. Pages still SELECT `full_name` and fall back to `firstName(full_name)` when `display_name` is empty. The `full_name` column is still granted SELECT to anon and authenticated (`00005`). A crafted query can still read the whole name. Revoke that SELECT for anon once nothing public reads the column.
 
 ### P2.14 — S$10 to S$40 is guidance, not a rule
-Decided 29 September 2026. Remaining: HOST_ONBOARDING, BUSINESS, and HANDOVER still describe it as a hard band. CreateListing already only checks `priceCents > 0`.
+Decided 29 September 2026. HANDOVER is updated (19 October). The database caps a listing at S$500 as a typo guard (`00028`). BUSINESS.md still calls the band a positioning asset, which is fine as long as it is not presented to hosts as a rule. Check HOST_ONBOARDING after the 19 October replacement.
 
 ---
 
@@ -204,6 +223,19 @@ In this order after warm-contact launch:
 11. **Revoke client session INSERT.** Hosts still have INSERT on `sessions` for the pre-`00018` duration fallback. A crafted insert can set its own `spots_total`. The product path uses `add_listing_session`.
 12. **`add_listing_session` should ignore client `p_spots`.** Hosting sends `listings.max_guests`, but the RPC still accepts any positive number. After launch, take spots from the locked listing row.
 13. **Add a Content Security Policy in vercel.json** (test against Stripe, Supabase, Resend links). Do not add `unsafe-eval`. Client image work stays on the main thread.
+
+14. **Move production to Singapore.** Production was created in Mumbai (`ap-south-1`) by accident. Supabase cannot move a project: create a new `ap-southeast-1` project and cut over the database and auth users, storage, Edge Function secrets, Vault and cron, Stripe webhook URLs, Vercel env, and `PRODUCTION_SUPABASE_PROJECT_REF`. Rui Heng's call on timing; a quiet week after the first bookings.
+15. **Propose a new time to guests.** Booked sessions cannot be edited. Let a host propose a new time that each guest accepts or declines (cancel with full refund).
+16. **Auto-fill area from postal code.** The OneMap lookup already returns the address; use its planning area to preselect the area.
+17. **Unit number formatted `#XX-XX`.**
+18. **Book a whole session privately.** One guest pays for every spot.
+19. **Per-pair price on the booking card** when group pricing applies.
+20. **Structured listing fields:** take-home, host credential, Instagram. Replaces putting them in the description. Then a description template in the create listing wizard.
+21. **"Tried by the TryKai team" badge** for listings the team has attended.
+22. **"Not as described? Full refund" guarantee.** Rui Heng's call, plus a Terms change.
+23. **Review RPC key rename:** `users.full_name` in the review jsonb returns the display name; rename the key to match (see P2.13).
+24. **Orphaned photo cleanup.** Storage objects no listing references.
+25. **Terms additions from the ToGatherSG review:** group booker responsible for their group; guest conduct and the host's right to end participation; detailed assumption of risk; payout offset right; session photos usable for marketing. Plus a **Host Safety and Standards page**: alcohol licence, domestic workers, MCST and neighbours, NParks permits, allergens and halal, pets.
 
 Then: identity and social layer, Date Mode, credit bundles, multi session courses, "this weekend" filter, search, in app notifications, listing performance nudges, listing video, host Pro subscription, payout clawback.
 
