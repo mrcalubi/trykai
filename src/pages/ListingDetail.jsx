@@ -36,6 +36,7 @@ import { publicName } from '../lib/publicName'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { listingReportSubject, reportMailto } from '../lib/reportMailto'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
+import { SHARE_NOTES, shareOrCopy } from '../lib/share'
 import { BackRowActions } from '../components/BackButton'
 import Icon from '../components/ui/Icon'
 
@@ -372,17 +373,11 @@ export default function ListingDetail() {
   }, [shareNote])
 
   async function shareListing() {
-    const url = window.location.href
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: listing?.title ?? 'TryKai', url })
-        return
-      }
-      await navigator.clipboard.writeText(url)
-      setShareNote('Link copied')
-    } catch (shareError) {
-      if (shareError?.name !== 'AbortError') setShareNote('Could not share this link')
-    }
+    const result = await shareOrCopy({
+      url: `${window.location.origin}/listings/${id}`,
+      title: listing?.title ?? 'TryKai',
+    })
+    if (SHARE_NOTES[result]) setShareNote(SHARE_NOTES[result])
   }
 
   // The phone booking bar steps aside once the booking card itself is on screen.
