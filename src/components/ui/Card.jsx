@@ -130,7 +130,20 @@ export default function Card({
     <Wrapper {...wrapperProps}>
       {showMedia ? (
         <div className="ui-card__image-wrap">
-          {badge ? <span className="ui-card__badge">{badge}</span> : null}
+          {badge && isBrowse ? (
+            // Browse shows the category as its icon, so the word does not cover the
+            // photo. With no photo the placeholder already shows the same icon.
+            image ? (
+              <span className="ui-card__badge ui-card__badge--icon" title={badge}>
+                <Icon name={categoryIconName(badge)} size={14} strokeWidth={1.9} />
+                <span className="visually-hidden">{badge}</span>
+              </span>
+            ) : (
+              <span className="visually-hidden">{badge}</span>
+            )
+          ) : badge ? (
+            <span className="ui-card__badge">{badge}</span>
+          ) : null}
           {image ? (
             <img
               src={image}

@@ -38,3 +38,9 @@ blob-report
 
 # Supabase CLI local cache (project ref, versions, pooler URL)
 supabase/.temp/
+
+# Production database dumps (personal data, never commit)
+prod-*.sql
+
+# Vercel CLI local build output
+.vercel

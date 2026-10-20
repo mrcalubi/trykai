@@ -5,7 +5,11 @@ import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession, makeListing } from '../test/fixtures'
-import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
+import {
+  LISTING_FIELD_HINTS,
+  LISTING_SAVE_ERROR,
+  PHOTO_UPLOAD_ERROR,
+} from '../lib/listingFieldHints'
 
 vi.mock('../lib/supabase')
 
@@ -332,8 +336,13 @@ describe('EditListing saving', () => {
     await user.clear(screen.getByLabelText('Area'))
     await user.type(screen.getByLabelText('Area'), 'Tampines')
     await user.click(screen.getByRole('option', { name: 'Tampines' }))
-    await user.clear(screen.getByLabelText(/^Full address/))
-    await user.type(screen.getByLabelText(/^Full address/), '5 Espresso Lane')
+    supabase.functions.invoke.mockResolvedValue({
+      data: { results: [{ address: '5 Espresso Lane', postal: '520123' }] },
+      error: null,
+    })
+    await user.type(screen.getByLabelText('Postal code'), '520123')
+    await user.click(screen.getByRole('button', { name: 'Find addresses' }))
+    expect(await screen.findByLabelText(/^Full address/)).toHaveValue('5 Espresso Lane')
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
@@ -380,7 +389,7 @@ describe('EditListing saving', () => {
       if (fn === 'my_is_founding_host') return { data: false, error: null }
       if (fn === 'listing_address') return { data: '12 Coffee Road', error: null }
       if (fn === 'set_listing_spots') {
-        return { data: null, error: { message: 'not allowed' } }
+        return { data: null, error: { message: 'Spots per session must be at least 1.' } }
       }
       return { data: null, error: null }
     })
@@ -388,19 +397,68 @@ describe('EditListing saving', () => {
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('not allowed')).toBeInTheDocument()
-    expect(supabase.__calls('listings', 'update')).toHaveLength(0)
+    expect(await screen.findByText('Spots per session must be at least 1.')).toBeInTheDocument()
     expect(currentPath()).toBe('/edit-listing/listing-1')
   })
 
-  it('reports a rejected update and stays put', async () => {
-    supabase.__on('listings', 'update', { error: { message: 'row level security' } })
+  it('saves the listing before set_listing_spots rewrites the row', async () => {
+    // set_listing_spots updates max_guests on this same row, so the database
+    // re-checks the price. Run first, it hit the old over-ceiling price the
+    // host was correcting in this very save.
+    let updatesBeforeSpots = null
+    supabase.rpc.mockImplementation(async (fn) => {
+      if (fn === 'my_is_founding_host') return { data: false, error: null }
+      if (fn === 'listing_address') return { data: '12 Coffee Road', error: null }
+      if (fn === 'set_listing_spots') {
+        updatesBeforeSpots = supabase.__calls('listings', 'update').length
+        return { data: { updated: 0, held: [] }, error: null }
+      }
+      return { data: null, error: null }
+    })
     const { user, currentPath } = await renderLoaded()
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('row level security')).toBeInTheDocument()
+    await waitFor(() => expect(currentPath()).toBe('/hosting'))
+    expect(updatesBeforeSpots).toBe(1)
+  })
+
+  it('does not set spots when the listing update is refused', async () => {
+    supabase.__on('listings', 'update', { error: { message: 'row level security' } })
+    const { user } = await renderLoaded()
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText(LISTING_SAVE_ERROR)).toBeInTheDocument()
+    expect(supabase.rpc).not.toHaveBeenCalledWith('set_listing_spots', expect.anything())
+  })
+
+  it('reports a rejected update in plain words and stays put', async () => {
+    supabase.__on('listings', 'update', {
+      error: { message: 'new row violates row-level security policy for table "listings"' },
+    })
+    const { user, currentPath } = await renderLoaded()
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText(LISTING_SAVE_ERROR)).toBeInTheDocument()
+    expect(screen.queryByText(/row-level security/)).not.toBeInTheDocument()
     expect(currentPath()).toBe('/edit-listing/listing-1')
+  })
+
+  it('points at the price instead of quoting the price ceiling check', async () => {
+    supabase.__on('listings', 'update', {
+      error: {
+        message: 'new row for relation "listings" violates check constraint "listings_price_ceiling"',
+      },
+    })
+    const { user } = await renderLoaded()
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Check the price above.')).toBeInTheDocument()
+    expect(screen.getByText(LISTING_FIELD_HINTS.price)).toBeInTheDocument()
+    expect(screen.queryByText(/listings_price_ceiling/)).not.toBeInTheDocument()
   })
 
   it('saves an empty provided list when "None" is selected', async () => {

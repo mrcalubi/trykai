@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  HIDDEN_HOST_PLANNING_AREAS,
   PLANNING_AREAS,
   PLANNING_AREA_NAMES,
   REGIONS,
+  hostPlanningAreaNames,
   regionForPlanningArea,
 } from './planningAreas'
 
@@ -28,5 +30,20 @@ describe('planningAreas', () => {
     expect(regionForPlanningArea('Katong')).toBeNull()
     expect(regionForPlanningArea('')).toBeNull()
     expect(regionForPlanningArea(null)).toBeNull()
+  })
+
+  it('hides the uninhabited host-picker areas unless they are already saved', () => {
+    expect(HIDDEN_HOST_PLANNING_AREAS).toEqual([
+      'Central Water Catchment',
+      'Western Water Catchment',
+      'Changi Bay',
+      'Marina East',
+      'Straits View',
+      'Simpang',
+      'Western Islands',
+    ])
+    expect(hostPlanningAreaNames()).not.toContain('Changi Bay')
+    expect(hostPlanningAreaNames('Changi Bay')).toContain('Changi Bay')
+    expect(hostPlanningAreaNames()).toHaveLength(48)
   })
 })

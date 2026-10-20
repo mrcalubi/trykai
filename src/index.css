@@ -18,6 +18,7 @@
   --error: #C7382C;         /* error text and icons */
   --error-bg: #F8EAE8;      /* error banner background */
   --star: #16264B;          /* rating stars use the text colour */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2316264B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   --scrim: rgba(15, 27, 56, 0.45);  /* dimmed backdrop behind overlays */
   --lightbox-backdrop: rgba(0, 0, 0, 0.92); /* photo viewer; page behind should disappear */
   --lightbox-chrome: #F4F1EA;               /* light controls on the dark overlay */
@@ -166,26 +167,6 @@ img {
 
 .eyebrow--on-dark {
   color: #E8A487;
-}
-
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.section-head__title {
-  margin: 0;
-  font-size: clamp(22px, 2.6vw, 30px);
-  line-height: 1.15;
-}
-
-.section-head__count {
-  flex-shrink: 0;
-  font-size: 14px;
-  color: var(--muted);
 }
 
 p {
@@ -780,13 +761,6 @@ a {
   color: var(--muted);
 }
 
-.home-hero__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 16px;
-}
-
 .trust-list {
   display: flex;
   gap: 8px;
@@ -799,6 +773,16 @@ a {
 
 .trust-list::-webkit-scrollbar {
   display: none;
+}
+
+/* Phones: fade the right edge so a pill running off screen reads as "swipe for more".
+   Not on .category-bar: there the half-cut tab is the cue, and a fade would hide it. */
+@media (max-width: 767px) {
+  .trust-list,
+  .filter-strip {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+  }
 }
 
 @media (min-width: 768px) {
@@ -899,6 +883,11 @@ a {
   margin-bottom: 24px;
 }
 
+.browse-count {
+  font-size: 14px;
+  color: var(--muted);
+}
+
 /* Swipeable icon tabs; bleeds to the screen edge on phones. */
 .category-bar {
   display: flex;
@@ -939,6 +928,17 @@ a {
   border-bottom: 2px solid transparent;
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Phones: size tabs so four and a half fit, so with five or more a half tab
+   always peeks at the edge. With four or fewer they simply all fit. */
+@media (max-width: 767px) {
+  .category-tab {
+    /* Left padding plus the four 4px gaps before the fifth tab. */
+    flex: 0 0 calc((100vw - var(--gutter) - 16px) / 4.5);
+    min-width: 0;
+    padding-inline: 4px;
+  }
 }
 
 .category-tab:hover {
@@ -998,6 +998,64 @@ a {
   border-color: var(--navy);
 }
 
+.chip .ui-icon {
+  flex-shrink: 0;
+}
+
+/* One swipeable row of filters; bleeds to the screen edge on phones. */
+.filter-strip {
+  display: flex;
+  gap: 8px;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 0 var(--gutter);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filter-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-strip .chip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (min-width: 1024px) {
+  .filter-strip {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.location-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.location-panel .browse-area {
+  flex: 1 1 180px;
+}
+
+.location-panel__clear {
+  min-height: 36px;
+  padding: 0 4px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
 .region-select {
   position: relative;
   display: inline-flex;
@@ -1011,26 +1069,43 @@ a {
   pointer-events: none;
 }
 
-.region-select__chevron {
-  position: absolute;
-  right: 12px;
-  pointer-events: none;
+.browse-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.browse-area {
+  position: relative;
+  min-width: 180px;
+}
+
+.browse-area .input {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
 }
 
 .filter-area {
   min-width: 170px;
   min-height: 36px;
-  padding: 0 36px 0 34px;
+  padding: 0 42px 0 34px;
   font-size: 13px;
   font-family: inherit;
   font-weight: 600;
   color: var(--navy);
-  background: var(--surface);
+  background-color: var(--surface);
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 16px 16px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   outline: none;
   cursor: pointer;
-  appearance: none;
 }
 
 .filter-area:hover {
@@ -1515,7 +1590,7 @@ a {
   color: var(--navy);
   background: transparent;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
@@ -1625,6 +1700,18 @@ a {
   box-shadow: 0 0 0 3px rgba(22, 38, 75, 0.12);
 }
 
+select,
+select.input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: #fff;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 16px 16px;
+  padding-right: 42px;
+}
+
 .input--file {
   padding: 10px;
   background: var(--surface);
@@ -1687,6 +1774,40 @@ input[type='radio'] {
 
 .planning-area-select .input[aria-invalid='true'] {
   border-color: var(--error);
+}
+
+.postal-address {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.postal-address__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.postal-address__option {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--text-h);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.postal-address__option:hover,
+.postal-address__option--on {
+  border-color: var(--navy);
+  background: var(--primary-bg);
 }
 
 .input--textarea {
@@ -2232,6 +2353,18 @@ input[type='password']::-webkit-password-reveal-button {
   box-shadow: var(--shadow-sm);
 }
 
+/* Browse: the category as an icon in a cream circle (same icons as the category row). */
+/* Category icon: a small tag, clearly smaller than the host's face (36px). */
+.ui-card__badge--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+}
+
 /* The host's face, ringed in cream, on the photo's bottom-left corner. */
 .ui-card__host {
   position: absolute;
@@ -2448,7 +2581,7 @@ input[type='password']::-webkit-password-reveal-button {
   font-weight: 700;
   color: var(--coral-ink);
   background: var(--coral-soft);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2474,6 +2607,14 @@ input[type='password']::-webkit-password-reveal-button {
   border: none;
   cursor: pointer;
   text-decoration: underline;
+}
+
+/* A countdown ("Send a new code in 42s") reads as text, not a dead link. */
+.link-btn:disabled {
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  cursor: default;
 }
 
 /* Messages */
@@ -3412,7 +3553,7 @@ body.lightbox-open {
   padding: 12px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .session-card__info {
@@ -3819,7 +3960,7 @@ body.lightbox-open {
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -4005,7 +4146,7 @@ body.lightbox-open {
   width: 100%;
   min-height: 54px;
   font-size: 16px;
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .payment-form__secure {
@@ -4130,7 +4271,7 @@ body.lightbox-open {
 
 .hosting__new {
   flex-shrink: 0;
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .hosting__layout {
@@ -4288,8 +4429,7 @@ body.lightbox-open {
 
 .hosting-stat {
   display: flex;
-  flex-direction: column-reverse;
-  justify-content: flex-end;
+  flex-direction: column;
   gap: 6px;
   min-width: 0;
   padding: 14px 10px 14px 12px;
@@ -4304,7 +4444,9 @@ body.lightbox-open {
   white-space: nowrap;
 }
 
+/* The figure sits above its label; any note follows the label. */
 .hosting-stat dd {
+  order: -1;
   margin: 0;
   overflow: hidden;
   font-family: var(--mono);
@@ -4314,6 +4456,16 @@ body.lightbox-open {
   color: var(--navy);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.hosting-stat dd.hosting-stat__note {
+  order: 0;
+  margin-top: -2px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: normal;
 }
 
 .hosting-listings__empty {
@@ -4331,7 +4483,7 @@ body.lightbox-open {
   line-height: 1.3;
   color: var(--navy);
   background: var(--sand);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .hosting-badge--hidden {
@@ -4363,6 +4515,17 @@ body.lightbox-open {
   border-top: 1px solid var(--border);
 }
 
+/* "I'm keen" demand on a listing with no dates (00032). */
+.hosting-keen {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--coral-ink);
+  background: var(--coral-soft);
+  border-radius: var(--radius-sm);
+}
+
 .hosting-listing__status {
   min-width: 0;
   margin: 0;
@@ -4375,115 +4538,47 @@ body.lightbox-open {
   color: var(--coral-ink);
 }
 
-.hosting-tips {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 20px;
-  color: var(--cream);
-  background: var(--navy);
-  border-radius: var(--radius-lg);
-}
-
-.hosting-tips__icon {
-  flex-shrink: 0;
-  margin-top: 1px;
-  color: var(--coral);
-}
-
-.hosting-tips__copy {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.hosting-tips__title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.hosting-tips__lede {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
-  color: rgba(244, 241, 234, 0.85);
-}
-
-.hosting-tips__toggle {
-  align-self: flex-start;
-  padding: 4px 0;
-  font: 700 14px var(--sans);
-  color: var(--cream);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  background: none;
-  border: 0;
-  cursor: pointer;
-}
-
-.hosting-tips__toggle:focus-visible {
-  outline: 2px solid var(--cream);
-  outline-offset: 2px;
-}
-
-.hosting-tips__list {
-  margin: 4px 0 0;
-  padding-left: 18px;
-  font-size: 14px;
-  line-height: 1.6;
-  color: rgba(244, 241, 234, 0.9);
-}
-
-/* Desktop: the checklist beside This month and the photo tips, then the
-   listings across the full width. */
+/* Desktop: the checklist beside This month, then the listings across the full
+   width. Once setup is done everything is one column. */
 @media (min-width: 1024px) {
   .hosting__layout {
-    grid-template-columns: minmax(0, 1fr) 400px;
-    grid-template-areas:
-      'month tips'
-      'upcoming upcoming'
-      'listings listings';
-    column-gap: 32px;
     row-gap: 40px;
   }
 
+  .hosting-month__stats {
+    max-width: 720px;
+  }
+
   .hosting__layout--setup {
+    grid-template-columns: minmax(0, 1fr) 400px;
     grid-template-areas:
       'setup month'
-      'setup tips'
       'upcoming upcoming'
       'listings listings';
-    grid-template-rows: auto 1fr;
+    column-gap: 32px;
     row-gap: 28px;
   }
 
-  .hosting-setup {
+  .hosting__layout--setup .hosting-setup {
     grid-area: setup;
     align-self: start;
-    padding: 24px 28px;
   }
 
-  .hosting-month {
+  .hosting__layout--setup .hosting-month {
     grid-area: month;
+    align-self: start;
   }
 
-  .hosting-upcoming {
+  .hosting__layout--setup .hosting-upcoming {
     grid-area: upcoming;
   }
 
-  .hosting-listings {
+  .hosting__layout--setup .hosting-listings {
     grid-area: listings;
   }
 
-  .hosting-tips {
-    grid-area: tips;
-    align-self: start;
-  }
-
-  .hosting__layout:not(.hosting__layout--setup) .hosting-tips {
-    align-self: stretch;
+  .hosting-setup {
+    padding: 24px 28px;
   }
 }
 
@@ -4608,7 +4703,7 @@ body.lightbox-open {
 }
 
 .add-sessions__repeat select.input {
-  padding-right: 36px;
+  padding-right: 42px;
 }
 
 .add-sessions__times {
@@ -6337,7 +6432,7 @@ body.lightbox-open {
 
 .wizard__actions .btn {
   min-height: 52px;
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .wizard__actions .btn--ghost {
@@ -6382,7 +6477,7 @@ body.lightbox-open {
   color: var(--navy);
   background: var(--surface);
   border: 1px solid var(--border-strong);
-  border-radius: 14px;
+  border-radius: var(--radius);
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -6486,7 +6581,7 @@ body.lightbox-open {
   padding: 0 18px;
   background: #fff;
   border: 2px solid var(--border-strong);
-  border-radius: 14px;
+  border-radius: var(--radius);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -6837,4 +6932,100 @@ body.lightbox-open {
   .wizard-inline-preview {
     display: none;
   }
+}
+
+/* "I'm keen" panel in the booking card when a listing has no dates (00032). */
+.keen-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.keen-panel__title {
+  margin: 0;
+  font-family: var(--display, inherit);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.keen-panel__text {
+  margin: -6px 0 0;
+  color: var(--muted);
+}
+
+.keen-panel__count {
+  align-self: flex-start;
+  margin: 0;
+  padding: 2px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--coral-ink);
+  background: var(--coral-soft);
+  border-radius: 999px;
+}
+
+.keen-panel__label {
+  margin: 4px 0 -4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.keen-panel__label span {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.keen-panel__chips {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.keen-panel__chips--days {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.keen-panel__chips .choice-chip {
+  min-height: 44px;
+}
+
+.keen-panel__stepper {
+  margin: 0;
+}
+
+.keen-panel__button {
+  width: 100%;
+  min-height: 48px;
+}
+
+.keen-panel__link {
+  align-self: flex-start;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--muted);
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* Shared availability (00033): a session set aside because the host is booked elsewhere. */
+.hosting-session__held {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.add-sessions__also {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.add-sessions__shared {
+  color: var(--muted);
 }

@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Login from './Login'
 import { supabase } from '../lib/supabase'
@@ -204,6 +204,7 @@ describe('Signing up', () => {
       password: 'hunter22',
       options: {
         data: { full_name: 'Mei Ling', display_name: 'Mei', terms_accepted: true },
+        emailRedirectTo: `${window.location.origin}/`,
       },
     })
     expect(supabase.__calls('users', 'insert')).toHaveLength(0)
@@ -250,19 +251,42 @@ describe('Signing up', () => {
     await waitFor(() => expect(currentPath()).toBe('/dashboard'))
   })
 
-  it('asks the user to confirm their email when no session is returned', async () => {
+  it('asks for the emailed code when no session is returned', async () => {
     givenSignupSucceeds({ session: null })
-    const { user, currentPath } = renderLogin()
+    const { user, currentPath } = renderLogin({ from: '/listings/abc' })
+    await switchToSignup(user)
+    await fillSignup(user, { email: 'mei@example.com' })
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    expect(await screen.findByRole('heading', { name: 'Check your email' })).toBeInTheDocument()
+    expect(screen.getByText('mei@example.com')).toBeInTheDocument()
+    const codeInput = screen.getByLabelText('Code')
+    expect(codeInput).toHaveAttribute('inputmode', 'numeric')
+    expect(codeInput).toHaveAttribute('autocomplete', 'one-time-code')
+    expect(screen.getByRole('button', { name: 'Send a new code in 60s' })).toBeDisabled()
+    expect(supabase.auth.signUp.mock.calls[0][0].options.emailRedirectTo).toBe(
+      `${window.location.origin}/listings/abc`
+    )
+    expect(currentPath()).toBe('/login')
+  })
+
+  it('tells someone with an existing account to log in instead', async () => {
+    supabase.auth.signUp.mockResolvedValue({
+      data: { user: makeUser({ id: 'fake', identities: [] }), session: null },
+      error: null,
+    })
+    const { user } = renderLogin()
     await switchToSignup(user)
     await fillSignup(user)
 
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
 
     expect(
-      await screen.findByText('Check your email to confirm your account, then log in.')
+      await screen.findByText('There is already an account with this email. Log in instead.')
     ).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
-    expect(currentPath()).toBe('/login')
+    expect(screen.queryByLabelText('Code')).not.toBeInTheDocument()
   })
 
   it('surfaces a signup rejection from the auth service', async () => {
@@ -304,5 +328,180 @@ describe('Signing up', () => {
     await switchToSignup(user)
 
     expect(screen.queryByText('Invalid login credentials')).not.toBeInTheDocument()
+  })
+})
+
+async function waitOutCooldown() {
+  for (let i = 0; i < 61; i += 1) {
+    await act(() => vi.advanceTimersByTimeAsync(1000))
+  }
+}
+
+describe('Confirming the email', () => {
+  async function reachCodeStep({ from } = {}) {
+    supabase.auth.signUp.mockResolvedValue({
+      data: { user: makeUser({ id: 'new-user' }), session: null },
+      error: null,
+    })
+    const rendered = renderLogin({ from })
+    await switchToSignup(rendered.user)
+    await fillSignup(rendered.user, { email: 'mei@example.com' })
+    await rendered.user.click(screen.getByRole('button', { name: 'Sign up' }))
+    await screen.findByLabelText('Code')
+    return rendered
+  }
+
+  it('signs in with the code and goes where the guest was heading', async () => {
+    supabase.auth.verifyOtp.mockResolvedValue({
+      data: { user: makeUser(), session: makeAuthSession() },
+      error: null,
+    })
+    const { user, currentPath } = await reachCodeStep({ from: '/listings/abc' })
+
+    await user.type(screen.getByLabelText('Code'), '12 34-56')
+    expect(screen.getByLabelText('Code')).toHaveValue('123456')
+    await user.click(screen.getByRole('button', { name: 'Confirm email' }))
+
+    await waitFor(() => expect(currentPath()).toBe('/listings/abc'))
+    expect(supabase.auth.verifyOtp).toHaveBeenCalledWith({
+      email: 'mei@example.com',
+      token: '123456',
+      type: 'email',
+    })
+  })
+
+  it('falls back to the signup type when the email type is refused', async () => {
+    supabase.auth.verifyOtp
+      .mockResolvedValueOnce({ data: {}, error: { message: 'Token has expired or is invalid' } })
+      .mockResolvedValueOnce({ data: { user: makeUser(), session: makeAuthSession() }, error: null })
+    const { user, currentPath } = await reachCodeStep()
+
+    await user.type(screen.getByLabelText('Code'), '123456')
+    await user.click(screen.getByRole('button', { name: 'Confirm email' }))
+
+    await waitFor(() => expect(currentPath()).toBe('/'))
+    expect(supabase.auth.verifyOtp.mock.calls.map((call) => call[0].type)).toEqual(['email', 'signup'])
+  })
+
+  it('explains a wrong or expired code and stays on the step', async () => {
+    supabase.auth.verifyOtp.mockResolvedValue({
+      data: {},
+      error: { message: 'Token has expired or is invalid', code: 'otp_expired' },
+    })
+    const { user, currentPath } = await reachCodeStep()
+
+    await user.type(screen.getByLabelText('Code'), '999999')
+    await user.click(screen.getByRole('button', { name: 'Confirm email' }))
+
+    expect(
+      await screen.findByText(
+        "That code didn't work. Check it against the latest email, or send a new one."
+      )
+    ).toBeInTheDocument()
+    expect(currentPath()).toBe('/login')
+  })
+
+  it('asks for the whole code before calling the server', async () => {
+    const { user } = await reachCodeStep()
+
+    await user.type(screen.getByLabelText('Code'), '123')
+    await user.click(screen.getByRole('button', { name: 'Confirm email' }))
+
+    expect(await screen.findByText('Enter the 6-digit code from the email.')).toBeInTheDocument()
+    expect(supabase.auth.verifyOtp).not.toHaveBeenCalled()
+  })
+
+  it('sends a new code once the cooldown has passed', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const { user } = await reachCodeStep()
+      await waitOutCooldown()
+
+      await user.click(await screen.findByRole('button', { name: 'Send a new code' }))
+
+      expect(await screen.findByText('New code sent. Use the latest email.')).toBeInTheDocument()
+      expect(supabase.auth.resend).toHaveBeenCalledWith({
+        type: 'signup',
+        email: 'mei@example.com',
+        options: { emailRedirectTo: `${window.location.origin}/` },
+      })
+      expect(screen.getByRole('button', { name: 'Send a new code in 60s' })).toBeDisabled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('shows the wait message when Supabase rate-limits a resend', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      supabase.auth.resend.mockResolvedValue({
+        data: {},
+        error: { status: 429, message: 'For security purposes, you can only request this after 30 seconds.' },
+      })
+      const { user } = await reachCodeStep()
+      await waitOutCooldown()
+
+      await user.click(await screen.findByRole('button', { name: 'Send a new code' }))
+
+      expect(
+        await screen.findByText('We just sent one. Please wait a minute before asking again.')
+      ).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('moves on when the link was confirmed in another tab', async () => {
+    const { currentPath } = await reachCodeStep({ from: '/bookings' })
+
+    act(() => supabase.__emitAuth('SIGNED_IN', makeAuthSession()))
+
+    await waitFor(() => expect(currentPath()).toBe('/bookings'))
+  })
+
+  it('lets the guest start again with a different email', async () => {
+    const { user } = await reachCodeStep()
+
+    await user.click(screen.getByRole('button', { name: 'Start again' }))
+
+    expect(screen.getByRole('heading', { name: 'Create account' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Email')).toHaveValue('mei@example.com')
+  })
+})
+
+describe('Logging in before confirming', () => {
+  it('sends a fresh code and asks for it', async () => {
+    supabase.auth.signInWithPassword.mockResolvedValue({
+      data: {},
+      error: { message: 'Email not confirmed', code: 'email_not_confirmed' },
+    })
+    const { user } = renderLogin({ from: '/hosting' })
+    await fillCredentials(user, { email: 'mei@example.com' })
+
+    await user.click(screen.getByRole('button', { name: 'Log in' }))
+
+    expect(await screen.findByLabelText('Code')).toBeInTheDocument()
+    expect(screen.getByText("Confirm your email first. We've sent you a new code.")).toBeInTheDocument()
+    expect(supabase.auth.resend).toHaveBeenCalledWith({
+      type: 'signup',
+      email: 'mei@example.com',
+      options: { emailRedirectTo: `${window.location.origin}/hosting` },
+    })
+  })
+
+  it('still asks for the code when the resend is refused', async () => {
+    supabase.auth.signInWithPassword.mockResolvedValue({
+      data: {},
+      error: { message: 'Email not confirmed' },
+    })
+    supabase.auth.resend.mockResolvedValue({ data: {}, error: { status: 429, message: 'rate limit' } })
+    const { user } = renderLogin()
+    await fillCredentials(user)
+
+    await user.click(screen.getByRole('button', { name: 'Log in' }))
+
+    expect(
+      await screen.findByText('Confirm your email first. Use the code in the email we sent you.')
+    ).toBeInTheDocument()
   })
 })

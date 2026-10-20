@@ -1,5 +1,16 @@
 {
   "rewrites": [
+    {
+      "source": "/listings/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|WhatsApp|Embedly|SkypeUriPreview|iframely|Pinterest).*"
+        }
+      ],
+      "destination": "/api/listing-preview?id=:id"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

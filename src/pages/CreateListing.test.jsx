@@ -5,7 +5,11 @@ import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession } from '../test/fixtures'
-import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
+import {
+  LISTING_FIELD_HINTS,
+  LISTING_SAVE_ERROR,
+  PHOTO_UPLOAD_ERROR,
+} from '../lib/listingFieldHints'
 
 vi.mock('../lib/supabase')
 
@@ -96,8 +100,18 @@ async function choosePlanningArea(user, name) {
 
 async function completeLocation(user, values) {
   await choosePlanningArea(user, values.area)
-  // The address label also wraps a hint span, so it needs a partial match.
-  if (values.fullAddress) await user.type(screen.getByLabelText(/^Full address/), values.fullAddress)
+  if (values.fullAddress?.trim()) {
+    supabase.functions.invoke.mockImplementation(async (name) => {
+      if (name !== 'lookup-postal-code') return { data: null, error: null }
+      return {
+        data: { results: [{ address: values.fullAddress, postal: '470012' }] },
+        error: null,
+      }
+    })
+    await user.type(screen.getByLabelText('Postal code'), '470012')
+    await user.click(screen.getByRole('button', { name: 'Find addresses' }))
+    expect(await screen.findByLabelText(/^Full address/)).toHaveValue(values.fullAddress)
+  }
   await next(user)
 }
 
@@ -336,6 +350,25 @@ describe('CreateListing validation', () => {
     expect(screen.getByRole('button', { name: 'Fewer guests' })).toBeDisabled()
   })
 
+  it('rejects a postal code OneMap cannot find', async () => {
+    const { user } = renderPage()
+    await goToPrice(user)
+    await completePrice(user, VALID)
+    await stepHeading('Where it happens')
+
+    await choosePlanningArea(user, VALID.area)
+    supabase.functions.invoke.mockResolvedValue({
+      data: { error: 'No address matches that postal code.', results: [] },
+      error: { message: 'Edge Function returned a non-2xx status code' },
+    })
+    await user.type(screen.getByLabelText('Postal code'), '000000')
+    await user.click(screen.getByRole('button', { name: 'Find addresses' }))
+    expect(await screen.findByText('No address matches that postal code.')).toBeInTheDocument()
+    await next(user)
+
+    expect(await screen.findByText(LISTING_FIELD_HINTS.fullAddress)).toBeInTheDocument()
+  })
+
   it('rejects a blank address', async () => {
     const { user } = renderPage()
     await goToPrice(user)
@@ -534,9 +567,27 @@ describe('CreateListing submission', () => {
 
     await user.click(screen.getByRole('button', { name: 'Create listing' }))
 
-    expect(await screen.findByText('row level security')).toBeInTheDocument()
+    expect(await screen.findByText(LISTING_SAVE_ERROR)).toBeInTheDocument()
+    expect(screen.queryByText('row level security')).not.toBeInTheDocument()
     expect(supabase.__calls('users', 'update')).toHaveLength(0)
     expect(currentPath()).toBe('/create-listing')
+  })
+
+  it('takes the host back to the price when the price ceiling check fails', async () => {
+    supabase.__on('listings', 'insert', {
+      error: {
+        message: 'new row for relation "listings" violates check constraint "listings_price_ceiling"',
+      },
+    })
+    const { user } = renderPage()
+    await fillValidForm(user)
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await stepHeading('Price and group size')
+    expect(screen.getByText('Check the price above.')).toBeInTheDocument()
+    expect(screen.getByText(LISTING_FIELD_HINTS.price)).toBeInTheDocument()
+    expect(screen.queryByText(/listings_price_ceiling/)).not.toBeInTheDocument()
   })
 
   it('reports a failure to flag the user as a host', async () => {

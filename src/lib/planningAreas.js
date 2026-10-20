@@ -66,11 +66,29 @@ export const PLANNING_AREAS = [
 
 export const PLANNING_AREA_NAMES = PLANNING_AREAS.map((area) => area.name)
 
+/** Hidden from the host picker. Existing listings keep the stored value. */
+export const HIDDEN_HOST_PLANNING_AREAS = [
+  'Central Water Catchment',
+  'Western Water Catchment',
+  'Changi Bay',
+  'Marina East',
+  'Straits View',
+  'Simpang',
+  'Western Islands',
+]
+
 const REGION_BY_LOWER_NAME = new Map(
   PLANNING_AREAS.map((area) => [area.name.toLowerCase(), area.region])
 )
 
+const HIDDEN_HOST = new Set(HIDDEN_HOST_PLANNING_AREAS)
+
 export function regionForPlanningArea(name) {
   if (!name) return null
   return REGION_BY_LOWER_NAME.get(String(name).trim().toLowerCase()) ?? null
+}
+
+export function hostPlanningAreaNames(currentValue = '') {
+  const keep = String(currentValue ?? '').trim()
+  return PLANNING_AREA_NAMES.filter((name) => !HIDDEN_HOST.has(name) || name === keep)
 }

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { CancellationPolicyInfo } from '../components/CancellationPolicy'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
+import PostalAddressFields from '../components/PostalAddressFields'
 import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
@@ -15,7 +16,11 @@ import Card from '../components/ui/Card'
 import Icon from '../components/ui/Icon'
 import { categoryIconName } from '../components/ui/categoryIcon'
 import { LISTING_CATEGORIES } from '../lib/listingCategories'
-import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
+import {
+  LISTING_FIELD_HINTS,
+  PHOTO_UPLOAD_ERROR,
+  listingSaveProblem,
+} from '../lib/listingFieldHints'
 import { providedForSave } from '../lib/whatsProvided'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import {
@@ -282,7 +287,12 @@ export default function CreateListing() {
 
     if (listingError) {
       setLoading(false)
-      setError(listingError.message)
+      const problem = listingSaveProblem(listingError)
+      if (problem.field === 'price') {
+        goTo(STEPS.findIndex((item) => item.id === 'price'))
+        setFieldHints({ price: problem.hint })
+      }
+      setError(problem.message)
       return
     }
 
@@ -294,7 +304,7 @@ export default function CreateListing() {
     setLoading(false)
 
     if (hostError) {
-      setError(hostError.message)
+      setError(listingSaveProblem(hostError).message)
       return
     }
 
@@ -539,22 +549,12 @@ export default function CreateListing() {
         <>
           <label className="label">
             Area
-            <PlanningAreaSelect value={area} onChange={setArea} />
+            <PlanningAreaSelect value={area} onChange={setArea} hideUninhabited />
             <FieldHint>{fieldHints.area}</FieldHint>
           </label>
 
-          <label className="label">
-            Full address
-            <input
-              type="text"
-              value={fullAddress}
-              onChange={(e) => setFullAddress(e.target.value)}
-              placeholder="Block, street, unit and postal code"
-              className="input"
-            />
-            <span className="hint">Hidden from browse. Revealed only after a confirmed booking.</span>
-            <FieldHint>{fieldHints.fullAddress}</FieldHint>
-          </label>
+          <PostalAddressFields value={fullAddress} onChange={setFullAddress} />
+          <FieldHint>{fieldHints.fullAddress}</FieldHint>
         </>
       )
     }

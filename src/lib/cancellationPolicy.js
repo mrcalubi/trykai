@@ -1,6 +1,8 @@
 // The tiers below are the published Cancellation Policy, in code. Anything that
-// changes what a guest is refunded should change this table and the wording on
-// src/pages/CancellationPolicy.jsx together.
+// changes what a guest is refunded should change, together: this table (which
+// only previews the refund), GUEST_REFUND_TIER_RULES in
+// supabase/functions/_shared/booking.ts (which sets the actual Stripe refund),
+// and the wording on src/pages/CancellationPolicy.jsx.
 //
 // A guest pays `total_amount`, and the platform fee is carved out of it rather
 // than added on top. So "the lesson fee" is `total_amount - platform_fee`, and a

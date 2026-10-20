@@ -8,7 +8,7 @@ export const LISTING_FIELD_HINTS = {
   spots: 'At least one guest per session.',
   duration: "Choose how long you'll spend with guests.",
   area: 'Pick the area guests will see before they book.',
-  fullAddress: 'The exact address. We only send this after a booking is confirmed.',
+  fullAddress: 'Look up the postal code. We only send the full address after a booking is confirmed.',
   hostTerms: 'Tick this to agree to the Host terms.',
 }
 
@@ -17,3 +17,22 @@ export const PHOTO_SKIP_COPY =
 
 export const PHOTO_UPLOAD_ERROR =
   "That photo didn't upload. Try again or pick a different one."
+
+export const LISTING_SAVE_ERROR =
+  "We couldn't save your listing. Check the details and try again."
+
+/**
+ * Plain words for a failed listing save. Database errors name constraints
+ * ("violates check constraint listings_price_ceiling"), which means nothing
+ * to a host; messages our own functions raise are already written for them.
+ */
+export function listingSaveProblem(error) {
+  const message = String(error?.message ?? '')
+  if (/listings_price_(ceiling|nonneg)/.test(message)) {
+    return { field: 'price', hint: LISTING_FIELD_HINTS.price, message: 'Check the price above.' }
+  }
+  const fromDatabase =
+    /constraint|violates|row.level security|permission denied|duplicate key|null value|invalid input/i
+  if (!message || fromDatabase.test(message)) return { message: LISTING_SAVE_ERROR }
+  return { message }
+}

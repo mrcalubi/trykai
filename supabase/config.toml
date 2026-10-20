@@ -223,11 +223,12 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# On to match staging and production (DECISIONS.md, 20 October).
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
-max_frequency = "1s"
+max_frequency = "60s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
@@ -242,6 +243,13 @@ otp_expiry = 3600
 # pass = "env(SENDGRID_API_KEY)"
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
+
+# Branded "Confirm signup" email with the code and the link. Generated from
+# confirmSignupTemplateHtml in _shared/email.ts; paste the same file into the
+# dashboard on staging and production (OPERATIONS.md).
+[auth.email.template.confirmation]
+subject = "Your TryKai code: {{ .Token }}"
+content_path = "./supabase/templates/confirm-signup.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
@@ -488,6 +496,18 @@ verify_jwt = false
 import_map = "./functions/report-booking-problem/deno.json"
 entrypoint = "./functions/report-booking-problem/index.ts"
 
+[functions.listing-interest]
+enabled = true
+verify_jwt = false
+import_map = "./functions/listing-interest/deno.json"
+entrypoint = "./functions/listing-interest/index.ts"
+
+[functions.notify-interested]
+enabled = true
+verify_jwt = false
+import_map = "./functions/notify-interested/deno.json"
+entrypoint = "./functions/notify-interested/index.ts"
+
 [functions.admin-cancel-booking]
 enabled = true
 verify_jwt = false
@@ -519,3 +539,11 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/purge-verification-docs/deno.json"
 entrypoint = "./functions/purge-verification-docs/index.ts"
+
+# verify_jwt is false because the function checks the caller's JWT itself.
+# OneMap search needs a token; credentials stay in Vault, not the client.
+[functions.lookup-postal-code]
+enabled = true
+verify_jwt = false
+import_map = "./functions/lookup-postal-code/deno.json"
+entrypoint = "./functions/lookup-postal-code/index.ts"

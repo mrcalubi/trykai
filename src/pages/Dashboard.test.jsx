@@ -158,7 +158,11 @@ function sectionFor(title) {
 }
 
 function listingCard(title) {
-  return within(sectionFor('Your listings')).getByText(title).closest('.dashboard-card')
+  // Match the card's own title, not "Also offer these times on" checkboxes.
+  const heading = within(sectionFor('Your listings'))
+    .getAllByText(title)
+    .find((node) => node.classList.contains('dashboard-card__title'))
+  return heading.closest('.dashboard-card')
 }
 
 function dateKeyFromToday(daysAhead) {
@@ -425,7 +429,7 @@ describe('Dashboard listings', () => {
     expect(foot?.[0]).toMatch(/justify-content:\s*space-between/)
     expect(listings?.[0]).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/)
     expect(listings?.[0]).toMatch(/align-items:\s*start/)
-    expect(css).toMatch(/\.add-sessions__repeat select\.input \{[^}]*padding-right:\s*36px/)
+    expect(css).toMatch(/\.add-sessions__repeat select\.input \{[^}]*padding-right:\s*42px/)
     expect(css).not.toMatch(
       /@media \(min-width: 1024px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
     )
@@ -672,6 +676,93 @@ describe('Dashboard add session', () => {
     const [, args] = supabase.rpc.mock.calls.find(([name]) => name === 'add_listing_session')
     expect(args.p_spots).toBe(6)
     expect(args).not.toHaveProperty('duration_mins')
+  })
+
+  it('offers the same times on another listing, with that listing\'s spots', async () => {
+    givenData({
+      listings: [makeMyListing(), makeMyListing({ id: 'listing-2', title: 'Pottery', max_guests: 6 })],
+    })
+    const { user } = await renderHosting()
+    await user.click(within(listingCard('Latte art')).getByRole('button', { name: 'Add sessions' }))
+    const dateKey = await fillSession(user, { time: '10:30' })
+    await user.click(screen.getByRole('checkbox', { name: 'Pottery' }))
+    await user.click(screen.getByRole('button', { name: 'Review sessions' }))
+    expect(screen.getByText(/on each of 2 listings/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Create sessions' }))
+
+    await waitFor(() =>
+      expect(supabase.rpc).toHaveBeenCalledWith('add_listing_session', {
+        p_listing_id: 'listing-2',
+        p_starts_at: `${dateKey}T02:30:00.000Z`,
+        p_spots: 6,
+      })
+    )
+    expect(supabase.rpc).toHaveBeenCalledWith('add_listing_session', {
+      p_listing_id: 'listing-1',
+      p_starts_at: `${dateKey}T02:30:00.000Z`,
+      p_spots: 4,
+    })
+    expect(await screen.findByText(/Also added on Pottery\./)).toBeInTheDocument()
+    const notified = supabase.functions.invoke.mock.calls
+      .filter(([name]) => name === 'notify-interested')
+      .map(([, options]) => options.body.listing_id)
+    expect(notified).toEqual(['listing-1', 'listing-2'])
+  })
+
+  it('says when the other listing refused the times', async () => {
+    givenData({
+      listings: [makeMyListing(), makeMyListing({ id: 'listing-2', title: 'Pottery' })],
+    })
+    const previous = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation(async (name, args) =>
+      name === 'add_listing_session' && args.p_listing_id === 'listing-2'
+        ? { data: null, error: { message: 'That time overlaps the session on Sat' } }
+        : previous(name, args)
+    )
+    const { user } = await renderHosting()
+    await user.click(within(listingCard('Latte art')).getByRole('button', { name: 'Add sessions' }))
+    await fillSession(user)
+    await user.click(screen.getByRole('checkbox', { name: 'Pottery' }))
+    await reviewAndCreate(user)
+
+    expect(await screen.findByText(/None added on Pottery/)).toBeInTheDocument()
+  })
+
+  it('does not offer other listings when the host has only one', async () => {
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+    expect(screen.queryByText('Also offer these times on')).not.toBeInTheDocument()
+  })
+
+  it('emails keen guests after sessions are added and says how many', async () => {
+    supabase.functions.invoke.mockImplementation(async (name) =>
+      name === 'notify-interested' ? { data: { notified: 3 }, error: null } : { data: null, error: null }
+    )
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+    await fillSession(user)
+    await reviewAndCreate(user)
+
+    await waitFor(() =>
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        'notify-interested',
+        expect.objectContaining({ body: { listing_id: 'listing-1' } })
+      )
+    )
+    expect(await screen.findByText(/We've emailed the 3 guests who were keen\./)).toBeInTheDocument()
+  })
+
+  it('does not mention keen guests when nobody was waiting', async () => {
+    supabase.functions.invoke.mockResolvedValue({ data: { notified: 0 }, error: null })
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+    await fillSession(user)
+    await reviewAndCreate(user)
+
+    await waitFor(() =>
+      expect(supabase.functions.invoke.mock.calls.some(([name]) => name === 'notify-interested')).toBe(true)
+    )
+    expect(screen.queryByText(/who were keen|who was keen/)).not.toBeInTheDocument()
   })
 
   it('previews a clash with an existing session instead of merging spots', async () => {
@@ -1407,6 +1498,8 @@ describe('Hosting this month', () => {
     givenData({
       listings: [makeMyListing()],
       hostSessions: [
+        // Already past and nobody booked: it never ran and the page does not show it.
+        makeHostSession({ id: 'past-empty', starts_at: '2026-10-05T02:00:00Z', bookings: [] }),
         makeHostSession({
           id: 'past',
           starts_at: '2026-10-10T02:00:00Z',
@@ -1427,7 +1520,8 @@ describe('Hosting this month', () => {
 
     const month = sectionFor('This month')
     const stat = (label) => within(month).getByText(label).closest('.hosting-stat')
-    expect(stat('Sessions')).toHaveTextContent('2')
+    expect(stat('Sessions').querySelector('dd')).toHaveTextContent(/^2$/)
+    expect(stat('Sessions').querySelector('.hosting-stat__note')).toHaveTextContent('1 held · 1 to come')
     expect(stat('Guests booked')).toHaveTextContent('3')
     expect(stat('Earned')).toHaveTextContent('S$62')
   })
@@ -1438,26 +1532,103 @@ describe('Hosting this month', () => {
 
     const month = sectionFor('This month')
     expect(within(month).getByText('Earned').closest('.hosting-stat')).toHaveTextContent('S$0')
+    const sessions = within(month).getByText('Sessions').closest('.hosting-stat')
+    expect(sessions.querySelector('dd')).toHaveTextContent(/^0$/)
+    expect(sessions.querySelector('.hosting-stat__note')).toBeNull()
+  })
+
+  it('splits the Sessions total so it matches the dates listed below', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({ id: 'open-1', starts_at: '2026-10-20T02:00:00Z', bookings: [] }),
+        makeHostSession({ id: 'open-2', starts_at: '2026-10-27T02:00:00Z', bookings: [] }),
+      ],
+    })
+    await renderHosting()
+
+    const sessions = within(sectionFor('This month')).getByText('Sessions').closest('.hosting-stat')
+    expect(sessions.querySelector('dd')).toHaveTextContent(/^2$/)
+    expect(sessions.querySelector('.hosting-stat__note')).toHaveTextContent(/^2 to come$/)
+    expect(within(listingCard('Latte art')).getAllByRole('checkbox')).toHaveLength(2)
   })
 })
 
 describe('Hosting listing cards', () => {
-  it('flags a listing with no dates as hidden and leads with Add sessions', async () => {
+  it('shows a set-aside session as taken by the booked listing, not as an open date', async () => {
+    const startsAt = hoursFromNow(30)
+    givenData({
+      listings: [makeMyListing(), makeMyListing({ id: 'listing-2', title: 'Pottery' })],
+      hostSessions: [
+        makeHostSession({
+          id: 'booked-1',
+          starts_at: startsAt,
+          listing_id: 'listing-1',
+          listings: { title: 'Latte art' },
+          bookings: [{ id: 'b1', status: 'confirmed', guests_count: 1 }],
+        }),
+        makeHostSession({
+          id: 'held-1',
+          starts_at: startsAt,
+          listing_id: 'listing-2',
+          listings: { title: 'Pottery' },
+          status: 'held',
+          held_by_session_id: 'booked-1',
+          bookings: [],
+        }),
+      ],
+    })
+    await renderHosting()
+
+    const pottery = listingCard('Pottery')
+    expect(
+      within(pottery).getByText(
+        "Taken: you're booked for Latte art then. Reopens if that booking is cancelled."
+      )
+    ).toBeInTheDocument()
+    expect(within(pottery).getAllByText('No dates yet').length).toBeGreaterThan(0)
+    expect(within(pottery).queryByText('1 open date')).not.toBeInTheDocument()
+  })
+
+  it('shows how many guests are keen on a listing with no dates', async () => {
+    givenData({ listings: [makeMyListing()] })
+    const previous = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation(async (name, args) =>
+      name === 'host_listing_interest'
+        ? {
+            data: [
+              { listing_id: 'listing-1', keen_count: 3, weekday: 0, weekend: 3, morning: 0, afternoon: 2, evening: 0 },
+            ],
+            error: null,
+          }
+        : previous(name, args)
+    )
+    await renderHosting()
+
+    const card = listingCard('Latte art')
+    expect(
+      within(card).getByText(
+        "3 people are keen. When suits them: Weekends 3, Afternoon 2. Add a date and we'll tell them."
+      )
+    ).toBeInTheDocument()
+  })
+
+  it('flags a listing with no dates and leads with Add sessions', async () => {
     givenData({
       listings: [makeMyListing({ price_per_person: 2300, duration_mins: 90, max_guests: 4 })],
     })
     await renderHosting()
 
     const card = listingCard('Latte art')
-    expect(within(card).getByText('Hidden: no sessions')).toBeInTheDocument()
+    expect(within(card).getAllByText('No dates yet')).toHaveLength(2)
+    expect(within(card).queryByText('Hidden: no sessions')).not.toBeInTheDocument()
     expect(within(card).getByText('S$23 · 90 min · up to 4')).toBeInTheDocument()
-    expect(within(card).getByText('No dates yet')).toBeInTheDocument()
     expect(within(card).getByRole('button', { name: 'Add sessions' }).className).toContain(
       'primary'
     )
   })
 
-  it('marks a listing with dates as live and shows the next one', async () => {
+  it('marks a listing with dates as live and counts them instead of repeating the first row', async () => {
     const startsAt = hoursFromNow(30)
     givenData({
       listings: [makeMyListing()],
@@ -1467,8 +1638,31 @@ describe('Hosting listing cards', () => {
 
     const card = listingCard('Latte art')
     expect(within(card).getByText('Live')).toBeInTheDocument()
-    expect(within(card).getByText(`Next: ${formatSessionDateTime(startsAt)}`)).toBeInTheDocument()
-    expect(within(card).queryByText('Hidden: no sessions')).not.toBeInTheDocument()
+    expect(within(card).getByText('1 open date')).toBeInTheDocument()
+    expect(within(card).getAllByText(formatSessionDateTime(startsAt))).toHaveLength(1)
+    expect(within(card).queryByText(/^Next:/)).not.toBeInTheDocument()
+    expect(within(card).queryByText('No dates yet')).not.toBeInTheDocument()
+  })
+
+  it('counts a booked date, which sits under Upcoming bookings rather than the card', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({ id: 'booked', starts_at: hoursFromNow(30) }),
+        makeHostSession({ id: 'open', starts_at: hoursFromNow(60), bookings: [] }),
+      ],
+    })
+    await renderHosting()
+
+    expect(within(listingCard('Latte art')).getByText('1 open date · 1 booked')).toBeInTheDocument()
+    expect(within(sectionFor('Upcoming bookings')).getByText('Latte art')).toBeInTheDocument()
+  })
+
+  it('says when every date is booked', async () => {
+    givenData({ listings: [makeMyListing()], hostSessions: [makeHostSession()] })
+    await renderHosting()
+
+    expect(within(listingCard('Latte art')).getByText('1 booked · no open dates')).toBeInTheDocument()
   })
 })
 
@@ -1544,20 +1738,13 @@ describe('Hosting draft listing', () => {
   })
 })
 
-describe('Hosting photo tips', () => {
-  it('opens the photo tips from the banner', async () => {
+describe('Hosting without photo tips', () => {
+  it('leaves the photo tips to the listing forms', async () => {
     givenData({ listings: [makeMyListing()] })
-    const { user } = await renderHosting()
+    await renderHosting()
 
-    const toggle = screen.getByRole('button', { name: 'See the 4 photo tips' })
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    await user.click(toggle)
-
-    expect(screen.getByRole('button', { name: 'Hide the photo tips' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
-    )
-    expect(screen.getByText('Natural light is your best friend. A window beats any flash.')).toBeInTheDocument()
+    expect(screen.queryByText('Better photos, more bookings')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /photo tips/ })).not.toBeInTheDocument()
   })
 })
 

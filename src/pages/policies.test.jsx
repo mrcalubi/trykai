@@ -60,7 +60,7 @@ describe('Cancellation Policy page', () => {
   })
 
   it('tells guests to cancel from their profile, not a dashboard', () => {
-    expect(screen.getByText(/Cancel anytime from your profile/)).toBeInTheDocument()
+    expect(screen.getByText(/Cancel anytime from the Bookings tab on your profile/)).toBeInTheDocument()
     expect(screen.queryByText(/Dashboard/)).not.toBeInTheDocument()
   })
 
@@ -222,5 +222,10 @@ describe('Privacy Policy page', () => {
   it('keeps booking records for five years and does not sell personal data', () => {
     expect(screen.getByText(/kept for 5 years/)).toBeInTheDocument()
     expect(screen.getByText(/We do not sell personal data/)).toBeInTheDocument()
+  })
+
+  it('names OneMap as the address lookup service', () => {
+    expect(screen.getByText(/OneMap \(Singapore Land Authority\)/)).toBeInTheDocument()
+    expect(screen.getByText(/look up and verify listing addresses/)).toBeInTheDocument()
   })
 })

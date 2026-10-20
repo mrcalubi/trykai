@@ -1,17 +1,6 @@
 import { useId, useMemo, useRef, useState } from 'react'
-import { PLANNING_AREA_NAMES } from '../lib/planningAreas'
-
-function matchesQuery(name, query) {
-  const q = query.trim().toLowerCase()
-  if (!q) return true
-  return name.toLowerCase().includes(q)
-}
-
-function exactMatch(query) {
-  const q = query.trim().toLowerCase()
-  if (!q) return null
-  return PLANNING_AREA_NAMES.find((name) => name.toLowerCase() === q) ?? null
-}
+import { planningAreaForAlias, searchAreaOptions } from '../lib/areaSearch'
+import { PLANNING_AREA_NAMES, hostPlanningAreaNames } from '../lib/planningAreas'
 
 const PICK_AREA = 'Pick an area from the list.'
 
@@ -21,6 +10,9 @@ export default function PlanningAreaSelect({
   onChange,
   required = false,
   disabled = false,
+  hideUninhabited = false,
+  allowEmpty = false,
+  placeholder = 'Search areas or neighbourhoods',
 }) {
   const generatedId = useId()
   const inputId = id ?? generatedId
@@ -38,12 +30,14 @@ export default function PlanningAreaSelect({
     if (!error) setQuery(value ?? '')
   }
 
+  const names = hideUninhabited ? hostPlanningAreaNames(value) : PLANNING_AREA_NAMES
+
   const options = useMemo(() => {
     const selected = (value ?? '').toLowerCase()
     const browsing = query.trim().toLowerCase() === selected
-    if (browsing) return PLANNING_AREA_NAMES
-    return PLANNING_AREA_NAMES.filter((name) => matchesQuery(name, query))
-  }, [query, value])
+    if (browsing) return names.map((name) => ({ name, label: name }))
+    return searchAreaOptions(query, names)
+  }, [names, query, value])
 
   const safeIndex = options.length === 0 ? 0 : Math.min(activeIndex, options.length - 1)
 
@@ -60,8 +54,9 @@ export default function PlanningAreaSelect({
   }
 
   function commitTyped(raw) {
-    const match = exactMatch(raw)
-    if (match) {
+    const match = planningAreaForAlias(raw)
+    const allowed = match && names.includes(match)
+    if (allowed) {
       select(match)
       return
     }
@@ -72,7 +67,8 @@ export default function PlanningAreaSelect({
       return
     }
     setQuery('')
-    setValidity('')
+    setValidity(allowEmpty || !required ? '' : PICK_AREA)
+    if (allowEmpty) onChange('')
   }
 
   function moveActive(delta) {
@@ -107,8 +103,8 @@ export default function PlanningAreaSelect({
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         aria-required={required || undefined}
-        required={required || undefined}
-        placeholder="Search planning areas"
+        required={required && !allowEmpty ? true : undefined}
+        placeholder={placeholder}
         onChange={(event) => {
           setQuery(event.target.value)
           setActiveIndex(0)
@@ -131,7 +127,7 @@ export default function PlanningAreaSelect({
           } else if (event.key === 'Enter') {
             if (open && activeOption) {
               event.preventDefault()
-              select(activeOption)
+              select(activeOption.name)
             }
           } else if (event.key === 'Escape') {
             event.preventDefault()
@@ -139,8 +135,6 @@ export default function PlanningAreaSelect({
             setValidity('')
             setOpen(false)
           } else if (event.key === 'Tab') {
-            // Commit before focus moves. In jsdom, Tab can land on an option
-            // button and skip input blur (relatedTarget is inside the widget).
             commitTyped(event.currentTarget.value)
           }
         }}
@@ -150,22 +144,22 @@ export default function PlanningAreaSelect({
           {options.length === 0 ? (
             <li className="planning-area-select__empty">No matching planning areas</li>
           ) : (
-            options.map((name, index) => (
-              <li key={name} role="presentation">
+            options.map((option, index) => (
+              <li key={option.name} role="presentation">
                 <button
                   type="button"
                   tabIndex={-1}
                   id={`${listId}-opt-${index}`}
                   role="option"
-                  aria-selected={name === value}
+                  aria-selected={option.name === value}
                   className={`planning-area-select__option${
                     index === safeIndex ? ' planning-area-select__option--active' : ''
                   }`}
                   onMouseEnter={() => setActiveIndex(index)}
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => select(name)}
+                  onClick={() => select(option.name)}
                 >
-                  {name}
+                  {option.label}
                 </button>
               </li>
             ))

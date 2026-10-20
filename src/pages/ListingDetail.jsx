@@ -36,8 +36,10 @@ import { publicName } from '../lib/publicName'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { listingReportSubject, reportMailto } from '../lib/reportMailto'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
+import { SHARE_NOTES, shareOrCopy } from '../lib/share'
 import { BackRowActions } from '../components/BackButton'
 import Icon from '../components/ui/Icon'
+import KeenPanel from '../components/KeenPanel'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -372,17 +374,11 @@ export default function ListingDetail() {
   }, [shareNote])
 
   async function shareListing() {
-    const url = window.location.href
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: listing?.title ?? 'TryKai', url })
-        return
-      }
-      await navigator.clipboard.writeText(url)
-      setShareNote('Link copied')
-    } catch (shareError) {
-      if (shareError?.name !== 'AbortError') setShareNote('Could not share this link')
-    }
+    const result = await shareOrCopy({
+      url: `${window.location.origin}/listings/${id}`,
+      title: listing?.title ?? 'TryKai',
+    })
+    if (SHARE_NOTES[result]) setShareNote(SHARE_NOTES[result])
   }
 
   // The phone booking bar steps aside once the booking card itself is on screen.
@@ -1072,7 +1068,12 @@ export default function ListingDetail() {
 
             {checkoutSessionId && renderCheckout()}
 
-            {!sessionRange && <p className="empty-state">No upcoming sessions yet.</p>}
+            {!sessionRange && isOwnListing && (
+              <p className="empty-state">No upcoming sessions yet. Add dates from your Hosting tab.</p>
+            )}
+            {!sessionRange && !isOwnListing && (
+              <KeenPanel listingId={id} hostName={hostName} viewerId={viewerId} />
+            )}
 
             {sessionRange && !checkoutSessionId && (
               <>

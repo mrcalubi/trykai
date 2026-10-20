@@ -2,7 +2,9 @@
 
 Week by week execution plan and the pre launch checklist. Updated live at the Saturday scrum.
 
-**Target: soft launch, week of 20 October 2026.** Warm contacts only, 15 to 20 listings across two or three categories.
+**Target: soft launch, week of 20 October 2026.** Warm contacts only, 15 to 20 listings across two or three categories. **Warm host onboarding starts Wednesday 21 October**; first real paid booking expected within a week.
+
+**Before touching either Supabase project, read Environments and production SQL below.**
 
 ---
 
@@ -23,13 +25,33 @@ Each week has three sections, one per founder, tagged **[CRITICAL]**, **[HIGH]**
 
 **Monthly, first Saturday:** contribution log updated by each founder. This is the evidence base for equity refresh conversations.
 
-**Ongoing, Caleb:** every cost logged in EXPENSES.xlsx the day it occurs. The founder loan balance must always be current.
+**Ongoing, Caleb:** every TryKai cost paid from the Aspire card and logged in EXPENSES.xlsx the day it occurs; every transfer into Aspire logged as founder loan the day it lands (BUSINESS.md, How money moves). The founder loan balance must always be current.
+
+---
+
+## Progress snapshot, 19 October 2026
+
+Week 13 of the original plan. Read this snapshot first. HANDOVER.md has the full state; this block is what ops needs.
+
+**Migrations.** `00022` to `00031` verified on both staging and production (18 and 19 October). See Environments and production SQL for the per environment table.
+
+**Branches.** `main` has everything through PR #129. `staging` is ahead by #130, #131 and #132 (location batch C, including the `lookup-postal-code` Edge Function).
+
+**Edge Functions in the tree:** `abandon-checkout`, `admin-cancel-booking`, `admin-dispute-booking`, `admin-verifications`, `cancel-booking`, `create-account-link`, `create-connect-account`, `create-identity-session`, `create-payment-intent`, `lookup-postal-code`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`, `report-booking-problem`, `stripe-webhook`.
+
+**This week (agreed at the 18 October scrum):**
+- Production sync (Rui Heng): see Production sync, October 2026 below
+- Production end to end testing without real checkout, then mobile testing
+- Wednesday 21 October: warm host onboarding begins (HOST_ONBOARDING.md)
+- First real paid booking within a week of onboarding
+
+**Production is on Supabase Pro from 19 October** (DECISIONS.md). Staging is in its own free organisation. Run no SQL on production until the first daily backup shows under Database, Backups.
 
 ---
 
 ## Progress snapshot, 21 September 2026
 
-Week 8 of the original plan (15–21 September) is ending. The week-by-week sections below stay as the historical plan. Read this snapshot first.
+*History. Superseded by the 19 October snapshot.* Week 8 of the original plan (15–21 September) was ending.
 
 **In the tree now (not true of the 31 August snapshot):**
 - Schema is `00001`–`00012`. `00008` is `can_create_listing()` for listing and session INSERT. `00009` is booked/hosted session and listing reads, plus the drop of leftover booking INSERT/UPDATE policies. `00010` schedules `release-payout` hourly via pg_cron. `00011` is `reviews_for_listing` plus guest review INSERT (confirmed, session ended, one per booking per role). `00012` is `delete_empty_session` (soft-delete empty upcoming sessions) and `confirm_paid_booking` requiring `status = 'open'`. Not yet applied on staging.
@@ -353,6 +375,8 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 
 **Goal:** TryKai is live to warm contacts. Real friends booking real sessions with real payment.
 
+**Revised at the 18 October scrum:** production sync and production testing first; warm host onboarding from Wednesday 21 October; first real paid booking within a week of that.
+
 ### CALEB
 - [CRITICAL] Launch day, personal messages to warm contacts, not a group blast
 - [CRITICAL] Monitor the Supabase dashboard actively for the first 48 hours
@@ -381,6 +405,102 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 | A founder disengages over a longer runway | Low | High | Monthly check ins make this visible early. |
 | Yide day trading listing creates liability | Low | High | Frame as experience sharing only, explicit disclaimer, law student review. |
 | Off platform leakage | Low at this scale | Medium | Reviews only through TryKai, brief hosts during onboarding. |
+| SQL run on the wrong Supabase project | Happened 18 October | High | Both dashboards show "PRODUCTION". Check the ref in the URL every time. Staging first. See Environments and production SQL. |
+| Production data lost with no backup | Low | **Critical** | Production on Supabase Pro from 19 October (daily backups, kept 7 days). Check a backup from the last 24 hours exists before any production SQL. |
+| A new Edge Function goes live on production without its secret | Medium | Medium | Merging to `main` deploys every function. Set the secrets on production first. |
+
+---
+
+# Environments and production SQL
+
+| | Staging | Production |
+|---|---|---|
+| Supabase project | `trykai-staging` (Free plan, "TryKai Staging" org) | "Kai" (Pro, "TryKai" org, region Mumbai `ap-south-1`) |
+| Project ref | `hzgybclfvpuxkmytdoos` | `dqqlwofluvhikebtjune` |
+| Dashboard | https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos | https://supabase.com/dashboard/project/dqqlwofluvhikebtjune |
+| Site | trykai.vercel.app | trykai.sg |
+| Git branch | `staging` | `main` |
+| Edge Function deploy | Automatic on push to `staging` | Automatic on push to `main` (`PRODUCTION_SUPABASE_PROJECT_REF` GitHub secret, required) |
+| Migrations | By hand, SQL Editor | By hand, SQL Editor |
+
+**Both dashboards show the "PRODUCTION" label.** It is not a guide. The ref in the URL is. The runbooks below are written against staging; for production, swap in `dqqlwofluvhikebtjune`.
+
+Who does what: Caleb applies migrations and sets secrets. Claude and Cursor never hold a Supabase access token, and nobody pastes secrets into chat. `SUPABASE_ACCESS_TOKEN` lives only in GitHub Actions secrets.
+
+## Production SQL
+
+Every migration, and any other SQL that writes on production.
+
+1. **Apply on staging first.** Open the SQL Editor, confirm the URL contains `hzgybclfvpuxkmytdoos`, run the migration, test the flows it touches.
+2. **Check production has a recent backup.** Production dashboard, Database, Backups: the latest daily backup should be from the last 24 hours. If there is none (still on the Free plan, or the backup failed), stop and do not run the SQL.
+3. **Apply on production in the same sitting.** Confirm the URL contains `dqqlwofluvhikebtjune`, then run.
+4. **Record it.** Update the migration table below.
+
+A manual dump gives a restore point from the minute before a risky change, newer than the daily backup. It is optional and needs Docker Desktop and the production database password, so it is for whoever has those set up (Rui Heng): `npx supabase link --project-ref dqqlwofluvhikebtjune`, then `npx supabase db dump -f prod-schema.sql` and `npx supabase db dump --data-only -f prod-data.sql`, run outside the repo folder. Dumps hold users' personal data: never commit them (`.gitignore` blocks `prod-*.sql`) and never upload them to chat.
+
+## Migration state
+
+| Migrations | Staging | Production | Checked |
+|---|---|---|---|
+| `00022` to `00026` | Applied | Applied | 18 October (production was applied first, by mistake) |
+| `00027` to `00031` | Applied | Applied | 19 October, read-only check query |
+| `00032` (I'm keen) | Not yet | Not yet | Apply with PR "I'm keen". No new secrets: the two new functions use the existing `RESEND_API_KEY` and `SITE_URL` |
+| `00033` (shared availability) | Not yet | Not yet | Replaces `confirm_paid_booking`. Rui Heng reviews first. Apply right after the PR's code reaches that environment; no Edge Function changes |
+
+Earlier migrations are assumed applied on both, since these build on them.
+
+---
+
+# Production sync, October 2026
+
+Merging `staging` into `main` so production runs the current tree. Owner: Rui Heng. PR #129 (19 October) brought `main` up to `00031` and the dispute, complaint and chargeback functions. #130 to #132 are still on `staging` only.
+
+**Before the next merge into `main`:**
+- [ ] GitHub secrets `PRODUCTION_SUPABASE_PROJECT_REF` and `SUPABASE_ACCESS_TOKEN` valid (the deploy step fails without them)
+- [ ] `ONEMAP_EMAIL` and `ONEMAP_PASSWORD` set as production Edge Function secrets (`lookup-postal-code`, from #132)
+
+**After the merge:**
+- [ ] Live Stripe "Connected accounts" webhook destination for `account.updated`, and `STRIPE_CONNECT_WEBHOOK_SECRET` on production (see Connected accounts webhook below)
+- [ ] One real card booking on production, then refund it
+- [ ] Production cron `pg_net` timeout raised to about 30 seconds (the hourly `release-payout` call)
+- [ ] Production end to end test without real checkout, then on a phone
+
+---
+
+# Email confirmation at signup (Supabase Auth)
+
+New accounts confirm their email before they can sign in (DECISIONS.md, 20 October). Supabase sends one email with a 6-digit code and a link; the site asks for the code in the same tab. The code ships first; the dashboard switch is last, so nothing breaks in between: with confirmation off, signup still signs people straight in.
+
+Do every step on **staging** (`hzgybclfvpuxkmytdoos`, site trykai.vercel.app), test, then repeat on **production** (`dqqlwofluvhikebtjune`, site trykai.sg) once the code is on `main`. Owner: Caleb.
+
+1. **Send auth email through Resend.** Authentication, Emails, SMTP Settings, turn on custom SMTP:
+   - Sender email `no-reply@trykai.sg`, sender name `TryKai`
+   - Host `smtp.resend.com`, port `465`, username `resend`
+   - Password: a new Resend API key with sending access only, one per project ("Supabase Auth staging", "Supabase Auth production"). Paste it straight into Supabase; it never goes in chat or the repo.
+
+   This is what broke signup before (ENGINEERING.md section 7): Supabase's built-in mailer sends only a few emails an hour, and only to team members. Password reset emails go through Resend too once this is on.
+2. **Raise the email rate limit.** Authentication, Rate Limits, "Rate limit for sending emails": 100 per hour.
+3. **Paste the branded template.** Authentication, Emails, Templates, **Confirm signup**:
+   - Subject: `Your TryKai code: {{ .Token }}`
+   - Body: the whole of `supabase/templates/confirm-signup.html`, from the branch that environment runs.
+
+   The file is generated from `confirmSignupTemplateHtml` in `_shared/email.ts`. After changing that function, regenerate with `UPDATE_AUTH_TEMPLATES=1 npx vitest run auth-templates` and paste again on both projects.
+4. **Check the URLs.** Authentication, URL Configuration. Site URL is that environment's site. Redirect URLs include `https://trykai.sg/**` (production) or `https://trykai.vercel.app/**` (staging). The link returns the guest to the page they were heading for; an address not on the list falls back to the Site URL, and the email is still confirmed.
+5. **Check the code settings.** Authentication, Sign In / Providers, Email: Email OTP Length 6, Email OTP Expiration 3600 seconds (the email says "works for an hour").
+6. **Turn on Confirm email** on the same page. Existing accounts are already confirmed (signup stamped them while this was off); to check, `select count(*) from auth.users where email_confirmed_at is null;` should be 0. Anyone it counts will be asked for a code at their next login, which the site handles.
+7. **Test with a fresh Gmail address**, on a phone:
+   - [ ] The email arrives in the inbox (not spam) within a minute, branded, with the code in the subject
+   - [ ] Typing the code signs you in and returns you to where you were (start from a listing's I'm keen)
+   - [ ] The button in the email also confirms (try it in the mail app's browser)
+   - [ ] "Send a new code" works after the 60-second countdown, and only the newest code works
+   - [ ] Logging in before confirming asks for a code instead of failing
+   - [ ] Signing up again with the same address says to log in instead
+
+| Step | Staging | Production |
+|---|---|---|
+| 1 to 5 | Not yet | Not yet |
+| 6 Confirm email on | Not yet | Not yet |
+| 7 Tested | Not yet | Not yet |
 
 ---
 
@@ -829,7 +949,8 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 ## Auth and accounts
 - [ ] Signup, login, logout working
 - [ ] User row created on signup
-- [ ] Password reset working (not built; Login has no reset link)
+- [ ] Password reset working (built: Forgot password on Login and `/reset-password`; test once auth email goes through Resend)
+- [ ] Email confirmed before first sign-in (see Email confirmation at signup)
 - [ ] Phone OTP required before booking
 - [ ] `is_host` set true on first listing
 - [ ] Avatar or initial in navbar when logged in (`SiteNav` / `TopNav`; `Navbar.jsx` is deleted)

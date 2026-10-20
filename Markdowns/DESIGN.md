@@ -109,7 +109,7 @@ Fonts load from Google Fonts via `<link>` with `preconnect` in `index.html`, not
 
 - **Hero headline (decided):** *"Singapore's not boring. You just haven't found your thing yet."*
 - **Subhead (decided):** *"Solo, with friends, or on a date — something better than scrolling for the tenth time."*
-- **Trust line under the hero:** three chips: *ID-verified hosts* (hosts must pass verification before they can list), *Exact address after booking* (the address is revealed only to confirmed guests), *Most sessions S$15–30* (typical guest-facing band, not a filter or CHECK). Do not add a claim here unless the code enforces it, except this typical-price line.
+- **Trust line under the hero:** three chips: *ID-verified hosts* (hosts must pass verification before they can list), *Exact address after booking* (the address is revealed only to confirmed guests), *Most sessions under S$30* (typical guest-facing band, not a filter or CHECK). Do not add a claim here unless the code enforces it, except this typical-price line.
 - **No "Become a host" in the hero** (unchanged). Supply is recruited lower down: a quiet "Teach what you love" band at the end of Home and a footer link, both pointing at the host entry (`hostEntry()`), plus the post-session email nudge (still KIV).
 - "Skip the course. Just learn the basics." stays banked for Lane 2.
 
@@ -143,9 +143,9 @@ All in plain CSS in `src/index.css` (no Tailwind), previewable at `/style-guide`
 ## 9. Pages
 
 ### Home
-1. **Hero**, left-aligned on every width. Headline, subhead, the three-item trust line, and a "Browse sessions" button that jumps to the grid. From 1024px the mascot sits on the right in a cream-on-sand panel.
-2. **Category bar** directly above the grid, swipeable sideways, scrolls away with the page.
-3. **Filter row:** quick chips that are computed from real data ("This weekend", "Under $30") plus the region select. Chips only appear when at least one listing would match.
+1. **Hero**, left-aligned on every width. Eyebrow, headline, subhead and the three-item trust line. No button: on a phone the grid starts just below, and a "Browse sessions" jump added height without doing anything scrolling does not (removed 20 October; that slot is kept for a future "For you" feed). From 1024px the mascot sits on the right in a cream-on-sand panel.
+2. **Category bar** straight under the hero and directly above the grid, swipeable sideways, scrolls away with the page. No visible section heading (the "Coming up / Find something to try" pair was removed 21 October; the hero already says what the page is). The h2 stays for screen readers, and "3 of 12 listings" shows under the filters only while one is on.
+3. **Filter row:** quick chips that are computed from real data ("This weekend", "Under $30") plus the region select and a searchable area combobox (neighbourhood aliases resolve to a planning area). Chips only appear when at least one listing would match. Every `<select>` uses the shared chevron in `index.css` (`appearance: none`, SVG 16px from the right).
 4. **Grid** of browse cards, 2 / 3 / 4 columns at phone / 768px / 1024px. Sort is unchanged (soonest upcoming session day, then more sessions).
 5. **How TryKai works:** a deep-navy band with three numbered steps (pick, book a verified host, show up).
 6. **Teach what you love:** a quiet bordered band pointing to the host entry.
@@ -173,11 +173,11 @@ Same tokens and components: raised white cards with `--shadow-sm`, display title
 ### Hosting dashboard (built from the canvas "Hosting dashboard · phone" mockup, 18 October 2026)
 - Lives in the profile's Hosting tab (`/hosting` still redirects there). A "Hosting" title with a navy "New listing" button on top.
 - **Get ready for guests:** a checklist card with "N of 4" in mono and a progress bar: ID verified, first listing created (names it), payouts set up (Set up / Continue opens Stripe), first session added (Add opens the session form on the first listing with no dates). Done steps get a green check; open steps get one outlined action. The card disappears once all four are done.
-- **This month:** three stat tiles (Sessions, Guests booked, Earned) in mono, counted over the Singapore calendar month. Earned is what the host takes home from paid bookings.
+- **This month:** three stat tiles (Sessions, Guests booked, Earned) in mono, counted over the Singapore calendar month. Sessions counts every date still to come plus past dates that had guests (a past date nobody booked never ran and is left out), with a small note under it, "2 held · 5 to come", so the total ties to the dates the page lists. Earned is what the host takes home from paid bookings.
 - **Upcoming bookings:** booked sessions with Cancel session, shown only when there are any.
-- **Your listings:** a card per listing with thumbnail, a status badge ("Hidden: no sessions" in coral, or "Live" in green), title, "S$23 · 90 min · up to 4" in mono, and a ⋯ menu (View, Edit, Delete). The footer says "No dates yet" in coral-ink with a primary Add sessions, or the next date with a secondary Add sessions. A draft saved in the wizard on this device shows as a Draft card with "Step N of 5: <step>" and Continue, which reopens the wizard at that step with the draft restored; its menu discards it.
-- **Photo tips banner:** a navy card with a coral camera, "Better photos, more bookings", and a toggle that reveals the photo tips.
-- **Phones:** everything stacks in the mockup's order. **From 1024px:** the checklist on the left with This month and the photo tips in a 400px column beside it, then the listings full width, one card per row so the session list under each has room. Without the checklist, This month and the tips share the top row.
+- **Your listings:** a card per listing with thumbnail, a status badge ("Hidden: no sessions" in coral, or "Live" in green), title, "S$23 · 90 min · up to 4" in mono, and a ⋯ menu (View, Edit, Delete). Open dates are the rows under the card; booked dates live under Upcoming bookings. The footer counts both rather than naming a date that could sit in either place: "No dates yet" in coral-ink with a primary Add sessions, or "2 open dates · 1 booked" / "1 booked · no open dates" with a secondary Add sessions. A draft saved in the wizard on this device shows as a Draft card with "Step N of 5: <step>" and Continue, which reopens the wizard at that step with the draft restored; its menu discards it.
+- **No photo tips here:** they live beside the photo upload on create and edit listing.
+- **Phones:** everything stacks in the mockup's order. **From 1024px:** the checklist on the left with This month in a 400px column beside it, then the listings full width, one card per row so the session list under each has room. Without the checklist the page is one column and the stat tiles cap at 720px.
 
 ### Create listing (built from the canvas "New listing, step 3 · phone" mockup, 18 October 2026)
 - **Five steps:** *The basics* (title, category as six icon tiles, description), *Add photos* (tips panel, a dashed upload tile, square previews with Cover top-left and × top-right; drag to reorder; tap a tile for Crop / Make cover / Remove), *Price and group size*, *Where it happens* (area and full address), *Final touches* (what's provided including custom chips; None clears and disables the rest; a preview of the browse card, cancellation policy, Host terms, Create listing). Cover crop is locked to the 4:3 card (`--listing-cover-aspect`); other photos default to 4:3 with a Free option.
@@ -188,6 +188,7 @@ Same tokens and components: raised white cards with `--shadow-sm`, display title
 
 ### Edit listing
 Still one form, grouped into titled sections — *The basics*, *Price and time*, *Location*, *Photos*, *What's provided* — with the photo tip panel in the Photos section. Hosts editing want every field at once.
+- **Save errors** (edit and create): never show database wording. A price the database refuses puts the price hint back under the field with "Check the price above." by the button (create returns to the price step); anything else from the database reads "We couldn't save your listing. Check the details and try again."
 
 ---
 

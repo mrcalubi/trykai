@@ -1,5 +1,7 @@
 # TryKai: Host Onboarding
 
+*Rewritten 19 October 2026: listing copy template, listing checklist, founder at first session. Payout timing is 72 hours after the session ends (`PAYOUT_HOLD_MS`, DECISIONS.md 18 October).*
+
 Two parts. **Part A** is the internal process, for Caleb and Aakash. **Part B** is host facing and can be sent directly or adapted into the listing creation flow.
 
 ---
@@ -34,24 +36,54 @@ Cover four things:
 
 **2. Account and identity verification.** They sign up, then run the Stripe Identity check from `/verify-identity`: NRIC or passport, plus a live selfie taken on the spot. It usually clears in under a minute with no action from us, so do this while you are still on the call. If it fails, or if they would rather not do a face scan, use the "Having trouble? Upload your documents instead" link and approve them yourself at `/admin/verifications`. Target same day for founding hosts either way.
 
-**3. Stripe Connect onboarding.** *Expect friction.* This is a separate step from the identity check in step 2, and it will feel like repetition to them: Connect is about where the money lands, so Stripe collects bank details and its own identity information for payout compliance. For someone offering a S$20 session it is a second round of paperwork. Warn them it is coming, explain that it is how they get paid, and stay on the call while they do it.
+**3. Mark them as a founding host.** Set `is_founding_host` on their account so the price panel shows "Founding host: no host fee, ever."
 
-**4. Build the listing together.** Do not let them do this alone the first time. Walk through the guidelines in Part B, particularly pricing and photos.
+**4. Stripe Connect onboarding.** *Expect friction.* This is a separate step from the identity check in step 2, and it will feel like repetition to them: Connect is about where the money lands, so Stripe collects bank details and its own identity information for payout compliance. For someone offering a S$20 session it is a second round of paperwork. Warn them it is coming, explain that it is how they get paid, and stay on the call while they do it.
 
-**5. Review before it goes live.** Photos, description clarity, price sanity, correct category. Reject and give specific feedback rather than approving to be polite. A bad listing on a browse page of fifteen damages everything around it.
+**5. Build the listing together, using the listing copy template below.** Do not let them do this alone the first time. Walk through the guidelines in Part B, particularly pricing and photos.
 
-**6. Add their first session.** A host with no session dates is invisible. Do this in the same sitting.
+**6. Review before it goes live.** Run the listing checklist below. Reject and give specific feedback rather than approving to be polite. A bad listing on a browse page of fifteen damages everything around it.
 
-**7. Brief them on what happens next.** Someone may book. Accept all bookings. Message Caleb immediately if anything breaks. Feedback on what was confusing is wanted.
+**7. Add their sessions.** A host with no session dates is invisible. Use quick fill to add the next few weeks in the same sitting (dates up to 80 days ahead).
 
-## Quality bar
+**8. Brief them on what happens next.** Someone may book. Message Caleb immediately if anything breaks. Feedback on what was confusing is wanted. Give them their listing link and suggest they share it with their own followers.
+
+**9. A founder attends the first session.** Caleb or Aakash attends each new listing's first session. It catches problems before a stranger does and gives honest early feedback. Do not count a founder's review as demand.
+
+## Listing copy template
+
+Fill this in with the host, in their words. Each line should be specific enough that a stranger can picture the session.
+
+**Title:** what you'll do, plainly. *"Latte art for beginners"*, not *"The Art of Coffee"*.
+
+**Description:**
+
+> **What you'll do:** one or two sentences, concrete. *"We'll steam milk together and pour three latte art designs: a heart, a tulip and a rosetta."*
+>
+> **What you'll take home:** something real. *"You leave with your best cup, a printed cheat sheet, and the confidence to try it at home."*
+>
+> **Why you know this stuff:** a credential, not a bio. *"Barista for six years at a specialty café in Tiong Bahru."* Link their Instagram if they have one.
+>
+> **Where it happens:** the space, not the address. *"In my home kitchen, with a proper espresso machine. Small and relaxed."*
+>
+> **Good to know:** who it suits and anything unpredictable. *"Complete beginners welcome. Nothing to bring."*
+
+**Photos, in this order:** the finished thing (cover), hands in action, the space, the host. Three good ones beat five mediocre ones.
+
+**What's provided:** tick the standard items and add specifics with "+ Add your own" (e.g. *"Oat milk available"*, *"Take-home box"*).
+
+## Listing checklist (before it goes live)
 
 Reject and send back for:
-- Photos that are dark, blurry, cluttered, or clearly not of the actual session
-- Descriptions that do not say what the guest will actually do or leave with
+- Photos that are dark, blurry, cluttered, watermarked, stock, or clearly not of the actual session
+- No photo of the space
+- A description that does not say what the guest will do and take home
+- A vague credential line, or none
 - Prices well outside the S$10 to S$40 band without a reason
-- Wrong category
+- Wrong category or wrong area
 - Anything that reads as advice rather than experience sharing in a regulated area
+- **Alcohol served or sold from a home.** This needs a liquor licence. Hold the listing until the host confirms they hold one (see GoBusiness).
+- Food sessions that do not state allergens and halal status
 
 ## Ongoing
 
@@ -86,37 +118,40 @@ Your earnings depend far more on how full your session is than on your price:
 | 2 | S$34 | S$17 |
 | 1 | S$17 | S$8 |
 
-**This is why group bookings matter so much.** Consider setting a lower per person price for groups of three or four. Losing 10 per cent per head while doubling your group nearly doubles your hourly rate, and groups book more readily when the price drops as they add friends.
+**This is why group bookings matter so much.** You can turn on group discounts (5% off for two guests, up to 20% for five or more). The discount comes off your price, so a group pays you a little less per head, but groups book more readily and fill your session faster.
 
 ## Photos
 
 You do not need a professional. You need a phone, daylight, and five minutes.
 
-- **Natural light.** Near a window, during the day. Never use flash.
-- **Clear the background.** The most common problem is clutter, not camera quality.
-- **Show what the guest actually gets.** The finished latte, the ring, the drink. Not just your workspace.
-- **Show the real thing.** A photo that oversells produces a disappointed guest and a bad review.
-- Up to five photos. Three good ones beat five mediocre ones.
+- **Natural light is your best friend.** A window beats any flash.
+- **Lead with the good stuff:** the finished latte, the ring, the drink.
+- **Hands in action beat an empty room.**
+- **Include one photo of the space,** so guests know what to expect.
+- **Show the real thing.** A photo that oversells produces a disappointed guest and a bad review. No stock photos.
+- Up to five photos. Drag to reorder; the first is your cover.
 
 Listings with good photos get noticeably more bookings. This is the single highest return five minutes you will spend.
 
 ## Your description
 
-Answer three questions plainly:
+Answer these plainly, like you are texting a friend who asked what happens:
 
-1. **What will we actually do?** "We'll make three classic cocktails and you'll take the recipes home", not "learn the art of mixology".
-2. **What do I need to bring or know?** Especially if the answer is nothing.
-3. **What do I leave with?** A drink, a ring, a skill, a photo.
+1. **What will we actually do?** "We'll pour three latte art designs together", not "learn the art of coffee".
+2. **What do I take home?** A drink, a ring, a skill, a photo.
+3. **Why do you know this stuff?** "Barista for six years" beats "passionate about coffee".
+4. **Where does it happen?** The kind of space, not the address.
+5. **Who is it for, and what do I need to bring?** Especially if the answer is "complete beginners" and "nothing".
 
-Write like you are texting a friend who asked what happens. Say if it suits complete beginners, because most guests are.
+**Flag anything unpredictable**, for example if the session depends on outdoor conditions. Guests who know in advance do not complain later, and it protects you if you have to cancel.
 
-**Flag anything unpredictable in the description**, for example if the session depends on outdoor conditions. Guests who know in advance do not complain later, and it protects you if you have to cancel.
+**Food and drink sessions:** state allergens and whether the food is halal. If alcohol is served or sold, you need a liquor licence. Talk to us first.
 
 ## Location
 
-Guests see only your general area, for example Tiong Bahru, until they have a confirmed booking. Your full address is revealed only after someone has actually paid.
+Guests see only your general area, for example Tiong Bahru, until they have a confirmed booking. Your full address is revealed only after someone has actually paid. You enter it by postal code, so it is always a real, findable address.
 
-If you are hosting at home, think about whether you are comfortable with that. A public or bookable venue is fine, and often easier.
+If you are hosting at home, think about whether you are comfortable with that. A public or bookable venue is fine, and often easier. Follow your condo, landlord or venue rules, and keep noise and crowding considerate of neighbours.
 
 ## Cancellations, and what happens if things go wrong
 
@@ -130,7 +165,7 @@ If something goes wrong on the day, tell us as early as you can. Early is always
 
 ## Reviews
 
-Both sides review each other after a session. Your reviews are how the next guest decides whether to book you, and they exist only on TryKai. This is your reputation, and it is worth more than any individual booking.
+Guests review you after each session. Your reviews are how the next guest decides whether to book you, and they exist only on TryKai. This is your reputation, and it is worth more than any individual booking.
 
 ## Money
 

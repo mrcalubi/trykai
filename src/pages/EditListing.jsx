@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
+import PostalAddressFields from '../components/PostalAddressFields'
 import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
@@ -12,7 +13,11 @@ import WhatsProvidedFields from '../components/WhatsProvidedFields'
 import FieldHint from '../components/FieldHint'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import { groupDiscountExampleLine, hostPriceBreakdown, parsePriceInputCents } from '../lib/pricing'
-import { LISTING_FIELD_HINTS, PHOTO_UPLOAD_ERROR } from '../lib/listingFieldHints'
+import {
+  LISTING_FIELD_HINTS,
+  PHOTO_UPLOAD_ERROR,
+  listingSaveProblem,
+} from '../lib/listingFieldHints'
 import { providedForSave } from '../lib/whatsProvided'
 import { formatListingSpotsMessage } from '../lib/listingSpots'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
@@ -145,6 +150,12 @@ export default function EditListing() {
     return hints
   }
 
+  function showSaveProblem(saveError) {
+    const problem = listingSaveProblem(saveError)
+    if (problem.field) setFieldHints({ [problem.field]: problem.hint })
+    setError(problem.message)
+  }
+
   async function saveListing() {
     setError('')
     setPhotoError('')
@@ -161,17 +172,6 @@ export default function EditListing() {
       console.error('Listing photo upload failed', uploadError)
       setLoading(false)
       setPhotoError(PHOTO_UPLOAD_ERROR)
-      return
-    }
-
-    const { data: spotsData, error: spotsError } = await supabase.rpc('set_listing_spots', {
-      p_listing_id: id,
-      p_spots: guests,
-    })
-
-    if (spotsError) {
-      setLoading(false)
-      setError(spotsError.message)
       return
     }
 
@@ -203,10 +203,24 @@ export default function EditListing() {
         .eq('host_id', userId))
     }
 
+    if (updateError) {
+      setLoading(false)
+      showSaveProblem(updateError)
+      return
+    }
+
+    // After the update, not before: set_listing_spots writes this same row, and
+    // the database re-checks every constraint on it. Run first, it tripped over
+    // the old price (say one above the S$500 ceiling) the host was fixing here.
+    const { data: spotsData, error: spotsError } = await supabase.rpc('set_listing_spots', {
+      p_listing_id: id,
+      p_spots: guests,
+    })
+
     setLoading(false)
 
-    if (updateError) {
-      setError(updateError.message)
+    if (spotsError) {
+      showSaveProblem(spotsError)
       return
     }
 
@@ -360,22 +374,12 @@ export default function EditListing() {
           <h2 className="form-section__title">Location</h2>
           <label className="label">
             Area
-            <PlanningAreaSelect value={area} onChange={setArea} />
+            <PlanningAreaSelect value={area} onChange={setArea} hideUninhabited />
             <FieldHint>{fieldHints.area}</FieldHint>
           </label>
 
-          <label className="label">
-            Full address
-            <input
-              type="text"
-              value={fullAddress}
-              onChange={(e) => setFullAddress(e.target.value)}
-              placeholder="Only shown to guests after booking"
-              className="input"
-            />
-            <span className="hint">Hidden from browse — revealed after confirmed booking</span>
-            <FieldHint>{fieldHints.fullAddress}</FieldHint>
-          </label>
+          <PostalAddressFields value={fullAddress} onChange={setFullAddress} />
+          <FieldHint>{fieldHints.fullAddress}</FieldHint>
 
           <h2 className="form-section__title">Photos</h2>
           <PhotoTips />
