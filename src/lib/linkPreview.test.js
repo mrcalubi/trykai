@@ -10,7 +10,7 @@ import {
   listingPreviewMeta,
   previewTags,
 } from '../../api/_lib/linkPreview.js'
-import { formatGuestFacingPrice } from './pricing'
+import { formatGuestFacingPrice, guestFacingPriceCents } from './pricing'
 
 const ID = '0b6c2f1e-8d1a-4f43-9a7e-2c5d8e9f1a2b'
 const listing = {
@@ -22,12 +22,21 @@ const listing = {
 const indexHtml = readFileSync(resolve(import.meta.dirname, '../../index.html'), 'utf8')
 
 describe('cardPriceForOneGuestCents', () => {
-  it('matches formatGuestFacingPrice for every price a listing can have', () => {
-    // Every cent from S$0.01 to S$500 (the 00028 ceiling).
+  it('matches the app price in cents for every price a listing can have', () => {
+    // Every cent from S$0.01 to S$500 (the 00028 ceiling). Compares cents, not
+    // formatted strings: formatting 50,000 prices twice was too slow for CI.
     for (let cents = 1; cents <= 50000; cents += 1) {
-      const expected = formatGuestFacingPrice(cents)
-      const actual = `$${new Intl.NumberFormat('en-SG').format(cardPriceForOneGuestCents(cents) / 100)}`
-      if (actual !== expected) throw new Error(`${cents}: preview ${actual}, app ${expected}`)
+      const app = guestFacingPriceCents(cents)
+      const preview = cardPriceForOneGuestCents(cents)
+      if (preview !== app) throw new Error(`${cents}: preview ${preview}, app ${app}`)
+    }
+  })
+
+  it('formats the same as the app for typical and large prices', () => {
+    for (const cents of [100, 1000, 1550, 2500, 3999, 12345, 50000]) {
+      expect(listingPreviewDescription({ price_per_person: cents })).toBe(
+        `S${formatGuestFacingPrice(cents)} per person`,
+      )
     }
   })
 })
