@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Home from './Home'
 import { supabase } from '../lib/supabase'
 import { PAGE_LOAD_ERROR } from '../lib/pageLoad'
-import { BROWSE_CATEGORIES } from '../lib/listingCategories'
 import { renderWithRouter } from '../test/render'
 import { makeListing, makeSession } from '../test/fixtures'
 
@@ -35,6 +34,35 @@ const POTTERY = makeListing({
 
 function givenListings(listings) {
   supabase.__on('listings', 'select', { data: listings, error: null })
+}
+
+// The location filter only appears from 8 listings across 2+ regions. These
+// fillers sit in the West, so East and Central filters never show them.
+const WEST_FILLERS = Array.from({ length: 6 }, (_, i) =>
+  makeListing({
+    id: `w-${i}`,
+    title: `West filler ${i}`,
+    category: 'Other',
+    area: 'Jurong West',
+    price_per_person: 9000,
+    created_at: '2026-01-01T00:00:00Z',
+  })
+)
+
+function withFillers(listings) {
+  return [...listings, ...WEST_FILLERS]
+}
+
+async function openLocationAgain(user, name) {
+  await user.click(screen.getByRole('button', { name }))
+}
+
+async function openLocation(user) {
+  await user.click(screen.getByRole('button', { name: /Anywhere/ }))
+}
+
+function realTitles() {
+  return listingTitles().filter((title) => !title.startsWith('West filler'))
 }
 
 function listingTitles() {
@@ -266,10 +294,11 @@ describe('Home listing order', () => {
   })
 
   it('keeps that order inside a filtered grid', async () => {
-    givenListings(NEWEST_FIRST)
+    givenListings(withFillers(NEWEST_FIRST))
     const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
+    await openLocation(user)
     await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
 
     expect(listingTitles()).toEqual(['Pottery hour', 'Boxing basics', 'Knife skills'])
@@ -277,7 +306,7 @@ describe('Home listing order', () => {
 })
 
 describe('Home filters', () => {
-  it('offers All plus every host-choosable category', async () => {
+  it('offers All plus only the categories that have listings', async () => {
     givenListings([LATTE, BOXING, POTTERY])
     renderWithRouter(<Home />)
     await screen.findByText('Latte art')
@@ -285,7 +314,7 @@ describe('Home filters', () => {
     const pills = within(document.querySelector('.filter-pills'))
       .getAllByRole('button')
       .map((button) => button.textContent)
-    expect(pills).toEqual([...BROWSE_CATEGORIES])
+    expect(pills).toEqual(['All', 'Food', 'Fitness', 'Arts'])
   })
 
   it('narrows the grid to the chosen category', async () => {
@@ -308,42 +337,47 @@ describe('Home filters', () => {
   })
 
   it('narrows the grid to the chosen region', async () => {
-    givenListings([LATTE, BOXING, POTTERY])
+    givenListings(withFillers([LATTE, BOXING, POTTERY]))
     const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
+    await openLocation(user)
     await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
 
     expect(listingTitles()).toEqual(['Boxing basics', 'Pottery hour'])
+    expect(screen.getByRole('button', { name: /East/ })).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('keeps a neighbourhood that is not a planning area off every region filter', async () => {
-    givenListings([LATTE, BOXING])
+    givenListings(withFillers([LATTE, BOXING]))
     const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
+    await openLocation(user)
     await user.selectOptions(screen.getByLabelText('Filter by region'), 'Central')
 
     expect(screen.getByText('No listings match your filters.')).toBeInTheDocument()
   })
 
   it('combines the category and region filters', async () => {
-    givenListings([LATTE, BOXING, POTTERY])
+    givenListings(withFillers([LATTE, BOXING, POTTERY]))
     const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
     await user.click(screen.getByRole('button', { name: 'Arts' }))
+    await openLocation(user)
     await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
 
     expect(listingTitles()).toEqual(['Pottery hour'])
   })
 
   it('explains when a filter combination matches nothing', async () => {
-    givenListings([LATTE, BOXING])
+    givenListings(withFillers([LATTE, BOXING]))
     const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
     await user.click(screen.getByRole('button', { name: 'Food' }))
+    await openLocation(user)
     await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
 
     expect(screen.getByText('No listings match your filters.')).toBeInTheDocument()
@@ -361,22 +395,27 @@ describe('Home filters', () => {
   })
 
   it('resolves a neighbourhood alias to the planning area', async () => {
-    givenListings([LATTE, BOXING, POTTERY])
+    givenListings(withFillers([LATTE, BOXING, POTTERY]))
     const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
+    await openLocation(user)
     await user.click(screen.getByLabelText('Filter by area'))
     await user.type(screen.getByLabelText('Filter by area'), 'Kembangan')
     await user.click(screen.getByRole('option', { name: 'Bedok (Kembangan)' }))
 
     expect(listingTitles()).toEqual(['Boxing basics', 'Pottery hour'])
+    // Picking an area closes the panel and names it on the chip.
+    expect(screen.getByRole('button', { name: /Bedok/ })).toHaveAttribute('aria-expanded', 'false')
+    await openLocationAgain(user, /Bedok/)
     expect(screen.getByLabelText('Filter by area')).toHaveValue('Bedok')
   })
 
   it('always offers All plus the five regions', async () => {
-    givenListings([LATTE, BOXING, POTTERY])
-    renderWithRouter(<Home />)
+    givenListings(withFillers([LATTE, BOXING, POTTERY]))
+    const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
+    await openLocation(user)
 
     const options = within(screen.getByLabelText('Filter by region'))
       .getAllByRole('option')
@@ -384,16 +423,48 @@ describe('Home filters', () => {
     expect(options).toEqual(['All regions', 'Central', 'North', 'North-East', 'East', 'West'])
   })
 
-  it('still shows every host category when only Food is listed', async () => {
+  it('hides categories nobody lists yet, but keeps one a link asked for', async () => {
     givenListings([LATTE, makeListing({ id: 'l-9', title: 'Uncategorised', category: null })])
-    renderWithRouter(<Home />)
-    await screen.findByText('Latte art')
+    renderWithRouter(<Home />, { route: '/?category=Music' })
+    await screen.findByText('No listings match your filters.')
 
     const pills = within(document.querySelector('.filter-pills'))
       .getAllByRole('button')
       .map((button) => button.textContent)
-    expect(pills).toEqual([...BROWSE_CATEGORIES])
-    expect(pills).toContain('Music')
+    expect(pills).toEqual(['All', 'Food', 'Music'])
+    expect(screen.getByRole('button', { name: 'Music' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('shows the location filter only from 8 listings across 2 regions', async () => {
+    givenListings([LATTE, BOXING, POTTERY])
+    renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+    expect(screen.queryByRole('button', { name: /Anywhere/ })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Filter by region')).not.toBeInTheDocument()
+  })
+
+  it('opens and closes the location panel, and Anywhere clears it', async () => {
+    givenListings(withFillers([LATTE, BOXING, POTTERY]))
+    const { user } = renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    expect(screen.queryByLabelText('Filter by region')).not.toBeInTheDocument()
+    await openLocation(user)
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
+    expect(realTitles()).toEqual(['Boxing basics', 'Pottery hour'])
+    await user.click(screen.getByRole('button', { name: 'Anywhere' }))
+    expect(screen.queryByLabelText('Filter by region')).not.toBeInTheDocument()
+    expect(realTitles()).toEqual(['Latte art', 'Boxing basics', 'Pottery hour'])
+  })
+
+  it('shows the listing count only while a filter is on', async () => {
+    givenListings([LATTE, BOXING])
+    const { user } = renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+    expect(screen.queryByText('2 of 2 listings')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Food' }))
+    expect(screen.getByText('1 of 2 listings')).toBeInTheDocument()
   })
 })
 
@@ -404,7 +475,7 @@ describe('Home hero', () => {
     await screen.findByText('Latte art')
 
     const chips = document.querySelector('.trust-list')
-    expect(within(chips).getByText('Most sessions S$15–30')).toBeInTheDocument()
+    expect(within(chips).getByText('Most sessions under S$30')).toBeInTheDocument()
     expect(within(chips).queryByText('Pay by PayNow or Card')).not.toBeInTheDocument()
   })
 
@@ -453,6 +524,16 @@ describe('Home quick filters', () => {
     expect(screen.getByRole('button', { name: 'Under $30' })).toHaveAttribute('aria-pressed', 'true')
   })
 
+  it('hides a quick filter that every listing would match', async () => {
+    const CHEAP = makeListing({ id: 'l-5', title: 'Cheap chess', category: 'Other', price_per_person: 2000 })
+    const CHEAPER = makeListing({ id: 'l-6', title: 'Cheap cards', category: 'Other', price_per_person: 1500 })
+    givenListings([CHEAP, CHEAPER])
+    renderWithRouter(<Home />)
+    await screen.findByText('Cheap chess')
+
+    expect(screen.queryByRole('button', { name: 'Under $30' })).not.toBeInTheDocument()
+  })
+
   it('hides a quick filter nothing would match', async () => {
     givenListings([LATTE, BOXING])
     renderWithRouter(<Home />)
@@ -463,14 +544,32 @@ describe('Home quick filters', () => {
   })
 
   it('clears every filter from the empty state', async () => {
-    givenListings([LATTE, BOXING])
+    givenListings(withFillers([LATTE, BOXING]))
     const { user } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
     await user.click(screen.getByRole('button', { name: 'Food' }))
+    await openLocation(user)
     await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
     await user.click(screen.getByRole('button', { name: 'Clear filters' }))
 
-    expect(listingTitles()).toEqual(['Latte art', 'Boxing basics'])
+    expect(realTitles()).toEqual(['Latte art', 'Boxing basics'])
+  })
+})
+
+describe('Home New label', () => {
+  it('stays off while most listings are new, and shows once they are not', async () => {
+    const fresh = new Date().toISOString()
+    const FRESH = makeListing({ id: 'n-1', title: 'Fresh one', created_at: fresh })
+    givenListings([FRESH, makeListing({ id: 'n-2', title: 'Fresh two', created_at: fresh })])
+    const { unmount } = renderWithRouter(<Home />)
+    await screen.findByText('Fresh one')
+    expect(screen.queryByText('New')).not.toBeInTheDocument()
+    unmount()
+
+    givenListings([FRESH, ...WEST_FILLERS.slice(0, 2)])
+    renderWithRouter(<Home />)
+    await screen.findByText('Fresh one')
+    expect(screen.getAllByText('New')).toHaveLength(1)
   })
 })

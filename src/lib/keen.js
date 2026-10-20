@@ -32,10 +32,10 @@ export const NO_DATES_LABEL = 'No dates yet'
  * there (it wins over "New"), so the date slot can stay a short "No dates yet"
  * and the area is never squeezed on a phone.
  */
-export function browseFlag(listing, keenCount, now = new Date()) {
+export function browseFlag(listing, keenCount, now = new Date(), showNew = true) {
   const badge = nextSessionLabel(listing, now) ? '' : keenBadge(keenCount)
   if (badge) return badge
-  return isRecentlyListed(listing, now) ? 'New' : undefined
+  return showNew && isRecentlyListed(listing, now) ? 'New' : undefined
 }
 
 /** listing_keen_counts rows → { [listingId]: count }. */

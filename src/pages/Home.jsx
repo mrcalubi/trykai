@@ -8,7 +8,7 @@ import { ratingsByListingId } from '../lib/listingRatings'
 import { browseFlag, keenCountsById, NO_DATES_LABEL } from '../lib/keen'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { sortListingsForBrowse } from '../lib/listingSort'
-import { BROWSE_CATEGORIES } from '../lib/listingCategories'
+import { filterNarrows, locationLabel, showLocationFilter, showNewFlags, visibleCategories } from '../lib/browseUi'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
 import { REGIONS, regionForPlanningArea } from '../lib/planningAreas'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
@@ -30,8 +30,8 @@ const QUICK_FILTERS = [
 
 const TRUST_POINTS = [
   { icon: 'shield', label: 'ID-verified hosts' },
+  { icon: 'wallet', label: 'Most sessions under S$30' },
   { icon: 'pin', label: 'Exact address after booking' },
-  { icon: 'wallet', label: 'Most sessions S$15–30' },
 ]
 
 const STEPS = [
@@ -69,11 +69,11 @@ function SkeletonGrid() {
   )
 }
 
-function EmptyPanel({ title, children }) {
+function EmptyPanel({ title, icon = 'search', children }) {
   return (
     <div className="empty-panel">
       <span className="empty-panel__icon">
-        <Icon name="sparkle" size={24} />
+        <Icon name={icon} size={24} />
       </span>
       <p className="empty-panel__title">{title}</p>
       {children}
@@ -92,6 +92,7 @@ export default function Home() {
   const [regionFilter, setRegionFilter] = useState('All')
   const [areaFilter, setAreaFilter] = useState('')
   const [quickFilter, setQuickFilter] = useState(null)
+  const [locationOpen, setLocationOpen] = useState(false)
 
   useEffect(() => {
     async function fetchListings() {
@@ -157,15 +158,23 @@ export default function Home() {
     fetchListings()
   }, [])
 
-  const activeCategory =
-    categoryFilter === 'All' || BROWSE_CATEGORIES.includes(categoryFilter)
-      ? categoryFilter
-      : 'All'
-
-  const availableQuickFilters = useMemo(
-    () => QUICK_FILTERS.filter((filter) => listings.some(filter.matches)),
-    [listings]
+  const categories = useMemo(
+    () => visibleCategories(listings, categoryFilter),
+    [listings, categoryFilter]
   )
+  const activeCategory = categories.includes(categoryFilter) ? categoryFilter : 'All'
+
+  // A quick filter shows only when it would narrow the grid, or while it is on.
+  const availableQuickFilters = useMemo(
+    () =>
+      QUICK_FILTERS.filter(
+        (filter) => filter.id === quickFilter || filterNarrows(listings, filter.matches)
+      ),
+    [listings, quickFilter]
+  )
+  const locationActive = regionFilter !== 'All' || Boolean(areaFilter)
+  const showLocation = locationActive || showLocationFilter(listings)
+  const showNew = useMemo(() => showNewFlags(listings), [listings])
   const activeQuick = availableQuickFilters.find((filter) => filter.id === quickFilter) ?? null
 
   const filteredListings = useMemo(() => {
@@ -190,10 +199,18 @@ export default function Home() {
 
   function clearFilters() {
     chooseCategory('All')
-    setRegionFilter('All')
-    setAreaFilter('')
+    clearLocation()
     setQuickFilter(null)
   }
+
+  function clearLocation() {
+    setRegionFilter('All')
+    setAreaFilter('')
+    setLocationOpen(false)
+  }
+
+  const isFiltering =
+    activeCategory !== 'All' || Boolean(activeQuick) || locationActive
 
   return (
     <div className="page page--browse">
@@ -205,7 +222,7 @@ export default function Home() {
             <span className="home-hero__mark">your thing</span> yet.
           </h1>
           <p className="home-hero__subtitle">
-            Solo, with friends, or on a date — your next hobby awaits.
+            Solo, with friends, or on a date. Your next hobby awaits.
           </p>
           <div className="home-hero__actions">
             <a href="#listings" className="ui-button ui-button--primary ui-button--lg">
@@ -239,7 +256,7 @@ export default function Home() {
               Find something to try
             </h2>
           </div>
-          {!loading && !error && listings.length > 0 ? (
+          {!loading && !error && listings.length > 0 && isFiltering ? (
             <p className="section-head__count">
               {filteredListings.length} of {listings.length} listing{listings.length === 1 ? '' : 's'}
             </p>
@@ -257,7 +274,7 @@ export default function Home() {
         {error && <p className="status-banner--error">{error}</p>}
 
         {!loading && !error && listings.length === 0 && (
-          <EmptyPanel title="No listings yet. Check back soon.">
+          <EmptyPanel title="No listings yet. Check back soon." icon="calendar">
             <p className="empty-panel__body">
               New hosts are joining every week. Know someone with a skill worth sharing?
             </p>
@@ -268,7 +285,7 @@ export default function Home() {
           <>
             <div className="filters">
               <div className="category-bar filter-pills" role="group" aria-label="Categories">
-                {BROWSE_CATEGORIES.map((category) => (
+                {categories.map((category) => (
                   <button
                     key={category}
                     type="button"
@@ -281,30 +298,46 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-              <div className="filters__row">
-                {availableQuickFilters.length > 0 ? (
-                  <div className="quick-filters" role="group" aria-label="Quick filters">
-                    {availableQuickFilters.map((filter) => (
-                      <button
-                        key={filter.id}
-                        type="button"
-                        className={`chip${activeQuick?.id === filter.id ? ' chip--active' : ''}`}
-                        aria-pressed={activeQuick?.id === filter.id}
-                        onClick={() =>
-                          setQuickFilter((current) => (current === filter.id ? null : filter.id))
-                        }
-                      >
-                        {filter.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                <div className="browse-filters">
+              {availableQuickFilters.length > 0 || showLocation ? (
+                <div className="filter-strip" role="group" aria-label="Filters">
+                  {availableQuickFilters.map((filter) => (
+                    <button
+                      key={filter.id}
+                      type="button"
+                      className={`chip${activeQuick?.id === filter.id ? ' chip--active' : ''}`}
+                      aria-pressed={activeQuick?.id === filter.id}
+                      onClick={() =>
+                        setQuickFilter((current) => (current === filter.id ? null : filter.id))
+                      }
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                  {showLocation ? (
+                    <button
+                      type="button"
+                      className={`chip${locationActive ? ' chip--active' : ''}`}
+                      aria-expanded={locationOpen}
+                      aria-controls="location-panel"
+                      onClick={() => setLocationOpen((open) => !open)}
+                    >
+                      <Icon name="pin" size={16} />
+                      {locationLabel(regionFilter, areaFilter)}
+                      <Icon name="chevronDown" size={14} />
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {showLocation && locationOpen ? (
+                <div id="location-panel" className="location-panel">
                   <div className="region-select">
                     <Icon name="pin" size={16} />
                     <select
                       value={regionFilter}
-                      onChange={(e) => setRegionFilter(e.target.value)}
+                      onChange={(e) => {
+                        setRegionFilter(e.target.value)
+                        setAreaFilter('')
+                      }}
                       className="filter-area"
                       aria-label="Filter by region"
                     >
@@ -321,12 +354,20 @@ export default function Home() {
                     <PlanningAreaSelect
                       allowEmpty
                       value={areaFilter}
-                      onChange={setAreaFilter}
+                      onChange={(value) => {
+                        setAreaFilter(value)
+                        if (value) setLocationOpen(false)
+                      }}
                       placeholder="All areas"
                     />
                   </label>
+                  {locationActive ? (
+                    <button type="button" className="location-panel__clear" onClick={clearLocation}>
+                      Anywhere
+                    </button>
+                  ) : null}
                 </div>
-              </div>
+              ) : null}
             </div>
 
             {filteredListings.length === 0 ? (
@@ -351,7 +392,7 @@ export default function Home() {
                     price={`${formatGuestFacingPrice(listing.price_per_person)}/person`}
                     rating={ratings[listing.id]?.rating}
                     reviewCount={ratings[listing.id]?.reviewCount}
-                    flag={browseFlag(listing, keenCounts[listing.id])}
+                    flag={browseFlag(listing, keenCounts[listing.id], undefined, showNew)}
                   />
                 ))}
               </div>

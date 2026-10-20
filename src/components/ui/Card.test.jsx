@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import Card from './Card'
@@ -57,6 +57,28 @@ describe('Card', () => {
     render(<Card title="Latte art" badge="Food" />)
 
     expect(screen.getByText('Food')).toBeInTheDocument()
+  })
+
+  it('shows the category as an icon on a browse photo, still named for screen readers', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Card mode="browse" to="/listings/l" title="Latte art" badge="Food" image="https://x/p.jpg" />
+      </MemoryRouter>
+    )
+    const badge = container.querySelector('.ui-card__badge--icon')
+    expect(badge).toHaveAttribute('title', 'Food')
+    expect(badge.querySelector('svg')).toBeInTheDocument()
+    expect(within(badge).getByText('Food')).toHaveClass('visually-hidden')
+  })
+
+  it('leaves the icon to the placeholder when a browse card has no photo', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Card mode="browse" to="/listings/l" title="Latte art" badge="Food" />
+      </MemoryRouter>
+    )
+    expect(container.querySelector('.ui-card__badge')).toBeNull()
+    expect(screen.getByText('Food')).toHaveClass('visually-hidden')
   })
 
   it('shows a rating only when a real rating value is passed', () => {
