@@ -472,9 +472,7 @@ a {
   display: inline-flex;
   align-items: center;
   min-height: 40px;
-  /* 3px on top only: centring counts the "g" descender, so without it the
-     letters sit about 1.5px high in the pill. */
-  padding: 3px 16px 0;
+  padding: 0 16px;
   font-family: var(--sans);
   font-size: 14px;
   font-weight: 700;
