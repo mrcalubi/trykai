@@ -168,6 +168,8 @@ export function createSupabaseMock() {
     signInWithPassword: async () => ({ data: { user: null, session: null }, error: null }),
     signUp: async () => ({ data: { user: null, session: null }, error: null }),
     resetPasswordForEmail: async () => ({ data: {}, error: null }),
+    verifyOtp: async () => ({ data: { user: null, session: null }, error: null }),
+    resend: async () => ({ data: {}, error: null }),
     updateUser: async () => ({ data: { user: null }, error: null }),
     signOut: async () => ({ error: null }),
     onAuthStateChange: (callback) => {

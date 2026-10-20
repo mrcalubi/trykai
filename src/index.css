@@ -2623,6 +2623,14 @@ input[type='password']::-webkit-password-reveal-button {
   text-decoration: underline;
 }
 
+/* A countdown ("Send a new code in 42s") reads as text, not a dead link. */
+.link-btn:disabled {
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  cursor: default;
+}
+
 /* Messages */
 .status-message {
   text-align: center;

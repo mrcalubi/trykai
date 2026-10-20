@@ -1,7 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Input from '../components/ui/Input'
+import {
+  RESEND_COOLDOWN_SECONDS,
+  codeErrorMessage,
+  isCodeComplete,
+  isEmailNotConfirmed,
+  isExistingAccount,
+  normalizeCode,
+  resendErrorMessage,
+  resendLabel,
+  verifySignupCode,
+} from '../lib/emailConfirm'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -17,6 +28,38 @@ export default function Login() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  // Set once a confirmation code has been emailed; the page then asks for it.
+  const [pendingEmail, setPendingEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [resendIn, setResendIn] = useState(0)
+
+  useEffect(() => {
+    if (resendIn <= 0) return undefined
+    const timer = setTimeout(() => setResendIn((s) => s - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [resendIn])
+
+  // Confirming through the link in another tab of this browser signs this tab in too.
+  useEffect(() => {
+    if (!pendingEmail) return undefined
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) navigate(redirectTo, { replace: true })
+    })
+    return () => subscription.unsubscribe()
+  }, [pendingEmail, navigate, redirectTo])
+
+  function askForCode(address, note = '') {
+    setPendingEmail(address)
+    setCode('')
+    setError('')
+    setMessage(note)
+    setPassword('')
+    setResendIn(RESEND_COOLDOWN_SECONDS)
+    // The signup form is taller than this step; start the code step at the top.
+    window.scrollTo(0, 0)
+  }
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -29,6 +72,22 @@ export default function Login() {
       password,
     })
 
+    if (isEmailNotConfirmed(authError)) {
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: confirmRedirectUrl() },
+      })
+      setLoading(false)
+      askForCode(
+        email,
+        resendError
+          ? 'Confirm your email first. Use the code in the email we sent you.'
+          : "Confirm your email first. We've sent you a new code."
+      )
+      return
+    }
+
     setLoading(false)
 
     if (authError) {
@@ -37,6 +96,10 @@ export default function Login() {
     }
 
     navigate(redirectTo, { replace: true })
+  }
+
+  function confirmRedirectUrl() {
+    return `${window.location.origin}${redirectTo}`
   }
 
   async function handleSignup(e) {
@@ -70,6 +133,7 @@ export default function Login() {
       password,
       options: {
         data: { full_name: name, display_name: handle, terms_accepted: true },
+        emailRedirectTo: confirmRedirectUrl(),
       },
     })
 
@@ -87,11 +151,66 @@ export default function Login() {
 
     if (data.session) {
       navigate(redirectTo, { replace: true })
-    } else {
-      setMessage('Check your email to confirm your account, then log in.')
+      return
+    }
+
+    if (isExistingAccount(data)) {
       setIsSignup(false)
       setPassword('')
+      setAcceptedTerms(false)
+      setError('There is already an account with this email. Log in instead.')
+      return
     }
+
+    askForCode(email)
+  }
+
+  async function handleConfirm(e) {
+    e.preventDefault()
+    setError('')
+    setMessage('')
+    if (!isCodeComplete(code)) {
+      setError('Enter the 6-digit code from the email.')
+      return
+    }
+
+    setLoading(true)
+    const { data, error: verifyError } = await verifySignupCode(supabase.auth, pendingEmail, code)
+    setLoading(false)
+
+    if (verifyError || !data?.session) {
+      setError(codeErrorMessage(verifyError))
+      return
+    }
+
+    navigate(redirectTo, { replace: true })
+  }
+
+  async function handleResend() {
+    if (resendIn > 0) return
+    setError('')
+    setMessage('')
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
+      email: pendingEmail,
+      options: { emailRedirectTo: confirmRedirectUrl() },
+    })
+    if (resendError) {
+      setError(resendErrorMessage(resendError))
+      return
+    }
+    setCode('')
+    setResendIn(RESEND_COOLDOWN_SECONDS)
+    setMessage('New code sent. Use the latest email.')
+  }
+
+  function startAgain() {
+    setPendingEmail('')
+    setCode('')
+    setError('')
+    setMessage('')
+    setResendIn(0)
+    setIsSignup(true)
   }
 
   function handleSubmit(e) {
@@ -107,6 +226,60 @@ export default function Login() {
     setAcceptedTerms(false)
     setError('')
     setMessage('')
+  }
+
+  if (pendingEmail) {
+    return (
+      <div className="page page--form">
+        <div className="form-card">
+          <h1 className="form-card__title">Check your email</h1>
+          <p className="form-card__subtitle">
+            We sent a code to <strong>{pendingEmail}</strong>. Enter it here, or tap the
+            button in the email.
+          </p>
+
+          <form onSubmit={handleConfirm} className="form">
+            <Input
+              id="login-code"
+              label="Code"
+              type="text"
+              floatingLabel
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(e) => setCode(normalizeCode(e.target.value))}
+              placeholder="123456"
+              required
+              hint="Not there? Check spam or promotions."
+            />
+
+            {error && <p className="error-message">{error}</p>}
+            {message && <p className="success-message">{message}</p>}
+
+            <button type="submit" disabled={loading} className="btn btn--primary">
+              {loading ? 'Please wait…' : 'Confirm email'}
+            </button>
+          </form>
+
+          <p className="form-card__footer">
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resendIn > 0}
+              className="link-btn"
+            >
+              {resendLabel(resendIn)}
+            </button>
+          </p>
+          <p className="form-card__footer">
+            Wrong email?{' '}
+            <button type="button" onClick={startAgain} className="link-btn">
+              Start again
+            </button>
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (

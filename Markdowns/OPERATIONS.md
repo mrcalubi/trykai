@@ -467,6 +467,43 @@ Merging `staging` into `main` so production runs the current tree. Owner: Rui He
 
 ---
 
+# Email confirmation at signup (Supabase Auth)
+
+New accounts confirm their email before they can sign in (DECISIONS.md, 20 October). Supabase sends one email with a 6-digit code and a link; the site asks for the code in the same tab. The code ships first; the dashboard switch is last, so nothing breaks in between: with confirmation off, signup still signs people straight in.
+
+Do every step on **staging** (`hzgybclfvpuxkmytdoos`, site trykai.vercel.app), test, then repeat on **production** (`dqqlwofluvhikebtjune`, site trykai.sg) once the code is on `main`. Owner: Caleb.
+
+1. **Send auth email through Resend.** Authentication, Emails, SMTP Settings, turn on custom SMTP:
+   - Sender email `no-reply@trykai.sg`, sender name `TryKai`
+   - Host `smtp.resend.com`, port `465`, username `resend`
+   - Password: a new Resend API key with sending access only, one per project ("Supabase Auth staging", "Supabase Auth production"). Paste it straight into Supabase; it never goes in chat or the repo.
+
+   This is what broke signup before (ENGINEERING.md section 7): Supabase's built-in mailer sends only a few emails an hour, and only to team members. Password reset emails go through Resend too once this is on.
+2. **Raise the email rate limit.** Authentication, Rate Limits, "Rate limit for sending emails": 100 per hour.
+3. **Paste the branded template.** Authentication, Emails, Templates, **Confirm signup**:
+   - Subject: `Your TryKai code: {{ .Token }}`
+   - Body: the whole of `supabase/templates/confirm-signup.html`, from the branch that environment runs.
+
+   The file is generated from `confirmSignupTemplateHtml` in `_shared/email.ts`. After changing that function, regenerate with `UPDATE_AUTH_TEMPLATES=1 npx vitest run auth-templates` and paste again on both projects.
+4. **Check the URLs.** Authentication, URL Configuration. Site URL is that environment's site. Redirect URLs include `https://trykai.sg/**` (production) or `https://trykai.vercel.app/**` (staging). The link returns the guest to the page they were heading for; an address not on the list falls back to the Site URL, and the email is still confirmed.
+5. **Check the code settings.** Authentication, Sign In / Providers, Email: Email OTP Length 6, Email OTP Expiration 3600 seconds (the email says "works for an hour").
+6. **Turn on Confirm email** on the same page. Existing accounts are already confirmed (signup stamped them while this was off); to check, `select count(*) from auth.users where email_confirmed_at is null;` should be 0. Anyone it counts will be asked for a code at their next login, which the site handles.
+7. **Test with a fresh Gmail address**, on a phone:
+   - [ ] The email arrives in the inbox (not spam) within a minute, branded, with the code in the subject
+   - [ ] Typing the code signs you in and returns you to where you were (start from a listing's I'm keen)
+   - [ ] The button in the email also confirms (try it in the mail app's browser)
+   - [ ] "Send a new code" works after the 60-second countdown, and only the newest code works
+   - [ ] Logging in before confirming asks for a code instead of failing
+   - [ ] Signing up again with the same address says to log in instead
+
+| Step | Staging | Production |
+|---|---|---|
+| 1 to 5 | Not yet | Not yet |
+| 6 Confirm email on | Not yet | Not yet |
+| 7 Tested | Not yet | Not yet |
+
+---
+
 # Platform webhook (`stripe-webhook`)
 
 The platform destination (signing secret `STRIPE_WEBHOOK_SECRET`) carries every event on the TryKai account. `stripe-webhook` answers 200 to anything it does not handle, so a missing event is silent: check this list whenever the function learns a new event.
@@ -912,7 +949,8 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 ## Auth and accounts
 - [ ] Signup, login, logout working
 - [ ] User row created on signup
-- [ ] Password reset working (not built; Login has no reset link)
+- [ ] Password reset working (built: Forgot password on Login and `/reset-password`; test once auth email goes through Resend)
+- [ ] Email confirmed before first sign-in (see Email confirmation at signup)
 - [ ] Phone OTP required before booking
 - [ ] `is_host` set true on first listing
 - [ ] Avatar or initial in navbar when logged in (`SiteNav` / `TopNav`; `Navbar.jsx` is deleted)
