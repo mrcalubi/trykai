@@ -23,6 +23,7 @@ function toggleInList(list, value) {
 export default function AddSessionsForm({
   listing,
   existingSessions,
+  otherListings = [],
   onCancel,
   onCreated,
 }) {
@@ -41,6 +42,7 @@ export default function AddSessionsForm({
   const [error, setError] = useState('')
   const [preview, setPreview] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [alsoListingIds, setAlsoListingIds] = useState([])
 
   const monthIndex = monthKeys.indexOf(monthKey)
   const duration = usesListingDuration ? listing.duration_mins : parseInt(durationMins, 10)
@@ -114,6 +116,7 @@ export default function AddSessionsForm({
       times: filledTimes,
       durationMins: duration,
       existingSessions,
+      listingId: listing.id,
     })
 
     if (!next.ok) {
@@ -145,6 +148,7 @@ export default function AddSessionsForm({
       spots,
       duration,
       usesListingDuration,
+      alsoListingIds,
     })
     setSaving(false)
     if (result?.error) {
@@ -287,6 +291,31 @@ export default function AddSessionsForm({
         <Link to={`/edit-listing/${listing.id}`}>change in listing settings</Link>
       </p>
 
+      {otherListings.length > 0 ? (
+        <fieldset className="add-sessions__also">
+          <legend className="add-sessions__legend">Also offer these times on</legend>
+          <p className="hint">
+            The first booking takes the time. Your other listings at that time close automatically,
+            and reopen if that booking is cancelled.
+          </p>
+          {otherListings.map((other) => (
+            <label key={other.id} className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={alsoListingIds.includes(other.id)}
+                onChange={() => {
+                  setAlsoListingIds((ids) =>
+                    ids.includes(other.id) ? ids.filter((id) => id !== other.id) : [...ids, other.id]
+                  )
+                  setPreview(null)
+                }}
+              />
+              {other.title}
+            </label>
+          ))}
+        </fieldset>
+      ) : null}
+
       {error ? <p className="error-message">{error}</p> : null}
 
       {preview ? (
@@ -294,6 +323,9 @@ export default function AddSessionsForm({
           <p className="add-sessions__preview-title">
             This creates {preview.accepted.length}{' '}
             {preview.accepted.length === 1 ? 'session' : 'sessions'}
+            {alsoListingIds.length > 0
+              ? ` on each of ${alsoListingIds.length + 1} listings`
+              : ''}
             {preview.skipped.length > 0
               ? `. ${preview.skipped.length} will be skipped.`
               : '.'}
@@ -303,6 +335,9 @@ export default function AddSessionsForm({
               {preview.accepted.map((item) => (
                 <li key={`${item.dateKey}-${item.time}`}>
                   {formatSessionDateTime(item.startsAt)}
+                  {item.sharedWith?.length ? (
+                    <span className="add-sessions__shared"> · shared with {item.sharedWith.join(', ')}</span>
+                  ) : null}
                 </li>
               ))}
             </ul>

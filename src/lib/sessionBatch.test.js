@@ -19,6 +19,7 @@ import {
   singaporeTimeValue,
   singaporeWeekday,
   skipReasonFromRpcMessage,
+  SKIP_BOOKED,
 } from './sessionBatch'
 
 const NOW = Date.parse('2026-10-17T04:00:00.000Z') // Sat 17 Oct 2026, 12:00 in Singapore
@@ -259,5 +260,48 @@ describe('formatBatchSummary', () => {
       skipReasonFromRpcMessage('That time overlaps the session on Fri, 9 Oct at 11:11 am (90 mins).')
     ).toBe(SKIP_EXISTING)
     expect(skipReasonFromRpcMessage('Choose a time in the future.')).toBe(SKIP_PAST)
+  })
+})
+
+describe('previewSessionBatch with shared availability (listingId)', () => {
+  const dateKey = '2099-06-06'
+  const base = { dateKeys: [dateKey], times: ['10:00'], durationMins: 60, now: Date.parse('2099-01-01T00:00:00Z') }
+  const at = (listingId, extra = {}) => ({
+    starts_at: '2099-06-06T02:30:00.000Z',
+    duration_mins: 60,
+    listing_id: listingId,
+    status: 'open',
+    listings: { title: listingId === 'l-2' ? 'Pottery' : 'Latte art' },
+    bookings: [],
+    ...extra,
+  })
+
+  it('shares a time with an unbooked session on another listing', () => {
+    const result = previewSessionBatch({ ...base, listingId: 'l-1', existingSessions: [at('l-2')] })
+    expect(result.accepted).toHaveLength(1)
+    expect(result.accepted[0].sharedWith).toEqual(['Pottery'])
+  })
+
+  it('still skips a clash on the same listing', () => {
+    const result = previewSessionBatch({ ...base, listingId: 'l-1', existingSessions: [at('l-1')] })
+    expect(result.skipped[0].reason).toBe(SKIP_EXISTING)
+  })
+
+  it('skips a time the host is already booked for elsewhere', () => {
+    const booked = at('l-2', { bookings: [{ status: 'confirmed' }] })
+    const result = previewSessionBatch({ ...base, listingId: 'l-1', existingSessions: [booked] })
+    expect(result.skipped[0].reason).toBe(SKIP_BOOKED)
+  })
+
+  it('ignores cancelled sessions and keeps the old host-wide rule without listingId', () => {
+    expect(
+      previewSessionBatch({ ...base, listingId: 'l-1', existingSessions: [at('l-1', { status: 'cancelled' })] }).accepted,
+    ).toHaveLength(1)
+    expect(previewSessionBatch({ ...base, existingSessions: [at('l-2')] }).skipped[0].reason).toBe(SKIP_EXISTING)
+  })
+
+  it('does not mark a free time as shared', () => {
+    const result = previewSessionBatch({ ...base, listingId: 'l-1', existingSessions: [] })
+    expect(result.accepted[0].sharedWith).toBeUndefined()
   })
 })

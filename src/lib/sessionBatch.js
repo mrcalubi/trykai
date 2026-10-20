@@ -22,6 +22,7 @@ export const WEEKDAYS = [
 ]
 
 export const SKIP_EXISTING = 'clashes with an existing session'
+export const SKIP_BOOKED = 'clashes with a booked session'
 export const SKIP_BATCH = 'clashes with another session in this batch'
 export const SKIP_PAST = 'in the past'
 
@@ -143,15 +144,26 @@ function existingDuration(session, fallbackMins) {
   return Number.isInteger(mins) && mins >= 1 ? mins : fallbackMins
 }
 
+function hasConfirmedBooking(session) {
+  return (session.bookings ?? []).some((booking) => booking.status === 'confirmed')
+}
+
 /**
- * Preview a batch: mark past, host-wide existing clashes, and in-batch clashes.
+ * Preview a batch: mark past, existing clashes, and in-batch clashes.
  * Earlier starts in the batch are kept when two proposed times overlap.
+ *
+ * With `listingId` (00033, shared availability): only this listing's own
+ * sessions and sessions with a confirmed booking count as clashes. An unbooked
+ * session on another of the host's listings may share the time; the first
+ * booking decides which listing gets it, so the item is kept and `sharedWith`
+ * names those listings. Without `listingId`, any of the host's sessions clash.
  */
 export function previewSessionBatch({
   dateKeys,
   times,
   durationMins,
   existingSessions = [],
+  listingId,
   now = Date.now(),
 } = {}) {
   const duration = Number(durationMins)
@@ -172,7 +184,7 @@ export function previewSessionBatch({
       continue
     }
 
-    const clashesExisting = existing.some((session) => {
+    const overlapping = existing.filter((session) => {
       const otherStart = new Date(session.starts_at).getTime()
       if (!Number.isFinite(otherStart)) return false
       return intervalsOverlap(
@@ -182,10 +194,21 @@ export function previewSessionBatch({
         existingDuration(session, duration),
       )
     })
-    if (clashesExisting) {
+    if (!listingId && overlapping.length > 0) {
       skipped.push({ ...item, reason: SKIP_EXISTING })
       continue
     }
+    if (listingId && overlapping.some((session) => session.listing_id === listingId)) {
+      skipped.push({ ...item, reason: SKIP_EXISTING })
+      continue
+    }
+    if (listingId && overlapping.some(hasConfirmedBooking)) {
+      skipped.push({ ...item, reason: SKIP_BOOKED })
+      continue
+    }
+    const sharedWith = listingId
+      ? [...new Set(overlapping.map((session) => session.listings?.title).filter(Boolean))]
+      : []
 
     const clashesBatch = accepted.some((kept) =>
       intervalsOverlap(startMs, duration, kept.startsAt.getTime(), duration),
@@ -195,7 +218,7 @@ export function previewSessionBatch({
       continue
     }
 
-    accepted.push(item)
+    accepted.push(sharedWith.length > 0 ? { ...item, sharedWith } : item)
   }
 
   return { ok: true, error: null, accepted, skipped }

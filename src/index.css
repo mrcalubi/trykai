@@ -7022,3 +7022,23 @@ body.lightbox-open {
   border: 0;
   cursor: pointer;
 }
+
+/* Shared availability (00033): a session set aside because the host is booked elsewhere. */
+.hosting-session__held {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.add-sessions__also {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.add-sessions__shared {
+  color: var(--muted);
+}
