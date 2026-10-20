@@ -169,26 +169,6 @@ img {
   color: #E8A487;
 }
 
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.section-head__title {
-  margin: 0;
-  font-size: clamp(22px, 2.6vw, 30px);
-  line-height: 1.15;
-}
-
-.section-head__count {
-  flex-shrink: 0;
-  font-size: 14px;
-  color: var(--muted);
-}
-
 p {
   margin: 0;
 }
@@ -901,6 +881,11 @@ a {
   flex-direction: column;
   gap: 14px;
   margin-bottom: 24px;
+}
+
+.browse-count {
+  font-size: 14px;
+  color: var(--muted);
 }
 
 /* Swipeable icon tabs; bleeds to the screen edge on phones. */
@@ -2369,12 +2354,13 @@ input[type='password']::-webkit-password-reveal-button {
 }
 
 /* Browse: the category as an icon in a cream circle (same icons as the category row). */
+/* Category icon: a small tag, clearly smaller than the host's face (36px). */
 .ui-card__badge--icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 50%;
 }

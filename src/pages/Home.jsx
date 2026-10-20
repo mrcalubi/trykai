@@ -243,19 +243,11 @@ export default function Home() {
       </section>
 
       <section id="listings" className="home-browse" aria-labelledby="browse-title">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">Coming up</p>
-            <h2 id="browse-title" className="section-head__title">
-              Find something to try
-            </h2>
-          </div>
-          {!loading && !error && listings.length > 0 && isFiltering ? (
-            <p className="section-head__count">
-              {filteredListings.length} of {listings.length} listing{listings.length === 1 ? '' : 's'}
-            </p>
-          ) : null}
-        </div>
+        {/* No visible heading: the hero already says what this is, and the
+            categories start straight under it. Kept for screen readers. */}
+        <h2 id="browse-title" className="visually-hidden">
+          Find something to try
+        </h2>
 
         {loading && (
           <>
@@ -361,6 +353,11 @@ export default function Home() {
                     </button>
                   ) : null}
                 </div>
+              ) : null}
+              {isFiltering ? (
+                <p className="browse-count">
+                  {filteredListings.length} of {listings.length} listing{listings.length === 1 ? '' : 's'}
+                </p>
               ) : null}
             </div>
 

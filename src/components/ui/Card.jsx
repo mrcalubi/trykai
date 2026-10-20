@@ -135,7 +135,7 @@ export default function Card({
             // photo. With no photo the placeholder already shows the same icon.
             image ? (
               <span className="ui-card__badge ui-card__badge--icon" title={badge}>
-                <Icon name={categoryIconName(badge)} size={16} strokeWidth={1.8} />
+                <Icon name={categoryIconName(badge)} size={14} strokeWidth={1.9} />
                 <span className="visually-hidden">{badge}</span>
               </span>
             ) : (
