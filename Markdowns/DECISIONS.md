@@ -586,6 +586,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-20 — The hero has no button.** "Browse sessions" only scrolled to the grid, which on a phone starts just below anyway, and it cost about 60px above the first listing. Removed until there is somewhere else to send people: Rui Heng's planned "For you" feed would take that slot. The eyebrow, headline, subtitle and three trust pills stay. Supersedes the 20 October hold on hero length. On 21 October the "Coming up / Find something to try" heading above the categories went too, for the same reason; the heading stays for screen readers and the filtered count moved under the filters.
 
+**2026-10-21 — Browse cards with no dates show no date line.** "No dates yet" on the card read as "nothing here" and put people off tapping in, which is the opposite of what I'm keen needs. The card now shows just the area (plus "4 keen" in the pill from 2 keen guests); the listing page still says "No dates yet" with the I'm keen panel. Supersedes the browse-card part of the 20 October I'm keen entry. Also: the nav "Log in" pill text sat about 1.5px high (centring counted the "g" descender) and is nudged down.
+
 ---
 
 # Analysed but not decided

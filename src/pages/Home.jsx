@@ -5,7 +5,7 @@ import Card from '../components/ui/Card'
 import Icon from '../components/ui/Icon'
 import { categoryIconName } from '../components/ui/categoryIcon'
 import { ratingsByListingId } from '../lib/listingRatings'
-import { browseFlag, keenCountsById, NO_DATES_LABEL } from '../lib/keen'
+import { browseFlag, keenCountsById } from '../lib/keen'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { sortListingsForBrowse } from '../lib/listingSort'
 import { filterNarrows, locationLabel, showLocationFilter, showNewFlags, visibleCategories } from '../lib/browseUi'
@@ -378,7 +378,9 @@ export default function Home() {
                     badge={listing.category}
                     title={listing.title}
                     titleLevel={3}
-                    metaItems={[listing.area, nextSessionLabel(listing) || NO_DATES_LABEL]}
+                    // No "No dates yet" here: a card with no dates should still invite a
+                    // tap, and the listing page asks for interest instead.
+                    metaItems={[listing.area, nextSessionLabel(listing)]}
                     host={listingHost(listing)}
                     price={`${formatGuestFacingPrice(listing.price_per_person)}/person`}
                     rating={ratings[listing.id]?.rating}

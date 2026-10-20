@@ -25,12 +25,11 @@ export {
   keenBadge,
 }
 
-export const NO_DATES_LABEL = 'No dates yet'
-
 /**
  * Browse card pill. A listing with no dates and 2+ keen guests shows "4 keen"
- * there (it wins over "New"), so the date slot can stay a short "No dates yet"
- * and the area is never squeezed on a phone.
+ * there (it wins over "New"). The card shows no date at all for it: "No dates
+ * yet" put people off tapping in, and the listing page is where they say
+ * they're keen.
  */
 export function browseFlag(listing, keenCount, now = new Date(), showNew = true) {
   const badge = nextSessionLabel(listing, now) ? '' : keenBadge(keenCount)
