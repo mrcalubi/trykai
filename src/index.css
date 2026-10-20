@@ -781,13 +781,6 @@ a {
   color: var(--muted);
 }
 
-.home-hero__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 16px;
-}
-
 .trust-list {
   display: flex;
   gap: 8px;
@@ -2628,6 +2621,14 @@ input[type='password']::-webkit-password-reveal-button {
   border: none;
   cursor: pointer;
   text-decoration: underline;
+}
+
+/* A countdown ("Send a new code in 42s") reads as text, not a dead link. */
+.link-btn:disabled {
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  cursor: default;
 }
 
 /* Messages */

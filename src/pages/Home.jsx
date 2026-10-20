@@ -224,12 +224,6 @@ export default function Home() {
           <p className="home-hero__subtitle">
             Solo, with friends, or on a date. Your next hobby awaits.
           </p>
-          <div className="home-hero__actions">
-            <a href="#listings" className="ui-button ui-button--primary ui-button--lg">
-              Browse sessions
-              <Icon name="arrowDown" size={18} />
-            </a>
-          </div>
           <ul className="trust-list" aria-label="Why book on TryKai">
             {TRUST_POINTS.map((point) => (
               <li key={point.label} className="trust-list__item">

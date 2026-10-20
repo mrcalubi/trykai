@@ -511,6 +511,31 @@ export function bookingConfirmedHostHtml(options: {
   )
 }
 
+/**
+ * Supabase Auth's "Confirm signup" email. Supabase sends this one itself, so the
+ * HTML is pasted into the dashboard (Authentication, Emails, Confirm signup) on
+ * staging and production instead of being sent from an Edge Function.
+ * {{ .Token }}, {{ .ConfirmationURL }} and {{ .SiteURL }} are Supabase's Go
+ * template variables. The copy in supabase/templates/confirm-signup.html is
+ * generated from this (UPDATE_AUTH_TEMPLATES=1 npx vitest run email.test) and
+ * a test fails if it drifts.
+ */
+export const CONFIRM_SIGNUP_SUBJECT = 'Your TryKai code: {{ .Token }}'
+
+export function confirmSignupTemplateHtml(): string {
+  const code = `<p style="margin:12px 0 16px;font-family:${DISPLAY_STACK};font-size:34px;line-height:40px;font-weight:700;letter-spacing:0.16em;color:${EMAIL_COLORS.navy};">{{ .Token }}</p>`
+  return wrapEmail(
+    `${emailHeading('Confirm your email')}
+      <p style="margin:0;">Enter this code on TryKai to finish signing up:</p>
+      ${code}
+      <p style="margin:0;">Or tap the button instead.</p>
+      ${primaryButton('{{ .ConfirmationURL }}', 'Confirm my email')}
+      <p style="margin:16px 0 0;font-size:14px;line-height:1.5;color:${EMAIL_COLORS.muted};">The code works for an hour. Didn't sign up for TryKai? You can ignore this email.</p>`,
+    '{{ .SiteURL }}',
+    'Your code is {{ .Token }}',
+  )
+}
+
 export function verificationApprovedHtml(options: { hostName?: string | null }): string {
   const name = (options.hostName || '').trim()
   const greeting = name ? `You're verified, ${name}!` : "You're verified!"

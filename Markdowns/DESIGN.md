@@ -109,7 +109,7 @@ Fonts load from Google Fonts via `<link>` with `preconnect` in `index.html`, not
 
 - **Hero headline (decided):** *"Singapore's not boring. You just haven't found your thing yet."*
 - **Subhead (decided):** *"Solo, with friends, or on a date — something better than scrolling for the tenth time."*
-- **Trust line under the hero:** three chips: *ID-verified hosts* (hosts must pass verification before they can list), *Exact address after booking* (the address is revealed only to confirmed guests), *Most sessions S$15–30* (typical guest-facing band, not a filter or CHECK). Do not add a claim here unless the code enforces it, except this typical-price line.
+- **Trust line under the hero:** three chips: *ID-verified hosts* (hosts must pass verification before they can list), *Exact address after booking* (the address is revealed only to confirmed guests), *Most sessions under S$30* (typical guest-facing band, not a filter or CHECK). Do not add a claim here unless the code enforces it, except this typical-price line.
 - **No "Become a host" in the hero** (unchanged). Supply is recruited lower down: a quiet "Teach what you love" band at the end of Home and a footer link, both pointing at the host entry (`hostEntry()`), plus the post-session email nudge (still KIV).
 - "Skip the course. Just learn the basics." stays banked for Lane 2.
 
@@ -143,7 +143,7 @@ All in plain CSS in `src/index.css` (no Tailwind), previewable at `/style-guide`
 ## 9. Pages
 
 ### Home
-1. **Hero**, left-aligned on every width. Headline, subhead, the three-item trust line, and a "Browse sessions" button that jumps to the grid. From 1024px the mascot sits on the right in a cream-on-sand panel.
+1. **Hero**, left-aligned on every width. Eyebrow, headline, subhead and the three-item trust line. No button: on a phone the grid starts just below, and a "Browse sessions" jump added height without doing anything scrolling does not (removed 20 October; that slot is kept for a future "For you" feed). From 1024px the mascot sits on the right in a cream-on-sand panel.
 2. **Category bar** directly above the grid, swipeable sideways, scrolls away with the page.
 3. **Filter row:** quick chips that are computed from real data ("This weekend", "Under $30") plus the region select and a searchable area combobox (neighbourhood aliases resolve to a planning area). Chips only appear when at least one listing would match. Every `<select>` uses the shared chevron in `index.css` (`appearance: none`, SVG 16px from the right).
 4. **Grid** of browse cards, 2 / 3 / 4 columns at phone / 768px / 1024px. Sort is unchanged (soonest upcoming session day, then more sessions).
