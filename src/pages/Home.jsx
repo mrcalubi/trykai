@@ -5,7 +5,7 @@ import Card from '../components/ui/Card'
 import Icon from '../components/ui/Icon'
 import { categoryIconName } from '../components/ui/categoryIcon'
 import { ratingsByListingId } from '../lib/listingRatings'
-import { browseFlag, keenCountsById, NO_DATES_LABEL } from '../lib/keen'
+import { browseFlag, keenCountsById } from '../lib/keen'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { sortListingsForBrowse } from '../lib/listingSort'
 import { filterNarrows, locationLabel, showLocationFilter, showNewFlags, visibleCategories } from '../lib/browseUi'
@@ -243,19 +243,11 @@ export default function Home() {
       </section>
 
       <section id="listings" className="home-browse" aria-labelledby="browse-title">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">Coming up</p>
-            <h2 id="browse-title" className="section-head__title">
-              Find something to try
-            </h2>
-          </div>
-          {!loading && !error && listings.length > 0 && isFiltering ? (
-            <p className="section-head__count">
-              {filteredListings.length} of {listings.length} listing{listings.length === 1 ? '' : 's'}
-            </p>
-          ) : null}
-        </div>
+        {/* No visible heading: the hero already says what this is, and the
+            categories start straight under it. Kept for screen readers. */}
+        <h2 id="browse-title" className="visually-hidden">
+          Find something to try
+        </h2>
 
         {loading && (
           <>
@@ -362,6 +354,11 @@ export default function Home() {
                   ) : null}
                 </div>
               ) : null}
+              {isFiltering ? (
+                <p className="browse-count">
+                  {filteredListings.length} of {listings.length} listing{listings.length === 1 ? '' : 's'}
+                </p>
+              ) : null}
             </div>
 
             {filteredListings.length === 0 ? (
@@ -381,7 +378,9 @@ export default function Home() {
                     badge={listing.category}
                     title={listing.title}
                     titleLevel={3}
-                    metaItems={[listing.area, nextSessionLabel(listing) || NO_DATES_LABEL]}
+                    // No "No dates yet" here: a card with no dates should still invite a
+                    // tap, and the listing page asks for interest instead.
+                    metaItems={[listing.area, nextSessionLabel(listing)]}
                     host={listingHost(listing)}
                     price={`${formatGuestFacingPrice(listing.price_per_person)}/person`}
                     rating={ratings[listing.id]?.rating}

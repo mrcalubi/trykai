@@ -189,7 +189,7 @@ describe('Home listing grid', () => {
     expect(ratingCalls).toEqual([['listing_ratings', { listing_ids: ['l-1', 'l-2'] }]])
   })
 
-  it('shows "No dates yet" on cards without sessions, and the keen pill from 2', async () => {
+  it('leaves the date off cards without sessions, and shows the keen pill from 2', async () => {
     givenListings([LATTE, BOXING])
     supabase.rpc.mockImplementation(async (name) =>
       name === 'listing_keen_counts'
@@ -198,7 +198,8 @@ describe('Home listing grid', () => {
     )
     renderWithRouter(<Home />)
     expect(await screen.findByText('4 keen')).toBeInTheDocument()
-    expect(screen.getAllByText('No dates yet')).toHaveLength(2)
+    expect(screen.queryByText('No dates yet')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Tiong Bahru').length).toBeGreaterThan(0)
     expect(screen.queryByText('1 keen')).not.toBeInTheDocument()
     const keenCall = supabase.rpc.mock.calls.find(([name]) => name === 'listing_keen_counts')
     expect(keenCall[1].p_listing_ids.sort()).toEqual(['l-1', 'l-2'])
