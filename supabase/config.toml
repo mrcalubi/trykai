@@ -488,6 +488,18 @@ verify_jwt = false
 import_map = "./functions/report-booking-problem/deno.json"
 entrypoint = "./functions/report-booking-problem/index.ts"
 
+[functions.listing-interest]
+enabled = true
+verify_jwt = false
+import_map = "./functions/listing-interest/deno.json"
+entrypoint = "./functions/listing-interest/index.ts"
+
+[functions.notify-interested]
+enabled = true
+verify_jwt = false
+import_map = "./functions/notify-interested/deno.json"
+entrypoint = "./functions/notify-interested/index.ts"
+
 [functions.admin-cancel-booking]
 enabled = true
 verify_jwt = false

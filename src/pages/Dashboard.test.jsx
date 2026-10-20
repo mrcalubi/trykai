@@ -674,6 +674,37 @@ describe('Dashboard add session', () => {
     expect(args).not.toHaveProperty('duration_mins')
   })
 
+  it('emails keen guests after sessions are added and says how many', async () => {
+    supabase.functions.invoke.mockImplementation(async (name) =>
+      name === 'notify-interested' ? { data: { notified: 3 }, error: null } : { data: null, error: null }
+    )
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+    await fillSession(user)
+    await reviewAndCreate(user)
+
+    await waitFor(() =>
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        'notify-interested',
+        expect.objectContaining({ body: { listing_id: 'listing-1' } })
+      )
+    )
+    expect(await screen.findByText(/We've emailed the 3 guests who were keen\./)).toBeInTheDocument()
+  })
+
+  it('does not mention keen guests when nobody was waiting', async () => {
+    supabase.functions.invoke.mockResolvedValue({ data: { notified: 0 }, error: null })
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+    await fillSession(user)
+    await reviewAndCreate(user)
+
+    await waitFor(() =>
+      expect(supabase.functions.invoke.mock.calls.some(([name]) => name === 'notify-interested')).toBe(true)
+    )
+    expect(screen.queryByText(/who were keen|who was keen/)).not.toBeInTheDocument()
+  })
+
   it('previews a clash with an existing session instead of merging spots', async () => {
     const dateKey = dateKeyFromToday(1)
     givenData({
@@ -1464,16 +1495,39 @@ describe('Hosting this month', () => {
 })
 
 describe('Hosting listing cards', () => {
-  it('flags a listing with no dates as hidden and leads with Add sessions', async () => {
+  it('shows how many guests are keen on a listing with no dates', async () => {
+    givenData({ listings: [makeMyListing()] })
+    const previous = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation(async (name, args) =>
+      name === 'host_listing_interest'
+        ? {
+            data: [
+              { listing_id: 'listing-1', keen_count: 3, weekday: 0, weekend: 3, morning: 0, afternoon: 2, evening: 0 },
+            ],
+            error: null,
+          }
+        : previous(name, args)
+    )
+    await renderHosting()
+
+    const card = listingCard('Latte art')
+    expect(
+      within(card).getByText(
+        "3 people are keen. When suits them: Weekends 3, Afternoon 2. Add a date and we'll tell them."
+      )
+    ).toBeInTheDocument()
+  })
+
+  it('flags a listing with no dates and leads with Add sessions', async () => {
     givenData({
       listings: [makeMyListing({ price_per_person: 2300, duration_mins: 90, max_guests: 4 })],
     })
     await renderHosting()
 
     const card = listingCard('Latte art')
-    expect(within(card).getByText('Hidden: no sessions')).toBeInTheDocument()
+    expect(within(card).getAllByText('No dates yet')).toHaveLength(2)
+    expect(within(card).queryByText('Hidden: no sessions')).not.toBeInTheDocument()
     expect(within(card).getByText('S$23 · 90 min · up to 4')).toBeInTheDocument()
-    expect(within(card).getByText('No dates yet')).toBeInTheDocument()
     expect(within(card).getByRole('button', { name: 'Add sessions' }).className).toContain(
       'primary'
     )
@@ -1492,7 +1546,7 @@ describe('Hosting listing cards', () => {
     expect(within(card).getByText('1 open date')).toBeInTheDocument()
     expect(within(card).getAllByText(formatSessionDateTime(startsAt))).toHaveLength(1)
     expect(within(card).queryByText(/^Next:/)).not.toBeInTheDocument()
-    expect(within(card).queryByText('Hidden: no sessions')).not.toBeInTheDocument()
+    expect(within(card).queryByText('No dates yet')).not.toBeInTheDocument()
   })
 
   it('counts a booked date, which sits under Upcoming bookings rather than the card', async () => {

@@ -4438,6 +4438,17 @@ body.lightbox-open {
   border-top: 1px solid var(--border);
 }
 
+/* "I'm keen" demand on a listing with no dates (00032). */
+.hosting-keen {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--coral-ink);
+  background: var(--coral-soft);
+  border-radius: var(--radius-sm);
+}
+
 .hosting-listing__status {
   min-width: 0;
   margin: 0;
@@ -6844,4 +6855,80 @@ body.lightbox-open {
   .wizard-inline-preview {
     display: none;
   }
+}
+
+/* "I'm keen" panel in the booking card when a listing has no dates (00032). */
+.keen-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.keen-panel__title {
+  margin: 0;
+  font-family: var(--display, inherit);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.keen-panel__text {
+  margin: -6px 0 0;
+  color: var(--muted);
+}
+
+.keen-panel__count {
+  align-self: flex-start;
+  margin: 0;
+  padding: 2px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--coral-ink);
+  background: var(--coral-soft);
+  border-radius: 999px;
+}
+
+.keen-panel__label {
+  margin: 4px 0 -4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.keen-panel__label span {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.keen-panel__chips {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.keen-panel__chips--days {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.keen-panel__chips .choice-chip {
+  min-height: 44px;
+}
+
+.keen-panel__stepper {
+  margin: 0;
+}
+
+.keen-panel__button {
+  width: 100%;
+  min-height: 48px;
+}
+
+.keen-panel__link {
+  align-self: flex-start;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--muted);
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
 }

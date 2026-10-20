@@ -5,6 +5,7 @@ import Card from '../components/ui/Card'
 import Icon from '../components/ui/Icon'
 import { categoryIconName } from '../components/ui/categoryIcon'
 import { ratingsByListingId } from '../lib/listingRatings'
+import { browseFlag, keenCountsById, NO_DATES_LABEL } from '../lib/keen'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { sortListingsForBrowse } from '../lib/listingSort'
 import { BROWSE_CATEGORIES } from '../lib/listingCategories'
@@ -15,7 +16,6 @@ import { publicName } from '../lib/publicName'
 import {
   hasSessionThisWeekend,
   isBudgetFriendly,
-  isRecentlyListed,
   nextSessionLabel,
 } from '../lib/browseFilters'
 import foodArt from '../assets/categories/food.png'
@@ -85,6 +85,7 @@ export default function Home() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [listings, setListings] = useState([])
   const [ratings, setRatings] = useState({})
+  const [keenCounts, setKeenCounts] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || 'All')
@@ -126,22 +127,30 @@ export default function Home() {
         setError(PAGE_LOAD_ERROR)
         setListings([])
         setRatings({})
+        setKeenCounts({})
         setLoading(false)
         return
       }
 
       const rows = sortListingsForBrowse(data ?? [])
       const listingIds = rows.map((listing) => listing.id)
+      const noDateIds = rows.filter((listing) => !nextSessionLabel(listing)).map((listing) => listing.id)
       let ratingRows = []
+      let keenRows = []
       if (listingIds.length > 0) {
-        const { data: ratingData } = await supabase.rpc('listing_ratings', {
-          listing_ids: listingIds,
-        })
-        ratingRows = ratingData ?? []
+        const [ratingResult, keenResult] = await Promise.all([
+          supabase.rpc('listing_ratings', { listing_ids: listingIds }),
+          noDateIds.length > 0
+            ? supabase.rpc('listing_keen_counts', { p_listing_ids: noDateIds })
+            : Promise.resolve({ data: [] }),
+        ])
+        ratingRows = ratingResult.data ?? []
+        keenRows = keenResult.data ?? []
       }
 
       setListings(rows)
       setRatings(ratingsByListingId(ratingRows))
+      setKeenCounts(keenCountsById(keenRows))
       setLoading(false)
     }
 
@@ -337,12 +346,12 @@ export default function Home() {
                     badge={listing.category}
                     title={listing.title}
                     titleLevel={3}
-                    metaItems={[listing.area, nextSessionLabel(listing)]}
+                    metaItems={[listing.area, nextSessionLabel(listing) || NO_DATES_LABEL]}
                     host={listingHost(listing)}
                     price={`${formatGuestFacingPrice(listing.price_per_person)}/person`}
                     rating={ratings[listing.id]?.rating}
                     reviewCount={ratings[listing.id]?.reviewCount}
-                    flag={isRecentlyListed(listing) ? 'New' : undefined}
+                    flag={browseFlag(listing, keenCounts[listing.id])}
                   />
                 ))}
               </div>

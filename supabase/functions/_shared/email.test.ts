@@ -29,6 +29,10 @@ import {
   publicDisplayName,
   receiptPriceLines,
   receiptRows,
+  keenHostHtml,
+  keenHostSubject,
+  dateOpenedGuestHtml,
+  dateOpenedGuestSubject,
   EMAIL_COLORS,
   EMAIL_LOGO_URL,
   refundDeadlineLines,
@@ -1301,5 +1305,70 @@ describe('branded receipt', () => {
     const html = verificationApprovedHtml({ hostName: '<img src=x onerror=alert(1)>' })
     expect(html).not.toContain('<img src=x')
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
+  })
+})
+
+describe('I\'m keen emails', () => {
+  const summary = {
+    keen_count: 3,
+    weekday: 1,
+    weekend: 2,
+    morning: 0,
+    afternoon: 0,
+    evening: 3,
+    min_group: 1,
+    max_group: 4,
+  }
+
+  it('tells the host counts and tallies, never who', () => {
+    expect(keenHostSubject('Latte art', 3)).toBe('3 people are keen on Latte art')
+    expect(keenHostSubject('Latte art', 1)).toBe('Someone is keen on Latte art')
+    const html = keenHostHtml({ hostName: 'Mei Ling', listingTitle: 'Latte art', summary, siteUrl: 'https://trykai.sg' })
+    expect(html).toContain('Hi Mei Ling,')
+    expect(hasDetail(html, 'Days', 'Weekends 2 · Weekdays 1')).toBe(true)
+    expect(hasDetail(html, 'Times', 'Evening 3')).toBe(true)
+    expect(hasDetail(html, 'Group size', 'Groups of 1 to 4')).toBe(true)
+    expect(html).toContain('href="https://trykai.sg/hosting"')
+    expect(html).toContain('Add dates')
+    expect(html).toContain(`src="${EMAIL_LOGO_URL}"`)
+  })
+
+  it('leaves out tallies nobody picked and escapes the title', () => {
+    const html = keenHostHtml({
+      listingTitle: '<b>Tea</b>',
+      summary: { ...summary, keen_count: 1, weekday: 0, weekend: 0, evening: 0, min_group: null, max_group: null },
+    })
+    expect(html).toContain('Someone tapped')
+    expect(html).not.toContain('>Days<')
+    expect(html).not.toContain('>Group size<')
+    expect(html).not.toContain('<b>Tea</b>')
+    expect(html).toContain('&lt;b&gt;Tea&lt;/b&gt;')
+  })
+
+  it('tells a keen guest the next dates, once', () => {
+    expect(dateOpenedGuestSubject('Mei Ling', 'Latte art')).toBe('Mei Ling just opened a date for Latte art')
+    expect(dateOpenedGuestSubject('', 'Latte art')).toBe('Your host just opened a date for Latte art')
+    const html = dateOpenedGuestHtml({
+      guestName: 'Sam',
+      hostName: 'Mei Ling',
+      listingTitle: 'Latte art',
+      listingId: 'listing-1',
+      sessionDates: ['25 Oct 2026, 2:00 pm', '26 Oct 2026, 2:00 pm', '1 Nov 2026, 10:00 am', '2 Nov 2026, 10:00 am'],
+      siteUrl: 'https://trykai.sg',
+    })
+    expect(html).toContain('Hi Sam,')
+    expect(html).toContain('25 Oct 2026, 2:00 pm')
+    expect(html).toContain('1 Nov 2026, 10:00 am')
+    expect(html).not.toContain('2 Nov 2026, 10:00 am')
+    expect(html).toContain('and 1 more.')
+    expect(html).toContain('href="https://trykai.sg/listings/listing-1"')
+    expect(html).toContain('We only send it once.')
+  })
+
+  it('omits the date list and "more" line when there are no dates', () => {
+    const html = dateOpenedGuestHtml({ listingTitle: 'Latte art', listingId: 'l', sessionDates: [] })
+    expect(html).not.toContain('<ul')
+    expect(html).not.toContain('more.')
+    expect(html).toContain('Your host just opened')
   })
 })
