@@ -3,6 +3,12 @@ import {
   discountedLessonCents,
   groupDiscountRate,
 } from './booking.ts'
+import {
+  groupSizeRange,
+  type InterestSummary,
+  interestTallies,
+  keenPeopleLine,
+} from './interest.ts'
 
 const RESEND_FROM = 'TryKai <no-reply@trykai.sg>'
 export const GUEST_REPLY_TO = 'hello@trykai.sg'
@@ -851,6 +857,81 @@ export async function sendComplaintEmails(options: {
   } catch (err) {
     console.error('sendComplaintEmails failed', err)
   }
+}
+
+export function keenHostSubject(listingTitle: string, keenCount: number): string {
+  return `${keenPeopleLine(keenCount)} on ${listingTitle}`
+}
+
+/**
+ * To the host when guests tap "I'm keen" on a listing with no dates. Counts
+ * and tallies only: the host never learns who asked.
+ */
+export function keenHostHtml(options: {
+  hostName?: string | null
+  listingTitle: string
+  summary: InterestSummary
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const { days, times } = interestTallies(options.summary)
+  const groups = groupSizeRange(options.summary)
+  const count = options.summary.keen_count
+  const who = count === 1 ? 'Someone tapped' : `${count} people tapped`
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    ${emailHeading(`${keenPeopleLine(count)} on ${options.listingTitle}`)}
+    <p style="margin:0 0 20px;color:${EMAIL_COLORS.muted};">${escapeHtml(who)} "I'm keen" because your listing has no dates yet.</p>
+    ${detailRows([
+      ['Days', days ? escapeHtml(days) : ''],
+      ['Times', times ? escapeHtml(times) : ''],
+      ['Group size', groups ? escapeHtml(groups) : ''],
+    ])}
+    <p style="margin:0 0 8px;">Add a few dates and we'll email them the moment they open.</p>
+    ${primaryButton(`${siteUrl}/hosting`, 'Add dates')}
+    ${emailSignOff('see-you')}
+    `,
+    siteUrl,
+    `${keenPeopleLine(count)} on ${options.listingTitle}. Add a date and we'll tell them.`,
+  )
+}
+
+export function dateOpenedGuestSubject(hostName: string, listingTitle: string): string {
+  return `${hostName || 'Your host'} just opened a date for ${listingTitle}`
+}
+
+/** To each guest who was keen, once, when the host adds sessions. */
+export function dateOpenedGuestHtml(options: {
+  guestName?: string | null
+  hostName?: string | null
+  listingTitle: string
+  listingId: string
+  sessionDates: string[]
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const host = options.hostName || 'Your host'
+  const dates = options.sessionDates.slice(0, 3)
+  const more = options.sessionDates.length - dates.length
+  const dateList = dates
+    .map((date) => `<li style="margin:0 0 4px;">${escapeHtml(date)}</li>`)
+    .join('')
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
+    ${emailHeading(options.listingTitle)}
+    <p style="margin:0 0 12px;">You were keen, so you're the first to know. ${escapeHtml(host)} just opened:</p>
+    ${dateList ? `<ul style="margin:0 0 12px;padding-left:20px;">${dateList}</ul>` : ''}
+    ${more > 0 ? `<p style="margin:0 0 12px;color:${EMAIL_COLORS.muted};">and ${more} more.</p>` : ''}
+    <p style="margin:0 0 8px;">Spots are first come, first served.</p>
+    ${primaryButton(`${siteUrl}/listings/${encodeURIComponent(options.listingId)}`, 'See dates and book')}
+    <p style="margin:0;font-size:13px;color:${EMAIL_COLORS.muted};">You're getting this because you tapped "I'm keen" on this listing. We only send it once.</p>
+    ${emailSignOff('see-you')}
+    `,
+    siteUrl,
+    `${host} opened a date for ${options.listingTitle}`,
+  )
 }
 
 /** Hosts see only their payout, never a guest's payment or refund. */

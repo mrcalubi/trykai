@@ -436,6 +436,7 @@ src/
 │   ├── listingCategories.js     # Shared host/browse category list + area line
 │   ├── reportMailto.js          # Report links to hello@trykai.sg
 │   ├── share.js                 # Share sheet, else clipboard, else execCommand copy
+│   ├── keen.js                  # I'm keen: card pill, host banner copy, RPC row mapping (wraps _shared/interest.ts)
 │   └── edgeFunctionError.js     # Read Edge Function error bodies
 ├── data/
 │   └── areaAliases.js           # URA MP2019 subzones + extra aliases (one name may map to several areas)
@@ -532,7 +533,8 @@ supabase/functions/
 │   ├── disputes.ts              # Dispute hold codes and partial refund rules for admin-dispute-booking
 │   ├── admin-auth.ts            # Admin JWT + users.is_admin, x-admin-secret break-glass with operator name
 │   ├── money-events.ts          # booking_money_events rows (hold, release, partial refund, admin cancel)
-│   ├── email.ts                 # Resend helper + booking receipt, cancel, dispute refund, and host-strike HTML
+│   ├── interest.ts              # I'm keen: request parsing, who may ask, host email gap, tallies
+│   ├── email.ts                 # Resend helper + booking receipt, cancel, dispute refund, host-strike, and I'm keen HTML
 │   ├── payouts.ts               # 72h-after-session-end Transfer eligibility, skip reasons, charge backfill
 │   ├── verification.ts          # Status, Identity params, 30-day retention rules
 │   └── onemap.ts                # Postal validation, OneMap token + search, lookup rate limit

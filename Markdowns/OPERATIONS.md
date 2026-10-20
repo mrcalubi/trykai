@@ -444,6 +444,7 @@ A manual dump gives a restore point from the minute before a risky change, newer
 |---|---|---|---|
 | `00022` to `00026` | Applied | Applied | 18 October (production was applied first, by mistake) |
 | `00027` to `00031` | Applied | Applied | 19 October, read-only check query |
+| `00032` (I'm keen) | Not yet | Not yet | Apply with PR "I'm keen". No new secrets: the two new functions use the existing `RESEND_API_KEY` and `SITE_URL` |
 
 Earlier migrations are assumed applied on both, since these build on them.
 

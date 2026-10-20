@@ -107,8 +107,12 @@ test.describe('listing detail', () => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART], sessions: [], reviews: [] })
     await page.goto('/listings/listing-latte')
 
-    await expect(page.getByText('No upcoming sessions yet.')).toBeVisible()
+    await expect(page.getByText('No dates yet')).toBeVisible()
     await expect(page.getByText('Pick a date, then a time')).toHaveCount(0)
+
+    // Signed out, "I'm keen" goes to log in first.
+    await page.getByRole('button', { name: "I'm keen" }).click()
+    await expect(page).toHaveURL(/\/login$/)
   })
 
   test('disables PayNow when the session is more than 80 days away', async ({ page }) => {

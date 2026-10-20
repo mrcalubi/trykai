@@ -39,6 +39,7 @@ import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import { SHARE_NOTES, shareOrCopy } from '../lib/share'
 import { BackRowActions } from '../components/BackButton'
 import Icon from '../components/ui/Icon'
+import KeenPanel from '../components/KeenPanel'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -1067,7 +1068,12 @@ export default function ListingDetail() {
 
             {checkoutSessionId && renderCheckout()}
 
-            {!sessionRange && <p className="empty-state">No upcoming sessions yet.</p>}
+            {!sessionRange && isOwnListing && (
+              <p className="empty-state">No upcoming sessions yet. Add dates from your Hosting tab.</p>
+            )}
+            {!sessionRange && !isOwnListing && (
+              <KeenPanel listingId={id} hostName={hostName} viewerId={viewerId} />
+            )}
 
             {sessionRange && !checkoutSessionId && (
               <>

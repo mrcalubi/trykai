@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import AddSessionsForm from '../components/AddSessionsForm'
+import { hostBannerLine, hostInterestById, keenNotifiedLine } from '../lib/keen'
 import Button from '../components/ui/Button'
 import OverflowMenu from '../components/ui/OverflowMenu'
 import Icon from '../components/ui/Icon'
@@ -140,6 +141,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
 
   const connectStatus = searchParams.get('connect')
   const [bookingStatusMessage, setBookingStatusMessage] = useState('')
+  const [interestByListing, setInterestByListing] = useState({})
 
   const [activeFormId, setActiveFormId] = useState(null)
   const [selectedEmptyIds, setSelectedEmptyIds] = useState(() => new Set())
@@ -215,6 +217,10 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
     setPendingCount(admin ? Number(adminRow?.pending_count) || 0 : 0)
 
     const listingIds = listingsResult.data?.map((l) => l.id) ?? []
+    // 00032. Until it is applied the RPC errors; the page simply shows no banner.
+    const { data: interestRows } = await supabase.rpc('host_listing_interest')
+    setInterestByListing(hostInterestById(interestRows))
+
     if (listingIds.length > 0) {
       const { data: sessionsData, error: sessionsError } = await supabase
         .from('sessions')
@@ -346,7 +352,14 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
     }
 
     const created = accepted.length - (rejected.length - skipped.length)
-    setBookingStatusMessage(formatBatchSummary({ created, skipped: rejected }))
+    let summary = formatBatchSummary({ created, skipped: rejected })
+    if (created > 0) {
+      // Tell everyone who tapped "I'm keen" that a date opened. Never blocks the host.
+      const { data: notifyData } = await invokeAuthed('notify-interested', { listing_id: listingId })
+      const notified = Number(notifyData?.notified) || 0
+      if (notified > 0) summary = `${summary} ${keenNotifiedLine(notified)}`
+    }
+    setBookingStatusMessage(summary)
     closeSessionForm()
     await loadData()
     return {}
@@ -862,7 +875,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                             <span className="hosting-badge hosting-badge--live">Live</span>
                           ) : (
                             <span className="hosting-badge hosting-badge--hidden">
-                              Hidden: no sessions
+                              No dates yet
                             </span>
                           )}
                           <p className="dashboard-card__title">{listing.title}</p>
@@ -895,6 +908,12 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                           {formOpen ? 'Cancel' : 'Add sessions'}
                         </Button>
                       </div>
+                      {!hasDates && interestByListing[listing.id] ? (
+                        <p className="hosting-keen">
+                          {hostBannerLine(interestByListing[listing.id])} Add a date and we&apos;ll
+                          tell them.
+                        </p>
+                      ) : null}
                     </div>
 
                     {formOpen ? (

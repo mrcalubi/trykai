@@ -566,7 +566,8 @@ describe('ListingDetail sessions', () => {
     givenSessions([])
     renderPage()
 
-    expect(await screen.findByText('No upcoming sessions yet.')).toBeInTheDocument()
+    expect(await screen.findByText('No dates yet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: "I'm keen" })).toBeInTheDocument()
     expect(screen.queryByText('Pick a date, then a time')).not.toBeInTheDocument()
   })
 

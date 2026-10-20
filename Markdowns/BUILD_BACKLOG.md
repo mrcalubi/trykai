@@ -57,7 +57,7 @@ Not a calendar. Updated 19 October 2026.
    1. Docs consolidation (this PR)
    2. Link previews and Share fallback
    3. Branded email receipt
-   4. Host nudge when a listing has no sessions
+   4. "I'm keen" on listings with no dates (replaces the weekly host nudge)
 3. **Suspend a test host on staging** and confirm browse, listing detail and Book all hide them (P0.4).
 4. Browse card rating: the listings fetch does not supply one and there is no aggregate rating column.
 5. The rest of P2 in listed order.
@@ -79,8 +79,10 @@ Server side Open Graph and Twitter tags for `/listings/:id`: cover photo, title,
 ### B3 — Email receipt
 Branded, mobile friendly shared template in `_shared/email.ts`: logo, colours, a receipt block with the price breakdown, booking details, policy link. Table based with inline styles. Tested by sending real staging emails to Gmail and iOS Mail.
 
-### B4 — Host nudge (no sessions)
-In-app banner on the Hosting tab for active listings with no upcoming sessions. A weekly email to those hosts from a scheduled job (like `release-payout`), with a small migration recording the last nudge so nobody is emailed twice in a week.
+### B4 — "I'm keen" on listings with no dates (decided 20 October)
+Replaces the weekly "you have no sessions" email, which was nagging. Guests tap **I'm keen** on a listing with no dates, optionally picking Weekdays / Weekends and Morning / Afternoon / Evening and a group size. The host gets "3 people are keen on Latte art" (at most one email a day per listing) and a banner on the Hosting tab. When the host adds sessions, every keen guest is emailed once. Migration `00032`, Edge Functions `listing-interest` and `notify-interested`. Details: DECISIONS.md, 20 October.
+
+Follow-ups, post launch: an email when interest expires after 30 days with no date ("Mei Ling hasn't added a date yet"), and a daily roundup for keen taps that arrive inside the 24-hour email gap (today they show on the Hosting banner and in the next email).
 
 ---
 

@@ -157,10 +157,23 @@ describe('Home listing grid', () => {
     renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
-    expect(supabase.rpc).toHaveBeenCalledTimes(1)
-    expect(supabase.rpc).toHaveBeenCalledWith('listing_ratings', {
-      listing_ids: ['l-1', 'l-2'],
-    })
+    const ratingCalls = supabase.rpc.mock.calls.filter(([name]) => name === 'listing_ratings')
+    expect(ratingCalls).toEqual([['listing_ratings', { listing_ids: ['l-1', 'l-2'] }]])
+  })
+
+  it('shows "No dates yet" on cards without sessions, and the keen pill from 2', async () => {
+    givenListings([LATTE, BOXING])
+    supabase.rpc.mockImplementation(async (name) =>
+      name === 'listing_keen_counts'
+        ? { data: [{ listing_id: 'l-1', keen_count: 4 }, { listing_id: 'l-2', keen_count: 1 }], error: null }
+        : { data: [], error: null }
+    )
+    renderWithRouter(<Home />)
+    expect(await screen.findByText('4 keen')).toBeInTheDocument()
+    expect(screen.getAllByText('No dates yet')).toHaveLength(2)
+    expect(screen.queryByText('1 keen')).not.toBeInTheDocument()
+    const keenCall = supabase.rpc.mock.calls.find(([name]) => name === 'listing_keen_counts')
+    expect(keenCall[1].p_listing_ids.sort()).toEqual(['l-1', 'l-2'])
   })
 
   it('shows the landing headline above the grid', async () => {
