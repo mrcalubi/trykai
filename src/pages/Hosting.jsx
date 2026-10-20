@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useSearchParams, Link, Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import AddSessionsForm from '../components/AddSessionsForm'
 import { hostBannerLine, hostInterestById, keenNotifiedLine } from '../lib/keen'
+import { heldByTitleMap, heldSessionLine, isHeld, sharedBatchLine } from '../lib/sharedAvailability'
 import Button from '../components/ui/Button'
 import OverflowMenu from '../components/ui/OverflowMenu'
 import Icon from '../components/ui/Icon'
@@ -230,6 +231,8 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
           starts_at,
           duration_mins,
           listing_id,
+          status,
+          held_by_session_id,
           listings (title),
           bookings (id, status, guests_count, total_amount, platform_fee, host_payout_amount)
         `
@@ -321,7 +324,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
 
   async function handleCreateSessions(
     listingId,
-    { accepted, skipped, spots, duration, usesListingDuration },
+    { accepted, skipped, spots, duration, usesListingDuration, alsoListingIds = [] },
   ) {
     const rejected = [...skipped]
 
@@ -352,14 +355,37 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
     }
 
     const created = accepted.length - (rejected.length - skipped.length)
-    let summary = formatBatchSummary({ created, skipped: rejected })
-    if (created > 0) {
-      // Tell everyone who tapped "I'm keen" that a date opened. Never blocks the host.
-      const { data: notifyData } = await invokeAuthed('notify-interested', { listing_id: listingId })
-      const notified = Number(notifyData?.notified) || 0
-      if (notified > 0) summary = `${summary} ${keenNotifiedLine(notified)}`
+    const summaries = [formatBatchSummary({ created, skipped: rejected })]
+    const listingsWithNewDates = created > 0 ? [listingId] : []
+
+    // Shared availability (00033): the same times on the host's other listings,
+    // each with its own spots and length. The database refuses a time that
+    // clashes with that listing's own sessions.
+    for (const otherId of alsoListingIds) {
+      const other = listings.find((item) => item.id === otherId)
+      if (!other) continue
+      let otherCreated = 0
+      for (const item of accepted) {
+        const { error: otherError } = await supabase.rpc('add_listing_session', {
+          p_listing_id: otherId,
+          p_starts_at: item.startsAt.toISOString(),
+          p_spots: Number(other.max_guests) || spots,
+        })
+        if (!otherError) otherCreated += 1
+      }
+      summaries.push(sharedBatchLine(other.title, otherCreated, accepted.length))
+      if (otherCreated > 0) listingsWithNewDates.push(otherId)
     }
-    setBookingStatusMessage(summary)
+
+    let notified = 0
+    for (const id of listingsWithNewDates) {
+      // Tell everyone who tapped "I'm keen" that a date opened. Never blocks the host.
+      const { data: notifyData } = await invokeAuthed('notify-interested', { listing_id: id })
+      notified += Number(notifyData?.notified) || 0
+    }
+    if (notified > 0) summaries.push(keenNotifiedLine(notified))
+
+    setBookingStatusMessage(summaries.join(' '))
     closeSessionForm()
     await loadData()
     return {}
@@ -571,6 +597,9 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
       .getElementById(`hosting-listing-${listingId}`)
       ?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
   }
+
+  // Which booked session (and listing) set aside each held session (00033).
+  const heldByTitles = useMemo(() => heldByTitleMap(hostSessions), [hostSessions])
 
   if (loading) {
     return <p className="status-message">Loading…</p>
@@ -827,10 +856,12 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                 const upcoming = hostSessions.filter(
                   (session) => session.listing_id === listing.id,
                 )
-                const hasDates = upcoming.length > 0
                 const bookedCount = upcoming.filter(
                   (session) => activeBookingsOn(session).length > 0,
                 ).length
+                const heldCount = upcoming.filter(isHeld).length
+                const openCount = upcoming.length - bookedCount - heldCount
+                const hasDates = openCount + bookedCount > 0
                 const formOpen = activeFormId === listing.id
                 return (
                   <article
@@ -896,7 +927,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                               : 'hosting-listing__status hosting-listing__status--empty'
                           }
                         >
-                          {listingDatesLine(upcoming.length - bookedCount, bookedCount)}
+                          {listingDatesLine(openCount, bookedCount)}
                         </p>
                         <Button
                           className="hosting-listing__add"
@@ -920,6 +951,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                       <AddSessionsForm
                         listing={listing}
                         existingSessions={hostSessions}
+                        otherListings={listings.filter((other) => other.id !== listing.id)}
                         onCancel={closeSessionForm}
                         onCreated={(payload) => handleCreateSessions(listing.id, payload)}
                       />
@@ -927,6 +959,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
 
                     <ListingSessions
                       listingId={listing.id}
+                      heldByTitles={heldByTitles}
                       sessions={upcoming.filter(
                         (session) => activeBookingsOn(session).length === 0,
                       )}
@@ -1052,6 +1085,7 @@ function DraftListingCard({ draft, onDiscard }) {
 
 function ListingSessions({
   listingId,
+  heldByTitles = {},
   sessions,
   selectedIds,
   expanded,
@@ -1088,6 +1122,7 @@ function ListingSessions({
         <SessionRow
           key={session.id}
           session={session}
+          heldNote={isHeld(session) ? heldSessionLine(heldByTitles[session.held_by_session_id]) : ''}
           selectable
           selected={selectedIds.has(session.id)}
           confirmCancel={false}
@@ -1153,6 +1188,7 @@ function ListingSessions({
 
 function SessionRow({
   session,
+  heldNote = '',
   showListing = false,
   selectable,
   selected,
@@ -1226,6 +1262,7 @@ function SessionRow({
         ) : (
           <div className="hosting-session__text">
             <p className="dashboard-card__title">{title}</p>
+            {heldNote ? <p className="hosting-session__held">{heldNote}</p> : null}
             {showListing ? (
               <p className="dashboard-card__meta">
                 {when} · {guestLabel}
