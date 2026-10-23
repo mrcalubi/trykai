@@ -444,8 +444,9 @@ A manual dump gives a restore point from the minute before a risky change, newer
 |---|---|---|---|
 | `00022` to `00026` | Applied | Applied | 18 October (production was applied first, by mistake) |
 | `00027` to `00031` | Applied | Applied | 19 October, read-only check query |
-| `00032` (I'm keen) | Not yet | Not yet | Apply with PR "I'm keen". No new secrets: the two new functions use the existing `RESEND_API_KEY` and `SITE_URL` |
-| `00033` (shared availability) | Not yet | Not yet | Replaces `confirm_paid_booking`. Rui Heng reviews first. Apply right after the PR's code reaches that environment; no Edge Function changes |
+| `00032` (I'm keen) | Applied | Applied | 21 October, run before the #142 sync. Re-check with the query in the sync steps if in doubt |
+| `00033` (shared availability) | Applied | Applied | 21 October, same sitting |
+| `00034` (teaching plan) | Not yet | Not yet | **Run before the PR's code reaches that environment**: `admin-verifications` selects `teaching_plan` and the queue fails without it. Safe for the old page (the new argument defaults to null) |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
@@ -501,6 +502,25 @@ Do every step on **staging** (`hzgybclfvpuxkmytdoos`, site trykai.vercel.app), t
 | 1 to 5 | Not yet | Not yet |
 | 6 Confirm email on | Not yet | Not yet |
 | 7 Tested | Not yet | Not yet |
+
+---
+
+# New verification alert (`notify-verification-pending`)
+
+Every host now verifies by upload, so Caleb needs an email when one arrives. The email comes from a **database webhook**, set up per project in the dashboard. Production had none on 23 October (no `NOTIFY_FUNCTION_SECRET` secret). Until it is set up, check `/admin/verifications` yourself after each onboarding call.
+
+1. **Make a secret.** Any long random string, for example from a password manager. Add it as the Edge Function secret `NOTIFY_FUNCTION_SECRET` (Edge Functions, Secrets).
+2. **Create the webhook.** Database, Webhooks, Create a new hook:
+   - Name `notify-verification-pending`, table `public.users`, events **Update** only
+   - Type: Supabase Edge Functions, function `notify-verification-pending`, method POST
+   - HTTP header `x-notify-secret` = the secret from step 1
+3. **Test:** submit a verification with a test account. An email titled "New host verification pending review" should arrive at `ADMIN_NOTIFY_EMAIL` (default calebong2002@gmail.com), with what they want to teach.
+
+The function ignores every update except a move into `pending`, so other profile edits send nothing.
+
+| | Staging | Production |
+|---|---|---|
+| Secret and webhook | Check | Not set up |
 
 ---
 

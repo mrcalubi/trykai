@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
-import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { verificationDocumentPaths } from '../../supabase/functions/_shared/verification.ts'
 
 /** `my_verification` returns a table, so PostgREST hands back an array. */
@@ -11,30 +10,28 @@ function firstRow(data) {
   return data ?? null
 }
 
-// Stripe's checks are asynchronous, so a host returning from the hosted flow
-// usually lands here before the webhook has recorded anything.
-const POLL_ATTEMPTS = 12
-const POLL_INTERVAL_MS = 2500
+/**
+ * Manual review is the only route (DECISIONS.md, 23 October): Stripe Identity
+ * is not offered to Singapore-based businesses, so live sessions are refused.
+ */
+export const TEACHING_PLAN_MIN = 15
+export const TEACHING_PLAN_MAX = 600
 
 export default function VerifyIdentity() {
   const navigate = useNavigate()
   const location = useLocation()
   const userId = useAuthedUserId()
-  const [searchParams] = useSearchParams()
-  const returnedFromStripe = searchParams.get('identity') === 'return'
 
   const [statusChecked, setStatusChecked] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState(null)
   const [rejectionReason, setRejectionReason] = useState('')
+  const [teachingPlan, setTeachingPlan] = useState('')
   const [idPhoto, setIdPhoto] = useState(null)
   const [selfie, setSelfie] = useState(null)
   const [consent, setConsent] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [stripeLoading, setStripeLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [awaitingResult, setAwaitingResult] = useState(false)
-  const [showManual, setShowManual] = useState(false)
 
   const readStatus = useCallback(async () => {
     const { data } = await supabase.rpc('my_verification')
@@ -51,19 +48,14 @@ export default function VerifyIdentity() {
     async function loadStatus() {
       const { status, reason } = await readStatus()
       if (cancelled) return
-      // The success card is only for the moment verification lands. A later
-      // visit from an already-approved host goes straight to create listing.
-      if (status === 'approved' && !returnedFromStripe) {
+      // An approved host has nothing to do here; send them on to create listing.
+      if (status === 'approved') {
         navigate('/create-listing', { replace: true })
         return
       }
       setVerificationStatus(status)
       setRejectionReason(reason)
       setStatusChecked(true)
-      // Only a host coming back from Stripe has a result on the way.
-      if (returnedFromStripe && status !== 'approved' && status !== 'rejected') {
-        setAwaitingResult(true)
-      }
     }
 
     void Promise.resolve().then(() => {
@@ -73,78 +65,17 @@ export default function VerifyIdentity() {
     return () => {
       cancelled = true
     }
-  }, [navigate, readStatus, returnedFromStripe])
-
-  useEffect(() => {
-    if (!awaitingResult) return
-
-    let cancelled = false
-    let attempts = 0
-
-    async function poll() {
-      while (!cancelled && attempts < POLL_ATTEMPTS) {
-        attempts += 1
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
-        if (cancelled) return
-
-        const { status, reason } = await readStatus()
-        if (cancelled) return
-
-        if (status === 'approved' || status === 'rejected') {
-          setVerificationStatus(status)
-          setRejectionReason(reason)
-          setAwaitingResult(false)
-          return
-        }
-      }
-
-      if (!cancelled) setAwaitingResult(false)
-    }
-
-    void poll()
-
-    return () => {
-      cancelled = true
-    }
-  }, [awaitingResult, readStatus])
-
-  async function startStripeCheck() {
-    setError('')
-    setStripeLoading(true)
-
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    const { data, error: fnError } = await supabase.functions.invoke('create-identity-session', {
-      body: {},
-      headers: { Authorization: `Bearer ${session?.access_token}` },
-    })
-
-    if (fnError || data?.error) {
-      setStripeLoading(false)
-      setError(await edgeFunctionErrorMessage(fnError, data))
-      return
-    }
-
-    if (data?.already_verified) {
-      setStripeLoading(false)
-      navigate('/create-listing', { replace: true })
-      return
-    }
-
-    if (!data?.url) {
-      setStripeLoading(false)
-      setError('Could not start the identity check. Please try again.')
-      return
-    }
-
-    window.location.assign(data.url)
-  }
+  }, [navigate, readStatus])
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+
+    const plan = teachingPlan.trim()
+    if (plan.length < TEACHING_PLAN_MIN) {
+      setError('Tell us a little about what you would like to teach.')
+      return
+    }
 
     if (!idPhoto || !selfie) {
       setError('Please upload both your ID photo and a selfie.')
@@ -184,6 +115,7 @@ export default function VerifyIdentity() {
       p_id_photo_url: paths.idPhoto,
       p_selfie_url: paths.selfie,
       p_consent: true,
+      p_teaching_plan: plan,
     })
 
     setLoading(false)
@@ -201,48 +133,14 @@ export default function VerifyIdentity() {
     return <p className="status-message">Loading…</p>
   }
 
-  if (verificationStatus === 'approved') {
-    return (
-      <div className="page page--form page--form-status">
-        <div className="form-card">
-          <h1 className="form-card__title">Identity verified</h1>
-          <p className="form-card__subtitle">
-            Your identity has been approved. You can create listings on TryKai.
-          </p>
-          <button
-            type="button"
-            onClick={() => navigate('/create-listing', { replace: true })}
-            className="btn btn--primary"
-          >
-            Create a listing
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (awaitingResult) {
-    return (
-      <div className="page page--form">
-        <div className="form-card">
-          <h1 className="form-card__title">Checking your documents</h1>
-          <p className="success-message">
-            Stripe is verifying what you submitted. This usually takes under a minute, and this
-            page will update on its own.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   if (verificationStatus === 'pending' || submitted) {
     return (
       <div className="page page--form page--form-status">
         <div className="form-card">
           <h1 className="form-card__title">Under review</h1>
           <p className="success-message">
-            Your verification documents have been submitted and are under review. We&apos;ll
-            notify you once your identity is approved — usually within 1–2 business days.
+            Thanks. The TryKai team will check your photos and get back to you by email, usually
+            within 1 to 2 business days.
           </p>
         </div>
       </div>
@@ -254,8 +152,9 @@ export default function VerifyIdentity() {
       <div className="form-card">
         <h1 className="form-card__title">Verify your identity</h1>
         <p className="form-card__subtitle">
-          Hosting on TryKai means meeting people in person, so we verify every host. The check is
-          run by Stripe, takes about a minute, and TryKai never stores your ID.
+          Hosting on TryKai means meeting people in person, so we check every host. Tell us what
+          you&apos;d like to teach, add a photo of your ID and a selfie, and the TryKai team will
+          review it within 1 to 2 business days.
         </p>
 
         {location.state?.message && (
@@ -270,80 +169,67 @@ export default function VerifyIdentity() {
           </p>
         )}
 
-        {error && <p className="error-message error-message--spaced">{error}</p>}
+        <form onSubmit={handleSubmit} className="form">
+          <label className="label">
+            What would you like to teach?
+            <textarea
+              value={teachingPlan}
+              onChange={(e) => setTeachingPlan(e.target.value)}
+              maxLength={TEACHING_PLAN_MAX}
+              rows={4}
+              className="input input--textarea"
+              placeholder="Latte art for beginners. I've been a barista for six years and pour at home every weekend."
+            />
+            <span className="hint">
+              A sentence or two: what guests would do, and why you know it. You can change the
+              details when you create your listing.
+            </span>
+          </label>
 
-        <button
-          type="button"
-          className="btn btn--primary"
-          disabled={stripeLoading}
-          onClick={startStripeCheck}
-        >
-          {stripeLoading ? 'Opening Stripe…' : 'Verify with Stripe'}
-        </button>
+          <label className="label">
+            Passport or NRIC photo
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setIdPhoto(e.target.files?.[0] || null)}
+              className="input input--file"
+            />
+            <span className="hint">
+              The front, clear and readable. On an NRIC you can cover the number: we only need
+              your name and photo.
+            </span>
+          </label>
 
-        <p className="hint hint--spaced">
-          You will need your NRIC or passport and a phone or webcam for the selfie.
-        </p>
+          <label className="label">
+            Selfie
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setSelfie(e.target.files?.[0] || null)}
+              className="input input--file"
+            />
+            <span className="hint">A clear photo of your face, taken recently</span>
+          </label>
 
-        <div className="verify-fallback">
-          {showManual ? (
-            <>
-              <p className="verify-fallback__intro">
-                Upload your documents instead and the TryKai team will review them by hand. This
-                takes 1 to 2 business days.
-              </p>
+          <label className="label label--inline">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+            />
+            <span>
+              I agree to TryKai using these photos to verify my identity. They are stored
+              privately and seen only by the TryKai team. If I am not approved they are deleted
+              within 30 days; if I am, they are kept while my account is active.
+            </span>
+          </label>
 
-              <form onSubmit={handleSubmit} className="form">
-                <label className="label">
-                  NRIC or passport photo
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setIdPhoto(e.target.files?.[0] || null)}
-                    className="input input--file"
-                  />
-                  <span className="hint">Clear photo of the front of your ID document</span>
-                </label>
+          {error && <p className="error-message">{error}</p>}
 
-                <label className="label">
-                  Selfie
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setSelfie(e.target.files?.[0] || null)}
-                    className="input input--file"
-                  />
-                  <span className="hint">A clear photo of your face, taken recently</span>
-                </label>
-
-                <label className="label label--inline">
-                  <input
-                    type="checkbox"
-                    checked={consent}
-                    onChange={(e) => setConsent(e.target.checked)}
-                  />
-                  <span>
-                    I agree to TryKai using these documents to verify my identity. They are stored
-                    privately, are only seen by the TryKai team for this review, and are deleted
-                    within 30 days if my application is not approved.
-                  </span>
-                </label>
-
-                <button type="submit" disabled={loading} className="btn btn--primary">
-                  {loading ? 'Submitting…' : 'Submit for review'}
-                </button>
-              </form>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="link-button"
-              onClick={() => setShowManual(true)}
-            >
-              Having trouble? Upload your documents instead
-            </button>
-          )}
-        </div>
+          <button type="submit" disabled={loading} className="btn btn--primary">
+            {loading ? 'Submitting…' : 'Submit for review'}
+          </button>
+        </form>
       </div>
     </div>
   )

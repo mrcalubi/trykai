@@ -158,6 +158,11 @@ describe('Terms of Service page', () => {
     renderWithRouter(<Terms />)
   })
 
+  it('describes verification as an upload reviewed by TryKai, not Stripe Identity', () => {
+    expect(screen.getByText(/uploading a photo\s+of your passport or NRIC and a selfie/)).toBeInTheDocument()
+    expect(screen.queryByText(/Stripe Identity/)).not.toBeInTheDocument()
+  })
+
   it('requires users to be 18 and names the UEN', () => {
     expect(screen.getByText(/You must be 18 or older/)).toBeInTheDocument()
     expect(screen.getByText(/UEN 53526159D/)).toBeInTheDocument()
@@ -215,8 +220,11 @@ describe('Privacy Policy page', () => {
     )
   })
 
-  it('does not claim TryKai stores Stripe Identity images', () => {
-    expect(screen.getByText(/TryKai does not receive or store those images/)).toBeInTheDocument()
+  it('says hosts upload ID photos that TryKai stores, and no longer claims Stripe checks them', () => {
+    expect(screen.getByText(/Hosts verify by uploading a photo of their passport or NRIC/)).toBeInTheDocument()
+    expect(screen.getByText(/you may cover the number/)).toBeInTheDocument()
+    expect(screen.queryByText(/Stripe Identity/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/does not receive or store those images/)).not.toBeInTheDocument()
   })
 
   it('keeps booking records for five years and does not sell personal data', () => {

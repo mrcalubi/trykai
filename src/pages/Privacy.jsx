@@ -2,7 +2,7 @@ export default function Privacy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Privacy Policy</h1>
-      <p className="policy-page__updated">Last updated: 18 October 2026</p>
+      <p className="policy-page__updated">Last updated: 23 October 2026</p>
 
       <p>
         This policy explains how TryKai collects, uses, shares and protects your
@@ -69,10 +69,8 @@ export default function Privacy() {
               <td>To confirm Hosts are real, identifiable people</td>
             </tr>
             <tr>
-              <td>ID document and selfie (manual review only)</td>
-              <td>
-                Only if you use manual verification instead of Stripe Identity
-              </td>
+              <td>ID document and selfie</td>
+              <td>When you verify to host</td>
               <td>Same as above</td>
             </tr>
             <tr>
@@ -96,14 +94,11 @@ export default function Privacy() {
 
       <h2>4. Identity verification</h2>
       <p>
-        Most Hosts verify through <strong>Stripe Identity</strong>. Stripe
-        checks your ID document and a live selfie and tells us only whether
-        verification passed. TryKai does not receive or store those images.
-      </p>
-      <p>
-        If you use <strong>manual verification</strong> instead, your ID and
-        selfie are stored in private, access-restricted storage and reviewed
-        only by TryKai. We use them only to confirm your identity.
+        Hosts verify by uploading a photo of their passport or NRIC and a
+        selfie. These are stored in private, access-restricted storage and
+        reviewed only by the TryKai team. We use them only to confirm your
+        identity. On an NRIC you may cover the number: we need only your name
+        and photo.
       </p>
       <ul>
         <li>Images from a rejected attempt are deleted after 30 days.</li>
@@ -116,8 +111,7 @@ export default function Privacy() {
       <p>We share personal data only with the service providers we need to run TryKai:</p>
       <ul>
         <li>
-          <strong>Stripe:</strong> payments, Host payouts and identity
-          verification
+          <strong>Stripe:</strong> payments and Host payouts
         </li>
         <li>
           <strong>Supabase:</strong> our database, file storage and logins
