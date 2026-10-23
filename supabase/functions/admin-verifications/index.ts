@@ -56,7 +56,7 @@ async function listPending() {
 
   const { data: rows, error } = await admin
     .from('users')
-    .select('id, full_name, email, verification_submitted_at, id_photo_url, selfie_url')
+    .select('id, full_name, email, verification_submitted_at, teaching_plan, id_photo_url, selfie_url')
     .eq('verification_status', 'pending')
     .order('verification_submitted_at', { ascending: true, nullsFirst: true })
 
@@ -75,6 +75,7 @@ async function listPending() {
       full_name: row.full_name,
       email: row.email,
       submitted_at: row.verification_submitted_at,
+      teaching_plan: row.teaching_plan ?? null,
       id_photo_url: idPhoto,
       selfie_url: selfie,
     })

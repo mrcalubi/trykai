@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 18 October 2026
+Last updated: 23 October 2026
 
 This policy explains how TryKai collects, uses, shares and protects your personal data, in line with Singapore's Personal Data Protection Act 2012 (PDPA).
 
@@ -22,7 +22,7 @@ Contact our Data Protection Officer for any question about your data or to exerc
 | Booking and payment records | When you book or are booked | To process bookings, refunds and payouts |
 | Reviews | When you leave one | Shown publicly on the Host's listing and profile |
 | Identity verification result | Before you host | To confirm Hosts are real, identifiable people |
-| ID document and selfie (manual review only) | Only if you use manual verification instead of Stripe Identity | Same as above |
+| ID document and selfie | When you verify to host | Same as above |
 | Basic usage data (pages viewed, device type) | Automatically | To keep the site working and improve it |
 
 We do not collect your full card details. Stripe handles them.
@@ -33,9 +33,7 @@ Your display name, profile photo, ID verified badge, listings and the reviews yo
 
 ## 4. Identity verification
 
-Most Hosts verify through **Stripe Identity**. Stripe checks your ID document and a live selfie and tells us only whether verification passed. TryKai does not receive or store those images.
-
-If you use **manual verification** instead, your ID and selfie are stored in private, access-restricted storage and reviewed only by TryKai. We use them only to confirm your identity.
+Hosts verify by uploading a photo of their passport or NRIC and a selfie. These are stored in private, access-restricted storage and reviewed only by the TryKai team. We use them only to confirm your identity. On an NRIC you may cover the number: we need only your name and photo.
 
 - Images from a rejected attempt are deleted after 30 days.
 - Images for an approved Host are kept while the account is active.
@@ -44,7 +42,7 @@ If you use **manual verification** instead, your ID and selfie are stored in pri
 
 We share personal data only with the service providers we need to run TryKai:
 
-- **Stripe:** payments, Host payouts and identity verification
+- **Stripe:** payments and Host payouts
 - **Supabase:** our database, file storage and logins
 - **Resend:** sending our emails
 - **Vercel:** hosting the website

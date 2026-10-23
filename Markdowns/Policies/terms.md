@@ -1,6 +1,6 @@
 # Terms of Service
 
-Last updated: 7 October 2026
+Last updated: 23 October 2026
 
 These terms apply to everyone who uses TryKai. Part 1 applies to all users. Part 2 applies when you host. Part 3 applies when you book.
 
@@ -109,7 +109,7 @@ By listing a session, you confirm that:
 
 ### 3. Identity verification
 
-You must verify your identity before you can list. Verification normally runs through Stripe Identity, which checks an ID document and a live selfie and tells us only the result. If that is not possible, you can submit documents for manual review instead. Verification confirms who you are. It does not certify your skill or character.
+You must verify your identity before you can list, by uploading a photo of your passport or NRIC and a selfie for the TryKai team to review. Verification confirms who you are. It does not certify your skill or character.
 
 ### 4. Fees
 

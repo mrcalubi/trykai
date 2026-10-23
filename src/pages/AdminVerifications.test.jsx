@@ -73,6 +73,26 @@ describe('AdminVerifications queue', () => {
     )
   })
 
+  it('shows what the host wants to teach', async () => {
+    givenQueue([makePending({ teaching_plan: 'Latte art for beginners' })])
+    renderPage()
+
+    await screen.findByText('Mei Ling')
+    const card = cardFor('Mei Ling')
+    expect(within(card).getByText('Wants to teach')).toBeInTheDocument()
+    expect(within(card).getByText('Latte art for beginners')).toBeInTheDocument()
+  })
+
+  it('marks a submission made before the question was asked', async () => {
+    givenQueue([makePending({ teaching_plan: null })])
+    renderPage()
+
+    await screen.findByText('Mei Ling')
+    expect(
+      within(cardFor('Mei Ling')).getByText('Not given (submitted before this was asked)')
+    ).toBeInTheDocument()
+  })
+
   it('sends the signed-in reviewer token with the request', async () => {
     givenQueue([makePending()])
     renderPage()
