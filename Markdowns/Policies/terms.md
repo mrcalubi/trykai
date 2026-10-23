@@ -109,7 +109,7 @@ By listing a session, you confirm that:
 
 ### 3. Identity verification
 
-You must verify your identity before you can list, by uploading a photo of your passport or NRIC and a selfie for the TryKai team to review. Verification confirms who you are. It does not certify your skill or character.
+You must verify your identity before you can list, with Singpass where it is offered, or by uploading a photo of your passport or NRIC and a selfie for the TryKai team to review. Verification confirms who you are. It does not certify your skill or character.
 
 ### 4. Fees
 

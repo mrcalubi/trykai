@@ -5,9 +5,12 @@ import { useAuthedUserId } from '../lib/authedUser'
 import { verificationDocumentPaths } from '../../supabase/functions/_shared/verification.ts'
 import {
   TEACHING_PLAN_MAX,
+  TEACHING_PLAN_MIN,
   missingItemsMessage,
   missingVerificationItems,
 } from '../lib/verificationForm'
+import { singpassEnabled } from '../lib/singpass'
+import { functionReasonOrDefault } from '../lib/edgeFunctionError'
 
 /** `my_verification` returns a table, so PostgREST hands back an array. */
 function firstRow(data) {
@@ -16,8 +19,10 @@ function firstRow(data) {
 }
 
 /**
- * Manual review is the only route (DECISIONS.md, 23 October): Stripe Identity
- * is not offered to Singapore-based businesses, so live sessions are refused.
+ * Two routes (DECISIONS.md, 23 October). Singpass Login, where the environment
+ * turns it on: Singpass confirms the name and TryKai stores no documents.
+ * Upload, always: an ID photo and a selfie for manual review, for anyone
+ * without Singpass. Stripe Identity is not offered to Singapore businesses.
  */
 
 export default function VerifyIdentity() {
@@ -35,6 +40,9 @@ export default function VerifyIdentity() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [singpassLoading, setSingpassLoading] = useState(false)
+  const [showUpload, setShowUpload] = useState(false)
+  const singpass = singpassEnabled()
 
   const readStatus = useCallback(async () => {
     const { data } = await supabase.rpc('my_verification')
@@ -123,6 +131,38 @@ export default function VerifyIdentity() {
     setSubmitted(true)
   }
 
+  async function startSingpass() {
+    setError('')
+    const plan = teachingPlan.trim()
+    if (plan.length < TEACHING_PLAN_MIN) {
+      setError(missingItemsMessage(["what you'd like to teach"]))
+      return
+    }
+
+    setSingpassLoading(true)
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    const { data, error: fnError } = await supabase.functions.invoke('singpass-start', {
+      body: { teaching_plan: plan },
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    })
+
+    if (fnError || data?.error || !data?.url) {
+      setSingpassLoading(false)
+      setError(
+        await functionReasonOrDefault(
+          fnError,
+          data,
+          'Could not open Singpass. Please try again, or upload your ID instead.'
+        )
+      )
+      return
+    }
+
+    window.location.assign(data.url)
+  }
+
   if (!statusChecked) {
     return <p className="status-message">Loading…</p>
   }
@@ -133,7 +173,7 @@ export default function VerifyIdentity() {
         <div className="form-card">
           <h1 className="form-card__title">Under review</h1>
           <p className="success-message">
-            Thanks. The TryKai team will check your photos and get back to you by email, usually
+            Thanks. The TryKai team will check your details and get back to you by email, usually
             within 1 to 2 business days.
           </p>
         </div>
@@ -141,14 +181,74 @@ export default function VerifyIdentity() {
     )
   }
 
+  const teachingField = (
+    <label className="label">
+      What would you like to teach?
+      <textarea
+        value={teachingPlan}
+        onChange={(e) => setTeachingPlan(e.target.value)}
+        maxLength={TEACHING_PLAN_MAX}
+        rows={4}
+        className="input input--textarea"
+        placeholder="Latte art for beginners. I've been a barista for six years and pour at home every weekend."
+      />
+      <span className="hint">
+        A sentence or two: what guests would do, and why you know it. You can change the
+        details when you create your listing.
+      </span>
+    </label>
+  )
+
+  const uploadFields = (
+    <>
+      <label className="label">
+        Passport or NRIC photo
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => setIdPhoto(e.target.files?.[0] || null)}
+          className="input input--file"
+        />
+        <span className="hint">
+          The front, clear and readable. On an NRIC you can cover the number: we only need
+          your name and photo.
+        </span>
+      </label>
+
+      <label className="label">
+        Selfie
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => setSelfie(e.target.files?.[0] || null)}
+          className="input input--file"
+        />
+        <span className="hint">A clear photo of your face, taken recently</span>
+      </label>
+
+      <label className="label label--inline">
+        <input
+          type="checkbox"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+        />
+        <span>
+          I agree to TryKai using these photos to verify my identity. They are stored
+          privately and seen only by the TryKai team. If I am not approved they are deleted
+          within 30 days; if I am, they are kept while my account is active.
+        </span>
+      </label>
+    </>
+  )
+
   return (
     <div className="page page--form">
       <div className="form-card">
         <h1 className="form-card__title">Verify your identity</h1>
         <p className="form-card__subtitle">
-          Hosting on TryKai means meeting people in person, so we check every host. Tell us what
-          you&apos;d like to teach, add a photo of your ID and a selfie, and the TryKai team will
-          review it within 1 to 2 business days.
+          {singpass
+            ? "Hosting on TryKai means meeting people in person, so we check every host. Tell us what you'd like to teach, then confirm who you are with Singpass. The TryKai team reviews it within 1 to 2 business days."
+            : "Hosting on TryKai means meeting people in person, so we check every host. Tell us what you'd like to teach, add a photo of your ID and a selfie, and the TryKai team will review it within 1 to 2 business days."}
         </p>
 
         {location.state?.message && (
@@ -164,65 +264,61 @@ export default function VerifyIdentity() {
         )}
 
         <form onSubmit={handleSubmit} className="form">
-          <label className="label">
-            What would you like to teach?
-            <textarea
-              value={teachingPlan}
-              onChange={(e) => setTeachingPlan(e.target.value)}
-              maxLength={TEACHING_PLAN_MAX}
-              rows={4}
-              className="input input--textarea"
-              placeholder="Latte art for beginners. I've been a barista for six years and pour at home every weekend."
-            />
-            <span className="hint">
-              A sentence or two: what guests would do, and why you know it. You can change the
-              details when you create your listing.
-            </span>
-          </label>
+          {teachingField}
 
-          <label className="label">
-            Passport or NRIC photo
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setIdPhoto(e.target.files?.[0] || null)}
-              className="input input--file"
-            />
-            <span className="hint">
-              The front, clear and readable. On an NRIC you can cover the number: we only need
-              your name and photo.
-            </span>
-          </label>
+          {singpass ? (
+            <>
+              <div className="verify-singpass">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  disabled={singpassLoading}
+                  onClick={startSingpass}
+                >
+                  {singpassLoading ? 'Opening Singpass…' : 'Verify with Singpass'}
+                </button>
+                <p className="hint">
+                  Singpass shares your name, date of birth and mobile number with TryKai. You check them before submitting. We never see your NRIC number.
+                </p>
+              </div>
 
-          <label className="label">
-            Selfie
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setSelfie(e.target.files?.[0] || null)}
-              className="input input--file"
-            />
-            <span className="hint">A clear photo of your face, taken recently</span>
-          </label>
+              {error && !showUpload && <p className="error-message">{error}</p>}
 
-          <label className="label label--inline">
-            <input
-              type="checkbox"
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-            />
-            <span>
-              I agree to TryKai using these photos to verify my identity. They are stored
-              privately and seen only by the TryKai team. If I am not approved they are deleted
-              within 30 days; if I am, they are kept while my account is active.
-            </span>
-          </label>
-
-          {error && <p className="error-message">{error}</p>}
-
-          <button type="submit" disabled={loading} className="btn btn--primary">
-            {loading ? 'Submitting…' : 'Submit for review'}
-          </button>
+              <div className="verify-fallback">
+                {showUpload ? (
+                  <>
+                    <p className="verify-fallback__intro">
+                      No Singpass? Upload a photo of your passport or NRIC and a selfie instead.
+                    </p>
+                    {uploadFields}
+                    {error && <p className="error-message">{error}</p>}
+                    <button type="submit" disabled={loading} className="btn btn--secondary">
+                      {loading ? 'Submitting…' : 'Submit for review'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => {
+                      setError('')
+                      setShowUpload(true)
+                    }}
+                  >
+                    No Singpass? Upload your ID instead
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {uploadFields}
+              {error && <p className="error-message">{error}</p>}
+              <button type="submit" disabled={loading} className="btn btn--primary">
+                {loading ? 'Submitting…' : 'Submit for review'}
+              </button>
+            </>
+          )}
         </form>
       </div>
     </div>

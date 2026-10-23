@@ -159,7 +159,8 @@ describe('Terms of Service page', () => {
   })
 
   it('describes verification as an upload reviewed by TryKai, not Stripe Identity', () => {
-    expect(screen.getByText(/uploading a photo\s+of your passport or NRIC and a selfie/)).toBeInTheDocument()
+    expect(screen.getByText(/uploading a photo of your passport or NRIC and a\s+selfie/)).toBeInTheDocument()
+    expect(screen.getByText(/with Singpass where\s+it is offered/)).toBeInTheDocument()
     expect(screen.queryByText(/Stripe Identity/)).not.toBeInTheDocument()
   })
 
@@ -221,8 +222,9 @@ describe('Privacy Policy page', () => {
   })
 
   it('says hosts upload ID photos that TryKai stores, and no longer claims Stripe checks them', () => {
-    expect(screen.getByText(/Hosts verify by uploading a photo of their passport or NRIC/)).toBeInTheDocument()
+    expect(screen.getByText(/Hosts can instead verify by uploading a photo of their passport or NRIC/)).toBeInTheDocument()
     expect(screen.getByText(/you may cover the number/)).toBeInTheDocument()
+    expect(screen.getByText(/We do not receive your NRIC number or\s+any document images/)).toBeInTheDocument()
     expect(screen.queryByText(/Stripe Identity/)).not.toBeInTheDocument()
     expect(screen.queryByText(/does not receive or store those images/)).not.toBeInTheDocument()
   })

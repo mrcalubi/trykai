@@ -19,6 +19,8 @@ import RedirectToOwnProfile from './pages/RedirectToOwnProfile'
 import BookingDetail from './pages/BookingDetail'
 import Settings from './pages/Settings'
 import AdminVerifications from './pages/AdminVerifications'
+import AdminSingpassKeys from './pages/AdminSingpassKeys'
+import SingpassReturn from './pages/SingpassReturn'
 import RefundPolicy from './pages/RefundPolicy'
 import CancellationPolicy from './pages/CancellationPolicy'
 import DisputePolicy from './pages/DisputePolicy'
@@ -102,6 +104,24 @@ export default function App() {
           element={
             <RequireAuth>
               <Settings />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/verify-identity/singpass"
+          element={
+            <RequireAuth>
+              <SingpassReturn />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/singpass-keys"
+          element={
+            <RequireAuth>
+              <RequireAdmin>
+                <AdminSingpassKeys />
+              </RequireAdmin>
             </RequireAuth>
           }
         />

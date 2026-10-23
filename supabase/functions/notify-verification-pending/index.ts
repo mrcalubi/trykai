@@ -31,6 +31,9 @@ Deno.serve(async (req) => {
     const fullName = typeof record?.full_name === 'string' ? record.full_name : 'A host'
     const email = typeof record?.email === 'string' ? record.email : 'unknown email'
     const plan = typeof record?.teaching_plan === 'string' ? record.teaching_plan.trim() : ''
+    const singpassName = record?.verification_method === 'singpass' && typeof record?.verified_name === 'string'
+      ? record.verified_name.trim()
+      : ''
 
     await sendResendEmail({
       apiKey: Deno.env.get('RESEND_API_KEY'),
@@ -38,8 +41,11 @@ Deno.serve(async (req) => {
       subject: 'New host verification pending review',
       html: `
         <h2>New verification submission</h2>
-        <p><strong>${escapeHtml(fullName)}</strong> (${escapeHtml(email)}) uploaded identity
-        documents for manual review.</p>
+        <p><strong>${escapeHtml(fullName)}</strong> (${escapeHtml(email)}) ${
+          singpassName
+            ? `verified with Singpass as <strong>${escapeHtml(singpassName)}</strong>.`
+            : 'uploaded identity documents for manual review.'
+        }</p>
         ${plan ? `<p><strong>Wants to teach:</strong> ${escapeHtml(plan)}</p>` : ''}
         <p><a href="${siteUrl}/admin/verifications">Review it on TryKai</a></p>
       `,
