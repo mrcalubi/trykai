@@ -36,6 +36,7 @@ import {
   draftValues,
   readDraft,
 } from '../lib/listingDraft'
+import { notifyListingSubmitted } from '../lib/listingReview'
 
 const MAX_PHOTOS = 5
 const DRAFT_RESTORED = 'Draft restored. Photos are not kept in drafts, so add them again.'
@@ -309,6 +310,7 @@ export default function CreateListing() {
     }
 
     clearDraft(userId)
+    void notifyListingSubmitted()
     navigate('/hosting', { replace: true })
   }
 

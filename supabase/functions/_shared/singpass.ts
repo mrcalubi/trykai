@@ -10,8 +10,6 @@
  * (`sub`) keeps one Singpass to one host account. No NRIC number is requested.
  */
 
-import { TEACHING_PLAN_MAX, TEACHING_PLAN_MIN } from './verification.ts'
-
 export const SINGPASS_SCOPE = 'openid name dob mobileno'
 
 /** Hosts must be 18 or older (Terms). */
@@ -92,19 +90,6 @@ export function readSingpassConfig(
     return { ok: false, missing: [...new Set(missing)] }
   }
   return { ok: true, config: { clientId, issuer, redirectUri, signingKey, encryptionKey } }
-}
-
-export function normalizeTeachingPlan(value: unknown):
-  | { ok: true; plan: string }
-  | { ok: false; error: string } {
-  const plan = typeof value === 'string' ? value.trim() : ''
-  if (plan.length < TEACHING_PLAN_MIN) {
-    return { ok: false, error: "Tell us what you'd like to teach first." }
-  }
-  if (plan.length > TEACHING_PLAN_MAX) {
-    return { ok: false, error: `What you'd like to teach must be ${TEACHING_PLAN_MAX} characters or fewer.` }
-  }
-  return { ok: true, plan }
 }
 
 /** The redirect's query string, as the page passes it on. */

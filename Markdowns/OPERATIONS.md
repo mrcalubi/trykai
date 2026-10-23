@@ -447,7 +447,8 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00032` (I'm keen) | Applied | Applied | 21 October, run before the #142 sync. Re-check with the query in the sync steps if in doubt |
 | `00033` (shared availability) | Applied | Applied | 21 October, same sitting |
 | `00034` (teaching plan) | Applied | Applied | 23 October, before #145. |
-| `00035` (Singpass) | Not yet | Not yet | **Run before the PR's code reaches that environment**: `admin-verifications` selects `verified_name` and `verification_method`. Safe with Singpass switched off |
+| `00035` (Singpass) | Applied | Not yet | Staging 23 October, before #146. **Production: run before the next sync to `main`**: `admin-verifications` selects `verified_name` and `verification_method`. Safe with Singpass switched off |
+| `00036` (Singpass auto-approve, listing review) | Not yet | Not yet | **Run before the PR's code reaches that environment**: Hosting, listing pages, I'm keen and checkout read `listings.review_status`. Run after `00035`. Existing listings stay live (they are marked approved) |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
@@ -530,7 +531,7 @@ Hosts can confirm who they are with Singpass instead of uploading an ID (DECISIO
 
    Then close the keys page.
 5. **Show the button on staging.** Vercel, Settings, Environment Variables: `VITE_SINGPASS_ENABLED` = `true`, for **Preview** only (staging). Redeploy staging.
-6. **Test** with a Myinfo test persona (Singpass portal, Testing): on `/verify-identity`, type what you would teach, tap Verify with Singpass, log in, check "Check your details" shows the persona's name, date of birth and mobile, tap Confirm and submit, and land on "Under review". The host should appear in `/admin/verifications` as "Verified with Singpass as <name>", with birth date, age and mobile. Approve it. Then:
+6. **Test** with a Myinfo test persona (Singpass portal, Testing; the staging Singpass app from TestFlight). On `/verify-identity`, tap Verify with Singpass, log in, check "Check your details" shows the persona's name, date of birth and mobile, tap Confirm and continue, and land on "You're verified" (with `00036`; before it, "Under review"). Create your listing should open the listing form. Then:
    - the same persona from a second TryKai account should say the Singpass is already linked
    - a persona under 18, if the test set has one, should say hosts must be 18 or older
    - tapping Cancel on "Check your details" should return to the verify page and save nothing
@@ -549,11 +550,46 @@ Rotate keys at least once a year: add the new public key to the app before switc
 
 | Step | Staging | Production |
 |---|---|---|
-| `00035` | Not yet | Not yet |
-| App created | Not yet | Not yet |
-| Secrets set | Not yet | Not yet |
-| Button on (`VITE_SINGPASS_ENABLED`) | Not yet | Not yet, after approval |
-| Tested | Not yet | Not yet |
+| `00035` | Done | Not yet |
+| App created | Done | Not yet |
+| Secrets set | Done | Not yet |
+| Button on (`VITE_SINGPASS_ENABLED`) | Done (Preview, `staging` branch) | Not yet, after approval |
+| Tested | Done 23 October (persona with no mobile) | Not yet |
+
+---
+
+# Listing review (`listing-submitted`, `admin-listings`)
+
+Every new listing is hidden from guests until someone on the team approves it (DECISIONS.md, 23 October, `00036`). The host can add dates straight away; only guests are kept out. Owner: Caleb, with Rui Heng as backup.
+
+**When a listing comes in.** `listing-submitted` emails `ADMIN_NOTIFY_EMAIL` ("New listing to review: <title>") the moment the host saves. Open `/admin/listings` (also in the menu as Listing review, admins only). Aim to decide within a few hours: the host is waiting to share it.
+
+**What to check.**
+- It is a real, in-person session this host can plausibly teach (Singpass name and the description agree; for an upload host, they are also on Verification review)
+- The photos look like theirs and show the activity, not stock images
+- It is not on the turn-away list (BUSINESS.md): nothing medical, risky without certification, or adult
+- Price, length and group size make sense; the description says what guests will do and what level it is for
+
+**Deciding.**
+- **Approve and go live**: the listing appears in browse at once and the host gets "<title> is live on TryKai" with a link.
+- **Ask for a change**: write the one thing to fix (up to 500 characters; it is emailed to the host and shown on their Hosting page). The listing moves to "Waiting on the host". When they save an edit, it comes back to the queue and you get "Listing updated for review".
+
+**If the email never came.** The page is the source of truth: anything waiting is on `/admin/listings` whether or not the email arrived. `listing-submitted` needs `RESEND_API_KEY` and `ADMIN_NOTIFY_EMAIL` (defaults to calebong2002@gmail.com); its logs show any failure. The host's next save retries.
+
+**Not reviewed again:** edits to a listing that is already approved (KIV). To pull a live listing, ask for a change with the SQL below, or suspend the host.
+
+```sql
+-- Send a live listing back to review (it disappears from browse at once).
+update public.listings
+set review_status = 'changes_requested', review_note = 'What needs fixing', reviewed_at = now()
+where id = '<listing id>';
+```
+
+| Step | Staging | Production |
+|---|---|---|
+| `00036` run | Not yet | Not yet |
+| New listing emails the team | Not yet | Not yet |
+| Approve and ask-for-change emails reach the host | Not yet | Not yet |
 
 ---
 

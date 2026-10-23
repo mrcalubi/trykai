@@ -560,6 +560,32 @@ describe('CreateListing submission', () => {
     await waitFor(() => expect(currentPath()).toBe('/hosting'))
   })
 
+  it('tells the TryKai team a new listing is waiting for review', async () => {
+    const { user } = renderPage()
+    await fillValidForm(user)
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() =>
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        'listing-submitted',
+        expect.objectContaining({ body: {} })
+      )
+    )
+    const [, options] = supabase.functions.invoke.mock.calls.find(([name]) => name === 'listing-submitted')
+    expect(options.headers.Authorization).toMatch(/^Bearer /)
+  })
+
+  it('still lands on Hosting if the team could not be told', async () => {
+    supabase.functions.invoke.mockRejectedValue(new Error('offline'))
+    const { user, currentPath } = renderPage()
+    await fillValidForm(user)
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(currentPath()).toBe('/hosting'))
+  })
+
   it('stops and reports a failed insert without promoting the user', async () => {
     supabase.__on('listings', 'insert', { error: { message: 'row level security' } })
     const { user, currentPath } = renderPage()

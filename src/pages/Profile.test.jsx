@@ -385,6 +385,7 @@ describe('Profile public content', () => {
       expect.arrayContaining([
         { method: 'eq', column: 'host_id', value: HOST_ID },
         { method: 'eq', column: 'is_active', value: true },
+        { method: 'eq', column: 'review_status', value: 'approved' },
       ])
     )
   })

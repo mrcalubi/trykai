@@ -46,13 +46,15 @@ Deno.serve(async (req) => {
 
     const { data: listing } = await admin
       .from('listings')
-      .select('id, title, host_id, is_active, users!host_id (full_name, display_name)')
+      .select('id, title, host_id, is_active, review_status, users!host_id (full_name, display_name)')
       .eq('id', listingId)
       .maybeSingle()
     if (!listing || listing.host_id !== user.id) {
       return jsonResponse({ error: 'Listing not found' }, 404)
     }
     if (!listing.is_active) return jsonResponse({ notified: 0, reason: 'inactive' })
+    // Guests would land on a page they cannot see yet (00036).
+    if (listing.review_status !== 'approved') return jsonResponse({ notified: 0, reason: 'in_review' })
 
     const { data: sessions } = await admin
       .from('sessions')

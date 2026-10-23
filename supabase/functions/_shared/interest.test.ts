@@ -56,7 +56,7 @@ describe('parseInterestRequest', () => {
 })
 
 describe('interestDecision', () => {
-  const listing = { host_id: 'host-1', is_active: true }
+  const listing = { host_id: 'host-1', is_active: true, review_status: 'approved' }
 
   it('needs a signed-in guest', () => {
     expect(interestDecision({ callerId: null, listing, hostSuspended: false })).toMatchObject({ httpStatus: 401 })
@@ -68,6 +68,14 @@ describe('interestDecision', () => {
       interestDecision({ callerId: 'g', listing: { ...listing, is_active: false }, hostSuspended: false }),
     ).toMatchObject({ httpStatus: 404 })
     expect(interestDecision({ callerId: 'g', listing, hostSuspended: true })).toMatchObject({ httpStatus: 404 })
+  })
+
+  it('hides listings still in review as not found', () => {
+    for (const review_status of ['pending', 'changes_requested', undefined]) {
+      expect(
+        interestDecision({ callerId: 'g', listing: { ...listing, review_status }, hostSuspended: false }),
+      ).toMatchObject({ httpStatus: 404 })
+    }
   })
 
   it('refuses the host on their own listing', () => {

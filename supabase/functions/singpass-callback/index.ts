@@ -9,7 +9,9 @@
 //                                  to check. Nothing is recorded on the account yet.
 //   { action: 'confirm', state }   records the stored details with
 //                                  record_singpass_verification and deletes the
-//                                  attempt. The host lands in the review queue.
+//                                  attempt. Singpass approves the host at once
+//                                  (00036); their first listing is what the
+//                                  TryKai team reviews.
 //   { action: 'cancel', state }    deletes the attempt and its details.
 //
 // Attempts are found by state for the signed-in user only, and expire after
@@ -65,7 +67,7 @@ Deno.serve(async (req) => {
 
       const { data: attempt } = await admin
         .from('singpass_auth_sessions')
-        .select('id, created_at, teaching_plan, retrieved_sub, retrieved_name, retrieved_dob, retrieved_mobile')
+        .select('id, created_at, retrieved_sub, retrieved_name, retrieved_dob, retrieved_mobile')
         .eq('state', state)
         .eq('user_id', user.id)
         .maybeSingle()
@@ -77,20 +79,19 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: SINGPASS_ERRORS.nothingToConfirm }, 400)
       }
 
-      const { error: recordError } = await admin.rpc('record_singpass_verification', {
+      const { data: recorded, error: recordError } = await admin.rpc('record_singpass_verification', {
         p_user_id: user.id,
         p_sub: attempt.retrieved_sub,
         p_name: attempt.retrieved_name,
         p_dob: attempt.retrieved_dob,
         p_mobile: attempt.retrieved_mobile,
-        p_teaching_plan: attempt.teaching_plan,
       })
       if (recordError) {
         const mapped = recordErrorResponse(recordError.message)
         if (mapped.status >= 500) console.error('record_singpass_verification failed', recordError.message)
         return jsonResponse({ error: mapped.error }, mapped.status)
       }
-      return jsonResponse({ ok: true, status: 'pending' })
+      return jsonResponse({ ok: true, status: recorded === 'approved' ? 'approved' : 'pending' })
     }
 
     // ---- the redirect back from Singpass ----

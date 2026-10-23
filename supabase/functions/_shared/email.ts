@@ -536,6 +536,101 @@ export function confirmSignupTemplateHtml(): string {
   )
 }
 
+// ===========================================================================
+// Listing review (00036): every new listing is checked before guests see it.
+// ===========================================================================
+
+export function listingSubmittedSubject(title: string, resubmitted: boolean): string {
+  return `${resubmitted ? 'Listing updated for review' : 'New listing to review'}: ${title}`
+}
+
+/** To the TryKai team, the moment a host creates (or fixes) a listing. */
+export function listingSubmittedOpsHtml(options: {
+  siteUrl: string
+  listingId: string
+  title: string
+  description: string | null
+  category: string | null
+  area: string | null
+  priceCents: number | null
+  photoCount: number
+  hostName: string
+  hostEmail: string
+  verifiedName: string | null
+  verificationMethod: string | null
+  resubmitted: boolean
+}): string {
+  const base = emailSiteUrl(options.siteUrl)
+  const price = Number.isInteger(options.priceCents) && (options.priceCents as number) > 0
+    ? `S${formatCents(options.priceCents as number)} per person`
+    : 'No price'
+  const who = options.verificationMethod === 'singpass' && options.verifiedName
+    ? `${escapeHtml(options.hostName)} (Singpass: ${escapeHtml(options.verifiedName)})`
+    : escapeHtml(options.hostName)
+  return wrapEmail(
+    `${emailHeading(options.resubmitted ? 'A listing was updated for review' : 'A new listing needs a look')}
+    <p style="margin:0 0 16px;">It stays hidden from guests until you approve it. The host can already add dates.</p>
+    ${detailRows([
+      ['Listing', `<strong>${escapeHtml(options.title)}</strong>`],
+      ['Host', `${who}<br>${escapeHtml(options.hostEmail)}`],
+      ['Category', escapeHtml(options.category ?? '')],
+      ['Area', escapeHtml(options.area ?? '')],
+      ['Price', escapeHtml(price)],
+      ['Photos', String(options.photoCount)],
+    ])}
+    <p style="margin:0 0 4px;font-size:14px;color:${EMAIL_COLORS.muted};">Description</p>
+    <p style="margin:0;white-space:pre-wrap;">${escapeHtml((options.description ?? '').slice(0, 1200))}</p>
+    ${primaryButton(`${base}/admin/listings`, 'Review it')}`,
+    base,
+    `${options.title} by ${options.hostName}`,
+  )
+}
+
+export function listingApprovedSubject(title: string): string {
+  return `${title} is live on TryKai`
+}
+
+export function listingApprovedHtml(options: {
+  siteUrl: string
+  hostName?: string | null
+  listingId: string
+  title: string
+}): string {
+  const base = emailSiteUrl(options.siteUrl)
+  return wrapEmail(
+    `${emailHeading('Your listing is live')}
+    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    <p style="margin:0 0 16px;"><strong>${escapeHtml(options.title)}</strong> is now on TryKai for guests to find and book. Share the link with your friends to get your first bookings.</p>
+    ${primaryButton(`${base}/listings/${encodeURIComponent(options.listingId)}`, 'See your listing')}
+    ${emailSignOff('see-you')}`,
+    base,
+  )
+}
+
+export function listingChangesSubject(title: string): string {
+  return `One thing to fix on ${title}`
+}
+
+export function listingChangesHtml(options: {
+  siteUrl: string
+  hostName?: string | null
+  listingId: string
+  title: string
+  note: string
+}): string {
+  const base = emailSiteUrl(options.siteUrl)
+  return wrapEmail(
+    `${emailHeading('Almost there')}
+    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    <p style="margin:0 0 16px;">We had a look at <strong>${escapeHtml(options.title)}</strong> before it goes live. One thing to change first:</p>
+    <p style="margin:0 0 16px;padding:12px 16px;background:${EMAIL_COLORS.cream};border-radius:12px;white-space:pre-wrap;">${escapeHtml(options.note)}</p>
+    <p style="margin:0 0 16px;">Once you save your edit, it comes straight back to us.</p>
+    ${primaryButton(`${base}/edit-listing/${encodeURIComponent(options.listingId)}`, 'Edit your listing')}
+    ${emailSignOff('take-care')}`,
+    base,
+  )
+}
+
 export function verificationApprovedHtml(options: { hostName?: string | null }): string {
   const name = (options.hostName || '').trim()
   const greeting = name ? `You're verified, ${name}!` : "You're verified!"

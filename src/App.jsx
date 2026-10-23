@@ -19,6 +19,7 @@ import RedirectToOwnProfile from './pages/RedirectToOwnProfile'
 import BookingDetail from './pages/BookingDetail'
 import Settings from './pages/Settings'
 import AdminVerifications from './pages/AdminVerifications'
+import AdminListings from './pages/AdminListings'
 import AdminSingpassKeys from './pages/AdminSingpassKeys'
 import SingpassReturn from './pages/SingpassReturn'
 import RefundPolicy from './pages/RefundPolicy'
@@ -121,6 +122,16 @@ export default function App() {
             <RequireAuth>
               <RequireAdmin>
                 <AdminSingpassKeys />
+              </RequireAdmin>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/listings"
+          element={
+            <RequireAuth>
+              <RequireAdmin>
+                <AdminListings />
               </RequireAdmin>
             </RequireAuth>
           }

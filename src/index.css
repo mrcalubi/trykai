@@ -4516,6 +4516,38 @@ body.lightbox-open {
 }
 
 /* "I'm keen" demand on a listing with no dates (00032). */
+.hosting-review {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--navy);
+  background: var(--sand);
+  border-radius: var(--radius-sm);
+}
+
+.hosting-review--changes {
+  color: var(--coral-ink);
+  background: var(--coral-soft);
+}
+
+.hosting-review__label {
+  margin: 0;
+  font-weight: 700;
+}
+
+.hosting-review__note {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  color: var(--navy);
+}
+
+.hosting-review__link {
+  display: inline-block;
+  margin-top: 8px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
 .hosting-keen {
   margin: 12px 0 0;
   padding: 10px 12px;
@@ -5244,6 +5276,10 @@ body.lightbox-open {
   border-top: 1px solid var(--border);
 }
 
+.verify-fallback__toggle {
+  font-size: 14px;
+}
+
 .verify-fallback__intro {
   margin: 0 0 16px;
   font-size: 14px;
@@ -5369,6 +5405,70 @@ body.lightbox-open {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-subtle);
+}
+
+/* Listing review, internal only (00036) */
+.listing-review__photos {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+
+.listing-review__photos img {
+  display: block;
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.listing-review__description {
+  margin: 12px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-h);
+  white-space: pre-line;
+}
+
+.listing-review__host {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.listing-review__sent {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  font-size: 15px;
+  color: var(--coral-ink);
+  white-space: pre-line;
+  background: var(--coral-soft);
+  border-radius: var(--radius);
+}
+
+.listing-review .label {
+  margin-top: 16px;
+}
+
+.listing-review__actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+@media (min-width: 640px) {
+  .listing-review__actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.listing-review__heading {
+  margin: 32px 0 12px;
+  font-size: 18px;
+  color: var(--text-h);
 }
 
 /* Cancellation policy */
@@ -7107,4 +7207,29 @@ body.lightbox-open {
 
 .add-sessions__shared {
   color: var(--muted);
+}
+
+/* Host-only notice on their own listing while it waits for review (00036). */
+.detail-review-banner {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  color: var(--navy);
+  background: var(--sand);
+  border-radius: var(--radius);
+}
+
+.detail-review-banner__title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.detail-review-banner__body {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.detail-review-banner__body a {
+  color: var(--navy);
+  font-weight: 700;
 }

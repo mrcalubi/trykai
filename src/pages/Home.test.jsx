@@ -228,6 +228,7 @@ describe('Home listing grid', () => {
 
     const call = supabase.__lastCall('listings', 'select')
     expect(call.filters).toContainEqual({ method: 'eq', column: 'is_active', value: true })
+    expect(call.filters).toContainEqual({ method: 'eq', column: 'review_status', value: 'approved' })
     expect(call.chain).toContainEqual({
       method: 'order',
       args: ['created_at', { ascending: false }],

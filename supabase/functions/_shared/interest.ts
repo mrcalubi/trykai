@@ -68,11 +68,17 @@ export function parseInterestRequest(
 
 export function interestDecision(options: {
   callerId: string | null | undefined
-  listing: { host_id: string; is_active: boolean } | null | undefined
+  listing: { host_id: string; is_active: boolean; review_status?: string | null } | null | undefined
   hostSuspended: boolean
 }): { ok: true } | { ok: false; httpStatus: number; error: string } {
   if (!options.callerId) return { ok: false, httpStatus: 401, error: 'Sign in to show interest' }
-  if (!options.listing || !options.listing.is_active || options.hostSuspended) {
+  // A listing still in review (00036) is not public, so it is "not found" here too.
+  if (
+    !options.listing ||
+    !options.listing.is_active ||
+    options.listing.review_status !== 'approved' ||
+    options.hostSuspended
+  ) {
     return { ok: false, httpStatus: 404, error: 'Listing not found' }
   }
   if (options.listing.host_id === options.callerId) {
