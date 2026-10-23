@@ -4,7 +4,7 @@ export default function Terms() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Terms of Service</h1>
-      <p className="policy-page__updated">Last updated: 7 October 2026</p>
+      <p className="policy-page__updated">Last updated: 23 October 2026</p>
 
       <p>
         These terms apply to everyone who uses TryKai. Part 1 applies to all
@@ -194,11 +194,10 @@ export default function Terms() {
 
       <h3>3. Identity verification</h3>
       <p>
-        You must verify your identity before you can list. Verification
-        normally runs through Stripe Identity, which checks an ID document and a
-        live selfie and tells us only the result. If that is not possible, you
-        can submit documents for manual review instead. Verification confirms
-        who you are. It does not certify your skill or character.
+        You must verify your identity before you can list, by uploading a photo
+        of your passport or NRIC and a selfie for the TryKai team to review.
+        Verification confirms who you are. It does not certify your skill or
+        character.
       </p>
 
       <h3>4. Fees</h3>

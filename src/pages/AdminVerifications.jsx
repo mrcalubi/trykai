@@ -116,6 +116,11 @@ export default function AdminVerifications() {
                 {host.email} · {formatSubmittedAt(host.submitted_at)}
               </p>
 
+              <p className="verification-review__plan">
+                <span className="verification-review__plan-label">Wants to teach</span>
+                {host.teaching_plan || 'Not given (submitted before this was asked)'}
+              </p>
+
               <div className="verification-review__docs">
                 {['id_photo_url', 'selfie_url'].map((key) => (
                   <figure key={key} className="verification-review__doc">
