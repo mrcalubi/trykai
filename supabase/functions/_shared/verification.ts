@@ -8,7 +8,7 @@
 export const VERIFICATION_STATUSES = ['unverified', 'pending', 'approved', 'rejected'] as const
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number]
 
-export const VERIFICATION_METHODS = ['manual', 'stripe_identity'] as const
+export const VERIFICATION_METHODS = ['manual', 'stripe_identity', 'singpass'] as const
 export type VerificationMethod = (typeof VERIFICATION_METHODS)[number]
 
 /** Free text reaches the host by email, so it is bounded. */

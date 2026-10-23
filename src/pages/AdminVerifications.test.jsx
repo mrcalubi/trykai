@@ -83,14 +83,54 @@ describe('AdminVerifications queue', () => {
     expect(within(card).getByText('Latte art for beginners')).toBeInTheDocument()
   })
 
-  it('marks a submission made before the question was asked', async () => {
+  it('leaves the teaching line out when the host was not asked', async () => {
     givenQueue([makePending({ teaching_plan: null })])
     renderPage()
 
     await screen.findByText('Mei Ling')
-    expect(
-      within(cardFor('Mei Ling')).getByText('Not given (submitted before this was asked)')
-    ).toBeInTheDocument()
+    expect(within(cardFor('Mei Ling')).queryByText('Wants to teach')).not.toBeInTheDocument()
+  })
+
+  it('points to the listing queue', async () => {
+    givenQueue([])
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: 'Listing review' })).toHaveAttribute(
+      'href',
+      '/admin/listings'
+    )
+  })
+
+  it('shows a Singpass-verified host by name, with no documents', async () => {
+    givenQueue([
+      makePending({
+        method: 'singpass',
+        verified_name: 'TAN MEI LING',
+        verified_dob: '1998-05-17',
+        verified_mobile: '+6597399245',
+        full_name: 'Mei Ling',
+        id_photo_url: null,
+        selfie_url: null,
+      }),
+    ])
+    renderPage()
+
+    await screen.findByText('Mei Ling')
+    const card = cardFor('Mei Ling')
+    expect(within(card).getByText(/Verified with Singpass as/)).toBeInTheDocument()
+    expect(within(card).getByText('TAN MEI LING')).toBeInTheDocument()
+    expect(within(card).getByText(/Their account says Mei Ling/)).toBeInTheDocument()
+    expect(within(card).getByText(/Born 17 May 1998 \(age \d+\)/)).toBeInTheDocument()
+    expect(within(card).getByText(/\+6597399245/)).toBeInTheDocument()
+    expect(within(card).queryByText('Not uploaded')).not.toBeInTheDocument()
+  })
+
+  it('does not repeat the name when Singpass and the account agree', async () => {
+    givenQueue([makePending({ method: 'singpass', verified_name: 'MEI LING', full_name: 'Mei Ling' })])
+    renderPage()
+
+    await screen.findByText('Mei Ling')
+    expect(within(cardFor('Mei Ling')).queryByText(/Their account says/)).not.toBeInTheDocument()
   })
 
   it('sends the signed-in reviewer token with the request', async () => {

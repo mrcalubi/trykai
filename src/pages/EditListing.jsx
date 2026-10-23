@@ -22,6 +22,7 @@ import { providedForSave } from '../lib/whatsProvided'
 import { formatListingSpotsMessage } from '../lib/listingSpots'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { LISTING_CATEGORIES } from '../lib/listingCategories'
+import { notifyListingSubmitted } from '../lib/listingReview'
 
 const MAX_PHOTOS = 5
 
@@ -224,6 +225,8 @@ export default function EditListing() {
       return
     }
 
+    // Only does anything when this edit put the listing back in the queue.
+    void notifyListingSubmitted()
     navigate('/hosting', {
       replace: true,
       state: {

@@ -63,6 +63,11 @@ Deno.serve(async (req) => {
 
     const listing = asRecord(session.listings)
 
+    // A listing waiting on the TryKai team's review (00036) cannot be booked.
+    if (listing?.review_status !== 'approved') {
+      return jsonResponse({ error: 'Session is not available' }, 400)
+    }
+
     if (isHostBookingOwnListing({ spots_remaining: session.spots_remaining, listings: listing }, user.id)) {
       return jsonResponse({ error: 'You cannot book your own listing.' }, 403)
     }

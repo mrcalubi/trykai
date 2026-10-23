@@ -20,6 +20,7 @@ const FUNCTIONS = [
   'abandon-checkout',
   'admin-cancel-booking',
   'admin-dispute-booking',
+  'admin-listings',
   'admin-verifications',
   'cancel-booking',
   'create-account-link',
@@ -27,12 +28,15 @@ const FUNCTIONS = [
   'create-identity-session',
   'create-payment-intent',
   'listing-interest',
+  'listing-submitted',
   'lookup-postal-code',
   'notify-interested',
   'notify-verification-pending',
   'purge-verification-docs',
   'release-payout',
   'report-booking-problem',
+  'singpass-callback',
+  'singpass-start',
   'stripe-webhook',
 ]
 

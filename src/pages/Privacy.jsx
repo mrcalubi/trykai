@@ -64,13 +64,18 @@ export default function Privacy() {
               <td>Shown publicly on the Host&apos;s listing and profile</td>
             </tr>
             <tr>
+              <td>Your name, date of birth and mobile number as held by Singpass, and a Singpass identifier for your TryKai account</td>
+              <td>When you verify to host with Singpass</td>
+              <td>To confirm Hosts are real, identifiable adults, that one person has one host account, and to reach Hosts about their sessions</td>
+            </tr>
+            <tr>
               <td>Identity verification result</td>
               <td>Before you host</td>
               <td>To confirm Hosts are real, identifiable people</td>
             </tr>
             <tr>
               <td>ID document and selfie</td>
-              <td>When you verify to host</td>
+              <td>When you verify to host by upload</td>
               <td>Same as above</td>
             </tr>
             <tr>
@@ -94,9 +99,17 @@ export default function Privacy() {
 
       <h2>4. Identity verification</h2>
       <p>
-        Hosts verify by uploading a photo of their passport or NRIC and a
-        selfie. These are stored in private, access-restricted storage and
-        reviewed only by the TryKai team. We use them only to confirm your
+        Where it is offered, Hosts can verify with <strong>Singpass</strong>.
+        With your consent, Singpass shares your name, date of birth and mobile
+        number, and gives us an identifier for you that is specific to TryKai.
+        You see these before submitting. We use your date of birth to confirm
+        you are 18 or older, and your mobile number to reach you about your
+        sessions. We do not receive your NRIC number or any document images.
+      </p>
+      <p>
+        Hosts can instead verify by uploading a photo of their passport or NRIC
+        and a selfie. These are stored in private, access-restricted storage
+        and reviewed only by the TryKai team. We use them only to confirm your
         identity. On an NRIC you may cover the number: we need only your name
         and photo.
       </p>
@@ -112,6 +125,10 @@ export default function Privacy() {
       <ul>
         <li>
           <strong>Stripe:</strong> payments and Host payouts
+        </li>
+        <li>
+          <strong>Singpass (GovTech):</strong> identity verification for Hosts
+          who choose it
         </li>
         <li>
           <strong>Supabase:</strong> our database, file storage and logins

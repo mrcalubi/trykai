@@ -216,6 +216,38 @@ describe('ListingDetail content', () => {
     expect(screen.queryByRole('link', { name: 'Report this listing' })).not.toBeInTheDocument()
   })
 
+  it('tells the host only they can see their listing while it is in review', async () => {
+    givenListing(makeListing({ review_status: 'pending' }))
+    givenSignedIn(makeAuthSession({ user: { id: 'host-1' } }))
+    renderPage()
+
+    expect(await screen.findByText('Only you can see this for now')).toBeInTheDocument()
+    expect(supabase.__lastCall('listings', 'select').chain[0].args[0]).toMatch(/review_status/)
+  })
+
+  it('sends the host to fix a listing the team sent back', async () => {
+    givenListing(makeListing({ review_status: 'changes_requested' }))
+    givenSignedIn(makeAuthSession({ user: { id: 'host-1' } }))
+    renderPage()
+
+    expect(
+      await screen.findByText('One thing to change before guests can see this')
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'edit your listing' })).toHaveAttribute(
+      'href',
+      '/edit-listing/listing-1'
+    )
+  })
+
+  it('shows no review notice on an approved listing', async () => {
+    givenListing(makeListing({ review_status: 'approved' }))
+    givenSignedIn(makeAuthSession({ user: { id: 'host-1' } }))
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
+    expect(screen.queryByText('Only you can see this for now')).not.toBeInTheDocument()
+  })
+
   it('tells a guest the general area and that the exact address comes after booking', async () => {
     givenListing(makeListing({ area: 'Bedok' }))
     renderPage()

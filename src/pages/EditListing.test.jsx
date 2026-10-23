@@ -382,6 +382,11 @@ describe('EditListing saving', () => {
     await waitFor(() => expect(currentPath()).toBe('/hosting'))
     expect(currentState().message).toMatch(/^Listing updated successfully\. Updated 2 future sessions\./)
     expect(currentState().message).toMatch(/kept 5 spots because of existing bookings/)
+    // A fix to a listing the team sent back goes straight back to them.
+    expect(supabase.functions.invoke).toHaveBeenCalledWith(
+      'listing-submitted',
+      expect.objectContaining({ body: {} })
+    )
   })
 
   it('stays on the form when set_listing_spots fails', async () => {

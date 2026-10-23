@@ -2,12 +2,8 @@
  * What the verify form still needs, in the order it appears on the page, so
  * one message names everything instead of revealing one gap per tap.
  */
-export const TEACHING_PLAN_MIN = 3
-export const TEACHING_PLAN_MAX = 600
-
-export function missingVerificationItems({ plan, idPhoto, selfie, consent }) {
+export function missingVerificationItems({ idPhoto, selfie, consent }) {
   const missing = []
-  if (String(plan ?? '').trim().length < TEACHING_PLAN_MIN) missing.push("what you'd like to teach")
   if (!idPhoto) missing.push('a photo of your ID')
   if (!selfie) missing.push('a selfie')
   if (!consent) missing.push('a tick in the agreement box')

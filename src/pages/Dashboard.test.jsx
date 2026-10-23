@@ -1613,6 +1613,44 @@ describe('Hosting listing cards', () => {
     ).toBeInTheDocument()
   })
 
+  it('tells the host a new listing is in review while they add dates', async () => {
+    givenData({ listings: [makeMyListing({ review_status: 'pending' })] })
+    await renderHosting()
+
+    const card = listingCard('Latte art')
+    expect(within(card).getByText('In review')).toBeInTheDocument()
+    expect(
+      within(card).getByText(/taking a quick look before guests can see it/)
+    ).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Add sessions' })).toBeInTheDocument()
+  })
+
+  it("shows the reviewer's note and a way to fix it", async () => {
+    givenData({
+      listings: [
+        makeMyListing({ review_status: 'changes_requested', review_note: 'Add a photo of the latte' }),
+      ],
+    })
+    await renderHosting()
+
+    const card = listingCard('Latte art')
+    expect(within(card).getByText('Changes needed')).toBeInTheDocument()
+    expect(within(card).getByText('Add a photo of the latte')).toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: 'Edit listing' })).toHaveAttribute(
+      'href',
+      '/edit-listing/listing-1'
+    )
+  })
+
+  it('reads the review state with the listings', async () => {
+    givenData({ listings: [makeMyListing()] })
+    await renderHosting()
+
+    const select = supabase.__calls('listings', 'select')[0].chain[0].args[0]
+    expect(select).toMatch(/review_status/)
+    expect(select).toMatch(/review_note/)
+  })
+
   it('flags a listing with no dates and leads with Add sessions', async () => {
     givenData({
       listings: [makeMyListing({ price_per_person: 2300, duration_mins: 90, max_guests: 4 })],

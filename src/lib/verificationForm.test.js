@@ -5,16 +5,13 @@ const file = {}
 
 describe('verify form gaps', () => {
   it('lists gaps in page order', () => {
-    expect(missingVerificationItems({ plan: '', idPhoto: null, selfie: null, consent: false })).toEqual([
-      "what you'd like to teach",
+    expect(missingVerificationItems({ idPhoto: null, selfie: null, consent: false })).toEqual([
       'a photo of your ID',
       'a selfie',
       'a tick in the agreement box',
     ])
-    expect(missingVerificationItems({ plan: 'yoga', idPhoto: file, selfie: file, consent: true })).toEqual([])
-    expect(missingVerificationItems({ plan: ' ab ', idPhoto: file, selfie: file, consent: true })).toEqual([
-      "what you'd like to teach",
-    ])
+    expect(missingVerificationItems({ idPhoto: file, selfie: file, consent: true })).toEqual([])
+    expect(missingVerificationItems({ idPhoto: file, selfie: null, consent: true })).toEqual(['a selfie'])
   })
 
   it('joins one, two or more items in plain English', () => {

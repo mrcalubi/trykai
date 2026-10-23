@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { edgeFunctionErrorMessage, isPayNowTooFarAheadError } from './edgeFunctionError'
+import { edgeFunctionErrorMessage, isPayNowTooFarAheadError, functionReasonOrDefault } from './edgeFunctionError'
 import {
   PAYNOW_TOO_FAR_AHEAD,
   PAYNOW_TOO_FAR_AHEAD_MESSAGE,
@@ -58,5 +58,16 @@ describe('edgeFunctionErrorMessage', () => {
     expect(isPayNowTooFarAheadError({ error: PAYNOW_TOO_FAR_AHEAD }, '')).toBe(true)
     expect(isPayNowTooFarAheadError(null, PAYNOW_TOO_FAR_AHEAD_MESSAGE)).toBe(true)
     expect(isPayNowTooFarAheadError({ error: 'Not enough spots' }, 'Not enough spots')).toBe(false)
+  })
+})
+
+describe('functionReasonOrDefault', () => {
+  it("uses the function's own sentence from the body", async () => {
+    expect(await functionReasonOrDefault(null, { error: 'Singpass is busy.' }, 'fallback')).toBe('Singpass is busy.')
+  })
+
+  it('falls back instead of showing a transport error', async () => {
+    expect(await functionReasonOrDefault(new Error('Failed to send a request'), null, 'fallback')).toBe('fallback')
+    expect(await functionReasonOrDefault(null, {}, 'fallback')).toBe('fallback')
   })
 })

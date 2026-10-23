@@ -43,7 +43,7 @@ async function fetchListing(id) {
   }
   const url =
     `${base}/rest/v1/listings?select=${LISTING_COLUMNS}` +
-    `&id=eq.${encodeURIComponent(id)}&is_active=eq.true&limit=1`
+    `&id=eq.${encodeURIComponent(id)}&is_active=eq.true&review_status=eq.approved&limit=1`
   const response = await fetch(url, {
     headers: { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' },
     signal: AbortSignal.timeout(4000),

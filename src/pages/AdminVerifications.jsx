@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { MAX_REJECTION_REASON_LENGTH } from '../../supabase/functions/_shared/verification.ts'
+import { ageFromDob, formatSingpassDob } from '../lib/singpass'
 
 function formatSubmittedAt(iso) {
   if (!iso) return 'Submitted date unknown'
@@ -96,8 +98,10 @@ export default function AdminVerifications() {
     <div className="page page--narrow">
       <h1 className="dashboard-heading">Verification review</h1>
       <p className="form-card__subtitle">
-        Check that the selfie is the same person as the ID, and that the ID is readable. Document
-        links expire after a few minutes, so reload if an image stops loading.
+        Hosts who upload an ID instead of using Singpass wait here. Check that the selfie is the
+        same person as the ID, and that the ID is readable. Document links expire after a few
+        minutes, so reload if an image stops loading. New listings are reviewed on{' '}
+        <Link to="/admin/listings">Listing review</Link>.
       </p>
 
       {notice && <p className="success-message">{notice}</p>}
@@ -116,28 +120,48 @@ export default function AdminVerifications() {
                 {host.email} · {formatSubmittedAt(host.submitted_at)}
               </p>
 
-              <p className="verification-review__plan">
-                <span className="verification-review__plan-label">Wants to teach</span>
-                {host.teaching_plan || 'Not given (submitted before this was asked)'}
-              </p>
+              {host.teaching_plan ? (
+                <p className="verification-review__plan">
+                  <span className="verification-review__plan-label">Wants to teach</span>
+                  {host.teaching_plan}
+                </p>
+              ) : null}
 
-              <div className="verification-review__docs">
-                {['id_photo_url', 'selfie_url'].map((key) => (
-                  <figure key={key} className="verification-review__doc">
-                    <figcaption>{key === 'id_photo_url' ? 'ID document' : 'Selfie'}</figcaption>
-                    {host[key] ? (
-                      <a href={host[key]} target="_blank" rel="noreferrer">
-                        <img
-                          src={host[key]}
-                          alt={key === 'id_photo_url' ? 'ID document' : 'Selfie'}
-                        />
-                      </a>
-                    ) : (
-                      <p className="hint">Not uploaded</p>
-                    )}
-                  </figure>
-                ))}
-              </div>
+              {host.method === 'singpass' ? (
+                <p className="verification-review__singpass">
+                  Verified with Singpass as <strong>{host.verified_name || 'unknown name'}</strong>
+                  {host.verified_name &&
+                  host.full_name &&
+                  host.verified_name.trim().toLowerCase() !== host.full_name.trim().toLowerCase()
+                    ? `. Their account says ${host.full_name}.`
+                    : '.'}
+                  {host.verified_dob ? (
+                    <>
+                      <br />
+                      Born {formatSingpassDob(host.verified_dob)} (age {ageFromDob(host.verified_dob)}) ·{' '}
+                      {host.verified_mobile || 'no mobile on Singpass'}
+                    </>
+                  ) : null}
+                </p>
+              ) : (
+                <div className="verification-review__docs">
+                  {['id_photo_url', 'selfie_url'].map((key) => (
+                    <figure key={key} className="verification-review__doc">
+                      <figcaption>{key === 'id_photo_url' ? 'ID document' : 'Selfie'}</figcaption>
+                      {host[key] ? (
+                        <a href={host[key]} target="_blank" rel="noreferrer">
+                          <img
+                            src={host[key]}
+                            alt={key === 'id_photo_url' ? 'ID document' : 'Selfie'}
+                          />
+                        </a>
+                      ) : (
+                        <p className="hint">Not uploaded</p>
+                      )}
+                    </figure>
+                  ))}
+                </div>
+              )}
 
               <label className="label">
                 Rejection reason
