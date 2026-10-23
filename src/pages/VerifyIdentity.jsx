@@ -278,7 +278,7 @@ export default function VerifyIdentity() {
                   {singpassLoading ? 'Opening Singpass…' : 'Verify with Singpass'}
                 </button>
                 <p className="hint">
-                  Singpass shares only your name with TryKai. We never see your NRIC number.
+                  Singpass shares your name, date of birth and mobile number with TryKai. You check them before submitting. We never see your NRIC number.
                 </p>
               </div>
 

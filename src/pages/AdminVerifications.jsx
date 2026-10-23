@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { MAX_REJECTION_REASON_LENGTH } from '../../supabase/functions/_shared/verification.ts'
+import { ageFromDob, formatSingpassDob } from '../lib/singpass'
 
 function formatSubmittedAt(iso) {
   if (!iso) return 'Submitted date unknown'
@@ -129,6 +130,13 @@ export default function AdminVerifications() {
                   host.verified_name.trim().toLowerCase() !== host.full_name.trim().toLowerCase()
                     ? `. Their account says ${host.full_name}.`
                     : '.'}
+                  {host.verified_dob ? (
+                    <>
+                      <br />
+                      Born {formatSingpassDob(host.verified_dob)} (age {ageFromDob(host.verified_dob)}) ·{' '}
+                      {host.verified_mobile || 'no mobile on Singpass'}
+                    </>
+                  ) : null}
                 </p>
               ) : (
                 <div className="verification-review__docs">

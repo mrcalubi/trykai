@@ -1,26 +1,27 @@
 /**
- * Singpass Login for host verification (00035, DECISIONS.md 23 October).
+ * Singpass Myinfo for host verification (00035, DECISIONS.md 23 October).
  * Pure helpers only, so the test suite can exercise them without Deno or the
  * network. The OIDC exchange itself lives in singpass-start and
  * singpass-callback, using openid-client as Singpass's own demo app does.
  *
- * Scope is `openid name`: the ID token's `sub` (Singpass's UUID for the
- * person) and `sub_attributes.name`. No NRIC number is requested.
+ * Scopes are `name dob mobileno`: the government-verified name, the date of
+ * birth (so hosts are really 18 or older) and the mobile number registered
+ * with Singpass (to reach a host on the day). Singpass's UUID for the person
+ * (`sub`) keeps one Singpass to one host account. No NRIC number is requested.
  */
 
 import { TEACHING_PLAN_MAX, TEACHING_PLAN_MIN } from './verification.ts'
 
-export const SINGPASS_SCOPE = 'openid name'
+export const SINGPASS_SCOPE = 'openid name dob mobileno'
 
-/** Singpass requires one for Login apps; becoming a host is onboarding. */
-export const SINGPASS_AUTH_CONTEXT_TYPE = 'APP_ONBOARDING_DEFAULT'
+/** Hosts must be 18 or older (Terms). */
+export const MIN_HOST_AGE = 18
 
-/** Shown on the Singpass screen. Printable ASCII, at most 100 characters. */
-export const SINGPASS_AUTH_CONTEXT_MESSAGE = 'Verify your identity to host on TryKai'
-
-/** Singpass gives the user 10 minutes; leave room for a slow return. */
+/**
+ * Singpass gives the user 10 minutes to log in, then the host reviews what
+ * came back before confirming; past this the retrieved details are purged.
+ */
 export const SINGPASS_SESSION_MAX_AGE_MINUTES = 30
-
 
 export type SingpassConfig = {
   clientId: string
@@ -128,19 +129,78 @@ export function isSessionFresh(createdAt: string | null | undefined, now = new D
   return now.getTime() - created <= SINGPASS_SESSION_MAX_AGE_MINUTES * 60 * 1000
 }
 
-/** What the ID token tells us, or why it is unusable. */
-export function singpassIdentity(claims: unknown):
-  | { ok: true; sub: string; name: string }
+export type MyinfoPerson = {
+  sub: string
+  name: string
+  /** As Singpass has it: YYYY-MM-DD, or YYYY-MM / YYYY when only partly known. */
+  dob: string
+  /** E.164, e.g. +6591234567, or null when Singpass has none. */
+  mobile: string | null
+}
+
+function itemValue(item: unknown): string {
+  const record = item && typeof item === 'object' ? (item as Record<string, unknown>) : null
+  if (!record || record.unavailable === true) return ''
+  return typeof record.value === 'string' ? record.value.trim() : ''
+}
+
+function mobileNumber(item: unknown): string | null {
+  const record = item && typeof item === 'object' ? (item as Record<string, unknown>) : null
+  if (!record || record.unavailable === true) return null
+  const nbr = itemValue(record.nbr).replace(/\s+/g, '')
+  if (!/^\d{4,12}$/.test(nbr)) return null
+  const areacode = (itemValue(record.areacode) || '65').replace(/\D/g, '')
+  return `+${areacode}${nbr}`
+}
+
+/**
+ * The userinfo payload (person_info) checked against the ID token's sub.
+ * A name and a date of birth are required; a mobile number is not, since
+ * Singpass may not hold one.
+ */
+export function myinfoPerson(idTokenClaims: unknown, userinfo: unknown):
+  | { ok: true; person: MyinfoPerson }
   | { ok: false; error: string } {
-  const record = claims && typeof claims === 'object' ? (claims as Record<string, unknown>) : null
-  const sub = typeof record?.sub === 'string' ? record.sub.trim() : ''
-  const attributes = record?.sub_attributes && typeof record.sub_attributes === 'object'
-    ? (record.sub_attributes as Record<string, unknown>)
+  const claims = idTokenClaims && typeof idTokenClaims === 'object'
+    ? (idTokenClaims as Record<string, unknown>)
     : null
-  const name = typeof attributes?.name === 'string' ? attributes.name.trim() : ''
+  const info = userinfo && typeof userinfo === 'object' ? (userinfo as Record<string, unknown>) : null
+  const sub = typeof claims?.sub === 'string' ? claims.sub.trim() : ''
   if (!sub) return { ok: false, error: 'Singpass did not return an identifier' }
+  if (typeof info?.sub === 'string' && info.sub.trim() !== sub) {
+    return { ok: false, error: 'Singpass userinfo is for a different person' }
+  }
+  const person = info?.person_info && typeof info.person_info === 'object'
+    ? (info.person_info as Record<string, unknown>)
+    : null
+  const name = itemValue(person?.name)
+  const dob = itemValue(person?.dob)
   if (!name) return { ok: false, error: 'Singpass did not return a name' }
-  return { ok: true, sub, name }
+  if (!/^\d{4}(-\d{2}(-\d{2})?)?$/.test(dob)) return { ok: false, error: 'Singpass did not return a date of birth' }
+  return { ok: true, person: { sub, name, dob, mobile: mobileNumber(person?.mobileno) } }
+}
+
+/**
+ * Whether someone born on `dob` is at least MIN_HOST_AGE on `now` (Singapore
+ * date). A partial date is read as the latest day it could be, so nobody who
+ * might be 17 passes.
+ */
+export function isAdult(dob: string, now = new Date()): boolean {
+  const match = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/.exec(dob)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = match[2] ? Number(match[2]) : 12
+  const day = match[3] ? Number(match[3]) : new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const sg = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+  const [y, m, d] = [sg.getUTCFullYear(), sg.getUTCMonth() + 1, sg.getUTCDate()]
+  let age = y - year
+  if (m < month || (m === month && d < day)) age -= 1
+  return age >= MIN_HOST_AGE
+}
+
+/** What the page shows back, read-only, before the host confirms. */
+export function singpassPreview(person: MyinfoPerson) {
+  return { name: person.name, dob: person.dob, mobile: person.mobile }
 }
 
 /** Host-facing copy. Singpass's own error text is never shown (content spoofing). */
@@ -152,6 +212,8 @@ export const SINGPASS_ERRORS = {
   alreadyVerified: "You're already verified.",
   underReview: 'Your verification is already under review.',
   failed: 'We could not confirm your identity with Singpass. Please try again, or upload your ID instead.',
+  underAge: 'Hosts on TryKai must be 18 or older.',
+  nothingToConfirm: 'That Singpass check has expired. Please verify again.',
 } as const
 
 /** Maps a database error from record_singpass_verification to copy and a status. */
@@ -159,6 +221,7 @@ export function recordErrorResponse(message: string | null | undefined): { statu
   const text = message ?? ''
   if (text.includes('singpass already linked')) return { status: 409, error: SINGPASS_ERRORS.alreadyLinked }
   if (text.includes('already verified')) return { status: 409, error: SINGPASS_ERRORS.alreadyVerified }
+  if (text.includes('under 18')) return { status: 403, error: SINGPASS_ERRORS.underAge }
   return { status: 500, error: SINGPASS_ERRORS.failed }
 }
 

@@ -64,9 +64,9 @@ export default function Privacy() {
               <td>Shown publicly on the Host&apos;s listing and profile</td>
             </tr>
             <tr>
-              <td>Your name as registered with Singpass, and a Singpass identifier for your TryKai account</td>
+              <td>Your name, date of birth and mobile number as held by Singpass, and a Singpass identifier for your TryKai account</td>
               <td>When you verify to host with Singpass</td>
-              <td>To confirm Hosts are real, identifiable people, and that one person has one host account</td>
+              <td>To confirm Hosts are real, identifiable adults, that one person has one host account, and to reach Hosts about their sessions</td>
             </tr>
             <tr>
               <td>Identity verification result</td>
@@ -100,9 +100,11 @@ export default function Privacy() {
       <h2>4. Identity verification</h2>
       <p>
         Where it is offered, Hosts can verify with <strong>Singpass</strong>.
-        Singpass tells us your registered name and gives us an identifier for
-        you that is specific to TryKai. We do not receive your NRIC number or
-        any document images.
+        With your consent, Singpass shares your name, date of birth and mobile
+        number, and gives us an identifier for you that is specific to TryKai.
+        You see these before submitting. We use your date of birth to confirm
+        you are 18 or older, and your mobile number to reach you about your
+        sessions. We do not receive your NRIC number or any document images.
       </p>
       <p>
         Hosts can instead verify by uploading a photo of their passport or NRIC

@@ -98,6 +98,8 @@ describe('AdminVerifications queue', () => {
       makePending({
         method: 'singpass',
         verified_name: 'TAN MEI LING',
+        verified_dob: '1998-05-17',
+        verified_mobile: '+6597399245',
         full_name: 'Mei Ling',
         id_photo_url: null,
         selfie_url: null,
@@ -110,6 +112,8 @@ describe('AdminVerifications queue', () => {
     expect(within(card).getByText(/Verified with Singpass as/)).toBeInTheDocument()
     expect(within(card).getByText('TAN MEI LING')).toBeInTheDocument()
     expect(within(card).getByText(/Their account says Mei Ling/)).toBeInTheDocument()
+    expect(within(card).getByText(/Born 17 May 1998 \(age \d+\)/)).toBeInTheDocument()
+    expect(within(card).getByText(/\+6597399245/)).toBeInTheDocument()
     expect(within(card).queryByText('Not uploaded')).not.toBeInTheDocument()
   })
 

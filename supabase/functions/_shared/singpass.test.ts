@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
+  isAdult,
   isSessionFresh,
+  myinfoPerson,
   normalizeTeachingPlan,
   parseSingpassCallback,
   publicJwk,
   readSingpassConfig,
   recordErrorResponse,
-  SINGPASS_AUTH_CONTEXT_MESSAGE,
   SINGPASS_ERRORS,
   SINGPASS_SCOPE,
-  singpassIdentity,
+  singpassPreview,
 } from './singpass.ts'
 
 const SIG = {
@@ -90,15 +91,9 @@ describe('readSingpassConfig', () => {
 })
 
 describe('Singpass request settings', () => {
-  it('asks for the name only, never the NRIC', () => {
-    expect(SINGPASS_SCOPE).toBe('openid name')
+  it('asks for name, date of birth and mobile, never the NRIC', () => {
+    expect(SINGPASS_SCOPE).toBe('openid name dob mobileno')
     expect(SINGPASS_SCOPE).not.toMatch(/identity|uinfin/)
-  })
-
-  it('keeps the on-screen message within Singpass rules', () => {
-    expect(SINGPASS_AUTH_CONTEXT_MESSAGE.length).toBeLessThanOrEqual(100)
-    expect(SINGPASS_AUTH_CONTEXT_MESSAGE).toMatch(/^[\x20-\x7E]+$/)
-    expect(SINGPASS_AUTH_CONTEXT_MESSAGE).not.toMatch(/[<>\\`]/)
   })
 })
 
@@ -145,18 +140,84 @@ describe('isSessionFresh', () => {
   })
 })
 
-describe('singpassIdentity', () => {
-  it('reads sub and the principal name from sub_attributes', () => {
-    expect(singpassIdentity({ sub: ' u-1 ', sub_attributes: { name: ' TAN MEI LING ' } })).toEqual({
-      ok: true, sub: 'u-1', name: 'TAN MEI LING',
+const ITEM = (value: string) => ({ lastupdated: '2026-01-01', source: '1', classification: 'C', value })
+const USERINFO = {
+  sub: 'u-1',
+  person_info: {
+    name: ITEM(' TAN MEI LING '),
+    dob: ITEM('1998-05-17'),
+    mobileno: { prefix: { value: '+' }, areacode: { value: '65' }, nbr: { value: '9739 9245' } },
+  },
+}
+
+describe('myinfoPerson', () => {
+  it('reads name, date of birth and mobile, checked against the ID token', () => {
+    expect(myinfoPerson({ sub: 'u-1' }, USERINFO)).toEqual({
+      ok: true,
+      person: { sub: 'u-1', name: 'TAN MEI LING', dob: '1998-05-17', mobile: '+6597399245' },
     })
   })
 
-  it('refuses a token with no sub or no name', () => {
-    expect(singpassIdentity({ sub_attributes: { name: 'A' } }).ok).toBe(false)
-    expect(singpassIdentity({ sub: 'u-1' }).ok).toBe(false)
-    expect(singpassIdentity({ sub: 'u-1', sub_attributes: { name: '  ' } }).ok).toBe(false)
-    expect(singpassIdentity(null).ok).toBe(false)
+  it('keeps going without a mobile, or with one Singpass marks unavailable', () => {
+    const noMobile = { ...USERINFO, person_info: { ...USERINFO.person_info, mobileno: undefined } }
+    expect(myinfoPerson({ sub: 'u-1' }, noMobile)).toMatchObject({ ok: true, person: { mobile: null } })
+    const unavailable = { ...USERINFO, person_info: { ...USERINFO.person_info, mobileno: { unavailable: true } } }
+    expect(myinfoPerson({ sub: 'u-1' }, unavailable)).toMatchObject({ ok: true, person: { mobile: null } })
+    const junk = { ...USERINFO, person_info: { ...USERINFO.person_info, mobileno: { nbr: { value: 'abc' } } } }
+    expect(myinfoPerson({ sub: 'u-1' }, junk)).toMatchObject({ ok: true, person: { mobile: null } })
+  })
+
+  it('defaults the area code to 65', () => {
+    const noArea = { ...USERINFO, person_info: { ...USERINFO.person_info, mobileno: { nbr: { value: '81234567' } } } }
+    expect(myinfoPerson({ sub: 'u-1' }, noArea)).toMatchObject({ ok: true, person: { mobile: '+6581234567' } })
+  })
+
+  it('accepts a partial date of birth as Singpass sends it', () => {
+    const partial = { ...USERINFO, person_info: { ...USERINFO.person_info, dob: ITEM('1998-05') } }
+    expect(myinfoPerson({ sub: 'u-1' }, partial)).toMatchObject({ ok: true, person: { dob: '1998-05' } })
+  })
+
+  it('refuses a missing sub, a mismatched sub, or no name or date of birth', () => {
+    expect(myinfoPerson({}, USERINFO).ok).toBe(false)
+    expect(myinfoPerson({ sub: 'u-2' }, USERINFO).ok).toBe(false)
+    expect(myinfoPerson({ sub: 'u-1' }, { ...USERINFO, person_info: { dob: ITEM('1998-05-17') } }).ok).toBe(false)
+    expect(myinfoPerson({ sub: 'u-1' }, { ...USERINFO, person_info: { name: ITEM('A'), dob: { unavailable: true } } }).ok).toBe(false)
+    expect(myinfoPerson({ sub: 'u-1' }, { ...USERINFO, person_info: { name: ITEM('A'), dob: ITEM('17/05/1998') } }).ok).toBe(false)
+    expect(myinfoPerson({ sub: 'u-1' }, null).ok).toBe(false)
+    expect(myinfoPerson(null, USERINFO).ok).toBe(false)
+  })
+
+  it('shows back only what the host reviews', () => {
+    expect(singpassPreview({ sub: 'u-1', name: 'A', dob: '1998', mobile: null })).toEqual({
+      name: 'A', dob: '1998', mobile: null,
+    })
+  })
+})
+
+describe('isAdult', () => {
+  // 23 Oct 2026, 10:00 in Singapore.
+  const now = new Date('2026-10-23T02:00:00Z')
+
+  it('counts birthdays on the Singapore date', () => {
+    expect(isAdult('2008-10-23', now)).toBe(true)
+    expect(isAdult('2008-10-24', now)).toBe(false)
+    expect(isAdult('1998-05-17', now)).toBe(true)
+    // 23 Oct 23:30 UTC is already 24 Oct in Singapore.
+    expect(isAdult('2008-10-24', new Date('2026-10-23T16:30:00Z'))).toBe(true)
+  })
+
+  it('reads a partial date as the latest it could be', () => {
+    expect(isAdult('2008-10', now)).toBe(false)
+    expect(isAdult('2008-09', now)).toBe(true)
+    expect(isAdult('2008', now)).toBe(false)
+    expect(isAdult('2007', now)).toBe(true)
+    expect(isAdult('2008-02', new Date('2026-02-28T02:00:00Z'))).toBe(false)
+    expect(isAdult('2008-02', new Date('2026-03-01T02:00:00Z'))).toBe(true)
+  })
+
+  it('refuses anything that is not a date', () => {
+    expect(isAdult('', now)).toBe(false)
+    expect(isAdult('17/05/1998', now)).toBe(false)
   })
 })
 
@@ -164,6 +225,7 @@ describe('recordErrorResponse', () => {
   it('maps the database refusals to host copy', () => {
     expect(recordErrorResponse('singpass already linked')).toEqual({ status: 409, error: SINGPASS_ERRORS.alreadyLinked })
     expect(recordErrorResponse('already verified')).toEqual({ status: 409, error: SINGPASS_ERRORS.alreadyVerified })
+    expect(recordErrorResponse('under 18')).toEqual({ status: 403, error: SINGPASS_ERRORS.underAge })
     expect(recordErrorResponse('boom')).toEqual({ status: 500, error: SINGPASS_ERRORS.failed })
     expect(recordErrorResponse(null).status).toBe(500)
   })

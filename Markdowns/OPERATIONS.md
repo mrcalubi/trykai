@@ -506,20 +506,20 @@ Do every step on **staging** (`hzgybclfvpuxkmytdoos`, site trykai.vercel.app), t
 
 ---
 
-# Singpass Login (host verification)
+# Singpass Myinfo (host verification)
 
-Hosts can confirm who they are with Singpass instead of uploading an ID (DECISIONS.md, 23 October). Singpass gives TryKai only their registered name and a Singpass identifier; no NRIC number and no documents. Do staging end to end first. Production needs Singpass's approval (up to 2 weeks), and the button stays hidden there until it is approved. Owner: Caleb. Never paste a private key into chat.
+Hosts can confirm who they are with Singpass instead of uploading an ID (DECISIONS.md, 23 October). Singpass gives TryKai their name, date of birth and mobile number and a Singpass identifier; no NRIC number and no documents. The host sees these and confirms before anything is saved. Do staging end to end first. Production needs Singpass's approval (up to 2 weeks), and the button stays hidden there until it is approved. Owner: Caleb. Never paste a private key into chat.
 
 **Staging** (Supabase `hzgybclfvpuxkmytdoos`, site trykai.vercel.app, Singpass portal set to **Staging**):
 
 1. **Run `00035`** in the staging SQL Editor, then merge the Singpass PR.
 2. **Make keys.** Signed in as an admin on the staging site, open `/admin/singpass-keys` and click Generate keys. Keep the page open for steps 3 and 4.
 3. **Create the Singpass app.** Singpass Developer Portal, Staging, **+ New app**:
-   - App type: **Singpass Login**
+   - App type: **Singpass Myinfo**
    - App name: `TryKai`
    - Redirect URI: `https://trykai.vercel.app/verify-identity/singpass`
    - JWKS: paste box 3 from the keys page (the public set)
-   - Scopes: **openid** and **Principal Name** only. Not User Identity, Email or Mobile Number.
+   - Scopes (data items): **openid**, **Name**, **Date of birth**, **Mobile number**. Nothing else: not NRIC/FIN, email, address or nationality. Justifications if asked: name, to confirm the host is a real, identifiable person; date of birth, to confirm hosts are 18 or older as our Terms require; mobile number, to reach a host about their sessions or in a safety incident.
    - Submit, then copy the **App ID** (32 letters and digits).
 4. **Add five Edge Function secrets** (staging Supabase, Edge Functions, Secrets):
    - `SINGPASS_CLIENT_ID` = the App ID
@@ -530,7 +530,10 @@ Hosts can confirm who they are with Singpass instead of uploading an ID (DECISIO
 
    Then close the keys page.
 5. **Show the button on staging.** Vercel, Settings, Environment Variables: `VITE_SINGPASS_ENABLED` = `true`, for **Preview** only (staging). Redeploy staging.
-6. **Test** with a Singpass staging test account (Singpass portal, Testing): on `/verify-identity`, type what you would teach, tap Verify with Singpass, log in, and check you land on "Under review". The host should appear in `/admin/verifications` as "Verified with Singpass as <name>". Approve it. Then try the same Singpass test account from a second TryKai account: it should say the Singpass is already linked.
+6. **Test** with a Myinfo test persona (Singpass portal, Testing): on `/verify-identity`, type what you would teach, tap Verify with Singpass, log in, check "Check your details" shows the persona's name, date of birth and mobile, tap Confirm and submit, and land on "Under review". The host should appear in `/admin/verifications` as "Verified with Singpass as <name>", with birth date, age and mobile. Approve it. Then:
+   - the same persona from a second TryKai account should say the Singpass is already linked
+   - a persona under 18, if the test set has one, should say hosts must be 18 or older
+   - tapping Cancel on "Check your details" should return to the verify page and save nothing
 
 If the button says Singpass isn't available, the function logs name the missing or malformed secret.
 

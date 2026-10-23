@@ -5274,6 +5274,25 @@ body.lightbox-open {
   color: var(--text-h);
 }
 
+.singpass-details {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 16px;
+}
+
+.singpass-details dt {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.singpass-details dd {
+  margin: 2px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
 .verify-singpass {
   display: grid;
   gap: 8px;

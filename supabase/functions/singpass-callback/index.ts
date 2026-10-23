@@ -1,23 +1,35 @@
-// POST { query } from /verify-identity/singpass, where Singpass sends the
-// host back. `query` is that page's query string (code, state, iss, or error).
+// POST from /verify-identity/singpass, where Singpass sends the host back.
 //
-// Looks up the attempt by state, for this signed-in user only, then exchanges
-// the code (DPoP, private_key_jwt, PKCE), decrypts and checks the ID token,
-// and records the Singpass identifier and name with
-// record_singpass_verification. The host lands in the review queue with what
-// they want to teach; no documents are stored on this route.
+//   { query }                      the redirect's query string (code, state,
+//                                  iss, or error). Exchanges the code (DPoP,
+//                                  private_key_jwt, PKCE), checks the ID token,
+//                                  fetches Myinfo (name, date of birth, mobile),
+//                                  refuses anyone under 18, stores the details
+//                                  on the attempt and returns them for the host
+//                                  to check. Nothing is recorded on the account yet.
+//   { action: 'confirm', state }   records the stored details with
+//                                  record_singpass_verification and deletes the
+//                                  attempt. The host lands in the review queue.
+//   { action: 'cancel', state }    deletes the attempt and its details.
+//
+// Attempts are found by state for the signed-in user only, and expire after
+// 30 minutes, so Myinfo data the host never submits does not linger.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, textResponse } from '../_shared/http.ts'
 import {
+  isAdult,
   isSessionFresh,
+  myinfoPerson,
   parseSingpassCallback,
   readSingpassConfig,
   recordErrorResponse,
   SINGPASS_ERRORS,
-  singpassIdentity,
+  singpassPreview,
 } from '../_shared/singpass.ts'
 import { finishSingpassLogin } from '../_shared/singpass-oidc.ts'
+
+const STATE_PATTERN = /^[A-Za-z0-9/+_\-=.]{1,255}$/
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return textResponse('ok')
@@ -41,13 +53,48 @@ Deno.serve(async (req) => {
     }
 
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
-    const callback = parseSingpassCallback(body.query)
-
     const admin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
+    // ---- confirm or cancel what the host has just reviewed ----
+    if (body.action === 'confirm' || body.action === 'cancel') {
+      const state = typeof body.state === 'string' ? body.state : ''
+      if (!STATE_PATTERN.test(state)) return jsonResponse({ error: SINGPASS_ERRORS.nothingToConfirm }, 400)
+
+      const { data: attempt } = await admin
+        .from('singpass_auth_sessions')
+        .select('id, created_at, teaching_plan, retrieved_sub, retrieved_name, retrieved_dob, retrieved_mobile')
+        .eq('state', state)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (attempt) await admin.from('singpass_auth_sessions').delete().eq('id', attempt.id)
+      if (body.action === 'cancel') return jsonResponse({ ok: true, cancelled: true })
+
+      if (!attempt?.retrieved_sub || !isSessionFresh(attempt.created_at)) {
+        return jsonResponse({ error: SINGPASS_ERRORS.nothingToConfirm }, 400)
+      }
+
+      const { error: recordError } = await admin.rpc('record_singpass_verification', {
+        p_user_id: user.id,
+        p_sub: attempt.retrieved_sub,
+        p_name: attempt.retrieved_name,
+        p_dob: attempt.retrieved_dob,
+        p_mobile: attempt.retrieved_mobile,
+        p_teaching_plan: attempt.teaching_plan,
+      })
+      if (recordError) {
+        const mapped = recordErrorResponse(recordError.message)
+        if (mapped.status >= 500) console.error('record_singpass_verification failed', recordError.message)
+        return jsonResponse({ error: mapped.error }, mapped.status)
+      }
+      return jsonResponse({ ok: true, status: 'pending' })
+    }
+
+    // ---- the redirect back from Singpass ----
+    const callback = parseSingpassCallback(body.query)
     if (!callback.ok) {
       if (callback.state) {
         await admin.from('singpass_auth_sessions').delete().eq('state', callback.state).eq('user_id', user.id)
@@ -58,21 +105,20 @@ Deno.serve(async (req) => {
 
     const { data: session } = await admin
       .from('singpass_auth_sessions')
-      .select('id, nonce, code_verifier, dpop_private_jwk, dpop_public_jwk, teaching_plan, created_at')
+      .select('id, nonce, code_verifier, dpop_private_jwk, dpop_public_jwk, created_at, retrieved_at')
       .eq('state', callback.state)
       .eq('user_id', user.id)
       .maybeSingle()
 
-    if (!session) return jsonResponse({ error: SINGPASS_ERRORS.expired }, 400)
+    if (!session || session.retrieved_at) return jsonResponse({ error: SINGPASS_ERRORS.expired }, 400)
+    if (!isSessionFresh(session.created_at)) {
+      await admin.from('singpass_auth_sessions').delete().eq('id', session.id)
+      return jsonResponse({ error: SINGPASS_ERRORS.expired }, 400)
+    }
 
-    // One use only, whatever happens next.
-    await admin.from('singpass_auth_sessions').delete().eq('id', session.id)
-
-    if (!isSessionFresh(session.created_at)) return jsonResponse({ error: SINGPASS_ERRORS.expired }, 400)
-
-    let claims: Record<string, unknown>
+    let result: { claims: Record<string, unknown>; userinfo: Record<string, unknown> }
     try {
-      claims = await finishSingpassLogin(settings.config, {
+      result = await finishSingpassLogin(settings.config, {
         search: callback.search,
         state: callback.state,
         nonce: session.nonce,
@@ -80,29 +126,42 @@ Deno.serve(async (req) => {
         dpop: { privateKey: session.dpop_private_jwk, publicKey: session.dpop_public_jwk },
       })
     } catch (err) {
-      console.error('singpass token exchange failed', err instanceof Error ? err.message : err)
+      await admin.from('singpass_auth_sessions').delete().eq('id', session.id)
+      console.error('singpass exchange failed', err instanceof Error ? err.message : err)
       return jsonResponse({ error: SINGPASS_ERRORS.failed }, 502)
     }
 
-    const identity = singpassIdentity(claims)
-    if (!identity.ok) {
-      console.error('singpass id token unusable', identity.error)
+    const parsed = myinfoPerson(result.claims, result.userinfo)
+    if (!parsed.ok) {
+      await admin.from('singpass_auth_sessions').delete().eq('id', session.id)
+      console.error('singpass myinfo unusable', parsed.error)
       return jsonResponse({ error: SINGPASS_ERRORS.failed }, 502)
     }
 
-    const { error: recordError } = await admin.rpc('record_singpass_verification', {
-      p_user_id: user.id,
-      p_sub: identity.sub,
-      p_name: identity.name,
-      p_teaching_plan: session.teaching_plan,
-    })
-    if (recordError) {
-      const mapped = recordErrorResponse(recordError.message)
-      if (mapped.status >= 500) console.error('record_singpass_verification failed', recordError.message)
-      return jsonResponse({ error: mapped.error }, mapped.status)
+    if (!isAdult(parsed.person.dob)) {
+      await admin.from('singpass_auth_sessions').delete().eq('id', session.id)
+      return jsonResponse({ error: SINGPASS_ERRORS.underAge }, 403)
     }
 
-    return jsonResponse({ ok: true, status: 'pending' })
+    // The DPoP key and verifier are spent; keep only what the host is about to confirm.
+    const { error: updateError } = await admin
+      .from('singpass_auth_sessions')
+      .update({
+        retrieved_sub: parsed.person.sub,
+        retrieved_name: parsed.person.name,
+        retrieved_dob: parsed.person.dob,
+        retrieved_mobile: parsed.person.mobile,
+        retrieved_at: new Date().toISOString(),
+        dpop_private_jwk: {},
+        code_verifier: '',
+      })
+      .eq('id', session.id)
+    if (updateError) {
+      console.error('singpass attempt update failed', updateError.message)
+      return jsonResponse({ error: SINGPASS_ERRORS.failed }, 500)
+    }
+
+    return jsonResponse({ ok: true, review: singpassPreview(parsed.person), state: callback.state })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unexpected error'
     console.error('singpass-callback failed', message)

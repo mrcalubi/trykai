@@ -396,7 +396,7 @@ describe('VerifyIdentity with Singpass turned on', () => {
     renderPage()
 
     expect(await screen.findByRole('button', { name: 'Verify with Singpass' })).toBeInTheDocument()
-    expect(screen.getByText(/Singpass shares only your name with TryKai/)).toBeInTheDocument()
+    expect(screen.getByText(/Singpass shares your name, date of birth and mobile number with TryKai/)).toBeInTheDocument()
     expect(screen.queryByLabelText(/^Passport or NRIC photo/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'No Singpass? Upload your ID instead' })).toBeInTheDocument()
   })

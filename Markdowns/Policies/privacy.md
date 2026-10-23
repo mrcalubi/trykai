@@ -22,7 +22,7 @@ Contact our Data Protection Officer for any question about your data or to exerc
 | Booking and payment records | When you book or are booked | To process bookings, refunds and payouts |
 | Reviews | When you leave one | Shown publicly on the Host's listing and profile |
 | Identity verification result | Before you host | To confirm Hosts are real, identifiable people |
-| Your name as registered with Singpass, and a Singpass identifier for your TryKai account | When you verify to host with Singpass | To confirm Hosts are real, identifiable people, and that one person has one host account |
+| Your name, date of birth and mobile number as held by Singpass, and a Singpass identifier for your TryKai account | When you verify to host with Singpass | To confirm Hosts are real, identifiable adults, that one person has one host account, and to reach Hosts about their sessions |
 | ID document and selfie | When you verify to host by upload | Same as above |
 | Basic usage data (pages viewed, device type) | Automatically | To keep the site working and improve it |
 
@@ -34,7 +34,7 @@ Your display name, profile photo, ID verified badge, listings and the reviews yo
 
 ## 4. Identity verification
 
-Where it is offered, Hosts can verify with **Singpass**. Singpass tells us your registered name and gives us an identifier for you that is specific to TryKai. We do not receive your NRIC number or any document images.
+Where it is offered, Hosts can verify with **Singpass**. With your consent, Singpass shares your name, date of birth and mobile number, and gives us an identifier for you that is specific to TryKai. You see these before submitting. We use your date of birth to confirm you are 18 or older, and your mobile number to reach you about your sessions. We do not receive your NRIC number or any document images.
 
 Hosts can instead verify by uploading a photo of their passport or NRIC and a selfie. These are stored in private, access-restricted storage and reviewed only by the TryKai team. We use them only to confirm your identity. On an NRIC you may cover the number: we need only your name and photo.
 

@@ -1,6 +1,6 @@
 // POST { teaching_plan } from a signed-in host on /verify-identity.
 //
-// Starts Singpass Login (00035): a pushed authorization request with PKCE and
+// Starts Singpass Myinfo (00035): a pushed authorization request with PKCE and
 // a fresh DPoP key, stored in singpass_auth_sessions for the callback. Returns
 // { url } for the page to send the host to. Singpass is optional per project:
 // without its five secrets this answers 503 and the page offers upload.

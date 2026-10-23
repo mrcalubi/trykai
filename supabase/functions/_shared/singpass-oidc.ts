@@ -1,6 +1,6 @@
 /**
- * The Singpass OIDC client: FAPI 2.0 with PAR, PKCE, DPoP, private_key_jwt and
- * an encrypted ID token. Built on openid-client, the library Singpass's own
+ * The Singpass Myinfo client: FAPI 2.0 with PAR, PKCE, DPoP, private_key_jwt,
+ * an encrypted ID token and an encrypted userinfo response. Built on openid-client, the library Singpass's own
  * demo app uses (github.com/singpass/demo-app, examples/nodejs/src/router.ts),
  * and kept the same shape so the two can be compared line by line.
  *
@@ -9,11 +9,7 @@
  */
 import * as oidc from 'npm:openid-client@6.8.1'
 import type { SingpassConfig } from './singpass.ts'
-import {
-  SINGPASS_AUTH_CONTEXT_MESSAGE,
-  SINGPASS_AUTH_CONTEXT_TYPE,
-  SINGPASS_SCOPE,
-} from './singpass.ts'
+import { SINGPASS_SCOPE } from './singpass.ts'
 
 export type DpopKeyPair = { privateKey: JsonWebKey; publicKey: JsonWebKey }
 
@@ -122,8 +118,6 @@ export async function beginSingpassLogin(config: SingpassConfig): Promise<Singpa
       code_challenge_method: 'S256',
       nonce,
       state,
-      authentication_context_type: SINGPASS_AUTH_CONTEXT_TYPE,
-      authentication_context_message: SINGPASS_AUTH_CONTEXT_MESSAGE,
     },
     await dpopOptions(client, dpop),
   )
@@ -131,13 +125,18 @@ export async function beginSingpassLogin(config: SingpassConfig): Promise<Singpa
   return { url: url.href, state, nonce, codeVerifier, dpop }
 }
 
-/** Token exchange; checks state, nonce, issuer and the ID token, then returns its claims. */
+/**
+ * Token exchange (checks state, nonce, issuer and the ID token), then the
+ * Myinfo userinfo request with the same DPoP key. Both responses arrive
+ * signed and encrypted; openid-client decrypts and verifies them.
+ */
 export async function finishSingpassLogin(
   config: SingpassConfig,
   session: { search: string; state: string; nonce: string; codeVerifier: string; dpop: DpopKeyPair },
-): Promise<Record<string, unknown>> {
+): Promise<{ claims: Record<string, unknown>; userinfo: Record<string, unknown> }> {
   const client = await singpassClient(config)
   const currentUrl = new URL(`${config.redirectUri}${session.search}`)
+  const dpop = await dpopOptions(client, session.dpop)
   const tokens = await oidc.authorizationCodeGrant(
     client,
     currentUrl,
@@ -148,9 +147,13 @@ export async function finishSingpassLogin(
       idTokenExpected: true,
     },
     undefined,
-    await dpopOptions(client, session.dpop),
+    dpop,
   )
   const claims = tokens.claims()
   if (!claims) throw new Error('ID token claims are missing')
-  return claims as Record<string, unknown>
+  const userinfo = await oidc.fetchUserInfo(client, tokens.access_token, claims.sub, dpop)
+  return {
+    claims: claims as Record<string, unknown>,
+    userinfo: userinfo as unknown as Record<string, unknown>,
+  }
 }
