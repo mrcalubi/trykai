@@ -43,6 +43,7 @@ describe('isVerificationMethod', () => {
   it('accepts manual and stripe_identity only', () => {
     expect(isVerificationMethod('manual')).toBe(true)
     expect(isVerificationMethod('stripe_identity')).toBe(true)
+    expect(isVerificationMethod('singpass')).toBe(true)
     expect(isVerificationMethod('veriff')).toBe(false)
     expect(isVerificationMethod(null)).toBe(false)
   })

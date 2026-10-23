@@ -34,7 +34,7 @@ Cover four things:
 
 **1. Confirm one to one.** Verbal or written commitment from the individual. Group chat enthusiasm is not commitment, and repeatedly has not been.
 
-**2. Account and identity verification.** They sign up, then go to `/verify-identity`: a sentence or two on what they want to teach, a photo of their passport or NRIC (they may cover the NRIC number), and a selfie. Approve them yourself at `/admin/verifications`, while you are still on the call if you can. Target same day for founding hosts. Stripe Identity is no longer offered: it is not available to Singapore businesses (DECISIONS.md, 23 October).
+**2. Account and identity verification.** They sign up, then go to `/verify-identity`: a sentence or two on what they want to teach, then **Verify with Singpass** where it is switched on, or a photo of their passport or NRIC (they may cover the NRIC number) and a selfie. Approve them yourself at `/admin/verifications`, while you are still on the call if you can. Target same day for founding hosts. Stripe Identity is no longer offered: it is not available to Singapore businesses (DECISIONS.md, 23 October).
 
 **3. Mark them as a founding host.** Set `is_founding_host` on their account so the price panel shows "Founding host: no host fee, ever."
 

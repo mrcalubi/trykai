@@ -30,6 +30,8 @@ export default defineConfig({
         'src/**/__mocks__/**',
         'src/**/*.{test,spec}.{js,jsx}',
         'supabase/functions/**/*.{test,spec}.{js,ts}',
+        // Network-only Singpass client; its rules live in _shared/singpass.ts.
+        'supabase/functions/_shared/singpass-oidc.ts',
       ],
       thresholds: {
         lines: 92,

@@ -2,8 +2,9 @@
  * What the verify form still needs, in the order it appears on the page, so
  * one message names everything instead of revealing one gap per tap.
  */
-export const TEACHING_PLAN_MIN = 3
-export const TEACHING_PLAN_MAX = 600
+import { TEACHING_PLAN_MAX, TEACHING_PLAN_MIN } from '../../supabase/functions/_shared/verification.ts'
+
+export { TEACHING_PLAN_MAX, TEACHING_PLAN_MIN }
 
 export function missingVerificationItems({ plan, idPhoto, selfie, consent }) {
   const missing = []

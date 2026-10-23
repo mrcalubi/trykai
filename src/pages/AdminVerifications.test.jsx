@@ -93,6 +93,34 @@ describe('AdminVerifications queue', () => {
     ).toBeInTheDocument()
   })
 
+  it('shows a Singpass-verified host by name, with no documents', async () => {
+    givenQueue([
+      makePending({
+        method: 'singpass',
+        verified_name: 'TAN MEI LING',
+        full_name: 'Mei Ling',
+        id_photo_url: null,
+        selfie_url: null,
+      }),
+    ])
+    renderPage()
+
+    await screen.findByText('Mei Ling')
+    const card = cardFor('Mei Ling')
+    expect(within(card).getByText(/Verified with Singpass as/)).toBeInTheDocument()
+    expect(within(card).getByText('TAN MEI LING')).toBeInTheDocument()
+    expect(within(card).getByText(/Their account says Mei Ling/)).toBeInTheDocument()
+    expect(within(card).queryByText('Not uploaded')).not.toBeInTheDocument()
+  })
+
+  it('does not repeat the name when Singpass and the account agree', async () => {
+    givenQueue([makePending({ method: 'singpass', verified_name: 'MEI LING', full_name: 'Mei Ling' })])
+    renderPage()
+
+    await screen.findByText('Mei Ling')
+    expect(within(cardFor('Mei Ling')).queryByText(/Their account says/)).not.toBeInTheDocument()
+  })
+
   it('sends the signed-in reviewer token with the request', async () => {
     givenQueue([makePending()])
     renderPage()

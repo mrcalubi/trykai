@@ -56,7 +56,7 @@ async function listPending() {
 
   const { data: rows, error } = await admin
     .from('users')
-    .select('id, full_name, email, verification_submitted_at, teaching_plan, id_photo_url, selfie_url')
+    .select('id, full_name, email, verification_submitted_at, verification_method, verified_name, teaching_plan, id_photo_url, selfie_url')
     .eq('verification_status', 'pending')
     .order('verification_submitted_at', { ascending: true, nullsFirst: true })
 
@@ -76,6 +76,8 @@ async function listPending() {
       email: row.email,
       submitted_at: row.verification_submitted_at,
       teaching_plan: row.teaching_plan ?? null,
+      method: row.verification_method === 'singpass' ? 'singpass' : 'manual',
+      verified_name: row.verification_method === 'singpass' ? row.verified_name ?? null : null,
       id_photo_url: idPhoto,
       selfie_url: selfie,
     })
@@ -99,25 +101,27 @@ async function review(reviewerId: string, body: Record<string, unknown>) {
     return jsonResponse({ error: 'user_id is required' }, 400)
   }
 
-  const prepared = prepareVerificationReview({
-    decision: body.decision,
-    reason: body.reason,
-    method: 'manual',
-  })
-  if (!prepared.ok) {
-    return jsonResponse({ error: prepared.message }, prepared.status)
-  }
-
   const admin = adminClient()
 
   const { data: profile, error: profileError } = await admin
     .from('users')
-    .select('full_name, email')
+    .select('full_name, email, verification_method')
     .eq('id', userId)
     .single()
 
   if (profileError || !profile) {
     return jsonResponse({ error: 'Host not found' }, 404)
+  }
+
+  // The decision keeps the route the host came by, so the audit row says
+  // whether Singpass or a document upload backed it.
+  const prepared = prepareVerificationReview({
+    decision: body.decision,
+    reason: body.reason,
+    method: profile.verification_method === 'singpass' ? 'singpass' : 'manual',
+  })
+  if (!prepared.ok) {
+    return jsonResponse({ error: prepared.message }, prepared.status)
   }
 
   const { error: reviewError } = await admin.rpc('review_verification', {

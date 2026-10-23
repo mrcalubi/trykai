@@ -33,6 +33,8 @@ const FUNCTIONS = [
   'purge-verification-docs',
   'release-payout',
   'report-booking-problem',
+  'singpass-callback',
+  'singpass-start',
   'stripe-webhook',
 ]
 

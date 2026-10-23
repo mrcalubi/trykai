@@ -194,8 +194,9 @@ export default function Terms() {
 
       <h3>3. Identity verification</h3>
       <p>
-        You must verify your identity before you can list, by uploading a photo
-        of your passport or NRIC and a selfie for the TryKai team to review.
+        You must verify your identity before you can list, with Singpass where
+        it is offered, or by uploading a photo of your passport or NRIC and a
+        selfie for the TryKai team to review.
         Verification confirms who you are. It does not certify your skill or
         character.
       </p>

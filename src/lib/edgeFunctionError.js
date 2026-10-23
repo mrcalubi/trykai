@@ -55,3 +55,14 @@ export function isPayNowTooFarAheadError(data, message = '') {
   if (data?.error === PAYNOW_TOO_FAR_AHEAD) return true
   return message === PAYNOW_TOO_FAR_AHEAD || message === PAYNOW_TOO_FAR_AHEAD_MESSAGE
 }
+
+/**
+ * Only a sentence the function itself sent back, never supabase-js's own
+ * "Failed to send a request…" or a network error: for flows where the
+ * function's copy is written for the person and anything else is noise.
+ */
+export async function functionReasonOrDefault(error, data, fallback) {
+  const message = await edgeFunctionErrorMessage(error, data)
+  if (!message || (error && message === (error.message || 'Something went wrong'))) return fallback
+  return message
+}

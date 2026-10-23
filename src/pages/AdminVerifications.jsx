@@ -121,23 +121,34 @@ export default function AdminVerifications() {
                 {host.teaching_plan || 'Not given (submitted before this was asked)'}
               </p>
 
-              <div className="verification-review__docs">
-                {['id_photo_url', 'selfie_url'].map((key) => (
-                  <figure key={key} className="verification-review__doc">
-                    <figcaption>{key === 'id_photo_url' ? 'ID document' : 'Selfie'}</figcaption>
-                    {host[key] ? (
-                      <a href={host[key]} target="_blank" rel="noreferrer">
-                        <img
-                          src={host[key]}
-                          alt={key === 'id_photo_url' ? 'ID document' : 'Selfie'}
-                        />
-                      </a>
-                    ) : (
-                      <p className="hint">Not uploaded</p>
-                    )}
-                  </figure>
-                ))}
-              </div>
+              {host.method === 'singpass' ? (
+                <p className="verification-review__singpass">
+                  Verified with Singpass as <strong>{host.verified_name || 'unknown name'}</strong>
+                  {host.verified_name &&
+                  host.full_name &&
+                  host.verified_name.trim().toLowerCase() !== host.full_name.trim().toLowerCase()
+                    ? `. Their account says ${host.full_name}.`
+                    : '.'}
+                </p>
+              ) : (
+                <div className="verification-review__docs">
+                  {['id_photo_url', 'selfie_url'].map((key) => (
+                    <figure key={key} className="verification-review__doc">
+                      <figcaption>{key === 'id_photo_url' ? 'ID document' : 'Selfie'}</figcaption>
+                      {host[key] ? (
+                        <a href={host[key]} target="_blank" rel="noreferrer">
+                          <img
+                            src={host[key]}
+                            alt={key === 'id_photo_url' ? 'ID document' : 'Selfie'}
+                          />
+                        </a>
+                      ) : (
+                        <p className="hint">Not uploaded</p>
+                      )}
+                    </figure>
+                  ))}
+                </div>
+              )}
 
               <label className="label">
                 Rejection reason

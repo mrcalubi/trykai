@@ -5267,6 +5267,35 @@ body.lightbox-open {
 }
 
 /* Verification review, internal only */
+.verification-review__singpass {
+  margin: 12px 0 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-h);
+}
+
+.verify-singpass {
+  display: grid;
+  gap: 8px;
+}
+
+.keys-block {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.keys-block__label {
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.keys-block__value {
+  font-family: var(--mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+
 /* What the host says they will teach, so the reviewer gets a sense of the listing. */
 .verification-review__plan {
   margin: 12px 0 0;
