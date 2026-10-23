@@ -63,6 +63,7 @@ describe('SingpassReturn', () => {
     renderAt('?code=abc&state=s1')
 
     expect(await screen.findByText('None registered with Singpass')).toBeInTheDocument()
+    expect(screen.getByText('Only the TryKai team sees these.')).toBeInTheDocument()
   })
 
   it('submits only after the host confirms', async () => {
