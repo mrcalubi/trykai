@@ -531,7 +531,7 @@ Hosts can confirm who they are with Singpass instead of uploading an ID (DECISIO
 
    Then close the keys page.
 5. **Show the button on staging.** Vercel, Settings, Environment Variables: `VITE_SINGPASS_ENABLED` = `true`, for **Preview** only (staging). Redeploy staging.
-6. **Test** with a Myinfo test persona (Singpass portal, Testing; the staging Singpass app from TestFlight). On `/verify-identity`, tap Verify with Singpass, log in, check "Check your details" shows the persona's name, date of birth and mobile, tap Confirm and continue, and land on "You're verified" (with `00036`; before it, "Under review"). Create your listing should open the listing form. Then:
+6. **Test** with a Myinfo test persona (Singpass portal, Testing; the staging Singpass app from TestFlight). On `/verify-identity`, tap Verify with Singpass, log in, check "Check your details" shows the persona's name and date of birth locked and the mobile editable (try a persona with no mobile: the page asks for one), tap Confirm and continue, and land on "You're verified" (with `00036`; before it, "Under review"). Create your listing should open the listing form. Then:
    - the same persona from a second TryKai account should say the Singpass is already linked
    - a persona under 18, if the test set has one, should say hosts must be 18 or older
    - tapping Cancel on "Check your details" should return to the verify page and save nothing

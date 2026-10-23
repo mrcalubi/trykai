@@ -5335,6 +5335,10 @@ body.lightbox-open {
   margin-top: 24px;
 }
 
+.singpass-privacy {
+  margin-top: 16px;
+}
+
 .singpass-actions .btn {
   width: 100%;
 }
@@ -5342,6 +5346,44 @@ body.lightbox-open {
 .verify-singpass {
   display: grid;
   gap: 8px;
+}
+
+/* Singpass's own button artwork (black variant), centred on its own colour so
+   it fills TryKai's full-width button slot. Colours are Singpass's, not ours. */
+.singpass-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  background: #141414;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.singpass-button img {
+  display: block;
+  height: 40px;
+  width: auto;
+}
+
+.singpass-button:focus-visible {
+  outline: 3px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.singpass-button:disabled {
+  cursor: progress;
+}
+
+/* Government-verified fields on the review step: shown, never editable. */
+.input--locked {
+  color: var(--text-h);
+  background: var(--sand);
+  border-color: var(--border);
+  cursor: default;
 }
 
 .keys-block {

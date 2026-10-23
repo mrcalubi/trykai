@@ -3,6 +3,7 @@ import {
   isAdult,
   isSessionFresh,
   myinfoPerson,
+  normalizeHostMobile,
   parseSingpassCallback,
   publicJwk,
   readSingpassConfig,
@@ -225,5 +226,22 @@ describe('publicJwk', () => {
     expect(publicJwk(SIG, 'sig')).toEqual({
       kty: 'EC', crv: 'P-256', x: 'x1', y: 'y1', kid: 'trykai-sig-1', alg: 'ES256', use: 'sig',
     })
+  })
+})
+
+describe('normalizeHostMobile', () => {
+  it('takes a Singapore number with or without +65, and any E.164 number', () => {
+    expect(normalizeHostMobile('9123 4567')).toEqual({ ok: true, mobile: '+6591234567' })
+    expect(normalizeHostMobile('+65 9123-4567')).toEqual({ ok: true, mobile: '+6591234567' })
+    expect(normalizeHostMobile('6581234567')).toEqual({ ok: true, mobile: '+6581234567' })
+    expect(normalizeHostMobile('+44 7700 900123')).toEqual({ ok: true, mobile: '+447700900123' })
+  })
+
+  it('requires a number and refuses anything that is not one', () => {
+    expect(normalizeHostMobile('')).toEqual({ ok: false, error: SINGPASS_ERRORS.mobileMissing })
+    expect(normalizeHostMobile(null)).toEqual({ ok: false, error: SINGPASS_ERRORS.mobileMissing })
+    for (const bad of ['1234', '51234567', '+12', 'abc', '+6591234567890123']) {
+      expect(normalizeHostMobile(bad)).toEqual({ ok: false, error: SINGPASS_ERRORS.mobileInvalid })
+    }
   })
 })
