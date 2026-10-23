@@ -5293,6 +5293,16 @@ body.lightbox-open {
   color: var(--text-h);
 }
 
+.singpass-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.singpass-actions .btn {
+  width: 100%;
+}
+
 .verify-singpass {
   display: grid;
   gap: 8px;

@@ -108,15 +108,18 @@ export default function SingpassReturn() {
             </div>
           </dl>
           <p className="hint">
-            Only the TryKai team sees these. We use your mobile number to reach you about your
-            sessions.
+            {mobile
+              ? 'Only the TryKai team sees these. We use your mobile number to reach you about your sessions.'
+              : 'Only the TryKai team sees these.'}
           </p>
-          <button type="button" className="btn btn--primary" disabled={busy} onClick={confirm}>
-            {busy ? 'Submitting…' : 'Confirm and submit'}
-          </button>
-          <button type="button" className="link-button" disabled={busy} onClick={cancel}>
-            Cancel
-          </button>
+          <div className="singpass-actions">
+            <button type="button" className="btn btn--primary" disabled={busy} onClick={confirm}>
+              {busy ? 'Submitting…' : 'Confirm and submit'}
+            </button>
+            <button type="button" className="btn btn--secondary" disabled={busy} onClick={cancel}>
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
     )
