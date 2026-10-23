@@ -83,14 +83,22 @@ describe('AdminVerifications queue', () => {
     expect(within(card).getByText('Latte art for beginners')).toBeInTheDocument()
   })
 
-  it('marks a submission made before the question was asked', async () => {
+  it('leaves the teaching line out when the host was not asked', async () => {
     givenQueue([makePending({ teaching_plan: null })])
     renderPage()
 
     await screen.findByText('Mei Ling')
-    expect(
-      within(cardFor('Mei Ling')).getByText('Not given (submitted before this was asked)')
-    ).toBeInTheDocument()
+    expect(within(cardFor('Mei Ling')).queryByText('Wants to teach')).not.toBeInTheDocument()
+  })
+
+  it('points to the listing queue', async () => {
+    givenQueue([])
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: 'Listing review' })).toHaveAttribute(
+      'href',
+      '/admin/listings'
+    )
   })
 
   it('shows a Singpass-verified host by name, with no documents', async () => {

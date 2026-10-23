@@ -1,4 +1,4 @@
-// POST { teaching_plan } from a signed-in host on /verify-identity.
+// POST {} from a signed-in host on /verify-identity.
 //
 // Starts Singpass Myinfo (00035): a pushed authorization request with PKCE and
 // a fresh DPoP key, stored in singpass_auth_sessions for the callback. Returns
@@ -9,7 +9,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, textResponse } from '../_shared/http.ts'
 import { canSubmitVerification } from '../_shared/verification.ts'
 import {
-  normalizeTeachingPlan,
   readSingpassConfig,
   SINGPASS_ERRORS,
   SINGPASS_SESSION_MAX_AGE_MINUTES,
@@ -36,10 +35,6 @@ Deno.serve(async (req) => {
       console.error('singpass-start not configured', settings.missing.join(', '))
       return jsonResponse({ error: SINGPASS_ERRORS.notConfigured }, 503)
     }
-
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
-    const plan = normalizeTeachingPlan(body.teaching_plan)
-    if (!plan.ok) return jsonResponse({ error: plan.error }, 400)
 
     const admin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -73,7 +68,6 @@ Deno.serve(async (req) => {
       code_verifier: start.codeVerifier,
       dpop_private_jwk: start.dpop.privateKey,
       dpop_public_jwk: start.dpop.publicKey,
-      teaching_plan: plan.plan,
     })
     if (insertError) {
       console.error('singpass-start session insert failed', insertError.message)

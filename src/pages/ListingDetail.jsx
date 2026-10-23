@@ -235,6 +235,7 @@ export default function ListingDetail() {
           photo_urls,
           whats_provided,
           host_id,
+          review_status,
           users!host_id (
             display_name,
             bio,
@@ -914,6 +915,26 @@ export default function ListingDetail() {
         <p className="share-note" role="status">
           {shareNote}
         </p>
+      ) : null}
+
+      {isOwnListing && listing.review_status && listing.review_status !== 'approved' ? (
+        <div className="detail-review-banner" role="status">
+          <p className="detail-review-banner__title">
+            {listing.review_status === 'changes_requested'
+              ? 'One thing to change before guests can see this'
+              : 'Only you can see this for now'}
+          </p>
+          <p className="detail-review-banner__body">
+            {listing.review_status === 'changes_requested' ? (
+              <>
+                See the note on your <Link to="/hosting">Hosting</Link> page, then{' '}
+                <Link to={`/edit-listing/${listing.id}`}>edit your listing</Link>.
+              </>
+            ) : (
+              "We're taking a quick look before it goes live. We'll email you when it does."
+            )}
+          </p>
+        </div>
       ) : null}
 
       {photos.length > 0 ? (

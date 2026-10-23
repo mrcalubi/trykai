@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { MAX_REJECTION_REASON_LENGTH } from '../../supabase/functions/_shared/verification.ts'
@@ -97,8 +98,10 @@ export default function AdminVerifications() {
     <div className="page page--narrow">
       <h1 className="dashboard-heading">Verification review</h1>
       <p className="form-card__subtitle">
-        Check that the selfie is the same person as the ID, and that the ID is readable. Document
-        links expire after a few minutes, so reload if an image stops loading.
+        Hosts who upload an ID instead of using Singpass wait here. Check that the selfie is the
+        same person as the ID, and that the ID is readable. Document links expire after a few
+        minutes, so reload if an image stops loading. New listings are reviewed on{' '}
+        <Link to="/admin/listings">Listing review</Link>.
       </p>
 
       {notice && <p className="success-message">{notice}</p>}
@@ -117,10 +120,12 @@ export default function AdminVerifications() {
                 {host.email} · {formatSubmittedAt(host.submitted_at)}
               </p>
 
-              <p className="verification-review__plan">
-                <span className="verification-review__plan-label">Wants to teach</span>
-                {host.teaching_plan || 'Not given (submitted before this was asked)'}
-              </p>
+              {host.teaching_plan ? (
+                <p className="verification-review__plan">
+                  <span className="verification-review__plan-label">Wants to teach</span>
+                  {host.teaching_plan}
+                </p>
+              ) : null}
 
               {host.method === 'singpass' ? (
                 <p className="verification-review__singpass">

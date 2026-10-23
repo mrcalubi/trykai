@@ -3,7 +3,6 @@ import {
   isAdult,
   isSessionFresh,
   myinfoPerson,
-  normalizeTeachingPlan,
   parseSingpassCallback,
   publicJwk,
   readSingpassConfig,
@@ -94,16 +93,6 @@ describe('Singpass request settings', () => {
   it('asks for name, date of birth and mobile, never the NRIC', () => {
     expect(SINGPASS_SCOPE).toBe('openid name dob mobileno')
     expect(SINGPASS_SCOPE).not.toMatch(/identity|uinfin/)
-  })
-})
-
-describe('normalizeTeachingPlan', () => {
-  it('trims and bounds the answer', () => {
-    expect(normalizeTeachingPlan('  coffee art  ')).toEqual({ ok: true, plan: 'coffee art' })
-    expect(normalizeTeachingPlan(' ab ').ok).toBe(false)
-    expect(normalizeTeachingPlan(null).ok).toBe(false)
-    expect(normalizeTeachingPlan('x'.repeat(601)).ok).toBe(false)
-    expect(normalizeTeachingPlan('x'.repeat(600)).ok).toBe(true)
   })
 })
 

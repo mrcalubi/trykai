@@ -3,12 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { verificationDocumentPaths } from '../../supabase/functions/_shared/verification.ts'
-import {
-  TEACHING_PLAN_MAX,
-  TEACHING_PLAN_MIN,
-  missingItemsMessage,
-  missingVerificationItems,
-} from '../lib/verificationForm'
+import { missingItemsMessage, missingVerificationItems } from '../lib/verificationForm'
 import { singpassEnabled } from '../lib/singpass'
 import { functionReasonOrDefault } from '../lib/edgeFunctionError'
 
@@ -19,10 +14,12 @@ function firstRow(data) {
 }
 
 /**
- * Two routes (DECISIONS.md, 23 October). Singpass Login, where the environment
- * turns it on: Singpass confirms the name and TryKai stores no documents.
- * Upload, always: an ID photo and a selfie for manual review, for anyone
- * without Singpass. Stripe Identity is not offered to Singapore businesses.
+ * Two routes (DECISIONS.md, 23 October). Singpass Myinfo is the main one where
+ * the environment turns it on: it verifies the host on the spot, TryKai stores
+ * no documents, and the host goes straight on to create a listing (which the
+ * team reviews before guests see it). Upload is the quiet fallback for anyone
+ * without Singpass: an ID photo and a selfie, checked by hand. Stripe Identity
+ * is not offered to Singapore businesses.
  */
 
 export default function VerifyIdentity() {
@@ -33,7 +30,6 @@ export default function VerifyIdentity() {
   const [statusChecked, setStatusChecked] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState(null)
   const [rejectionReason, setRejectionReason] = useState('')
-  const [teachingPlan, setTeachingPlan] = useState('')
   const [idPhoto, setIdPhoto] = useState(null)
   const [selfie, setSelfie] = useState(null)
   const [consent, setConsent] = useState(false)
@@ -82,8 +78,7 @@ export default function VerifyIdentity() {
     e.preventDefault()
     setError('')
 
-    const plan = teachingPlan.trim()
-    const missing = missingVerificationItems({ plan, idPhoto, selfie, consent })
+    const missing = missingVerificationItems({ idPhoto, selfie, consent })
     if (missing.length > 0) {
       setError(missingItemsMessage(missing))
       return
@@ -117,7 +112,6 @@ export default function VerifyIdentity() {
       p_id_photo_url: paths.idPhoto,
       p_selfie_url: paths.selfie,
       p_consent: true,
-      p_teaching_plan: plan,
     })
 
     setLoading(false)
@@ -133,18 +127,12 @@ export default function VerifyIdentity() {
 
   async function startSingpass() {
     setError('')
-    const plan = teachingPlan.trim()
-    if (plan.length < TEACHING_PLAN_MIN) {
-      setError(missingItemsMessage(["what you'd like to teach"]))
-      return
-    }
-
     setSingpassLoading(true)
     const {
       data: { session },
     } = await supabase.auth.getSession()
     const { data, error: fnError } = await supabase.functions.invoke('singpass-start', {
-      body: { teaching_plan: plan },
+      body: {},
       headers: { Authorization: `Bearer ${session?.access_token}` },
     })
 
@@ -180,24 +168,6 @@ export default function VerifyIdentity() {
       </div>
     )
   }
-
-  const teachingField = (
-    <label className="label">
-      What would you like to teach?
-      <textarea
-        value={teachingPlan}
-        onChange={(e) => setTeachingPlan(e.target.value)}
-        maxLength={TEACHING_PLAN_MAX}
-        rows={4}
-        className="input input--textarea"
-        placeholder="Latte art for beginners. I've been a barista for six years and pour at home every weekend."
-      />
-      <span className="hint">
-        A sentence or two: what guests would do, and why you know it. You can change the
-        details when you create your listing.
-      </span>
-    </label>
-  )
 
   const uploadFields = (
     <>
@@ -241,85 +211,95 @@ export default function VerifyIdentity() {
     </>
   )
 
+  const notices = (
+    <>
+      {location.state?.message && (
+        <p className="error-message error-message--spaced">{location.state.message}</p>
+      )}
+      {verificationStatus === 'rejected' && rejectionReason && (
+        <p className="error-message error-message--spaced">
+          Your last submission was not approved: {rejectionReason}
+        </p>
+      )}
+    </>
+  )
+
+  if (!singpass) {
+    return (
+      <div className="page page--form">
+        <div className="form-card">
+          <h1 className="form-card__title">Verify your identity</h1>
+          <p className="form-card__subtitle">
+            Hosting on TryKai means meeting people in person, so we check every host. Add a photo
+            of your ID and a selfie, and the TryKai team will review it within 1 to 2 business
+            days.
+          </p>
+          {notices}
+          <form onSubmit={handleSubmit} className="form">
+            {uploadFields}
+            {error && <p className="error-message">{error}</p>}
+            <button type="submit" disabled={loading} className="btn btn--primary">
+              {loading ? 'Submitting…' : 'Submit for review'}
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="page page--form">
       <div className="form-card">
         <h1 className="form-card__title">Verify your identity</h1>
         <p className="form-card__subtitle">
-          {singpass
-            ? "Hosting on TryKai means meeting people in person, so we check every host. Tell us what you'd like to teach, then confirm who you are with Singpass. The TryKai team reviews it within 1 to 2 business days."
-            : "Hosting on TryKai means meeting people in person, so we check every host. Tell us what you'd like to teach, add a photo of your ID and a selfie, and the TryKai team will review it within 1 to 2 business days."}
+          Hosting on TryKai means meeting people in person, so every host confirms who they are.
+          With Singpass it takes about a minute, and you can create your listing straight after.
         </p>
+        {notices}
 
-        {location.state?.message && (
-          <p className="error-message error-message--spaced">
-            {location.state.message}
+        <div className="verify-singpass">
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={singpassLoading}
+            onClick={startSingpass}
+          >
+            {singpassLoading ? 'Opening Singpass…' : 'Verify with Singpass'}
+          </button>
+          <p className="hint">
+            Singpass shares your name, date of birth and mobile number with TryKai. You check them
+            before confirming. We never see your NRIC number.
           </p>
-        )}
+        </div>
 
-        {verificationStatus === 'rejected' && rejectionReason && (
-          <p className="error-message error-message--spaced">
-            Your last submission was not approved: {rejectionReason}
-          </p>
-        )}
+        {error && !showUpload && <p className="error-message">{error}</p>}
 
-        <form onSubmit={handleSubmit} className="form">
-          {teachingField}
-
-          {singpass ? (
-            <>
-              <div className="verify-singpass">
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  disabled={singpassLoading}
-                  onClick={startSingpass}
-                >
-                  {singpassLoading ? 'Opening Singpass…' : 'Verify with Singpass'}
-                </button>
-                <p className="hint">
-                  Singpass shares your name, date of birth and mobile number with TryKai. You check them before submitting. We never see your NRIC number.
-                </p>
-              </div>
-
-              {error && !showUpload && <p className="error-message">{error}</p>}
-
-              <div className="verify-fallback">
-                {showUpload ? (
-                  <>
-                    <p className="verify-fallback__intro">
-                      No Singpass? Upload a photo of your passport or NRIC and a selfie instead.
-                    </p>
-                    {uploadFields}
-                    {error && <p className="error-message">{error}</p>}
-                    <button type="submit" disabled={loading} className="btn btn--secondary">
-                      {loading ? 'Submitting…' : 'Submit for review'}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="link-button"
-                    onClick={() => {
-                      setError('')
-                      setShowUpload(true)
-                    }}
-                  >
-                    No Singpass? Upload your ID instead
-                  </button>
-                )}
-              </div>
-            </>
-          ) : (
-            <>
+        <div className="verify-fallback">
+          {showUpload ? (
+            <form onSubmit={handleSubmit} className="form">
+              <p className="verify-fallback__intro">
+                No Singpass? Upload a photo of your passport or NRIC and a selfie. We check these
+                by hand, usually within 1 to 2 business days.
+              </p>
               {uploadFields}
               {error && <p className="error-message">{error}</p>}
-              <button type="submit" disabled={loading} className="btn btn--primary">
+              <button type="submit" disabled={loading} className="btn btn--secondary">
                 {loading ? 'Submitting…' : 'Submit for review'}
               </button>
-            </>
+            </form>
+          ) : (
+            <button
+              type="button"
+              className="link-button verify-fallback__toggle"
+              onClick={() => {
+                setError('')
+                setShowUpload(true)
+              }}
+            >
+              No Singpass? Upload your ID instead
+            </button>
           )}
-        </form>
+        </div>
       </div>
     </div>
   )

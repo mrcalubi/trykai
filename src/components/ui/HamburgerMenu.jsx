@@ -24,7 +24,10 @@ function loggedInItems({ isAdmin, verificationStatus, userId }) {
     { label: 'Settings', to: '/settings', icon: 'settings' },
     { ...host, promo: HOST_BLURB[host.label], divided: true },
     ...(isAdmin
-      ? [{ label: 'Verification review', to: '/admin/verifications', icon: 'shield', divided: true }]
+      ? [
+          { label: 'Listing review', to: '/admin/listings', icon: 'document', divided: true },
+          { label: 'Verification review', to: '/admin/verifications', icon: 'shield' },
+        ]
       : []),
     { label: 'Log out', action: 'logout', icon: 'logout', divided: true },
   ]

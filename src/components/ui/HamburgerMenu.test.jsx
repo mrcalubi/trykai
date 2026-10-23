@@ -95,6 +95,10 @@ describe('HamburgerMenu', () => {
       'href',
       '/admin/verifications'
     )
+    expect(screen.getByRole('link', { name: 'Listing review' })).toHaveAttribute(
+      'href',
+      '/admin/listings'
+    )
   })
 
   it('keeps links out of the tab order while closed', () => {

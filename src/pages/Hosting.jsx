@@ -36,6 +36,7 @@ import {
   monthStats,
 } from '../lib/hostingDashboard'
 import { parsePriceInputCents } from '../lib/pricing'
+import { listingReviewBadge } from '../lib/listingReview'
 
 function activeBookingsOn(session) {
   // Pending rows are unpaid checkouts, not guests the host has to refund.
@@ -171,7 +172,8 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
   const [pendingCount, setPendingCount] = useState(0)
 
   const loadData = useCallback(async () => {
-    const listingColumns = 'id, title, area, category, photo_urls, price_per_person, max_guests'
+    const listingColumns =
+      'id, title, area, category, photo_urls, price_per_person, max_guests, review_status, review_note'
     const [profileResult, adminResult] = await Promise.all([
       withIssuedAtRetry(() => supabase.rpc('my_account')),
       supabase.rpc('my_verification'),
@@ -863,6 +865,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                 const openCount = upcoming.length - bookedCount - heldCount
                 const hasDates = openCount + bookedCount > 0
                 const formOpen = activeFormId === listing.id
+                const reviewBadge = listingReviewBadge(listing.review_status)
                 return (
                   <article
                     key={listing.id}
@@ -902,7 +905,17 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                           />
                         )}
                         <div className="hosting-listing__text">
-                          {hasDates ? (
+                          {reviewBadge ? (
+                            <span
+                              className={
+                                reviewBadge.tone === 'changes'
+                                  ? 'hosting-badge hosting-badge--hidden'
+                                  : 'hosting-badge'
+                              }
+                            >
+                              {reviewBadge.label}
+                            </span>
+                          ) : hasDates ? (
                             <span className="hosting-badge hosting-badge--live">Live</span>
                           ) : (
                             <span className="hosting-badge hosting-badge--hidden">
@@ -939,6 +952,23 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
                           {formOpen ? 'Cancel' : 'Add sessions'}
                         </Button>
                       </div>
+                      {listing.review_status === 'pending' ? (
+                        <p className="hosting-review" role="status">
+                          We&apos;re taking a quick look before guests can see it. Add your dates
+                          now and we&apos;ll email you when it&apos;s live.
+                        </p>
+                      ) : null}
+                      {listing.review_status === 'changes_requested' ? (
+                        <div className="hosting-review hosting-review--changes">
+                          <p className="hosting-review__label">One thing to change before it goes live</p>
+                          {listing.review_note ? (
+                            <p className="hosting-review__note">{listing.review_note}</p>
+                          ) : null}
+                          <Link to={`/edit-listing/${listing.id}`} className="hosting-review__link">
+                            Edit listing
+                          </Link>
+                        </div>
+                      ) : null}
                       {!hasDates && interestByListing[listing.id] ? (
                         <p className="hosting-keen">
                           {hostBannerLine(interestByListing[listing.id])} Add a date and we&apos;ll

@@ -21,7 +21,8 @@ async function callSingpass(body) {
  * Where Singpass sends the host back (SINGPASS_REDIRECT_URI). Hands the query
  * string to singpass-callback once (the code works only once) and takes it
  * out of the address bar, then shows what Singpass returned, read-only, for
- * the host to confirm, as Myinfo requires.
+ * the host to confirm, as Myinfo requires. Confirming verifies the host on the
+ * spot (00036); their first listing is what the TryKai team reviews.
  */
 export default function SingpassReturn() {
   const location = useLocation()
@@ -61,7 +62,7 @@ export default function SingpassReturn() {
       setView({ phase: 'error', error: await functionReasonOrDefault(error, data, GENERIC_ERROR) })
       return
     }
-    setView({ phase: 'done' })
+    setView({ phase: 'done', approved: data.status === 'approved' })
   }
 
   async function cancel() {
@@ -114,7 +115,7 @@ export default function SingpassReturn() {
           </p>
           <div className="singpass-actions">
             <button type="button" className="btn btn--primary" disabled={busy} onClick={confirm}>
-              {busy ? 'Submitting…' : 'Confirm and submit'}
+              {busy ? 'Confirming…' : 'Confirm and continue'}
             </button>
             <button type="button" className="btn btn--secondary" disabled={busy} onClick={cancel}>
               Cancel
@@ -126,16 +127,33 @@ export default function SingpassReturn() {
   }
 
   if (view.phase === 'done') {
+    if (!view.approved) {
+      return (
+        <div className="page page--form page--form-status">
+          <div className="form-card">
+            <h1 className="form-card__title">Under review</h1>
+            <p className="success-message">
+              Singpass confirmed who you are. The TryKai team will get back to you by email,
+              usually within 1 to 2 business days.
+            </p>
+            <Link to="/" className="btn btn--primary">
+              Back to TryKai
+            </Link>
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="page page--form page--form-status">
         <div className="form-card">
-          <h1 className="form-card__title">Under review</h1>
+          <h1 className="form-card__title">You&apos;re verified</h1>
           <p className="success-message">
-            Singpass confirmed who you are. The TryKai team will check what you&apos;d like to
-            teach and get back to you by email, usually within 1 to 2 business days.
+            Singpass confirmed who you are, so you can create your listing now. The TryKai team
+            takes a quick look at every new listing before guests can see it, and emails you
+            when it&apos;s live.
           </p>
-          <Link to="/" className="btn btn--primary">
-            Back to TryKai
+          <Link to="/create-listing" className="btn btn--primary">
+            Create your listing
           </Link>
         </div>
       </div>

@@ -65,6 +65,7 @@ describe('api/listing-preview', () => {
     const listingsUrl = String(fetchMock.mock.calls.find(([u]) => String(u).includes('/rest/v1/'))[0])
     expect(listingsUrl).toContain(`id=eq.${ID}`)
     expect(listingsUrl).toContain('is_active=eq.true')
+    expect(listingsUrl).toContain('review_status=eq.approved')
     expect(listingsUrl).toContain('select=title,area,price_per_person,photo_urls')
     expect(listingsUrl).not.toContain('full_address')
     expect(String(fetchMock.mock.calls[0][0])).toBe('https://trykai.sg/index.html')

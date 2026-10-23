@@ -559,3 +559,15 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/singpass-callback/deno.json"
 entrypoint = "./functions/singpass-callback/index.ts"
+
+[functions.listing-submitted]
+enabled = true
+verify_jwt = false
+import_map = "./functions/listing-submitted/deno.json"
+entrypoint = "./functions/listing-submitted/index.ts"
+
+[functions.admin-listings]
+enabled = true
+verify_jwt = false
+import_map = "./functions/admin-listings/deno.json"
+entrypoint = "./functions/admin-listings/index.ts"

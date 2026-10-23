@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
 
     const { data: listing } = await admin
       .from('listings')
-      .select('id, title, host_id, is_active, users!host_id (email, full_name, display_name, is_suspended)')
+      .select('id, title, host_id, is_active, review_status, users!host_id (email, full_name, display_name, is_suspended)')
       .eq('id', request.listingId)
       .maybeSingle()
 

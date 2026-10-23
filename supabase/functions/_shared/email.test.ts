@@ -46,6 +46,12 @@ import {
   sendResendEmail,
   verificationApprovedHtml,
   verificationRejectedHtml,
+  listingApprovedHtml,
+  listingApprovedSubject,
+  listingChangesHtml,
+  listingChangesSubject,
+  listingSubmittedOpsHtml,
+  listingSubmittedSubject,
 } from './email.ts'
 
 afterEach(() => {
@@ -1370,5 +1376,69 @@ describe('I\'m keen emails', () => {
     expect(html).not.toContain('<ul')
     expect(html).not.toContain('more.')
     expect(html).toContain('Your host just opened')
+  })
+})
+
+describe('listing review emails', () => {
+  const submitted = {
+    siteUrl: 'https://trykai.sg/',
+    listingId: 'listing-1',
+    title: 'Latte <art>',
+    description: 'Pour hearts',
+    category: 'Food',
+    area: 'Tiong Bahru',
+    priceCents: 4500,
+    photoCount: 3,
+    hostName: 'Mei Ling',
+    hostEmail: 'mei@example.com',
+    verifiedName: 'TAN MEI LING',
+    verificationMethod: 'singpass',
+    resubmitted: false,
+  }
+
+  it('tells the team what is waiting, escaped, with a link to the queue', () => {
+    const html = listingSubmittedOpsHtml(submitted)
+    expect(html).toContain('Latte &lt;art&gt;')
+    expect(html).toContain('Singpass: TAN MEI LING')
+    expect(html).toContain('S$45 per person')
+    expect(html).toContain('https://trykai.sg/admin/listings')
+    expect(html).toContain('A new listing needs a look')
+    expect(listingSubmittedSubject('Latte', false)).toBe('New listing to review: Latte')
+  })
+
+  it('marks a fixed listing as an update, and copes with missing details', () => {
+    const html = listingSubmittedOpsHtml({
+      ...submitted,
+      resubmitted: true,
+      priceCents: null,
+      description: null,
+      category: null,
+      area: null,
+      verificationMethod: 'manual',
+    })
+    expect(html).toContain('A listing was updated for review')
+    expect(html).toContain('No price')
+    expect(html).not.toContain('Singpass:')
+    expect(listingSubmittedSubject('Latte', true)).toBe('Listing updated for review: Latte')
+  })
+
+  it('tells the host their listing is live, with a link to it', () => {
+    const html = listingApprovedHtml({ siteUrl: 'https://trykai.sg', hostName: 'Mei', listingId: 'listing-1', title: 'Latte' })
+    expect(html).toContain('https://trykai.sg/listings/listing-1')
+    expect(html).toContain('Mei')
+    expect(listingApprovedSubject('Latte')).toBe('Latte is live on TryKai')
+  })
+
+  it("gives the host the reviewer's note and a link to edit", () => {
+    const html = listingChangesHtml({
+      siteUrl: 'https://trykai.sg',
+      hostName: null,
+      listingId: 'listing-1',
+      title: 'Latte',
+      note: 'Add a <photo>',
+    })
+    expect(html).toContain('Add a &lt;photo&gt;')
+    expect(html).toContain('https://trykai.sg/edit-listing/listing-1')
+    expect(listingChangesSubject('Latte')).toBe('One thing to fix on Latte')
   })
 })

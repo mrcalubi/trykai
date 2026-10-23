@@ -205,6 +205,7 @@ export default function Profile() {
           .select('id, title, area, price_per_person, category, photo_urls')
           .eq('host_id', id)
           .eq('is_active', true)
+          .eq('review_status', 'approved')
           .order('created_at', { ascending: false }),
         supabase.rpc('reviews_for_host', { p_host_id: id }),
       ])

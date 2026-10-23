@@ -17,7 +17,7 @@ function renderAt(search) {
 }
 
 /** Routes the exchange, confirm and cancel calls to their own results. */
-function givenCallback({ exchange, confirm = { data: { ok: true, status: 'pending' }, error: null } } = {}) {
+function givenCallback({ exchange, confirm = { data: { ok: true, status: 'approved' }, error: null } } = {}) {
   supabase.functions.invoke.mockImplementation(async (name, options) => {
     if (name !== 'singpass-callback') return { data: null, error: null }
     if (options?.body?.action === 'confirm') return confirm
@@ -66,16 +66,27 @@ describe('SingpassReturn', () => {
     expect(screen.getByText('Only the TryKai team sees these.')).toBeInTheDocument()
   })
 
-  it('submits only after the host confirms', async () => {
+  it('verifies the host only after they confirm, then sends them to create a listing', async () => {
     givenCallback()
     const { user } = renderAt('?code=abc&state=s1')
     await screen.findByRole('heading', { name: 'Check your details' })
     expect(calls('confirm')).toHaveLength(0)
 
-    await user.click(screen.getByRole('button', { name: 'Confirm and submit' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm and continue' }))
+
+    expect(await screen.findByRole('heading', { name: "You're verified" })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Create your listing' })).toHaveAttribute('href', '/create-listing')
+    expect(calls('confirm')[0][1].body).toEqual({ action: 'confirm', state: 's1' })
+  })
+
+  it('still says "under review" if the database has not switched to auto-approval', async () => {
+    givenCallback({ confirm: { data: { ok: true, status: 'pending' }, error: null } })
+    const { user } = renderAt('?code=abc&state=s1')
+    await screen.findByRole('heading', { name: 'Check your details' })
+
+    await user.click(screen.getByRole('button', { name: 'Confirm and continue' }))
 
     expect(await screen.findByRole('heading', { name: 'Under review' })).toBeInTheDocument()
-    expect(calls('confirm')[0][1].body).toEqual({ action: 'confirm', state: 's1' })
   })
 
   it('throws the details away when the host cancels', async () => {
@@ -113,7 +124,7 @@ describe('SingpassReturn', () => {
     const { user } = renderAt('?code=abc&state=s1')
     await screen.findByRole('heading', { name: 'Check your details' })
 
-    await user.click(screen.getByRole('button', { name: 'Confirm and submit' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm and continue' }))
 
     expect(
       await screen.findByText('This Singpass is already linked to another TryKai account.')

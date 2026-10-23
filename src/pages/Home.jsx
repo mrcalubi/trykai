@@ -119,6 +119,8 @@ export default function Home() {
         `
           )
           .eq('is_active', true)
+          // RLS already hides other hosts' unapproved listings; this hides your own from browse too.
+          .eq('review_status', 'approved')
           .eq('sessions.status', 'open')
           .gt('sessions.starts_at', new Date().toISOString())
           .order('created_at', { ascending: false })

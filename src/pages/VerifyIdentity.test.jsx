@@ -65,15 +65,8 @@ function imageFile(name) {
   return new File(['binary'], name, { type: 'image/png' })
 }
 
-const PLAN = 'Latte art for beginners. Barista for six years.'
-
-async function renderFormWithBothPhotos({ consent = true, plan = PLAN } = {}) {
+async function renderFormWithBothPhotos({ consent = true } = {}) {
   const utils = await openForm()
-  if (plan) {
-    fireEvent.change(screen.getByLabelText(/^What would you like to teach\?/), {
-      target: { value: plan },
-    })
-  }
   attach(/^Passport or NRIC photo/, imageFile('id.png'))
   attach(/^Selfie/, imageFile('selfie.png'))
   if (consent) {
@@ -160,8 +153,8 @@ describe('VerifyIdentity upload route', () => {
   it('leads with the upload form and never offers or starts a Stripe check', async () => {
     renderPage()
 
-    expect(await screen.findByLabelText(/^What would you like to teach\?/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/^Passport or NRIC photo/)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/^Passport or NRIC photo/)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^What would you like to teach\?/)).not.toBeInTheDocument()
     expect(screen.getByLabelText(/^Selfie/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Stripe/ })).not.toBeInTheDocument()
     expect(screen.queryByText(/never stores your ID/)).not.toBeInTheDocument()
@@ -184,24 +177,6 @@ describe('VerifyIdentity upload route', () => {
 })
 
 describe('VerifyIdentity submission', () => {
-  it('asks what the host would like to teach before anything uploads', async () => {
-    const { user } = await renderFormWithBothPhotos({ plan: '  ' })
-
-    await user.click(screen.getByRole('button', { name: 'Submit for review' }))
-
-    expect(await screen.findByText("Still needed: what you'd like to teach.")).toBeInTheDocument()
-    expect(supabase.__bucket('verification-docs').upload).not.toHaveBeenCalled()
-  })
-
-  it('accepts a short answer like "coffee art"', async () => {
-    const { user } = await renderFormWithBothPhotos({ plan: 'coffee art' })
-
-    await user.click(screen.getByRole('button', { name: 'Submit for review' }))
-
-    await waitFor(() => expect(submitCalls()).toHaveLength(1))
-    expect(submitCalls()[0][1].p_teaching_plan).toBe('coffee art')
-  })
-
   it('names everything still missing in one message', async () => {
     const { user } = await openForm()
     attach(/^Passport or NRIC photo/, imageFile('id.png'))
@@ -210,25 +185,13 @@ describe('VerifyIdentity submission', () => {
 
     expect(
       await screen.findByText(
-        "Still needed: what you'd like to teach, a selfie and a tick in the agreement box."
+        'Still needed: a selfie and a tick in the agreement box.'
       )
     ).toBeInTheDocument()
   })
 
-  it('caps the teaching description at 600 characters', async () => {
-    await openForm()
-
-    expect(screen.getByLabelText(/^What would you like to teach\?/)).toHaveAttribute(
-      'maxlength',
-      '600'
-    )
-  })
-
   it('requires both documents', async () => {
     const { user } = await openForm()
-    fireEvent.change(screen.getByLabelText(/^What would you like to teach\?/), {
-      target: { value: PLAN },
-    })
 
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
@@ -240,9 +203,6 @@ describe('VerifyIdentity submission', () => {
 
   it('requires a selfie alongside the ID', async () => {
     const { user } = await openForm()
-    fireEvent.change(screen.getByLabelText(/^What would you like to teach\?/), {
-      target: { value: PLAN },
-    })
     attach(/^Passport or NRIC photo/, imageFile('id.png'))
 
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
@@ -288,7 +248,7 @@ describe('VerifyIdentity submission', () => {
   })
 
   it('moves the host into the pending queue through submit_verification', async () => {
-    const { user } = await renderFormWithBothPhotos({ plan: `  ${PLAN}  ` })
+    const { user } = await renderFormWithBothPhotos()
 
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
@@ -297,7 +257,6 @@ describe('VerifyIdentity submission', () => {
       p_id_photo_url: 'host-9/id-photo.jpg',
       p_selfie_url: 'host-9/selfie.jpg',
       p_consent: true,
-      p_teaching_plan: PLAN,
     })
     expect(supabase.__calls('users', 'update')).toHaveLength(0)
   })
@@ -388,10 +347,6 @@ describe('VerifyIdentity with Singpass turned on', () => {
     )
   }
 
-  function typePlan(value = PLAN) {
-    fireEvent.change(screen.getByLabelText(/^What would you like to teach\?/), { target: { value } })
-  }
-
   it('leads with Singpass and keeps the upload behind a link', async () => {
     renderPage()
 
@@ -401,26 +356,18 @@ describe('VerifyIdentity with Singpass turned on', () => {
     expect(screen.getByRole('button', { name: 'No Singpass? Upload your ID instead' })).toBeInTheDocument()
   })
 
-  it('asks what they would like to teach before opening Singpass', async () => {
-    const { user } = renderPage()
-    await user.click(await screen.findByRole('button', { name: 'Verify with Singpass' }))
-
-    expect(await screen.findByText("Still needed: what you'd like to teach.")).toBeInTheDocument()
-    expect(supabase.functions.invoke).not.toHaveBeenCalled()
-  })
-
-  it('sends the plan to singpass-start and goes to Singpass', async () => {
+  it('goes straight to Singpass, with nothing to fill in first', async () => {
     givenSingpassStart({ data: { url: 'https://stg-id.singpass.gov.sg/fapi/auth?x=1' }, error: null })
     const { user } = renderPage()
     await screen.findByRole('button', { name: 'Verify with Singpass' })
-    typePlan(`  ${PLAN}  `)
+    expect(screen.queryByLabelText(/^What would you like to teach\?/)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Verify with Singpass' }))
 
     await waitFor(() => expect(assign).toHaveBeenCalledWith('https://stg-id.singpass.gov.sg/fapi/auth?x=1'))
     const [name, options] = supabase.functions.invoke.mock.calls[0]
     expect(name).toBe('singpass-start')
-    expect(options.body).toEqual({ teaching_plan: PLAN })
+    expect(options.body).toEqual({})
     expect(options.headers.Authorization).toMatch(/^Bearer /)
   })
 
@@ -431,7 +378,6 @@ describe('VerifyIdentity with Singpass turned on', () => {
     })
     const { user } = renderPage()
     await screen.findByRole('button', { name: 'Verify with Singpass' })
-    typePlan()
 
     await user.click(screen.getByRole('button', { name: 'Verify with Singpass' }))
 
@@ -445,7 +391,6 @@ describe('VerifyIdentity with Singpass turned on', () => {
     givenSingpassStart({ data: {}, error: null })
     const { user } = renderPage()
     await screen.findByRole('button', { name: 'Verify with Singpass' })
-    typePlan()
 
     await user.click(screen.getByRole('button', { name: 'Verify with Singpass' }))
 
@@ -457,7 +402,6 @@ describe('VerifyIdentity with Singpass turned on', () => {
   it('still lets someone without Singpass upload instead', async () => {
     const { user } = renderPage()
     await user.click(await screen.findByRole('button', { name: 'No Singpass? Upload your ID instead' }))
-    typePlan()
     attach(/^Passport or NRIC photo/, imageFile('id.png'))
     attach(/^Selfie/, imageFile('selfie.png'))
     fireEvent.click(screen.getByRole('checkbox'))
@@ -465,6 +409,6 @@ describe('VerifyIdentity with Singpass turned on', () => {
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
     await waitFor(() => expect(submitCalls()).toHaveLength(1))
-    expect(submitCalls()[0][1].p_teaching_plan).toBe(PLAN)
+    expect(submitCalls()[0][1]).not.toHaveProperty('p_teaching_plan')
   })
 })
