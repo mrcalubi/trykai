@@ -3,6 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { verificationDocumentPaths } from '../../supabase/functions/_shared/verification.ts'
+import {
+  TEACHING_PLAN_MAX,
+  missingItemsMessage,
+  missingVerificationItems,
+} from '../lib/verificationForm'
 
 /** `my_verification` returns a table, so PostgREST hands back an array. */
 function firstRow(data) {
@@ -14,8 +19,6 @@ function firstRow(data) {
  * Manual review is the only route (DECISIONS.md, 23 October): Stripe Identity
  * is not offered to Singapore-based businesses, so live sessions are refused.
  */
-export const TEACHING_PLAN_MIN = 15
-export const TEACHING_PLAN_MAX = 600
 
 export default function VerifyIdentity() {
   const navigate = useNavigate()
@@ -72,18 +75,9 @@ export default function VerifyIdentity() {
     setError('')
 
     const plan = teachingPlan.trim()
-    if (plan.length < TEACHING_PLAN_MIN) {
-      setError('Tell us a little about what you would like to teach.')
-      return
-    }
-
-    if (!idPhoto || !selfie) {
-      setError('Please upload both your ID photo and a selfie.')
-      return
-    }
-
-    if (!consent) {
-      setError('Please confirm you agree to TryKai verifying your identity.')
+    const missing = missingVerificationItems({ plan, idPhoto, selfie, consent })
+    if (missing.length > 0) {
+      setError(missingItemsMessage(missing))
       return
     }
 

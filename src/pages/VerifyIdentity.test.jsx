@@ -184,14 +184,34 @@ describe('VerifyIdentity upload route', () => {
 
 describe('VerifyIdentity submission', () => {
   it('asks what the host would like to teach before anything uploads', async () => {
-    const { user } = await renderFormWithBothPhotos({ plan: '   Cooking   ' })
+    const { user } = await renderFormWithBothPhotos({ plan: '  ' })
+
+    await user.click(screen.getByRole('button', { name: 'Submit for review' }))
+
+    expect(await screen.findByText("Still needed: what you'd like to teach.")).toBeInTheDocument()
+    expect(supabase.__bucket('verification-docs').upload).not.toHaveBeenCalled()
+  })
+
+  it('accepts a short answer like "coffee art"', async () => {
+    const { user } = await renderFormWithBothPhotos({ plan: 'coffee art' })
+
+    await user.click(screen.getByRole('button', { name: 'Submit for review' }))
+
+    await waitFor(() => expect(submitCalls()).toHaveLength(1))
+    expect(submitCalls()[0][1].p_teaching_plan).toBe('coffee art')
+  })
+
+  it('names everything still missing in one message', async () => {
+    const { user } = await openForm()
+    attach(/^Passport or NRIC photo/, imageFile('id.png'))
 
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
     expect(
-      await screen.findByText('Tell us a little about what you would like to teach.')
+      await screen.findByText(
+        "Still needed: what you'd like to teach, a selfie and a tick in the agreement box."
+      )
     ).toBeInTheDocument()
-    expect(supabase.__bucket('verification-docs').upload).not.toHaveBeenCalled()
   })
 
   it('caps the teaching description at 600 characters', async () => {
@@ -212,7 +232,7 @@ describe('VerifyIdentity submission', () => {
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
     expect(
-      await screen.findByText('Please upload both your ID photo and a selfie.')
+      await screen.findByText(/^Still needed: .*a photo of your ID|^Still needed: .*a selfie/)
     ).toBeInTheDocument()
     expect(supabase.__bucket('verification-docs').upload).not.toHaveBeenCalled()
   })
@@ -227,7 +247,7 @@ describe('VerifyIdentity submission', () => {
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
     expect(
-      await screen.findByText('Please upload both your ID photo and a selfie.')
+      await screen.findByText(/^Still needed: .*a photo of your ID|^Still needed: .*a selfie/)
     ).toBeInTheDocument()
   })
 
@@ -238,7 +258,7 @@ describe('VerifyIdentity submission', () => {
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
     expect(
-      await screen.findByText('Please upload both your ID photo and a selfie.')
+      await screen.findByText(/^Still needed: .*a photo of your ID|^Still needed: .*a selfie/)
     ).toBeInTheDocument()
     expect(supabase.__bucket('verification-docs').upload).not.toHaveBeenCalled()
   })
@@ -287,7 +307,7 @@ describe('VerifyIdentity submission', () => {
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
     expect(
-      await screen.findByText('Please confirm you agree to TryKai verifying your identity.')
+      await screen.findByText('Still needed: a tick in the agreement box.')
     ).toBeInTheDocument()
     expect(submitCalls()).toHaveLength(0)
   })
@@ -347,7 +367,7 @@ describe('VerifyIdentity submission', () => {
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
     expect(
-      await screen.findByText('Please upload both your ID photo and a selfie.')
+      await screen.findByText(/^Still needed: .*a photo of your ID|^Still needed: .*a selfie/)
     ).toBeInTheDocument()
   })
 })
