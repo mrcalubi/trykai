@@ -5,6 +5,7 @@ import { useAuthedUserId } from '../lib/authedUser'
 import { verificationDocumentPaths } from '../../supabase/functions/_shared/verification.ts'
 import { missingItemsMessage, missingVerificationItems } from '../lib/verificationForm'
 import { singpassEnabled } from '../lib/singpass'
+import SingpassButton from '../components/SingpassButton'
 import { functionReasonOrDefault } from '../lib/edgeFunctionError'
 
 /** `my_verification` returns a table, so PostgREST hands back an array. */
@@ -37,7 +38,10 @@ export default function VerifyIdentity() {
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [singpassLoading, setSingpassLoading] = useState(false)
-  const [showUpload, setShowUpload] = useState(false)
+  // ?upload=1 comes from the Singpass error page, so the fallback opens straight away.
+  const [showUpload, setShowUpload] = useState(
+    () => new URLSearchParams(location.search).get('upload') === '1'
+  )
   const singpass = singpassEnabled()
 
   const readStatus = useCallback(async () => {
@@ -253,19 +257,19 @@ export default function VerifyIdentity() {
         <h1 className="form-card__title">Verify your identity</h1>
         <p className="form-card__subtitle">
           Hosting on TryKai means meeting people in person, so every host confirms who they are.
-          With Singpass it takes about a minute, and you can create your listing straight after.
+          With Singpass it takes about a minute, there are no documents to upload, and you can
+          create your listing straight after. Singpass is for Singapore citizens, PRs and pass
+          holders.
         </p>
         {notices}
 
         <div className="verify-singpass">
-          <button
-            type="button"
-            className="btn btn--primary"
-            disabled={singpassLoading}
-            onClick={startSingpass}
-          >
-            {singpassLoading ? 'Opening Singpass…' : 'Verify with Singpass'}
-          </button>
+          <SingpassButton busy={singpassLoading} onClick={startSingpass} />
+          {singpassLoading ? (
+            <p className="hint" role="status">
+              Opening Singpass…
+            </p>
+          ) : null}
           <p className="hint">
             Singpass shares your name, date of birth and mobile number with TryKai. You check them
             before confirming. We never see your NRIC number.

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { functionReasonOrDefault } from '../lib/edgeFunctionError'
 import { formatSingpassDob } from '../lib/singpass'
+import { normalizeHostMobile } from '../../supabase/functions/_shared/singpass.ts'
 
 const GENERIC_ERROR =
   'We could not confirm your identity with Singpass. Please try again, or upload your ID instead.'
@@ -30,6 +31,8 @@ export default function SingpassReturn() {
   const sent = useRef(false)
   const [view, setView] = useState({ phase: 'checking' })
   const [busy, setBusy] = useState(false)
+  const [mobile, setMobile] = useState('')
+  const [mobileError, setMobileError] = useState('')
 
   useEffect(() => {
     if (sent.current) return
@@ -48,6 +51,7 @@ export default function SingpassReturn() {
         setView({ phase: 'error', error: await functionReasonOrDefault(error, data, GENERIC_ERROR) })
         return
       }
+      setMobile(data.review.mobile || '')
       setView({ phase: 'review', review: data.review, state: data.state })
     }
 
@@ -55,9 +59,23 @@ export default function SingpassReturn() {
   }, [location.pathname, location.search, navigate])
 
   async function confirm() {
+    const checked = normalizeHostMobile(mobile)
+    if (!checked.ok) {
+      setMobileError(checked.error)
+      return
+    }
+    setMobileError('')
     setBusy(true)
-    const { data, error } = await callSingpass({ action: 'confirm', state: view.state })
+    const { data, error } = await callSingpass({
+      action: 'confirm',
+      state: view.state,
+      mobile: checked.mobile,
+    })
     setBusy(false)
+    if (data?.field === 'mobile' && data?.error) {
+      setMobileError(data.error)
+      return
+    }
     if (error || data?.error || !data?.ok) {
       setView({ phase: 'error', error: await functionReasonOrDefault(error, data, GENERIC_ERROR) })
       return
@@ -85,33 +103,52 @@ export default function SingpassReturn() {
   }
 
   if (view.phase === 'review') {
-    const { name, dob, mobile } = view.review
+    const { name, dob } = view.review
     return (
       <div className="page page--form">
         <div className="form-card">
           <h1 className="form-card__title">Check your details</h1>
           <p className="form-card__subtitle">
-            This is what Singpass shared with TryKai. It can&apos;t be edited here; if something is
-            wrong, update it with Singpass.
+            Your name and date of birth come from Singpass and can&apos;t be changed here. If
+            they&apos;re wrong, update them with the government first.
           </p>
-          <dl className="singpass-details">
-            <div>
-              <dt>Name</dt>
-              <dd>{name}</dd>
-            </div>
-            <div>
-              <dt>Date of birth</dt>
-              <dd>{formatSingpassDob(dob)}</dd>
-            </div>
-            <div>
-              <dt>Mobile number</dt>
-              <dd>{mobile || 'None registered with Singpass'}</dd>
-            </div>
-          </dl>
-          <p className="hint">
-            {mobile
-              ? 'Only the TryKai team sees these. We use your mobile number to reach you about your sessions.'
-              : 'Only the TryKai team sees these.'}
+          <div className="form">
+            <label className="label">
+              Name (from Singpass)
+              <input className="input input--locked" value={name} readOnly aria-readonly="true" />
+            </label>
+            <label className="label">
+              Date of birth (from Singpass)
+              <input
+                className="input input--locked"
+                value={formatSingpassDob(dob)}
+                readOnly
+                aria-readonly="true"
+              />
+            </label>
+            <label className="label">
+              Mobile number
+              <input
+                className="input"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+                placeholder="9123 4567"
+                aria-invalid={mobileError ? 'true' : undefined}
+              />
+              <span className="hint">
+                {view.review.mobile
+                  ? 'From Singpass. Change it if another number is better for reaching you.'
+                  : 'Singpass has no mobile number for you, so add the best one to reach you.'}
+              </span>
+            </label>
+            {mobileError ? <p className="error-message">{mobileError}</p> : null}
+          </div>
+          <p className="hint singpass-privacy">
+            Only the TryKai team sees these. We use your mobile number to reach you about your
+            sessions.
           </p>
           <div className="singpass-actions">
             <button type="button" className="btn btn--primary" disabled={busy} onClick={confirm}>
@@ -165,9 +202,14 @@ export default function SingpassReturn() {
       <div className="form-card">
         <h1 className="form-card__title">Singpass didn&apos;t go through</h1>
         <p className="error-message error-message--spaced">{view.error}</p>
-        <Link to="/verify-identity" className="btn btn--primary">
-          Try again
-        </Link>
+        <div className="singpass-actions">
+          <Link to="/verify-identity" className="btn btn--primary">
+            Try again
+          </Link>
+          <Link to="/verify-identity?upload=1" className="btn btn--secondary">
+            Upload your ID instead
+          </Link>
+        </div>
       </div>
     </div>
   )

@@ -399,6 +399,21 @@ describe('VerifyIdentity with Singpass turned on', () => {
     ).toBeInTheDocument()
   })
 
+  it('opens the upload form straight away when sent from a Singpass error', async () => {
+    renderPage({ route: '/verify-identity?upload=1' })
+
+    expect(await screen.findByLabelText(/^Passport or NRIC photo/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Verify with Singpass' })).toBeInTheDocument()
+  })
+
+  it("uses Singpass's own button artwork", async () => {
+    renderPage()
+
+    const button = await screen.findByRole('button', { name: 'Verify with Singpass' })
+    expect(button).toHaveClass('singpass-button')
+    expect(button.querySelector('img')).toHaveAttribute('src', expect.stringMatching(/verify_with_singpass_full_black/))
+  })
+
   it('still lets someone without Singpass upload instead', async () => {
     const { user } = renderPage()
     await user.click(await screen.findByRole('button', { name: 'No Singpass? Upload your ID instead' }))

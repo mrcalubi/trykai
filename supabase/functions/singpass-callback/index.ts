@@ -7,7 +7,11 @@
 //                                  refuses anyone under 18, stores the details
 //                                  on the attempt and returns them for the host
 //                                  to check. Nothing is recorded on the account yet.
-//   { action: 'confirm', state }   records the stored details with
+//   { action: 'confirm', state, mobile }
+//                                  records the stored details, with the
+//                                  mobile number as the host confirmed or
+//                                  changed it (Myinfo's mobile is self-declared,
+//                                  so Singpass lets the host edit it), with
 //                                  record_singpass_verification and deletes the
 //                                  attempt. Singpass approves the host at once
 //                                  (00036); their first listing is what the
@@ -23,6 +27,7 @@ import {
   isAdult,
   isSessionFresh,
   myinfoPerson,
+  normalizeHostMobile,
   parseSingpassCallback,
   readSingpassConfig,
   recordErrorResponse,
@@ -65,6 +70,10 @@ Deno.serve(async (req) => {
       const state = typeof body.state === 'string' ? body.state : ''
       if (!STATE_PATTERN.test(state)) return jsonResponse({ error: SINGPASS_ERRORS.nothingToConfirm }, 400)
 
+      // Checked before the attempt is used up, so a typo can be fixed and resent.
+      const mobile = body.action === 'confirm' ? normalizeHostMobile(body.mobile) : null
+      if (mobile && !mobile.ok) return jsonResponse({ error: mobile.error, field: 'mobile' }, 400)
+
       const { data: attempt } = await admin
         .from('singpass_auth_sessions')
         .select('id, created_at, retrieved_sub, retrieved_name, retrieved_dob, retrieved_mobile')
@@ -84,7 +93,7 @@ Deno.serve(async (req) => {
         p_sub: attempt.retrieved_sub,
         p_name: attempt.retrieved_name,
         p_dob: attempt.retrieved_dob,
-        p_mobile: attempt.retrieved_mobile,
+        p_mobile: mobile?.ok ? mobile.mobile : attempt.retrieved_mobile,
       })
       if (recordError) {
         const mapped = recordErrorResponse(recordError.message)
