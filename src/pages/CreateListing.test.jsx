@@ -846,7 +846,7 @@ describe('CreateListing photos', () => {
     await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
     await user.click(screen.getByRole('menuitem', { name: 'Crop' }))
 
-    expect(screen.getByText('Crop the cover to the listing card')).toBeInTheDocument()
+    expect(screen.getByText('Crop the cover')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Free' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Use this crop' })).toBeDisabled()
   })
