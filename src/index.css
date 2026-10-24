@@ -4249,6 +4249,24 @@ body.lightbox-open {
   text-underline-offset: 2px;
 }
 
+.payment-form-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.payment-form-wrap__wait {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--cream);
+}
+
 .payment-form {
   display: flex;
   flex-direction: column;
@@ -4312,6 +4330,7 @@ body.lightbox-open {
     padding: 18px var(--gutter) 24px;
   }
 
+  .checkout .payment-form-wrap,
   .checkout .payment-form {
     flex: 1;
   }

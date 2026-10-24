@@ -156,29 +156,35 @@ function CheckoutForm({ totalAmount, bookingId, onSuccess, onPaymentFailed }) {
     onSuccess(paymentIntent.status)
   }
 
-  if (loading) {
-    return (
-      <WaitingState
-        title="Confirming your payment"
-        message="PayNow and card payments both go through Stripe. Please keep this page open."
-      />
-    )
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="payment-form">
-      <p className="payment-form__total">
-        Total: <FormattedPrice cents={totalAmount} />
-      </p>
-      <PaymentElement />
-      {error && <p className="error-message">{error}</p>}
-      <div className="payment-form__actions">
-        <button type="submit" disabled={!stripe} className="btn btn--primary">
-          Pay <FormattedPrice cents={totalAmount} />
-        </button>
-        <p className="payment-form__secure">Payments are processed securely by Stripe.</p>
-      </div>
-    </form>
+    <div className="payment-form-wrap">
+      {loading ? (
+        <div className="payment-form-wrap__wait">
+          <WaitingState
+            title="Confirming your payment"
+            message="PayNow and card payments both go through Stripe. Please keep this page open."
+          />
+        </div>
+      ) : null}
+      <form
+        onSubmit={handleSubmit}
+        className="payment-form"
+        inert={loading || undefined}
+        aria-hidden={loading || undefined}
+      >
+        <p className="payment-form__total">
+          Total: <FormattedPrice cents={totalAmount} />
+        </p>
+        <PaymentElement />
+        {error && <p className="error-message">{error}</p>}
+        <div className="payment-form__actions">
+          <button type="submit" disabled={!stripe || loading} className="btn btn--primary">
+            Pay <FormattedPrice cents={totalAmount} />
+          </button>
+          <p className="payment-form__secure">Payments are processed securely by Stripe.</p>
+        </div>
+      </form>
+    </div>
   )
 }
 

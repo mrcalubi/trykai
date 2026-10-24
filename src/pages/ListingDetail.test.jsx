@@ -1286,6 +1286,47 @@ describe('ListingDetail checkout', () => {
     release()
   })
 
+  it('keeps PaymentElement mounted while confirmPayment is pending', async () => {
+    let release
+    stripe.instance.confirmPayment.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ error: null, paymentIntent: { status: 'succeeded' } })
+        })
+    )
+    const { user } = await openCheckout()
+    const paymentElement = screen.getByTestId('payment-element')
+
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Confirming your payment' })).toBeInTheDocument()
+    expect(screen.getByTestId('payment-element')).toBe(paymentElement)
+    expect(screen.getByRole('button', { name: /^Pay \$/, hidden: true })).toBeDisabled()
+    release()
+  })
+
+  it('keeps the same PaymentElement after a decline and shows the error', async () => {
+    let release
+    stripe.instance.confirmPayment.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ error: { message: 'Your card was declined.' } })
+        })
+    )
+    const { user } = await openCheckout()
+    const paymentElement = screen.getByTestId('payment-element')
+
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
+    expect(await screen.findByRole('heading', { name: 'Confirming your payment' })).toBeInTheDocument()
+    expect(screen.getByTestId('payment-element')).toBe(paymentElement)
+
+    release()
+
+    expect(await screen.findByText('Your card was declined.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Confirming your payment' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('payment-element')).toBe(paymentElement)
+  })
+
   it('confirms the payment without leaving the page when possible', async () => {
     const { user } = await openCheckout()
 
