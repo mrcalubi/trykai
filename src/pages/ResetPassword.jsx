@@ -165,8 +165,8 @@ export default function ResetPassword() {
               {error && <p className="error-message">{error}</p>}
               {message && <p className="success-message">{message}</p>}
 
-              <Button type="submit" variant="primary" disabled={loading}>
-                {loading ? 'Please wait…' : 'Update password'}
+              <Button type="submit" variant="primary" loading={loading} loadingLabel="Please wait">
+                Update password
               </Button>
             </form>
           </>

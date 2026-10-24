@@ -161,9 +161,9 @@ export default function ReportProblem({ booking }) {
           ) : null}
           {error ? <p className="error-message">{error}</p> : null}
           <div className="booking-detail__actions">
-            <button type="submit" disabled={sending} className="btn btn--primary">
-              {sending ? 'Sending…' : 'Send report'}
-            </button>
+            <Button type="submit" variant="primary" loading={sending} loadingLabel="Sending">
+              Send report
+            </Button>
             <button type="button" onClick={() => setOpen(false)} className="btn btn--ghost">
               Never mind
             </button>

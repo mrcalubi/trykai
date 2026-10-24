@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { functionReasonOrDefault } from '../lib/edgeFunctionError'
 import { formatSingpassDob } from '../lib/singpass'
 import { normalizeHostMobile } from '../../supabase/functions/_shared/singpass.ts'
+import Button from '../components/ui/Button'
+import WaitingState from '../components/WaitingState'
 
 const GENERIC_ERROR =
   'We could not confirm your identity with Singpass. Please try again, or upload your ID instead.'
@@ -93,10 +95,10 @@ export default function SingpassReturn() {
     return (
       <div className="page page--form page--form-status">
         <div className="form-card">
-          <h1 className="form-card__title">Checking with Singpass</h1>
-          <p className="form-card__subtitle" role="status">
-            This takes a few seconds.
-          </p>
+          <WaitingState
+            title="Checking with Singpass"
+            message="This takes a few seconds."
+          />
         </div>
       </div>
     )
@@ -151,9 +153,9 @@ export default function SingpassReturn() {
             sessions.
           </p>
           <div className="singpass-actions">
-            <button type="button" className="btn btn--primary" disabled={busy} onClick={confirm}>
-              {busy ? 'Confirming…' : 'Confirm and continue'}
-            </button>
+            <Button variant="primary" loading={busy} loadingLabel="Confirming" onClick={confirm}>
+              Confirm and continue
+            </Button>
             <button type="button" className="btn btn--secondary" disabled={busy} onClick={cancel}>
               Cancel
             </button>

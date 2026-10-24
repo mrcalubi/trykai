@@ -39,10 +39,14 @@ export async function filesToPhotos(fileList, remaining) {
   return photos
 }
 
-export async function uploadListingPhotos(photos, userId, storage) {
+export async function uploadListingPhotos(photos, userId, storage, { onProgress } = {}) {
   const urls = []
+  const uploadTotal = photos.filter((photo) => photo.file).length
+  let uploaded = 0
   for (const photo of photos) {
     if (photo.file) {
+      uploaded += 1
+      onProgress?.({ index: uploaded, total: uploadTotal })
       const ext = photo.file.name.split('.').pop() || 'jpg'
       const path = `${userId}/${crypto.randomUUID()}.${ext}`
       const { error } = await storage.from('listing-photos').upload(path, photo.file)

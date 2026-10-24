@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { composeFullAddress, isValidPostal } from '../../supabase/functions/_shared/onemap.ts'
+import Button from './ui/Button'
 
 export default function PostalAddressFields({ value, onChange }) {
   const [postal, setPostal] = useState('')
@@ -57,9 +58,9 @@ export default function PostalAddressFields({ value, onChange }) {
           className="input"
         />
       </label>
-      <button type="button" className="btn btn--secondary" onClick={lookup} disabled={looking}>
-        {looking ? 'Looking up…' : 'Find addresses'}
-      </button>
+      <Button type="button" variant="secondary" onClick={lookup} loading={looking} loadingLabel="Looking up">
+        Find addresses
+      </Button>
       {status ? (
         <p className="field-hint" role="status">
           {status}

@@ -864,6 +864,38 @@ describe('CreateListing photos', () => {
     await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
   }
 
+  it('shows upload progress then saving while publish is pending', async () => {
+    let finishUpload
+    supabase.__bucket('listing-photos').upload.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishUpload = () => resolve({ data: { path: 'p' }, error: null })
+        })
+    )
+    const innerFrom = supabase.from.getMockImplementation()
+    supabase.from.mockImplementation((table) => {
+      const entry = innerFrom(table)
+      if (table !== 'listings') return entry
+      return {
+        ...entry,
+        insert: () => ({ then: () => new Promise(() => {}) }),
+      }
+    })
+    try {
+      const { user } = renderPage()
+      await publishWithOnePhoto(user)
+
+      await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+      expect(await screen.findByRole('heading', { name: 'Creating your listing' })).toBeInTheDocument()
+      expect(screen.getByText('Uploading photo 1 of 1')).toBeInTheDocument()
+      finishUpload()
+      expect(await screen.findByText('Saving your listing')).toBeInTheDocument()
+    } finally {
+      supabase.from.mockImplementation(innerFrom)
+    }
+  })
+
   it('uploads the photos and saves their public URLs on the listing', async () => {
     const { user } = renderPage()
     await publishWithOnePhoto(user)

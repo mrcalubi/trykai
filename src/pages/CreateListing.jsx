@@ -10,6 +10,8 @@ import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
 import { revokePhotoUrls } from '../lib/coverCrop'
 import { uploadListingPhotos } from '../lib/listingPhotos'
+import PageLoader from '../components/PageLoader'
+import WaitingState from '../components/WaitingState'
 import ListingPricePanel from '../components/ListingPricePanel'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
 import FieldHint from '../components/FieldHint'
@@ -81,6 +83,7 @@ export default function CreateListing() {
   const [photoError, setPhotoError] = useState('')
   const [draftNote, setDraftNote] = useState(resumed ? DRAFT_RESTORED : '')
   const [loading, setLoading] = useState(false)
+  const [publishMessage, setPublishMessage] = useState('Saving your listing')
   const [draftHandled, setDraftHandled] = useState(Boolean(resumed))
   const [photoSkipOpen, setPhotoSkipOpen] = useState(false)
   const headingRef = useRef(null)
@@ -250,11 +253,19 @@ export default function CreateListing() {
     const provided = providedForSave(whatsProvided)
 
     setLoading(true)
+    const uploadCount = photos.filter((photo) => photo.file).length
+    setPublishMessage(
+      uploadCount ? `Uploading photo 1 of ${uploadCount}` : 'Saving your listing'
+    )
 
     let photoUrls = []
     try {
       if (photos.length > 0) {
-        photoUrls = await uploadListingPhotos(photos, userId, supabase.storage)
+        photoUrls = await uploadListingPhotos(photos, userId, supabase.storage, {
+          onProgress: ({ index, total }) => {
+            setPublishMessage(`Uploading photo ${index} of ${total}`)
+          },
+        })
       }
     } catch (uploadError) {
       console.error('Listing photo upload failed', uploadError)
@@ -263,6 +274,8 @@ export default function CreateListing() {
       goTo(STEPS.findIndex((step) => step.id === 'photos'))
       return
     }
+
+    setPublishMessage('Saving your listing')
 
     const listingPayload = {
       host_id: userId,
@@ -317,11 +330,11 @@ export default function CreateListing() {
   }
 
   if (!verificationChecked) {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   if (verificationStatus !== 'approved') {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   const current = STEPS[step]
@@ -627,62 +640,62 @@ export default function CreateListing() {
             </div>
           </div>
 
-          <div className="wizard__body">
-            <div className="wizard__intro">
-              <h1 className="wizard__title" ref={headingRef} tabIndex={-1}>
-                {current.title}
-              </h1>
-              <p className="wizard__lede">{current.intro}</p>
-            </div>
-
-            {hasSavedDraft ? (
-              <div className="wizard__note wizard__note--draft">
-                <p>You have a saved draft on this device.</p>
-                <div className="wizard__note-actions">
-                  <button type="button" className="btn btn--small btn--primary" onClick={restoreDraft}>
-                    Restore draft
-                  </button>
-                  <button type="button" className="btn btn--small btn--ghost" onClick={discardDraft}>
-                    Discard
-                  </button>
+          {loading ? (
+            <WaitingState title="Creating your listing" message={publishMessage} />
+          ) : (
+            <>
+              <div className="wizard__body">
+                <div className="wizard__intro">
+                  <h1 className="wizard__title" ref={headingRef} tabIndex={-1}>
+                    {current.title}
+                  </h1>
+                  <p className="wizard__lede">{current.intro}</p>
                 </div>
+
+                {hasSavedDraft ? (
+                  <div className="wizard__note wizard__note--draft">
+                    <p>You have a saved draft on this device.</p>
+                    <div className="wizard__note-actions">
+                      <button type="button" className="btn btn--small btn--primary" onClick={restoreDraft}>
+                        Restore draft
+                      </button>
+                      <button type="button" className="btn btn--small btn--ghost" onClick={discardDraft}>
+                        Discard
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                {draftNote ? (
+                  <p className="wizard__note" role="status">
+                    {draftNote}
+                  </p>
+                ) : null}
+
+                {renderStep()}
+
+                {error ? (
+                  <p className="wizard__note" role="status">
+                    {error}
+                  </p>
+                ) : null}
               </div>
-            ) : null}
-            {draftNote ? (
-              <p className="wizard__note" role="status">
-                {draftNote}
-              </p>
-            ) : null}
 
-            {renderStep()}
-
-            {error ? (
-              <p className="wizard__note" role="status">
-                {error}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="wizard__actions">
-            {step > 0 ? (
-              <button type="button" className="btn btn--ghost" onClick={() => goTo(step - 1)}>
-                Back
-              </button>
-            ) : null}
-            <button
-              type="submit"
-              className="btn btn--primary wizard__continue"
-              disabled={loading || (isLast && !acceptedHostTerms)}
-            >
-              {isLast
-                ? loading
-                  ? photos.length > 0
-                    ? 'Uploading…'
-                    : 'Creating…'
-                  : 'Create listing'
-                : 'Continue'}
-            </button>
-          </div>
+              <div className="wizard__actions">
+                {step > 0 ? (
+                  <button type="button" className="btn btn--ghost" onClick={() => goTo(step - 1)}>
+                    Back
+                  </button>
+                ) : null}
+                <button
+                  type="submit"
+                  className="btn btn--primary wizard__continue"
+                  disabled={isLast && !acceptedHostTerms}
+                >
+                  {isLast ? 'Create listing' : 'Continue'}
+                </button>
+              </div>
+            </>
+          )}
         </form>
       </div>
 

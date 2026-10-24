@@ -493,10 +493,13 @@ src/
 │   ├── SessionCalendar.jsx      # Guest month calendar on listing detail
 │   ├── DateMultiSelectCalendar.jsx # Host tap-to-select dates
 │   ├── AddSessionsForm.jsx      # Bulk add: quick-fill, times, preview, create
+│   ├── PageLoader.jsx           # Page-level wait: spinner after 400ms, "Loading…" for screen readers
+│   ├── WaitingState.jsx         # Long wait card: title, illustration, messages at 0 / 4s / 12s
+│   ├── LoadingMascot.jsx        # Default WaitingState art (three dots); future mascot home
 │   └── ui/
 │       ├── TopNav.jsx           # Global top bar; avatar links to own profile, via SiteNav
 │       ├── HamburgerMenu.jsx    # Slide-in panel; signed-in adds Profile, Settings, Log out
-│       ├── Button.jsx           # Live on Settings and Hosting listing rows; also /style-guide
+│       ├── Button.jsx           # Kit button; `loading` keeps width, spinner + loadingLabel, aria-busy
 │       ├── Input.jsx            # Live on Settings and Login (textarea for About); also /style-guide
 │       ├── Card.jsx             # Browse mode is live on Home and profile listings
 │       ├── OverflowMenu.jsx     # Shared ⋮/⋯ menu; Hosting rows, listing/profile/review Report
@@ -617,7 +620,8 @@ supabase/functions/
 | Global nav and hamburger                                   | `src/components/SiteNav.jsx`, `src/components/ui/TopNav.jsx`, `src/components/ui/HamburgerMenu.jsx` |
 | Content back row (every page except Home)                  | `src/components/BackButton.jsx`, mounted in `App.jsx`; listing Report in the actions slot           |
 | Report listing / profile / review                          | `src/components/ui/OverflowMenu.jsx`, `src/lib/reportMailto.js`                                     |
-| UI kit (Button on Settings and Hosting rows; Input on Settings and Login; SelectableCard preview only) | `src/components/ui/`, `src/pages/StyleGuide.jsx`                                           |
+| UI kit (Button `loading` on short actions; Input on Settings and Login; SelectableCard preview only) | `src/components/ui/`, `src/pages/StyleGuide.jsx`                                           |
+| Page and long-wait loaders                                 | `src/components/PageLoader.jsx`, `src/components/WaitingState.jsx`, `src/components/LoadingMascot.jsx` |
 | Colour tokens and all styling                              | `src/index.css`                                                                                     |
 | Component preview                                          | `/style-guide` route                                                                                |
 | Cancellation arithmetic                                    | `src/lib/cancellationPolicy.js` and `supabase/functions/_shared/booking.ts`                         |
