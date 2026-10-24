@@ -27,3 +27,38 @@ export function loadImage(src) {
     image.src = src
   })
 }
+
+export function revokeIfBlobUrl(url) {
+  if (typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url)
+}
+
+/** New picks keep the first file and its object URL. Saved listing photos do not. */
+export function rememberOriginal(photo) {
+  if (!photo || photo.originalUrl || photo.originalFile || !photo.file) return photo
+  return {
+    ...photo,
+    originalFile: photo.file,
+    originalUrl: photo.previewUrl,
+  }
+}
+
+export function cropSourceUrl(photo) {
+  return photo?.originalUrl || photo?.remoteUrl || photo?.previewUrl || ''
+}
+
+export function photoHasOriginal(photo) {
+  return Boolean(photo?.originalFile || photo?.originalUrl)
+}
+
+export function photoIsCropped(photo) {
+  if (!photoHasOriginal(photo)) return false
+  return Boolean(photo.cropState) || photo.previewUrl !== photo.originalUrl
+}
+
+export function revokePhotoUrls(photo) {
+  if (!photo) return
+  revokeIfBlobUrl(photo.previewUrl)
+  if (photo.originalUrl && photo.originalUrl !== photo.previewUrl) {
+    revokeIfBlobUrl(photo.originalUrl)
+  }
+}

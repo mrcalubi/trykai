@@ -20,13 +20,27 @@ import Cropper from 'react-easy-crop'
 import Button from './ui/Button'
 import Icon from './ui/Icon'
 import { compressImage } from '../lib/compressImage'
-import { LISTING_COVER_ASPECT, cropImageToBlob, loadImage } from '../lib/coverCrop'
+import {
+  LISTING_COVER_ASPECT,
+  cropImageToBlob,
+  cropSourceUrl,
+  loadImage,
+  photoIsCropped,
+  rememberOriginal,
+  revokeIfBlobUrl,
+  revokePhotoUrls,
+} from '../lib/coverCrop'
 import { filesToPhotos, movePhoto, snapshotImageFiles } from '../lib/listingPhotos'
 
 const MAX_PHOTOS = 5
+const NOT_PHOTOS_HINT = 'Those are not photos. Choose images instead.'
 
 function photoLabel(index, isCover) {
   return isCover ? `Photo ${index + 1} (cover)` : `Photo ${index + 1}`
+}
+
+function isFileDrag(event) {
+  return Array.from(event.dataTransfer?.types || []).includes('Files')
 }
 
 function PhotoTile({
@@ -105,9 +119,11 @@ function PhotoTile({
         </button>
         {menuOpen ? (
           <div className="preview-item__menu" role="menu" aria-label={photoLabel(index, isCover)}>
-            <button type="button" role="menuitem" onClick={onCrop}>
-              Crop
-            </button>
+            {isCover ? (
+              <button type="button" role="menuitem" onClick={onCrop}>
+                Crop
+              </button>
+            ) : null}
             {!isCover ? (
               <button type="button" role="menuitem" onClick={onMakeCover}>
                 Make cover
@@ -133,18 +149,25 @@ export default function ListingPhotosEditor({
   const localInputRef = useRef(null)
   const inputRef = pickerRef ?? localInputRef
   const rootRef = useRef(null)
+  const photosRef = useRef(photos)
+  const dragDepth = useRef(0)
   const [cropping, setCropping] = useState(null)
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [croppedArea, setCroppedArea] = useState(null)
-  const [freeCrop, setFreeCrop] = useState(false)
   const [adding, setAdding] = useState(false)
   const [menuId, setMenuId] = useState(null)
   const [activeId, setActiveId] = useState(null)
+  const [dragOver, setDragOver] = useState(false)
+  const [dropHint, setDropHint] = useState(null)
 
-  const croppingCover = cropping ? photos.findIndex((photo) => photo.id === cropping.id) === 0 : false
-  const cropAspect = croppingCover || !freeCrop ? LISTING_COVER_ASPECT : undefined
+  useEffect(() => {
+    photosRef.current = photos
+  }, [photos])
+
+  const atCap = photos.length >= max
   const activePhoto = photos.find((photo) => photo.id === activeId)
+  const croppingPhoto = cropping ? photos.find((photo) => photo.id === cropping.id) ?? cropping : null
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -175,63 +198,134 @@ export default function ListingPhotosEditor({
     }
   }, [menuId])
 
-  async function handleFiles(event) {
+  useEffect(() => {
+    return () => {
+      photosRef.current.forEach(revokePhotoUrls)
+    }
+  }, [])
+
+  async function addImageFiles(fileList) {
     const remaining = max - photos.length
-    const files = snapshotImageFiles(event.target.files)
-    event.target.value = ''
-    if (!files.length || remaining <= 0) return
+    const files = snapshotImageFiles(fileList)
+    if (!files.length) {
+      if (fileList && fileList.length) setDropHint(NOT_PHOTOS_HINT)
+      return
+    }
+    if (remaining <= 0) return
+    setDropHint(null)
     setAdding(true)
     try {
       const added = await filesToPhotos(files, remaining)
-      onChange([...photos, ...added])
+      onChange([...photos, ...added.map(rememberOriginal)])
     } catch (error) {
       console.error('ListingPhotosEditor: could not add photos', error)
-      onChange([...photos, ...files.map((file) => ({
-        id: `${file.name}-${file.lastModified}`,
-        file,
-        previewUrl: URL.createObjectURL(file),
-        remoteUrl: null,
-      }))])
+      onChange([
+        ...photos,
+        ...files.slice(0, remaining).map((file) =>
+          rememberOriginal({
+            id: `${file.name}-${file.lastModified}`,
+            file,
+            previewUrl: URL.createObjectURL(file),
+            remoteUrl: null,
+          }),
+        ),
+      ])
     } finally {
       setAdding(false)
     }
   }
 
+  function handleFiles(event) {
+    const list = event.target.files
+    event.target.value = ''
+    addImageFiles(list)
+  }
+
+  function handleDragEnter(event) {
+    if (!isFileDrag(event)) return
+    event.preventDefault()
+    event.stopPropagation()
+    dragDepth.current += 1
+    setDragOver(true)
+  }
+
+  function handleDragOver(event) {
+    if (!isFileDrag(event)) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.dataTransfer.dropEffect = atCap || adding ? 'none' : 'copy'
+  }
+
+  function handleDragLeave(event) {
+    if (!isFileDrag(event)) return
+    event.preventDefault()
+    event.stopPropagation()
+    dragDepth.current -= 1
+    if (dragDepth.current <= 0) {
+      dragDepth.current = 0
+      setDragOver(false)
+    }
+  }
+
+  function handleDrop(event) {
+    if (!isFileDrag(event)) return
+    event.preventDefault()
+    event.stopPropagation()
+    dragDepth.current = 0
+    setDragOver(false)
+    addImageFiles(event.dataTransfer.files)
+  }
+
   function removeAt(index) {
     const next = [...photos]
     const [removed] = next.splice(index, 1)
-    if (removed?.file && removed.previewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(removed.previewUrl)
-    }
+    revokePhotoUrls(removed)
     setMenuId(null)
     onChange(next)
   }
 
   function startCrop(photo) {
     setMenuId(null)
-    setCrop({ x: 0, y: 0 })
-    setZoom(1)
+    setCrop(photo.cropState?.crop ?? { x: 0, y: 0 })
+    setZoom(photo.cropState?.zoom ?? 1)
     setCroppedArea(null)
-    setFreeCrop(false)
     setCropping(photo)
   }
 
   async function applyCrop() {
-    if (!cropping || !croppedArea) return
-    const image = await loadImage(cropping.previewUrl)
+    if (!croppingPhoto || !croppedArea) return
+    const image = await loadImage(cropSourceUrl(croppingPhoto))
     const blob = await cropImageToBlob(image, croppedArea)
-    const name = croppingCover ? 'cover.jpg' : 'photo.jpg'
-    const file = new File([blob], name, { type: 'image/jpeg', lastModified: Date.now() })
+    const file = new File([blob], 'cover.jpg', { type: 'image/jpeg', lastModified: Date.now() })
     const compressed = await compressImage(file)
     const previewUrl = URL.createObjectURL(compressed)
+    const cropState = { crop, zoom }
     onChange(
       photos.map((photo) => {
-        if (photo.id !== cropping.id) return photo
-        if (photo.file && photo.previewUrl.startsWith('blob:')) URL.revokeObjectURL(photo.previewUrl)
-        return { ...photo, file: compressed, previewUrl, remoteUrl: null }
+        if (photo.id !== croppingPhoto.id) return photo
+        if (photo.previewUrl !== photo.originalUrl) revokeIfBlobUrl(photo.previewUrl)
+        return { ...photo, file: compressed, previewUrl, cropState }
       }),
     )
     setCropping(null)
+  }
+
+  function resetCrop() {
+    if (!croppingPhoto || !photoIsCropped(croppingPhoto)) return
+    if (croppingPhoto.previewUrl !== croppingPhoto.originalUrl) {
+      revokeIfBlobUrl(croppingPhoto.previewUrl)
+    }
+    const reset = {
+      ...croppingPhoto,
+      file: croppingPhoto.originalFile,
+      previewUrl: croppingPhoto.originalUrl,
+      cropState: null,
+    }
+    onChange(photos.map((photo) => (photo.id === reset.id ? reset : photo)))
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setCroppedArea(null)
+    setCropping(reset)
   }
 
   function handleDragEnd({ active, over }) {
@@ -246,22 +340,38 @@ export default function ListingPhotosEditor({
 
   return (
     <div ref={rootRef}>
-      <label className="photo-drop">
+      <label
+        className={`photo-drop${dragOver ? ' photo-drop--over' : ''}${atCap || adding ? ' photo-drop--disabled' : ''}`}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <Icon name="camera" size={28} strokeWidth={1.5} />
-        <span className="photo-drop__title">{adding ? 'Adding photos…' : 'Photos'}</span>
+        <span className="photo-drop__title">{adding ? 'Adding photos…' : 'Add photos'}</span>
+        <span className="photo-drop__hint photo-drop__hint--coarse">Tap to choose</span>
+        <span className="photo-drop__hint photo-drop__hint--fine">
+          Click to choose, or drag photos here
+        </span>
         <input
           ref={inputRef}
           type="file"
           accept="image/*"
           multiple
+          aria-label="Photos"
           onChange={handleFiles}
-          disabled={photos.length >= max || adding}
+          disabled={atCap || adding}
           className="visually-hidden"
         />
       </label>
       <p className="hint photo-drop__count">
         Maximum of {max} photos ({photos.length}/{max})
       </p>
+      {dropHint ? (
+        <p className="field-hint" role="status">
+          {dropHint}
+        </p>
+      ) : null}
       {error ? (
         <p className="field-hint" role="status">
           {error}
@@ -317,7 +427,7 @@ export default function ListingPhotosEditor({
         </>
       ) : null}
 
-      {cropping ? (
+      {croppingPhoto ? (
         <div className="confirm-dialog-backdrop">
           <div
             className="confirm-dialog confirm-dialog--wide"
@@ -326,42 +436,14 @@ export default function ListingPhotosEditor({
             aria-labelledby="photo-crop-title"
           >
             <p id="photo-crop-title" className="confirm-dialog__copy">
-              {croppingCover ? 'Crop the cover to the listing card' : 'Crop this photo'}
+              Crop the cover to the listing card
             </p>
-            {!croppingCover ? (
-              <div className="crop-aspect" role="group" aria-label="Crop shape">
-                <button
-                  type="button"
-                  className={`choice-chip${freeCrop ? '' : ' choice-chip--on'}`}
-                  aria-pressed={!freeCrop}
-                  onClick={() => {
-                    setFreeCrop(false)
-                    setCrop({ x: 0, y: 0 })
-                    setZoom(1)
-                  }}
-                >
-                  4:3
-                </button>
-                <button
-                  type="button"
-                  className={`choice-chip${freeCrop ? ' choice-chip--on' : ''}`}
-                  aria-pressed={freeCrop}
-                  onClick={() => {
-                    setFreeCrop(true)
-                    setCrop({ x: 0, y: 0 })
-                    setZoom(1)
-                  }}
-                >
-                  Free
-                </button>
-              </div>
-            ) : null}
             <div className="cover-crop">
               <Cropper
-                image={cropping.previewUrl}
+                image={cropSourceUrl(croppingPhoto)}
                 crop={crop}
                 zoom={zoom}
-                aspect={cropAspect}
+                aspect={LISTING_COVER_ASPECT}
                 onCropChange={setCrop}
                 onZoomChange={setZoom}
                 onCropComplete={(_, area) => setCroppedArea(area)}
@@ -371,6 +453,11 @@ export default function ListingPhotosEditor({
               <Button variant="primary" onClick={applyCrop} disabled={!croppedArea}>
                 Use this crop
               </Button>
+              {photoIsCropped(croppingPhoto) ? (
+                <Button variant="secondary" onClick={resetCrop}>
+                  Reset to original
+                </Button>
+              ) : null}
               <Button variant="secondary" onClick={() => setCropping(null)}>
                 Cancel
               </Button>

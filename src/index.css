@@ -6744,13 +6744,44 @@ body.lightbox-open {
   cursor: pointer;
 }
 
-.photo-drop:hover {
+.photo-drop:hover,
+.photo-drop--over {
   border-color: var(--navy);
+}
+
+.photo-drop--over {
+  background: var(--sand);
+  box-shadow: inset 0 0 0 1px var(--navy);
+}
+
+.photo-drop--disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .photo-drop__title {
   font-size: 16px;
   font-weight: 700;
+}
+
+.photo-drop__hint {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.photo-drop__hint--fine {
+  display: none;
+}
+
+@media (pointer: fine) {
+  .photo-drop__hint--coarse {
+    display: none;
+  }
+
+  .photo-drop__hint--fine {
+    display: block;
+  }
 }
 
 .photo-drop__count {
