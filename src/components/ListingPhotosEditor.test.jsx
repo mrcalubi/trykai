@@ -82,7 +82,7 @@ describe('ListingPhotosEditor', () => {
     expect(screen.getByRole('menuitem', { name: 'Remove' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('menuitem', { name: 'Crop' }))
-    expect(screen.getByText('Crop the cover to the listing card')).toBeInTheDocument()
+    expect(screen.getByText('Crop the cover')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Free' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '4:3' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reset to original' })).not.toBeInTheDocument()
@@ -96,22 +96,18 @@ describe('ListingPhotosEditor', () => {
     expect(next[0].originalFile).toBe(originalFile)
   })
 
-  it('does not offer crop on non-cover photos, and moving one to first place does not open crop', async () => {
+  it('offers crop on every photo, and making one the cover does not open crop', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    const { rerender } = render(<ListingPhotosEditor photos={photos} onChange={onChange} />)
+    render(<ListingPhotosEditor photos={photos} onChange={onChange} />)
 
     await user.click(screen.getByRole('button', { name: 'Photo 2' }))
-    expect(screen.queryByRole('menuitem', { name: 'Crop' })).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Crop' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Make cover' })).toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: 'Make cover' }))
     expect(onChange).toHaveBeenCalledWith([photos[1], photos[0]])
-    expect(screen.queryByText('Crop the cover to the listing card')).not.toBeInTheDocument()
-
-    rerender(<ListingPhotosEditor photos={[photos[1], photos[0]]} onChange={onChange} />)
-    await user.click(screen.getByRole('button', { name: 'Photo 2' }))
-    expect(screen.queryByRole('menuitem', { name: 'Crop' })).not.toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Make cover' })).toBeInTheDocument()
+    expect(screen.queryByText('Crop the cover')).not.toBeInTheDocument()
+    expect(screen.queryByText('Crop this photo')).not.toBeInTheDocument()
   })
 
   it('re-crops from the original and restores the previous crop and zoom', async () => {
@@ -170,7 +166,7 @@ describe('ListingPhotosEditor', () => {
     render(<ListingPhotosEditor photos={[photos[1], cropped]} onChange={onChange} />)
 
     await user.click(screen.getByRole('button', { name: 'Photo 2' }))
-    expect(screen.queryByRole('menuitem', { name: 'Crop' })).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Crop' })).toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: 'Undo crop' }))
     expect(onChange).toHaveBeenCalledWith([
       photos[1],
@@ -297,7 +293,7 @@ describe('ListingPhotosEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
     await user.click(screen.getByRole('menuitem', { name: 'Crop' }))
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(screen.queryByText('Crop the cover to the listing card')).not.toBeInTheDocument()
+    expect(screen.queryByText('Crop the cover')).not.toBeInTheDocument()
   })
 
   it('adds two dropped images and ignores a non-image drop with a hint', async () => {
@@ -337,6 +333,118 @@ describe('ListingPhotosEditor', () => {
     dropFiles([new File(['four'], 'four.png', { type: 'image/png' })])
     expect(onChange).not.toHaveBeenCalled()
     expect(screen.getByLabelText('Photos')).toBeDisabled()
+  })
+
+  function freshPhoto(id) {
+    const file = new File([id], `${id}.png`, { type: 'image/png' })
+    return {
+      id,
+      previewUrl: `blob:${id}`,
+      file,
+      remoteUrl: null,
+      originalFile: file,
+      originalUrl: `blob:${id}`,
+    }
+  }
+
+  it('closes the menu on a grid-gap click and a drop-zone click', async () => {
+    const user = userEvent.setup()
+    render(<ListingPhotosEditor photos={photos} onChange={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
+    expect(screen.getByRole('menuitem', { name: 'Crop' })).toBeInTheDocument()
+
+    fireEvent.pointerDown(document.querySelector('.preview-grid'))
+    expect(screen.queryByRole('menuitem', { name: 'Crop' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
+    expect(screen.getByRole('menuitem', { name: 'Crop' })).toBeInTheDocument()
+
+    fireEvent.pointerDown(dropZone())
+    expect(screen.queryByRole('menuitem', { name: 'Crop' })).not.toBeInTheDocument()
+  })
+
+  it('switches menus when another tile is clicked', async () => {
+    const user = userEvent.setup()
+    render(<ListingPhotosEditor photos={photos} onChange={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
+    expect(screen.getByRole('menu', { name: 'Photo 1 (cover)' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Photo 2' }))
+    expect(screen.queryByRole('menu', { name: 'Photo 1 (cover)' })).not.toBeInTheDocument()
+    expect(screen.getByRole('menu', { name: 'Photo 2' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Crop' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Make cover' })).toBeInTheDocument()
+  })
+
+  it('crops and undoes photo 3 from its menu', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const a = freshPhoto('a')
+    const b = freshPhoto('b')
+    const c = freshPhoto('c')
+    const { rerender } = render(
+      <ListingPhotosEditor photos={[a, b, c]} onChange={onChange} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Photo 3' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Crop' }))
+    expect(screen.getByText('Crop this photo')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Use this crop' }))
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    const cropped = onChange.mock.calls[0][0][2]
+    expect(cropped.id).toBe('c')
+    expect(cropped.file.name).toBe('cover.jpg')
+    expect(cropped.originalUrl).toBe('blob:c')
+
+    onChange.mockClear()
+    rerender(<ListingPhotosEditor photos={[a, b, cropped]} onChange={onChange} />)
+    await user.click(screen.getByRole('button', { name: 'Photo 3' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Undo crop' }))
+    expect(onChange.mock.calls[0][0][2]).toMatchObject({
+      id: 'c',
+      file: c.file,
+      previewUrl: 'blob:c',
+      cropState: null,
+    })
+  })
+
+  it('shows Undo crop on a cropped cover', async () => {
+    const user = userEvent.setup()
+    const cropped = {
+      ...photos[0],
+      file: new File(['crop'], 'cover.jpg', { type: 'image/jpeg' }),
+      previewUrl: 'blob:cropped',
+      cropState: { crop: { x: 8, y: 2 }, zoom: 1.4 },
+    }
+    render(<ListingPhotosEditor photos={[cropped]} onChange={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
+    expect(screen.getByRole('menuitem', { name: 'Crop' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Undo crop' })).toBeInTheDocument()
+  })
+
+  it('offers Crop but not Undo on a saved photo', async () => {
+    const user = userEvent.setup()
+    render(
+      <ListingPhotosEditor
+        photos={[
+          {
+            id: 'saved',
+            previewUrl: 'https://cdn.test/cover.jpg',
+            file: null,
+            remoteUrl: 'https://cdn.test/cover.jpg',
+          },
+        ]}
+        onChange={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
+    expect(screen.getByRole('menuitem', { name: 'Crop' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Undo crop' })).not.toBeInTheDocument()
   })
 
 })
