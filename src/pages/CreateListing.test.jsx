@@ -816,6 +816,27 @@ describe('CreateListing photos', () => {
     expect(screen.queryByRole('button', { name: 'Set as cover' })).not.toBeInTheDocument()
   })
 
+  it('keeps the same preview after leaving the photos step and coming back', async () => {
+    const revoke = vi.spyOn(URL, 'revokeObjectURL')
+    const { user } = renderPage()
+    await goToPhotos(user)
+    selectFiles([imageFile('a.png')])
+    await screen.findByText('Maximum of 5 photos (1/5)')
+    const preview = document.querySelector('.preview-image')
+    const src = preview.getAttribute('src')
+    expect(src).toMatch(/^blob:/)
+
+    await next(user)
+    await stepHeading('Price and group size')
+    expect(revoke).not.toHaveBeenCalledWith(src)
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await stepHeading('Add photos')
+    expect(document.querySelector('.preview-image')).toHaveAttribute('src', src)
+    expect(revoke).not.toHaveBeenCalledWith(src)
+    revoke.mockRestore()
+  })
+
   it('opens the cover crop dialog', async () => {
     const { user } = renderPage()
     await goToPhotos(user)
