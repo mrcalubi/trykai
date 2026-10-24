@@ -236,9 +236,9 @@ export default function ListingPhotosEditor({
   }
 
   function handleFiles(event) {
-    const list = event.target.files
+    const files = snapshotImageFiles(event.target.files)
     event.target.value = ''
-    addImageFiles(list)
+    addImageFiles(files)
   }
 
   function handleDragEnter(event) {
