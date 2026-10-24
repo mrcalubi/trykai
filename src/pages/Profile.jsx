@@ -13,6 +13,7 @@ import { hostEntry } from '../lib/hostEntry'
 import { firstAccountRow } from '../lib/myAccount'
 import { profileReportSubject, reportMailto } from '../lib/reportMailto'
 import OverflowMenu from '../components/ui/OverflowMenu'
+import PageLoader from '../components/PageLoader'
 import Bookings from './Bookings'
 import Hosting from './Hosting'
 
@@ -241,7 +242,7 @@ export default function Profile() {
   }, [id])
 
   if (loading || !viewerReady) {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   if (error && !profile) {

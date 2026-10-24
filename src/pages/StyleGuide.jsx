@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import Button from '../components/ui/Button'
+import PageLoader from '../components/PageLoader'
+import WaitingState from '../components/WaitingState'
 import Input from '../components/ui/Input'
 import Card from '../components/ui/Card'
 import SelectableCard from '../components/ui/SelectableCard'
@@ -116,6 +118,32 @@ export default function StyleGuide() {
               <Button variant={preview.variant}>{preview.text}</Button>
             </article>
           ))}
+          <article className="style-guide-card">
+            <p className="style-guide-card__label">Loading</p>
+            <p className="style-guide-card__usage">Used while a short action is in flight</p>
+            <Button variant="primary" loading loadingLabel="Saving">
+              Save changes
+            </Button>
+          </article>
+        </div>
+      </section>
+
+      <section className="style-guide-section" aria-labelledby="waiting-preview-heading">
+        <h2 id="waiting-preview-heading">Loading</h2>
+        <div className="style-guide-grid">
+          <article className="style-guide-card">
+            <p className="style-guide-card__label">Page loader</p>
+            <p className="style-guide-card__usage">Spinner after 400ms so fast loads do not flash</p>
+            <PageLoader />
+          </article>
+          <article className="style-guide-card">
+            <p className="style-guide-card__label">Waiting state</p>
+            <p className="style-guide-card__usage">Long waits: checkout, payouts, Singpass, publish</p>
+            <WaitingState
+              title="Creating your listing"
+              message="Uploading photo 2 of 4"
+            />
+          </article>
         </div>
       </section>
 

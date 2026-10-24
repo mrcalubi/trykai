@@ -13,8 +13,9 @@ import {
   guestCountLabel,
 } from '../../supabase/functions/_shared/email.ts'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
-import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import Button from '../components/ui/Button'
+import PageLoader from '../components/PageLoader'
+import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import ReportProblem from '../components/ReportProblem'
 
 function googleMapsUrl(address) {
@@ -140,7 +141,7 @@ export default function BookingDetail() {
   }
 
   if (loading) {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   if (error) {
@@ -282,14 +283,14 @@ export default function BookingDetail() {
         <div className="cancel-confirm">
           <p className="cancel-confirm__note">{guestCancellationNote(booking)}</p>
           <div className="booking-detail__actions">
-            <button
-              type="button"
-              disabled={cancelLoading}
+            <Button
+              variant="destructive"
+              loading={cancelLoading}
+              loadingLabel="Cancelling"
               onClick={handleCancel}
-              className="btn btn--danger"
             >
-              {cancelLoading ? 'Cancelling…' : 'Confirm cancellation'}
-            </button>
+              Confirm cancellation
+            </Button>
             <button
               type="button"
               onClick={() => setConfirmCancel(false)}

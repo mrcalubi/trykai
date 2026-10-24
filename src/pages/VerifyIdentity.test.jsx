@@ -356,6 +356,18 @@ describe('VerifyIdentity with Singpass turned on', () => {
     expect(screen.getByRole('button', { name: 'No Singpass? Upload your ID instead' })).toBeInTheDocument()
   })
 
+  it('shows a waiting state below Singpass while the start call is pending', async () => {
+    givenSingpassStart(new Promise(() => {}))
+    const { user } = renderPage()
+    await screen.findByRole('button', { name: 'Verify with Singpass' })
+
+    await user.click(screen.getByRole('button', { name: 'Verify with Singpass' }))
+
+    expect(await screen.findByRole('heading', { name: 'Opening Singpass' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Verify with Singpass' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Verify with Singpass' }).querySelector('.tk-spinner')).toBeNull()
+  })
+
   it('goes straight to Singpass, with nothing to fill in first', async () => {
     givenSingpassStart({ data: { url: 'https://stg-id.singpass.gov.sg/fapi/auth?x=1' }, error: null })
     const { user } = renderPage()

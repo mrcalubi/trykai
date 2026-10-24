@@ -1797,6 +1797,17 @@ describe('Dashboard payout setup', () => {
     expect(within(setup).getByRole('button', { name: 'Set up payouts' })).toHaveTextContent('Set up')
   })
 
+  it('shows a waiting state while the Stripe account link is created', async () => {
+    givenData({ listings: [makeMyListing()], payoutsEnabled: false })
+    supabase.functions.invoke.mockImplementation(() => new Promise(() => {}))
+    const { user } = await renderHosting()
+
+    await user.click(screen.getByRole('button', { name: 'Set up payouts' }))
+
+    expect(await screen.findByRole('heading', { name: 'Setting up payouts' })).toBeInTheDocument()
+    expect(screen.getByText('Opening Stripe so you can add your bank details.')).toBeInTheDocument()
+  })
+
   it('asks Stripe for an account link when payouts are not set up', async () => {
     givenData({ listings: [makeMyListing()], payoutsEnabled: false })
     supabase.functions.invoke.mockResolvedValue({

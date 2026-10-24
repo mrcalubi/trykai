@@ -177,7 +177,7 @@ describe('Logging in', () => {
 
     await user.click(screen.getByRole('button', { name: 'Log in' }))
 
-    expect(await screen.findByRole('button', { name: 'Please wait…' })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: 'Please wait' })).toBeDisabled()
     release()
   })
 })

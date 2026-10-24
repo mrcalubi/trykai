@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Input from '../components/ui/Input'
+import Button from '../components/ui/Button'
 import {
   RESEND_COOLDOWN_SECONDS,
   codeErrorMessage,
@@ -256,9 +257,9 @@ export default function Login() {
             {error && <p className="error-message">{error}</p>}
             {message && <p className="success-message">{message}</p>}
 
-            <button type="submit" disabled={loading} className="btn btn--primary">
-              {loading ? 'Please wait…' : 'Confirm email'}
-            </button>
+            <Button type="submit" variant="primary" loading={loading} loadingLabel="Please wait">
+              Confirm email
+            </Button>
           </form>
 
           <p className="form-card__footer">
@@ -374,13 +375,15 @@ export default function Login() {
           {error && <p className="error-message">{error}</p>}
           {message && <p className="success-message">{message}</p>}
 
-          <button
+          <Button
             type="submit"
-            disabled={loading || (isSignup && !acceptedTerms)}
-            className="btn btn--primary"
+            variant="primary"
+            loading={loading}
+            loadingLabel="Please wait"
+            disabled={isSignup && !acceptedTerms}
           >
-            {loading ? 'Please wait…' : isSignup ? 'Sign up' : 'Log in'}
-          </button>
+            {isSignup ? 'Sign up' : 'Log in'}
+          </Button>
         </form>
 
         <p className="form-card__footer">

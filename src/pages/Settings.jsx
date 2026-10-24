@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
+import PageLoader from '../components/PageLoader'
 import { getInitials } from '../components/ui/getInitials'
 import { firstAccountRow } from '../lib/myAccount'
 import { compressImage } from '../lib/compressImage'
@@ -165,7 +166,7 @@ export default function Settings() {
   }
 
   if (loading) {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   const previewSrc = avatarPreviewUrl || avatarUrl
@@ -251,8 +252,8 @@ export default function Settings() {
               error={nameError}
             />
 
-            <Button type="submit" variant="primary" disabled={saving}>
-              {saving ? 'Saving…' : 'Save changes'}
+            <Button type="submit" variant="primary" loading={saving} loadingLabel="Saving">
+              Save changes
             </Button>
           </form>
         </section>

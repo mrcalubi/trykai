@@ -12,6 +12,8 @@ import { photosFromUrls, uploadListingPhotos } from '../lib/listingPhotos'
 import ListingPricePanel from '../components/ListingPricePanel'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
 import FieldHint from '../components/FieldHint'
+import Button from '../components/ui/Button'
+import PageLoader from '../components/PageLoader'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import { groupDiscountExampleLine, hostPriceBreakdown, parsePriceInputCents } from '../lib/pricing'
 import {
@@ -248,7 +250,7 @@ export default function EditListing() {
   }
 
   if (fetching) {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   if (error && !title) {
@@ -400,9 +402,14 @@ export default function EditListing() {
             </p>
           ) : null}
 
-          <button type="submit" disabled={loading} className="btn btn--primary">
-            {loading ? (photos.some((photo) => photo.file) ? 'Uploading…' : 'Saving…') : 'Save changes'}
-          </button>
+          <Button
+            type="submit"
+            variant="primary"
+            loading={loading}
+            loadingLabel={photos.some((photo) => photo.file) ? 'Uploading' : 'Saving'}
+          >
+            Save changes
+          </Button>
         </form>
       </div>
 

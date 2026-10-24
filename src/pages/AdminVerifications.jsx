@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { MAX_REJECTION_REASON_LENGTH } from '../../supabase/functions/_shared/verification.ts'
 import { ageFromDob, formatSingpassDob } from '../lib/singpass'
+import Button from '../components/ui/Button'
+import PageLoader from '../components/PageLoader'
 
 function formatSubmittedAt(iso) {
   if (!iso) return 'Submitted date unknown'
@@ -108,7 +110,7 @@ export default function AdminVerifications() {
       {error && <p className="error-message">{error}</p>}
 
       {loading ? (
-        <p className="status-message">Loading…</p>
+        <PageLoader />
       ) : pending.length === 0 ? (
         <p className="empty-state">Nothing waiting for review.</p>
       ) : (
@@ -181,14 +183,14 @@ export default function AdminVerifications() {
               </label>
 
               <div className="booking-card__actions">
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  disabled={busyId === host.id}
+                <Button
+                  variant="primary"
+                  loading={busyId === host.id}
+                  loadingLabel="Saving"
                   onClick={() => decide(host, 'approve')}
                 >
-                  {busyId === host.id ? 'Saving…' : 'Approve'}
-                </button>
+                  Approve
+                </Button>
                 <button
                   type="button"
                   className="btn btn--ghost"

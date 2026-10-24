@@ -9,6 +9,8 @@ import PhotoLightbox from '../components/PhotoLightbox'
 import SessionCalendar from '../components/SessionCalendar'
 import { GuestCancellationNote } from '../components/CancellationPolicy'
 import FormattedPrice from '../components/FormattedPrice'
+import PageLoader from '../components/PageLoader'
+import WaitingState from '../components/WaitingState'
 import {
   formatDayTitle,
   formatMonthTitle,
@@ -142,9 +144,8 @@ function CheckoutForm({ totalAmount, bookingId, onSuccess, onPaymentFailed }) {
       redirect: 'if_required',
     })
 
-    setLoading(false)
-
     if (confirmError || !checkoutCanLeaveForWebhook(paymentIntent?.status)) {
+      setLoading(false)
       setError(confirmError?.message || 'Payment was not completed. You have not been charged.')
       // A declined card can be retried on this same payment. Cancelling the
       // payment sheet, or Stripe cancelling the intent, closes the checkout.
@@ -156,25 +157,34 @@ function CheckoutForm({ totalAmount, bookingId, onSuccess, onPaymentFailed }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="payment-form">
-      <p className="payment-form__total">
-        Total: <FormattedPrice cents={totalAmount} />
-      </p>
-      <PaymentElement />
-      {error && <p className="error-message">{error}</p>}
-      <div className="payment-form__actions">
-        <button type="submit" disabled={!stripe || loading} className="btn btn--primary">
-          {loading ? (
-            'Processing…'
-          ) : (
-            <>
-              Pay <FormattedPrice cents={totalAmount} />
-            </>
-          )}
-        </button>
-        <p className="payment-form__secure">Payments are processed securely by Stripe.</p>
-      </div>
-    </form>
+    <div className="payment-form-wrap">
+      {loading ? (
+        <div className="payment-form-wrap__wait">
+          <WaitingState
+            title="Confirming your payment"
+            message="PayNow and card payments both go through Stripe. Please keep this page open."
+          />
+        </div>
+      ) : null}
+      <form
+        onSubmit={handleSubmit}
+        className="payment-form"
+        inert={loading || undefined}
+        aria-hidden={loading || undefined}
+      >
+        <p className="payment-form__total">
+          Total: <FormattedPrice cents={totalAmount} />
+        </p>
+        <PaymentElement />
+        {error && <p className="error-message">{error}</p>}
+        <div className="payment-form__actions">
+          <button type="submit" disabled={!stripe || loading} className="btn btn--primary">
+            Pay <FormattedPrice cents={totalAmount} />
+          </button>
+          <p className="payment-form__secure">Payments are processed securely by Stripe.</p>
+        </div>
+      </form>
+    </div>
   )
 }
 
@@ -565,7 +575,7 @@ export default function ListingDetail() {
   }
 
   if (loading) {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   if (error || !listing) {
@@ -779,12 +789,18 @@ export default function ListingDetail() {
                 </div>
               )}
 
+              {bookingLoading ? (
+                <WaitingState
+                  title="Confirm and pay"
+                  message="Getting your payment ready, including PayNow."
+                />
+              ) : (
               <div className="payment-rails">
                 <p className="checkout__label">Pay with</p>
                 <button
                   type="button"
                   className="payment-rail payment-rail--paynow"
-                  disabled={bookingLoading || paynowBlocked}
+                  disabled={paynowBlocked}
                   aria-pressed={!paynowBlocked && checkoutRail === 'paynow'}
                   onClick={() => startPayment('paynow')}
                 >
@@ -819,7 +835,6 @@ export default function ListingDetail() {
                 <button
                   type="button"
                   className="payment-rail"
-                  disabled={bookingLoading}
                   aria-pressed={paynowBlocked || checkoutRail === 'card'}
                   onClick={() => startPayment('card')}
                 >
@@ -835,8 +850,8 @@ export default function ListingDetail() {
                     </span>
                   </span>
                 </button>
-                {bookingLoading ? <p className="hint">Preparing secure payment…</p> : null}
               </div>
+              )}
 
               <div className="price-breakdown">
                 <p className="price-breakdown__row">
