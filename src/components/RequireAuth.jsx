@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { AuthedUserContext } from '../lib/authedUser'
+import PageLoader from './PageLoader'
 
 /**
  * Gate for routes that need a signed-in user.
@@ -41,7 +42,7 @@ export default function RequireAuth({ children }) {
   }, [navigate, location])
 
   if (!userId) {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   return <AuthedUserContext.Provider value={userId}>{children}</AuthedUserContext.Provider>

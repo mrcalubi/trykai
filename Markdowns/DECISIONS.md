@@ -604,6 +604,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-24 — Only the cover is cropped.** Listing cards, the phone gallery, and a lone desktop photo all show the cover at 4:3, so that is the only crop. Other photos are shown in full in the viewer and centre-filled in tiles, so they do not need cropping. Moving a cropped cover out of first place keeps the crop; Undo crop restores the original. Every crop starts from the original file or object URL, not the last crop, and can be reset in this session. Already-saved Edit listing photos have no original, so they crop from the saved image and cannot be reset. The create/edit page owns those blob URLs and revokes them on unmount and after a successful save; the editor cannot, because Create listing unmounts it between wizard steps. Supersedes the 18 October "crop every photo" and Free-aspect wording.
 
+**2026-10-24 — Three loading patterns, not one.** Short actions use `Button loading` (spinner beside a `loadingLabel`, width held). Page fetches use `PageLoader` (spinner after 400ms so fast loads do not flash). Long waits that leave the guest staring at a button — checkout (including PayNow), Stripe payout setup, Singpass start/return, create-listing publish — use `WaitingState` with timed copy at 0 / 4s / 12s. The official Singpass button is never given a spinner; the wait sits under it. Home browse stays on skeleton cards.
+
 ---
 
 # Analysed but not decided

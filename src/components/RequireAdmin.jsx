@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import PageLoader from './PageLoader'
 
 /**
  * Gate for the internal review routes. `is_admin` has no client SELECT grant,
@@ -28,7 +29,7 @@ export default function RequireAdmin({ children }) {
   }, [])
 
   if (state === 'checking') {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   if (state === 'denied') {

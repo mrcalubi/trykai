@@ -1241,6 +1241,51 @@ describe('ListingDetail checkout', () => {
     return utils
   }
 
+  it('shows a waiting state while the payment intent is created, including PayNow', async () => {
+    givenListing()
+    givenSessions([makeSession({ id: 'session-7' })])
+    givenSignedIn()
+    let release
+    supabase.functions.invoke.mockImplementation((name) => {
+      if (name !== 'create-payment-intent') return Promise.resolve({ data: null, error: null })
+      return new Promise((resolve) => {
+        release = () =>
+          resolve({
+            data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 5100 },
+            error: null,
+          })
+      })
+    })
+    const { user } = renderPage()
+    await screen.findByText(/spots left/)
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
+
+    expect(
+      await screen.findByText('Getting your payment ready, including PayNow.')
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Confirm and pay', level: 2 })).toBeInTheDocument()
+    release()
+    await screen.findByTestId('stripe-elements')
+  })
+
+  it('shows a waiting state while Stripe confirms the payment', async () => {
+    let release
+    stripe.instance.confirmPayment.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ error: null, paymentIntent: { status: 'succeeded' } })
+        })
+    )
+    const { user } = await openCheckout()
+
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Confirming your payment' })).toBeInTheDocument()
+    expect(screen.getByText(/PayNow and card payments both go through Stripe/)).toBeInTheDocument()
+    release()
+  })
+
   it('confirms the payment without leaving the page when possible', async () => {
     const { user } = await openCheckout()
 

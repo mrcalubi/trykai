@@ -81,8 +81,8 @@ export default function ForgotPassword() {
           {error && <p className="error-message">{error}</p>}
           {message && <p className="success-message">{message}</p>}
 
-          <Button type="submit" variant="primary" disabled={loading}>
-            {loading ? 'Please wait…' : 'Send reset link'}
+          <Button type="submit" variant="primary" loading={loading} loadingLabel="Please wait">
+            Send reset link
           </Button>
         </form>
 

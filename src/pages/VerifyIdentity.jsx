@@ -6,6 +6,9 @@ import { verificationDocumentPaths } from '../../supabase/functions/_shared/veri
 import { missingItemsMessage, missingVerificationItems } from '../lib/verificationForm'
 import { singpassEnabled } from '../lib/singpass'
 import SingpassButton from '../components/SingpassButton'
+import Button from '../components/ui/Button'
+import PageLoader from '../components/PageLoader'
+import WaitingState from '../components/WaitingState'
 import { functionReasonOrDefault } from '../lib/edgeFunctionError'
 
 /** `my_verification` returns a table, so PostgREST hands back an array. */
@@ -156,7 +159,7 @@ export default function VerifyIdentity() {
   }
 
   if (!statusChecked) {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   if (verificationStatus === 'pending' || submitted) {
@@ -242,9 +245,9 @@ export default function VerifyIdentity() {
           <form onSubmit={handleSubmit} className="form">
             {uploadFields}
             {error && <p className="error-message">{error}</p>}
-            <button type="submit" disabled={loading} className="btn btn--primary">
-              {loading ? 'Submitting…' : 'Submit for review'}
-            </button>
+            <Button type="submit" variant="primary" loading={loading} loadingLabel="Submitting">
+              Submit for review
+            </Button>
           </form>
         </div>
       </div>
@@ -266,9 +269,10 @@ export default function VerifyIdentity() {
         <div className="verify-singpass">
           <SingpassButton busy={singpassLoading} onClick={startSingpass} />
           {singpassLoading ? (
-            <p className="hint" role="status">
-              Opening Singpass…
-            </p>
+            <WaitingState
+              title="Opening Singpass"
+              message="You'll confirm your details next."
+            />
           ) : null}
           <p className="hint">
             Singpass shares your name, date of birth and mobile number with TryKai. You check them
@@ -287,9 +291,9 @@ export default function VerifyIdentity() {
               </p>
               {uploadFields}
               {error && <p className="error-message">{error}</p>}
-              <button type="submit" disabled={loading} className="btn btn--secondary">
-                {loading ? 'Submitting…' : 'Submit for review'}
-              </button>
+              <Button type="submit" variant="secondary" loading={loading} loadingLabel="Submitting">
+                Submit for review
+              </Button>
             </form>
           ) : (
             <button
