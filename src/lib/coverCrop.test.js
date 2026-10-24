@@ -36,6 +36,7 @@ describe('coverCrop', () => {
     expect(css).toMatch(/\.hosting-listing__thumb \{[\s\S]*?object-position:\s*center/)
     expect(css).toMatch(/\.checkout-summary__photo \{[\s\S]*?object-position:\s*center/)
     expect(css).toMatch(/\.preview-image \{[\s\S]*?object-position:\s*center/)
+    expect(css).toMatch(/\.preview-item__frame \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
   })
 
   it('draws the chosen pixels onto a canvas and returns a blob', async () => {

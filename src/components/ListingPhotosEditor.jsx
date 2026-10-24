@@ -302,7 +302,8 @@ export default function ListingPhotosEditor({
     if (!croppingPhoto || !croppedArea) return
     const image = await loadImage(cropSourceUrl(croppingPhoto))
     const blob = await cropImageToBlob(image, croppedArea)
-    const file = new File([blob], 'cover.jpg', { type: 'image/jpeg', lastModified: Date.now() })
+    const fileName = photos[0]?.id === croppingPhoto.id ? 'cover.jpg' : 'photo.jpg'
+    const file = new File([blob], fileName, { type: 'image/jpeg', lastModified: Date.now() })
     const compressed = await compressImage(file)
     const previewUrl = URL.createObjectURL(compressed)
     const cropState = { crop, zoom }
