@@ -1,4 +1,4 @@
-/** Same 4:3 as `--listing-cover-aspect` in index.css. Open Graph (later) is 1.91:1. */
+/** Same 4:3 as `--listing-cover-aspect` in index.css. Every listing photo crops to this. Open Graph (later) is 1.91:1. */
 export const LISTING_COVER_W = 4
 export const LISTING_COVER_H = 3
 export const LISTING_COVER_ASPECT = LISTING_COVER_W / LISTING_COVER_H

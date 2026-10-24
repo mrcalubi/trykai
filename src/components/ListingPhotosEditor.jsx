@@ -84,6 +84,7 @@ function PhotoTile({
         <button
           type="button"
           className="preview-item__hit"
+          data-photo-menu-for={photo.id}
           aria-label={photoLabel(index, isCover)}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
@@ -120,18 +121,21 @@ function PhotoTile({
           ×
         </button>
         {menuOpen ? (
-          <div className="preview-item__menu" role="menu" aria-label={photoLabel(index, isCover)}>
-            {isCover ? (
-              <button type="button" role="menuitem" onClick={onCrop}>
-                Crop
-              </button>
-            ) : null}
+          <div
+            className="preview-item__menu"
+            role="menu"
+            data-photo-menu={photo.id}
+            aria-label={photoLabel(index, isCover)}
+          >
+            <button type="button" role="menuitem" onClick={onCrop}>
+              Crop
+            </button>
             {!isCover ? (
               <button type="button" role="menuitem" onClick={onMakeCover}>
                 Make cover
               </button>
             ) : null}
-            {!isCover && onUndoCrop ? (
+            {onUndoCrop ? (
               <button type="button" role="menuitem" onClick={onUndoCrop}>
                 Undo crop
               </button>
@@ -155,7 +159,6 @@ export default function ListingPhotosEditor({
 }) {
   const localInputRef = useRef(null)
   const inputRef = pickerRef ?? localInputRef
-  const rootRef = useRef(null)
   const dragDepth = useRef(0)
   const [cropping, setCropping] = useState(null)
   const [crop, setCrop] = useState({ x: 0, y: 0 })
@@ -187,7 +190,14 @@ export default function ListingPhotosEditor({
   useEffect(() => {
     if (!menuId) return undefined
     function onPointerDown(event) {
-      if (!rootRef.current?.contains(event.target)) setMenuId(null)
+      const target = event.target
+      if (!(target instanceof Element)) {
+        setMenuId(null)
+        return
+      }
+      if (target.closest(`[data-photo-menu="${menuId}"]`)) return
+      if (target.closest(`[data-photo-menu-for="${menuId}"]`)) return
+      setMenuId(null)
     }
     function onKey(event) {
       if (event.key === 'Escape') setMenuId(null)
@@ -333,7 +343,7 @@ export default function ListingPhotosEditor({
   }
 
   return (
-    <div ref={rootRef}>
+    <div>
       <label
         className={`photo-drop${dragOver ? ' photo-drop--over' : ''}${atCap || adding ? ' photo-drop--disabled' : ''}`}
         onDragEnter={handleDragEnter}
@@ -431,7 +441,7 @@ export default function ListingPhotosEditor({
             aria-labelledby="photo-crop-title"
           >
             <p id="photo-crop-title" className="confirm-dialog__copy">
-              Crop the cover to the listing card
+              {photos[0]?.id === croppingPhoto.id ? 'Crop the cover' : 'Crop this photo'}
             </p>
             <div className="cover-crop">
               <Cropper
