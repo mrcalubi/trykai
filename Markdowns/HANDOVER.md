@@ -1,6 +1,6 @@
 # TryKai: Handover
 
-*Written 19 October 2026 against the repo (`staging` at `4a84219`) and the 17 to 19 October working chat. Supersedes the 21 September handover and the Project file `claude/HANDOVER_2026-10-19.md`.*
+*Written 24 October 2026 against the repo (`staging` at `7c27da3`, PR #150). Supersedes the 19 October handover. Read this first if you are Cursor, a new Claude chat, or anyone picking up the code.*
 
 ---
 
@@ -8,7 +8,7 @@
 
 Peer to peer skill and experience marketplace for Singapore. Individuals list short, in person sessions teaching a skill. Most sessions are S$15 to S$30; S$10 to S$40 is guidance, not a rule, and the database caps a listing at S$500 as a typo guard (`00028`). Guests browse, book, and pay through the platform. TryKai takes a booking fee. Runs as a website, not an app.
 
-Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. Pre launch, zero revenue. **Warm host onboarding starts Wednesday 21 October 2026.** First real paid booking expected within a week of that.
+Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. **The first host was onboarded on 23 October 2026**; her feedback is the next round of UI work.
 
 **Team.** Caleb, CEO and product, carries all legal and financial liability. Rui Heng Leong, engineer, 8 hours a week. Aakash Chidambaram, marketing, growth, host recruitment.
 
@@ -16,15 +16,16 @@ Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. Pre launch, zero 
 
 ## Source of truth
 
-**The repo's `Markdowns/` folder is current.** Claude Project copies are synced from it and may lag. One fact, one home. When two docs disagree, say so rather than picking one.
+**The repo's `Markdowns/` folder is current.** Claude Project copies are synced from it and may lag. One fact, one home. When two docs disagree, say so rather than picking one. For any change, read the matching section of `ENGINEERING.md` (how it works), `DECISIONS.md` (why, newest entries at the bottom of the log) and `OPERATIONS.md` (what someone has to do by hand).
 
 ---
 
-## How the work is done now
+## How the work is done now (from 24 October)
 
-- **Claude builds directly.** Cursor credits are limited. Claude (Claude Code in the TryKai Project chat) attaches `mrcalubi/trykai`, branches from `staging`, runs lint and tests, and opens a PR into `staging`. Caleb reviews and merges. Claude never pushes to `staging` or `main`.
-- If Cursor is used: start the prompt with "Read ENGINEERING.md and DECISIONS.md first", one scope, name the branch, end with "Report anything unmapped".
-- **Secrets stay with Caleb.** Never hold or ask for a Supabase access token. Never paste secrets into chat. Caleb applies migrations and sets secrets himself.
+- **Cursor builds most code again.** Claude (Claude Code in the TryKai Project chat) built everything from 19 to 24 October while Cursor was down; see "Catching up" below. Claude now handles reviews, docs, research, Singpass and anything that needs a long read of the repo.
+- Either way: branch from `staging`, one scope per branch, run `npm run verify` (lint, coverage, build), open a PR into `staging`. Caleb merges. Nobody pushes to `staging` or `main` directly.
+- Cursor prompt pattern: start with "Read Markdowns/HANDOVER.md, ENGINEERING.md and DECISIONS.md first", one scope, name the branch, end with "Report anything unmapped".
+- **Secrets stay with Caleb.** Never hold or ask for a Supabase access token. Never paste secrets or private keys into chat. Caleb applies migrations and sets secrets himself.
 - One step at a time. Short lists. Honest pushback over validation. Distinguish verified, inferred and guessed.
 - When something touches money, safety or auth, err toward Rui Heng's call.
 
@@ -47,9 +48,45 @@ Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. Pre launch, zero 
 
 ---
 
-## State on 19 October
+## Catching up: what changed 19 to 24 October
 
-**Migrations.** Both environments have `00022` through `00031`: checked 18 October (00022 to 00026) and 19 October with a read-only query (00027 to 00031). Earlier migrations are assumed applied, since these build on them.
+Everything below is merged to `staging`; `main` has it up to #149, and #150 is on `staging` only until the next sync. Details and reasons are in DECISIONS.md under the same dates.
+
+**Guests**
+- Home hero: Browse sessions button and the "Coming up" heading removed. Browse heading visually hidden; result count under the filters; peeking category row; smaller icon category badge. Cards for listings with no dates show no date line.
+- **I'm keen** (`00032`): on a listing with no dates a guest says when suits them; the host sees the tally and keen guests are emailed when dates are added (`listing-interest`, `notify-interested`).
+- Link previews for crawlers (`api/listing-preview.js`) and Share falls back to copying the link.
+- Branded email frame and booking receipt (`_shared/email.ts`).
+- **Email confirmation at signup**: a 6-digit code in the same tab (`Login.jsx`, `confirm-signup.html` generated from `_shared/email.ts`). The dashboard steps are in OPERATIONS.md.
+
+**Hosts**
+- **Shared availability** (`00033`): a host can't be booked in two places at once; overlapping sessions show as "Taken".
+- **Verification**: Stripe Identity is gone (not offered to Singapore businesses). **Singpass Myinfo** is the main route (`00035`, `singpass-start`, `singpass-callback`, `/verify-identity/singpass`): name, date of birth and mobile, never NRIC. A Singpass host is **approved on the spot** (`00036`). Upload (ID photo and selfie) is the fallback, reviewed by hand at `/admin/verifications`. The "What would you like to teach?" question was added (`00034`) and then removed from the page; old answers stay in `users.teaching_plan`.
+- **Listing review** (`00036`): every new listing is hidden from guests until approved at `/admin/listings`. The team is emailed on save (`listing-submitted`); approve or ask for one change (`admin-listings`); the host is emailed either way. Hosting shows "In review" and "Changes needed" with the note.
+
+**Rules not to break**
+- **Singpass button**: use Singpass's own artwork in `src/assets/singpass/` (`SingpassButton.jsx`). Don't restyle it, recolour it or retype the label; Singpass's specification forbids it and production approval depends on it.
+- **"Check your details"** (`SingpassReturn.jsx`): name and date of birth stay locked; mobile stays editable and required. Retrieved data is shown as-is and nothing is saved until the host confirms. This is what was submitted to Singpass on 24 October.
+- **No NRIC numbers**, ever (DECISIONS.md, 23 October).
+- **`listings.review_status`**: clients can never write it (trigger `guard_listing_review`). Any new public listing read must also require `approved`, as browse, profiles, keen counts, checkout and link previews do.
+- **`review_note`** is readable by authenticated users only. Never add it to a query an anonymous visitor runs; the whole query fails.
+- `VITE_SINGPASS_ENABLED` decides whether the Singpass button shows: `true` on Preview (staging) only until Singpass approves production.
+
+---
+
+## State on 24 October
+
+**Migrations.** See OPERATIONS.md, Migration state, for what is applied where. Added since 19 October:
+
+| | What it does |
+|---|---|
+| `00032` | `listing_interests` (I'm keen), `listing_keen_counts`, host notices |
+| `00033` | Shared availability across a host's listings |
+| `00034` | `users.teaching_plan` (no longer asked) |
+| `00035` | Singpass Myinfo: `singpass_sub`, `verified_name`, `verified_dob`, `verified_mobile`, `singpass_auth_sessions` |
+| `00036` | Singpass approves on the spot; listing review (`review_status`, `listing_reviews`, `review_listing`) |
+
+Earlier, from the 19 October handover:
 
 | | What it does |
 |---|---|
@@ -64,40 +101,23 @@ Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. Pre launch, zero 
 | `00030` | `booking_money_events` audit log |
 | `00031` | `booking_complaints` (guest Report a problem) |
 
-**Branches.** `main` has everything through PR #129 (19 October sync, including `00027` to `00031` and the dispute, complaint and chargeback functions). `staging` is ahead by #130 (cancellation copy), #131 (hosting dashboard fixes) and #132 (location batch C, including the `lookup-postal-code` function).
+**Singpass production.** The Myinfo app was submitted for approval on 24 October (up to 2 weeks), with the user journey PDF. Production secrets are being set. Once approved: `VITE_SINGPASS_ENABLED=true` for Production in Vercel, redeploy, test on trykai.sg (OPERATIONS.md, Singpass Myinfo).
 
-**Production sync, in progress (Rui Heng).** Before the next merge of `staging` into `main`:
-- `PRODUCTION_SUPABASE_PROJECT_REF` and `SUPABASE_ACCESS_TOKEN` GitHub secrets valid
-- `ONEMAP_EMAIL` and `ONEMAP_PASSWORD` set on production Edge Function secrets (postal lookup fails without them)
+**Open, owned by Caleb.**
+- Production verification-alert database webhook (`notify-verification-pending`), for upload hosts.
+- Email confirmation dashboard steps on production, if not done.
+- Phone numbers for upload hosts and guests (KIV).
+- Edits to an approved listing are not re-reviewed (KIV).
 
-After the merge:
-- Live Stripe "Connected accounts" webhook destination (`account.updated`) plus `STRIPE_CONNECT_WEBHOOK_SECRET` on production
-- One real card booking and refund on production
-- Production cron `pg_net` timeout raised to about 30 seconds
-
-**Plan agreed at the 18 October scrum.** Everything to production now. Production end to end testing (without real checkout) and mobile testing over the next days. Warm host onboarding from 21 October.
-
-**Production is on Supabase Pro from 19 October** (about US$25 a month: daily backups, no inactivity pause). Staging is in its own free organisation. No production SQL until the first daily backup appears. Production sits in Mumbai by accident; moving it to Singapore is post-launch (DECISIONS.md, BUILD_BACKLOG.md P3). All TryKai money now goes through Aspire (BUSINESS.md, How money moves).
+**Production is on Supabase Pro** (daily backups, no inactivity pause). Production sits in Mumbai by accident; moving it to Singapore is post-launch. All TryKai money goes through Aspire.
 
 ---
 
-## Shipped 17 to 19 October (details in DECISIONS.md)
+## Next work
 
-- **Launch polish.** Back row, overflow report menus, hamburger account items, single password toggle, empty session copy, host bio "more", scroll to top, shorter hero, homepage chip "Most sessions S$15 to 30", 404 page.
-- **Sessions.** Recurring bulk create (calendar multi select, quick fill, multiple times, host-wide clash preview, max 40 a batch, 80 day window). Open sessions editable through a locked RPC. Capacity lives on the listing ("Spots per session"). PayNow blocked more than 80 days ahead.
-- **Create and edit listing.** Friendly validation, drag to reorder photos, crop every photo, one 4:3 cover ratio, client side compression, simplified price panel, custom "What's provided" chips.
-- **Location.** URA subzone aliases, uninhabited areas hidden, OneMap postal code lookup, shared select chevron.
-- **Security.** PII lockdown, grant tightening, storage lockdown (`00023` to `00026`).
-- **Trust and money.** Suspended hosts hidden (`00027`). Admin dispute tooling: payout hold, partial refund (`00029`). Audit log, admin JWT auth with break glass secret (`00030`). Guest Report a problem within 3 days, which holds the payout (`00031`). Chargebacks hold the payout; Dashboard refunds recorded. Host payout 72 hours after the session ends. Quality complaint window cut from 7 days to 3.
-
----
-
-## Next work (Claude builds, one PR each, in this order)
-
-1. **Docs consolidation.** This handover and the other repo docs brought up to date; HOST_ONBOARDING.md replaced with the 19 October version; docs synced back to the Project.
-2. **Link previews and Share fallback.** Server side Open Graph and Twitter tags for `/listings/:id` (cover photo, title, "S$X per person · Area"; public columns only, anon key) via Vercel middleware or a function, plus a default homepage preview. The existing Share button falls back to clipboard and "Link copied" when `navigator.share` is missing or throws (except `AbortError`). It showed "Could not share this link" in desktop Chrome device mode; check on a real phone.
-3. **Email receipt.** Branded, mobile friendly shared template in `_shared/email.ts`: logo, colours, receipt block with price breakdown, booking details, policy link. Table based, inline styles. Test with real staging emails to Gmail and iOS Mail.
-4. **Host nudge (no sessions).** Banner on the Hosting tab for active listings with no upcoming sessions. Weekly email to those hosts from a scheduled job (like `release-payout`), with a small migration recording the last nudge so nobody is spammed.
+1. **First host's feedback**: UI and UX changes Caleb has collected (23 October onboarding).
+2. Production Singpass switch-on after approval.
+3. BUILD_BACKLOG.md for everything else.
 
 ---
 
