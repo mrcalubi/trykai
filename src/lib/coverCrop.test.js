@@ -11,6 +11,7 @@ import {
   photoHasOriginal,
   photoIsCropped,
   rememberOriginal,
+  resetCroppedPhoto,
   revokeIfBlobUrl,
   revokePhotoUrls,
 } from './coverCrop'
@@ -124,5 +125,25 @@ describe('coverCrop', () => {
     expect(revoke).toHaveBeenCalledWith('blob:preview')
     expect(revoke).toHaveBeenCalledWith('blob:original')
     expect(revoke).not.toHaveBeenCalledWith('https://cdn.test/a.jpg')
+  })
+
+  it('restores a cropped photo to its original file and url', () => {
+    const file = new File(['a'], 'a.png', { type: 'image/png' })
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const cropped = {
+      id: 'a',
+      file: new File(['c'], 'cover.jpg', { type: 'image/jpeg' }),
+      previewUrl: 'blob:cropped',
+      originalFile: file,
+      originalUrl: 'blob:a',
+      cropState: { zoom: 2 },
+    }
+    expect(resetCroppedPhoto(cropped)).toEqual({
+      ...cropped,
+      file,
+      previewUrl: 'blob:a',
+      cropState: null,
+    })
+    expect(revoke).toHaveBeenCalledWith('blob:cropped')
   })
 })

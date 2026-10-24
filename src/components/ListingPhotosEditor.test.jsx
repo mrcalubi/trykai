@@ -158,6 +158,31 @@ describe('ListingPhotosEditor', () => {
     ])
   })
 
+  it('lets a cropped photo that is no longer the cover undo the crop', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const cropped = {
+      ...photos[0],
+      file: new File(['crop'], 'cover.jpg', { type: 'image/jpeg' }),
+      previewUrl: 'blob:cropped',
+      cropState: { crop: { x: 8, y: 2 }, zoom: 1.4 },
+    }
+    render(<ListingPhotosEditor photos={[photos[1], cropped]} onChange={onChange} />)
+
+    await user.click(screen.getByRole('button', { name: 'Photo 2' }))
+    expect(screen.queryByRole('menuitem', { name: 'Crop' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('menuitem', { name: 'Undo crop' }))
+    expect(onChange).toHaveBeenCalledWith([
+      photos[1],
+      {
+        ...cropped,
+        file: originalFile,
+        previewUrl: 'blob:a',
+        cropState: null,
+      },
+    ])
+  })
+
   it('does not show Reset for a saved listing photo', async () => {
     const user = userEvent.setup()
     render(
@@ -314,11 +339,4 @@ describe('ListingPhotosEditor', () => {
     expect(screen.getByLabelText('Photos')).toBeDisabled()
   })
 
-  it('revokes object urls created for photos when the editor unmounts', () => {
-    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
-    const { unmount } = render(<ListingPhotosEditor photos={photos} onChange={vi.fn()} />)
-    unmount()
-    expect(revoke).toHaveBeenCalledWith('blob:a')
-    revoke.mockRestore()
-  })
 })

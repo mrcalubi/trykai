@@ -8,6 +8,7 @@ import PostalAddressFields from '../components/PostalAddressFields'
 import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
+import { revokePhotoUrls } from '../lib/coverCrop'
 import { uploadListingPhotos } from '../lib/listingPhotos'
 import ListingPricePanel from '../components/ListingPricePanel'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
@@ -127,7 +128,7 @@ export default function CreateListing() {
 
   useEffect(() => {
     return () => {
-      photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.previewUrl))
+      photosRef.current.forEach(revokePhotoUrls)
     }
   }, [])
 
@@ -310,6 +311,7 @@ export default function CreateListing() {
     }
 
     clearDraft(userId)
+    photosRef.current.forEach(revokePhotoUrls)
     void notifyListingSubmitted()
     navigate('/hosting', { replace: true })
   }

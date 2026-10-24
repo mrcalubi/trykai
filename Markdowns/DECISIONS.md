@@ -54,7 +54,7 @@ Stage 2: "This weekend" filter, price range slider.
 Stage 3: personalisation from booking history.
 
 ### Listing media
-Up to 5 photos per listing. Stored in the public `listing-photos` bucket under `{auth.uid()}/`. Public object URLs work without a SELECT policy; `00026` removes the broad client SELECT that let anyone list every host folder. The client only `upload`s and `getPublicUrl`s — no `list()` or `download()`. Avatars use the same bucket. Compressed on the main thread to a 1600px long edge, JPEG 0.82; any compress failure uploads the original. Cover is a top-left badge; reorder and crop sit in a strip along the bottom of the thumb. Video is KIV, too complex for MVP. Interim: hosts can add an Instagram or TikTok link for social proof, requiring no engineering.
+Up to 5 photos per listing. Stored in the public `listing-photos` bucket under `{auth.uid()}/`. Public object URLs work without a SELECT policy; `00026` removes the broad client SELECT that let anyone list every host folder. The client only `upload`s and `getPublicUrl`s — no `list()` or `download()`. Avatars use the same bucket. Compressed on the main thread to a 1600px long edge, JPEG 0.82; any compress failure uploads the original. Cover is a top-left badge. Reorder is drag; tap a tile for Crop on the cover, Make cover or Undo crop on later photos, and Remove. Only the cover is cropped (4:3). Video is KIV, too complex for MVP. Interim: hosts can add an Instagram or TikTok link for social proof, requiring no engineering.
 
 ### Host notifications
 1. Email, built, triggered on booking confirmation
@@ -601,6 +601,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-10-24 — Cursor builds most code again; Claude reviews, writes docs and handles Singpass.** Cursor is back after being down from 19 to 24 October, when Claude built everything. HANDOVER.md has the catch-up and the rules not to break. Same workflow either way: branch from `staging`, `npm run verify`, PR into `staging`, Caleb merges.
 
 **2026-10-24 — Singpass production Myinfo app submitted for approval** with the user journey PDF (Singpass's template: entry point with the official button and the upload alternative, login, scopes, "Check your details" with name and date of birth locked and mobile editable, error handling with the upload route). Approval takes up to 2 weeks; the button stays off on production (`VITE_SINGPASS_ENABLED`) until then.
+
+**2026-10-24 — Only the cover is cropped.** Listing cards, the phone gallery, and a lone desktop photo all show the cover at 4:3, so that is the only crop. Other photos are shown in full in the viewer and centre-filled in tiles, so they do not need cropping. Moving a cropped cover out of first place keeps the crop; Undo crop restores the original. Every crop starts from the original file or object URL, not the last crop, and can be reset in this session. Already-saved Edit listing photos have no original, so they crop from the saved image and cannot be reset. The create/edit page owns those blob URLs and revokes them on unmount and after a successful save; the editor cannot, because Create listing unmounts it between wizard steps. Supersedes the 18 October "crop every photo" and Free-aspect wording.
 
 ---
 

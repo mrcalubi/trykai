@@ -27,6 +27,7 @@ import {
   loadImage,
   photoIsCropped,
   rememberOriginal,
+  resetCroppedPhoto,
   revokeIfBlobUrl,
   revokePhotoUrls,
 } from '../lib/coverCrop'
@@ -52,6 +53,7 @@ function PhotoTile({
   onCloseMenu,
   onCrop,
   onMakeCover,
+  onUndoCrop,
   onRemove,
 }) {
   const {
@@ -129,6 +131,11 @@ function PhotoTile({
                 Make cover
               </button>
             ) : null}
+            {!isCover && onUndoCrop ? (
+              <button type="button" role="menuitem" onClick={onUndoCrop}>
+                Undo crop
+              </button>
+            ) : null}
             <button type="button" role="menuitem" onClick={onRemove}>
               Remove
             </button>
@@ -149,7 +156,6 @@ export default function ListingPhotosEditor({
   const localInputRef = useRef(null)
   const inputRef = pickerRef ?? localInputRef
   const rootRef = useRef(null)
-  const photosRef = useRef(photos)
   const dragDepth = useRef(0)
   const [cropping, setCropping] = useState(null)
   const [crop, setCrop] = useState({ x: 0, y: 0 })
@@ -160,10 +166,6 @@ export default function ListingPhotosEditor({
   const [activeId, setActiveId] = useState(null)
   const [dragOver, setDragOver] = useState(false)
   const [dropHint, setDropHint] = useState(null)
-
-  useEffect(() => {
-    photosRef.current = photos
-  }, [photos])
 
   const atCap = photos.length >= max
   const activePhoto = photos.find((photo) => photo.id === activeId)
@@ -197,12 +199,6 @@ export default function ListingPhotosEditor({
       document.removeEventListener('keydown', onKey)
     }
   }, [menuId])
-
-  useEffect(() => {
-    return () => {
-      photosRef.current.forEach(revokePhotoUrls)
-    }
-  }, [])
 
   async function addImageFiles(fileList) {
     const remaining = max - photos.length
@@ -312,20 +308,18 @@ export default function ListingPhotosEditor({
 
   function resetCrop() {
     if (!croppingPhoto || !photoIsCropped(croppingPhoto)) return
-    if (croppingPhoto.previewUrl !== croppingPhoto.originalUrl) {
-      revokeIfBlobUrl(croppingPhoto.previewUrl)
-    }
-    const reset = {
-      ...croppingPhoto,
-      file: croppingPhoto.originalFile,
-      previewUrl: croppingPhoto.originalUrl,
-      cropState: null,
-    }
+    const reset = resetCroppedPhoto(croppingPhoto)
     onChange(photos.map((photo) => (photo.id === reset.id ? reset : photo)))
     setCrop({ x: 0, y: 0 })
     setZoom(1)
     setCroppedArea(null)
     setCropping(reset)
+  }
+
+  function undoCrop(photo) {
+    setMenuId(null)
+    if (!photoIsCropped(photo)) return
+    onChange(photos.map((item) => (item.id === photo.id ? resetCroppedPhoto(item) : item)))
   }
 
   function handleDragEnd({ active, over }) {
@@ -409,6 +403,7 @@ export default function ListingPhotosEditor({
                       setMenuId(null)
                       onChange(movePhoto(photos, index, 0))
                     }}
+                    onUndoCrop={photoIsCropped(photo) ? () => undoCrop(photo) : undefined}
                     onRemove={() => removeAt(index)}
                   />
                 ))}

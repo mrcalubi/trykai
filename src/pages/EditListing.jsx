@@ -7,6 +7,7 @@ import PostalAddressFields from '../components/PostalAddressFields'
 import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
+import { revokePhotoUrls } from '../lib/coverCrop'
 import { photosFromUrls, uploadListingPhotos } from '../lib/listingPhotos'
 import ListingPricePanel from '../components/ListingPricePanel'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
@@ -129,11 +130,7 @@ export default function EditListing() {
 
   useEffect(() => {
     return () => {
-      photosRef.current.forEach((photo) => {
-        if (photo.file && photo.previewUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(photo.previewUrl)
-        }
-      })
+      photosRef.current.forEach(revokePhotoUrls)
     }
   }, [])
 
@@ -226,6 +223,7 @@ export default function EditListing() {
     }
 
     // Only does anything when this edit put the listing back in the queue.
+    photosRef.current.forEach(revokePhotoUrls)
     void notifyListingSubmitted()
     navigate('/hosting', {
       replace: true,

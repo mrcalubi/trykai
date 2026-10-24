@@ -62,3 +62,14 @@ export function revokePhotoUrls(photo) {
     revokeIfBlobUrl(photo.originalUrl)
   }
 }
+
+export function resetCroppedPhoto(photo) {
+  if (!photoIsCropped(photo)) return photo
+  if (photo.previewUrl !== photo.originalUrl) revokeIfBlobUrl(photo.previewUrl)
+  return {
+    ...photo,
+    file: photo.originalFile,
+    previewUrl: photo.originalUrl,
+    cropState: null,
+  }
+}
