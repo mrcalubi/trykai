@@ -508,6 +508,12 @@ verify_jwt = false
 import_map = "./functions/notify-interested/deno.json"
 entrypoint = "./functions/notify-interested/index.ts"
 
+[functions.send-reminders]
+enabled = true
+verify_jwt = false
+import_map = "./functions/send-reminders/deno.json"
+entrypoint = "./functions/send-reminders/index.ts"
+
 [functions.admin-cancel-booking]
 enabled = true
 verify_jwt = false

@@ -37,7 +37,7 @@ Week 13 of the original plan. Read this snapshot first. HANDOVER.md has the full
 
 **Branches.** `main` has everything through PR #129. `staging` is ahead by #130, #131 and #132 (location batch C, including the `lookup-postal-code` Edge Function).
 
-**Edge Functions in the tree:** `abandon-checkout`, `admin-cancel-booking`, `admin-dispute-booking`, `admin-verifications`, `cancel-booking`, `create-account-link`, `create-connect-account`, `create-identity-session`, `create-payment-intent`, `lookup-postal-code`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`, `report-booking-problem`, `stripe-webhook`.
+**Edge Functions in the tree:** `abandon-checkout`, `admin-cancel-booking`, `admin-dispute-booking`, `admin-verifications`, `cancel-booking`, `create-account-link`, `create-connect-account`, `create-identity-session`, `create-payment-intent`, `lookup-postal-code`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`, `report-booking-problem`, `send-reminders`, `stripe-webhook`.
 
 **This week (agreed at the 18 October scrum):**
 - Production sync (Rui Heng): see Production sync, October 2026 below
@@ -806,6 +806,129 @@ Also open **Edge Functions → release-payout → Logs** and look for a line sta
 | `failed` + insufficient available funds | Platform available balance is too low (automatic payouts already sent it to the bank). Two Transfers can succeed and the rest fail in the same run. In **test mode**, Stripe's own message is the fix: create a charge with card `4000000000000077` (any future expiry and CVC) so funds land in the available balance, then run the same command again. Bookings already in `released` are not paid twice. |
 
 GitHub secrets `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAYOUT_CRON_SECRET` (and `PRODUCTION_*`) are optional on staging because of the database cron. They are needed for production once `.github/workflows/release-payout.yml` is on `main`. GitHub **schedule** only runs from `main`. **Actions → Release host payouts → Run workflow** works after that.
+
+---
+
+# Session reminders (`send-reminders`)
+
+Guests and hosts get one email when an open session starts in 2–24 hours. The function claims `bookings.guest_reminder_sent_at` / `sessions.host_reminder_sent_at` first, so a second run sends nothing. A booking created less than 6 hours ago is skipped so the reminder does not stack on the confirmation. Each run caps at 200 emails.
+
+Merging the GitHub PR deploys the function (CI on push to `staging`). **Apply `00037` on the project before you merge**, or the first hourly call will query columns that are not there yet. Do the same later on production, with production URLs and keys, before that deploy.
+
+**Project:** trykai-staging, ref `hzgybclfvpuxkmytdoos`  
+**Dashboard:** https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos
+
+Write one password-manager note called `REMINDERS_CRON_SECRET (staging)` and reuse that exact string in the Edge Function secret and in Vault. Generate it with `openssl rand -hex 32` in Terminal. Do not commit it.
+
+## 1. Apply migration `00037` before merging
+
+1. Open https://github.com/mrcalubi/trykai/blob/feat/session-reminders/supabase/migrations/00037_session_reminders.sql (or the file on the PR) and copy the whole file.
+2. Open the SQL editor: https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/sql/new
+3. Paste, click **Run**. Success is enough. Notices about `pg_cron not available` mean the Database → Extensions page needs `pg_cron` and `pg_net` enabled; enable both, then run the file again. Safe to run twice.
+
+**Confirm the cron row** (new query in the same SQL editor):
+
+```sql
+select jobid, jobname, schedule, command from cron.job
+where jobname = 'invoke-send-reminders-hourly';
+```
+
+You want one row, schedule `17 * * * *` (minute 17 every hour, UTC). That is five minutes after `invoke-release-payout-hourly` so the two jobs do not start together.
+
+## 2. Deploy `send-reminders` and set `REMINDERS_CRON_SECRET`
+
+The function checks header `x-cron-secret` against the Edge Function secret `REMINDERS_CRON_SECRET` (or fallback `CRON_SECRET`). Setting the secret is instant; the new code only exists after you deploy (or after CI deploys on merge to `staging`).
+
+**Secret (Dashboard, no CLI):**
+
+1. Open https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/functions/secrets
+2. If the left nav says **Edge Functions**, click **Secrets**.
+3. Add key `REMINDERS_CRON_SECRET` and paste the string from your password note. Save.
+
+A push to `staging` or `main` deploys every function through `.github/workflows/ci.yml`. The commands below are the manual path for one function.
+
+```bash
+supabase login
+supabase link --project-ref hzgybclfvpuxkmytdoos
+supabase functions deploy send-reminders --project-ref hzgybclfvpuxkmytdoos
+```
+
+Confirm at https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/functions that `send-reminders` shows a fresh deploy time.
+
+Optional CLI equivalent for the secret: `supabase secrets set REMINDERS_CRON_SECRET='paste-the-same-string' --project-ref hzgybclfvpuxkmytdoos`
+
+## 3. The three Vault secrets
+
+Vault holds the URL, anon key, and cron secret because those differ per project and must not live in git. The database cron **cannot** read Edge Function secrets; that is why Vault is a second copy.
+
+**Copy the anon public key**
+
+1. Open https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos/settings/api
+2. Copy the **anon** / **public** key (sometimes labelled publishable). Not the `service_role` key.
+
+**Create the Vault secrets** (skip any name that already exists):
+
+```sql
+select name from vault.decrypted_secrets
+where name in ('send_reminders_url', 'send_reminders_anon_key', 'reminders_cron_secret');
+
+select vault.create_secret(
+  'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/send-reminders',
+  'send_reminders_url',
+  'Hourly session reminder job'
+);
+select vault.create_secret(
+  'PASTE_ANON_PUBLIC_KEY',
+  'send_reminders_anon_key',
+  'Gateway JWT; the function still checks x-cron-secret'
+);
+select vault.create_secret(
+  'PASTE_SAME_VALUE_AS_REMINDERS_CRON_SECRET',
+  'reminders_cron_secret',
+  'x-cron-secret for send-reminders'
+);
+```
+
+`reminders_cron_secret` in Vault must match `REMINDERS_CRON_SECRET` on the function. If a name already exists and the value is wrong, update it with `vault.update_secret(id, 'new value')` using the `id` from `vault.decrypted_secrets`. You can also add named secrets under **Integrations → Vault** in the Dashboard.
+
+Production uses that project's URL and keys, not the staging ref above.
+
+## 4. Run it once now (do not wait until minute 17)
+
+Replace the two placeholders with the **anon public key** and the **same cron secret**.
+
+```bash
+curl -fsS -X POST 'https://hzgybclfvpuxkmytdoos.supabase.co/functions/v1/send-reminders' \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer PASTE_ANON_PUBLIC_KEY" \
+  -H "apikey: PASTE_ANON_PUBLIC_KEY" \
+  -H "x-cron-secret: PASTE_REMINDERS_CRON_SECRET" \
+  -d '{}'
+```
+
+**What you should see**
+
+- `401 Unauthorized`: the `x-cron-secret` does not match `REMINDERS_CRON_SECRET`, or you used the wrong project.
+- JSON with `guests_scanned`, `guests_sent`, `hosts_scanned`, `hosts_sent`, `skipped`, `failed`: the function ran. That is success even if both `*_sent` values are `0`.
+- A second curl in the same minute should send nothing: the claim timestamps are already set.
+
+Also open **Edge Functions → send-reminders → Logs** and look for a line starting `send-reminders`.
+
+**Check the cron is still scheduled** (any time later):
+
+```sql
+select jobid, jobname, schedule, command from cron.job
+where jobname = 'invoke-send-reminders-hourly';
+```
+
+To see recent runs: **Database → Extensions** has `pg_cron` enabled, then:
+
+```sql
+select * from cron.job_run_details
+where jobid = (select jobid from cron.job where jobname = 'invoke-send-reminders-hourly')
+order by start_time desc
+limit 10;
+```
 
 ---
 
