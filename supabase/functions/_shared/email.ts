@@ -88,6 +88,15 @@ export function formatSessionDay(iso: string): string {
   })
 }
 
+export function formatSessionTime(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString('en-SG', {
+    timeStyle: 'short',
+    timeZone: 'Asia/Singapore',
+  })
+}
+
 export function bookingConfirmedGuestSubject(listingTitle: string, startsAt: string): string {
   const day = formatSessionDay(startsAt)
   return day ? `You're in! ${listingTitle} on ${day}` : `You're in! ${listingTitle}`
@@ -508,6 +517,88 @@ export function bookingConfirmedHostHtml(options: {
     ${emailSignOff('see-you')}
     `,
     siteUrl,
+  )
+}
+
+export function guestSessionReminderSubject(listingTitle: string, startsAt: string): string {
+  const time = formatSessionTime(startsAt)
+  return time ? `Tomorrow: ${listingTitle}, ${time}` : `Tomorrow: ${listingTitle}`
+}
+
+export function guestSessionReminderHtml(options: {
+  guestName?: string | null
+  listingTitle: string
+  sessionDate: string
+  duration?: string
+  fullAddress?: string
+  whatsProvided?: string[] | null
+  hostName: string
+  bookingId: string
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const provided = whatsProvidedCopy(options.whatsProvided)
+  const duration = options.duration ? escapeHtml(options.duration) : ''
+  const address = options.fullAddress ? escapeHtml(options.fullAddress) : ''
+  const hostName = escapeHtml(options.hostName || 'your host')
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
+    <p style="margin:0 0 16px;">Your session is coming up! Hope you're excited.</p>
+    ${emailHeading(options.listingTitle)}
+    ${detailRows([
+      ['Day and time', escapeHtml(options.sessionDate)],
+      ['Duration', duration],
+      ['Address', address],
+      ["What's provided", provided ? escapeHtml(provided) : ''],
+      ['Host', hostName],
+    ])}
+    ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
+    <p style="margin:0 0 8px;">Need to change plans? You can do that on your booking page.</p>
+    ${emailSignOff('see-you')}
+    `,
+    siteUrl,
+    `Tomorrow: ${options.listingTitle}, ${options.sessionDate}`,
+  )
+}
+
+export function hostSessionReminderSubject(listingTitle: string, totalGuests: number): string {
+  const n = Math.max(0, Number(totalGuests) || 0)
+  return `Tomorrow: ${n} ${n === 1 ? 'person' : 'people'} coming to ${listingTitle}`
+}
+
+export function hostSessionReminderHtml(options: {
+  hostName?: string | null
+  listingTitle: string
+  sessionDate: string
+  guests: Array<{ name: string; guestsCount: number }>
+  totalGuests: number
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const who = (options.guests ?? [])
+    .map((guest) => {
+      const name = escapeHtml(guest.name || 'A guest')
+      return `${name} · ${escapeHtml(guestCountLabel(guest.guestsCount))}`
+    })
+    .join('<br>')
+  const total = Math.max(0, Number(options.totalGuests) || 0)
+  const totalLabel = `${total} ${total === 1 ? 'person' : 'people'}`
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    ${emailHeading(options.listingTitle)}
+    ${detailRows([
+      ["Who's coming", who],
+      ['Total', escapeHtml(totalLabel)],
+      ['Day and time', escapeHtml(options.sessionDate)],
+    ])}
+    ${primaryButton(`${siteUrl}/hosting`, 'View hosting')}
+    <p style="margin:0 0 8px;">Hope it goes brilliantly.</p>
+    ${emailSignOff('see-you')}
+    `,
+    siteUrl,
+    `Tomorrow: ${totalLabel} coming to ${options.listingTitle}`,
   )
 }
 

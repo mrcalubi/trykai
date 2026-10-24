@@ -606,6 +606,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-24 — Three loading patterns, not one.** Short actions use `Button loading` (spinner beside a `loadingLabel`, width held). Page fetches use `PageLoader` (spinner after 400ms so fast loads do not flash). Long waits that leave the guest staring at a button — checkout (including PayNow), Stripe payout setup, Singpass start/return, create-listing publish — use `WaitingState` with timed copy at 0 / 4s / 12s. The official Singpass button is never given a spinner; the wait sits under it. Home browse stays on skeleton cards.
 
+**2026-10-24 — Session reminders the day before, claimed then sent.** Guests were only emailed at confirmation, so a booking made a week out went quiet until the session. `send-reminders` (`00037`) runs hourly (minute 17 UTC, same Vault + pg_cron pattern as `release-payout`) and emails confirmed guests and the host when an open session starts in 2–24 hours. A booking created less than 6 hours ago is skipped so the reminder does not land on top of the confirmation. Each row is claimed (`guest_reminder_sent_at` / `host_reminder_sent_at`, no client grants) before Resend is called, so two overlapping runs cannot double-send. The host gets one email per session listing first names, group sizes, and the total. Cap 200 emails per run. Apply `00037` and the three Vault secrets (`send_reminders_url`, `send_reminders_anon_key`, `reminders_cron_secret`) before merging; click-by-click in OPERATIONS.md.
+
 ---
 
 # Analysed but not decided

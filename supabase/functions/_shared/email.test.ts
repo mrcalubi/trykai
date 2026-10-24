@@ -20,7 +20,12 @@ import {
   formatPaymentMethod,
   formatSessionDate,
   formatSessionDay,
+  formatSessionTime,
+  guestSessionReminderHtml,
+  guestSessionReminderSubject,
   googleCalendarUrl,
+  hostSessionReminderHtml,
+  hostSessionReminderSubject,
   guestCountLabel,
   hostPayoutLine,
   hostRefundedGuestsLine,
@@ -1440,5 +1445,103 @@ describe('listing review emails', () => {
     expect(html).toContain('Add a &lt;photo&gt;')
     expect(html).toContain('https://trykai.sg/edit-listing/listing-1')
     expect(listingChangesSubject('Latte')).toBe('One thing to fix on Latte')
+  })
+})
+
+describe('session reminder emails', () => {
+  it('writes the guest subject with Singapore time', () => {
+    expect(guestSessionReminderSubject('Latte art', SESSION_STARTS)).toBe(
+      `Tomorrow: Latte art, ${formatSessionTime(SESSION_STARTS)}`,
+    )
+    expect(formatSessionTime(SESSION_STARTS)).toMatch(/7:00/i)
+    expect(guestSessionReminderSubject('Latte art', 'not-a-date')).toBe('Tomorrow: Latte art')
+  })
+
+  it('opens the guest reminder with the coming-up line and booking details', () => {
+    const html = guestSessionReminderHtml({
+      guestName: 'Sam',
+      listingTitle: 'Latte art',
+      sessionDate: formatSessionDate(SESSION_STARTS),
+      duration: formatDuration(90),
+      fullAddress: '12 Club Street, Singapore 069410',
+      whatsProvided: ['Apron', 'Coffee beans'],
+      hostName: 'Mei Ling',
+      bookingId: 'booking-1',
+      siteUrl: 'https://trykai.sg',
+    })
+    expect(html).toContain('Hi Sam,')
+    expect(html).toContain("Your session is coming up! Hope you're excited.")
+    expect(hasDetail(html, 'Day and time', formatSessionDate(SESSION_STARTS))).toBe(true)
+    expect(hasDetail(html, 'Duration', '1 hr 30 min')).toBe(true)
+    expect(hasDetail(html, 'Address', '12 Club Street, Singapore 069410')).toBe(true)
+    expect(hasDetail(html, "What&#39;s provided", 'Apron, Coffee beans')).toBe(true)
+    expect(hasDetail(html, 'Host', 'Mei Ling')).toBe(true)
+    expect(html).toContain('href="https://trykai.sg/bookings/booking-1"')
+    expect(html).toContain('View booking')
+    expect(html).toContain('Need to change plans? You can do that on your booking page.')
+    expect(html).toContain('See you there,')
+    expect(html).toContain(`src="${EMAIL_LOGO_URL}"`)
+  })
+
+  it('escapes titles and names in the guest reminder', () => {
+    const html = guestSessionReminderHtml({
+      guestName: '<b>Sam</b>',
+      listingTitle: '<script>alert(1)</script>',
+      sessionDate: '28 Aug 2026, 7:00 pm',
+      hostName: '<img src=x>',
+      bookingId: 'booking-1',
+    })
+    expect(html).not.toContain('<script>alert(1)</script>')
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+    expect(html).toContain('Hi &lt;b&gt;Sam&lt;/b&gt;,')
+    expect(html).not.toContain('<img src=x>')
+    expect(html).toContain('&lt;img src=x&gt;')
+  })
+
+  it('uses person or people in the host subject', () => {
+    expect(hostSessionReminderSubject('Latte art', 1)).toBe(
+      'Tomorrow: 1 person coming to Latte art',
+    )
+    expect(hostSessionReminderSubject('Latte art', 3)).toBe(
+      'Tomorrow: 3 people coming to Latte art',
+    )
+  })
+
+  it('lists guests and group sizes on the host reminder', () => {
+    const html = hostSessionReminderHtml({
+      hostName: 'Mei',
+      listingTitle: 'Latte art',
+      sessionDate: formatSessionDate(SESSION_STARTS),
+      guests: [
+        { name: 'Sam', guestsCount: 2 },
+        { name: 'Alex', guestsCount: 1 },
+      ],
+      totalGuests: 3,
+      siteUrl: 'https://trykai.sg',
+    })
+    expect(html).toContain('Hi Mei,')
+    expect(html).toContain('Sam · 2 guests')
+    expect(html).toContain('Alex · 1 guest')
+    expect(hasDetail(html, 'Total', '3 people')).toBe(true)
+    expect(hasDetail(html, 'Day and time', formatSessionDate(SESSION_STARTS))).toBe(true)
+    expect(html).toContain('href="https://trykai.sg/hosting"')
+    expect(html).toContain('View hosting')
+    expect(html).toContain('Hope it goes brilliantly.')
+    expect(html).toContain('See you there,')
+  })
+
+  it('escapes titles and names in the host reminder', () => {
+    const html = hostSessionReminderHtml({
+      hostName: '<b>Mei</b>',
+      listingTitle: '<script>x</script>',
+      sessionDate: '28 Aug 2026, 7:00 pm',
+      guests: [{ name: '<img src=x>', guestsCount: 1 }],
+      totalGuests: 1,
+    })
+    expect(html).not.toContain('<script>x</script>')
+    expect(html).toContain('&lt;script&gt;x&lt;/script&gt;')
+    expect(html).toContain('Hi &lt;b&gt;Mei&lt;/b&gt;,')
+    expect(html).not.toContain('<img src=x>')
+    expect(html).toContain('&lt;img src=x&gt;')
   })
 })
