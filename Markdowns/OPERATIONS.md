@@ -447,8 +447,8 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00032` (I'm keen) | Applied | Applied | 21 October, run before the #142 sync. Re-check with the query in the sync steps if in doubt |
 | `00033` (shared availability) | Applied | Applied | 21 October, same sitting |
 | `00034` (teaching plan) | Applied | Applied | 23 October, before #145. |
-| `00035` (Singpass) | Applied | Not yet | Staging 23 October, before #146. **Production: run before the next sync to `main`**: `admin-verifications` selects `verified_name` and `verification_method`. Safe with Singpass switched off |
-| `00036` (Singpass auto-approve, listing review) | Not yet | Not yet | **Run before the PR's code reaches that environment**: Hosting, listing pages, I'm keen and checkout read `listings.review_status`. Run after `00035`. Existing listings stay live (they are marked approved) |
+| `00035` (Singpass) | Applied | Applied | Staging 23 October, before #146; production 23 October, before #149 |
+| `00036` (Singpass auto-approve, listing review) | Applied | Applied | **Run before the PR's code reaches that environment**: Hosting, listing pages, I'm keen and checkout read `listings.review_status`. Run after `00035`. Existing listings stay live (they are marked approved) |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
@@ -531,7 +531,7 @@ Hosts can confirm who they are with Singpass instead of uploading an ID (DECISIO
 
    Then close the keys page.
 5. **Show the button on staging.** Vercel, Settings, Environment Variables: `VITE_SINGPASS_ENABLED` = `true`, for **Preview** only (staging). Redeploy staging.
-6. **Test** with a Myinfo test persona (Singpass portal, Testing; the staging Singpass app from TestFlight). On `/verify-identity`, tap Verify with Singpass, log in, check "Check your details" shows the persona's name, date of birth and mobile, tap Confirm and continue, and land on "You're verified" (with `00036`; before it, "Under review"). Create your listing should open the listing form. Then:
+6. **Test** with a Myinfo test persona (Singpass portal, Testing; the staging Singpass app from TestFlight). On `/verify-identity`, tap Verify with Singpass, log in, check "Check your details" shows the persona's name and date of birth locked and the mobile editable (try a persona with no mobile: the page asks for one), tap Confirm and continue, and land on "You're verified" (with `00036`; before it, "Under review"). Create your listing should open the listing form. Then:
    - the same persona from a second TryKai account should say the Singpass is already linked
    - a persona under 18, if the test set has one, should say hosts must be 18 or older
    - tapping Cancel on "Check your details" should return to the verify page and save nothing
@@ -550,8 +550,8 @@ Rotate keys at least once a year: add the new public key to the app before switc
 
 | Step | Staging | Production |
 |---|---|---|
-| `00035` | Done | Not yet |
-| App created | Done | Not yet |
+| `00035` | Done | Done |
+| App created | Done | Submitted 24 October, awaiting approval |
 | Secrets set | Done | Not yet |
 | Button on (`VITE_SINGPASS_ENABLED`) | Done (Preview, `staging` branch) | Not yet, after approval |
 | Tested | Done 23 October (persona with no mobile) | Not yet |
@@ -587,7 +587,7 @@ where id = '<listing id>';
 
 | Step | Staging | Production |
 |---|---|---|
-| `00036` run | Not yet | Not yet |
+| `00036` run | Done 23 October | Done 23 October |
 | New listing emails the team | Not yet | Not yet |
 | Approve and ask-for-change emails reach the host | Not yet | Not yet |
 

@@ -41,15 +41,17 @@ beforeEach(() => {
 })
 
 describe('SingpassReturn', () => {
-  it('passes the query to singpass-callback once, then shows the details read-only', async () => {
+  it('passes the query to singpass-callback once, then shows name and birth date locked, mobile editable', async () => {
     givenCallback()
     renderAt('?code=abc&state=s1&iss=https%3A%2F%2Fstg-id.singpass.gov.sg%2Ffapi')
 
     expect(await screen.findByRole('heading', { name: 'Check your details' })).toBeInTheDocument()
-    expect(screen.getByText('TAN MEI LING')).toBeInTheDocument()
-    expect(screen.getByText('17 May 1998')).toBeInTheDocument()
-    expect(screen.getByText('+6597399245')).toBeInTheDocument()
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Name (from Singpass)')).toHaveValue('TAN MEI LING')
+    expect(screen.getByLabelText('Name (from Singpass)')).toHaveAttribute('readonly')
+    expect(screen.getByLabelText('Date of birth (from Singpass)')).toHaveValue('17 May 1998')
+    expect(screen.getByLabelText('Date of birth (from Singpass)')).toHaveAttribute('readonly')
+    expect(screen.getByLabelText(/^Mobile number/)).toHaveValue('+6597399245')
+    expect(screen.getByLabelText(/^Mobile number/)).not.toHaveAttribute('readonly')
     const exchange = supabase.functions.invoke.mock.calls.filter(([, options]) => options?.body?.query)
     expect(exchange).toHaveLength(1)
     expect(exchange[0][1].body).toEqual({
@@ -62,8 +64,45 @@ describe('SingpassReturn', () => {
     givenCallback({ exchange: { data: { ok: true, review: { ...REVIEW, mobile: null }, state: 's1' }, error: null } })
     renderAt('?code=abc&state=s1')
 
-    expect(await screen.findByText('None registered with Singpass')).toBeInTheDocument()
-    expect(screen.getByText('Only the TryKai team sees these.')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Singpass has no mobile number for you, so add the best one to reach you.')
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Mobile number/)).toHaveValue('')
+  })
+
+  it('needs a mobile number before confirming, and checks its shape', async () => {
+    givenCallback({ exchange: { data: { ok: true, review: { ...REVIEW, mobile: null }, state: 's1' }, error: null } })
+    const { user } = renderAt('?code=abc&state=s1')
+    await screen.findByRole('heading', { name: 'Check your details' })
+
+    await user.click(screen.getByRole('button', { name: 'Confirm and continue' }))
+    expect(
+      await screen.findByText('Add a mobile number so we can reach you about your sessions.')
+    ).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/^Mobile number/), '1234')
+    await user.click(screen.getByRole('button', { name: 'Confirm and continue' }))
+    expect(await screen.findByText(/Enter a mobile number like 9123 4567/)).toBeInTheDocument()
+    expect(calls('confirm')).toHaveLength(0)
+
+    await user.clear(screen.getByLabelText(/^Mobile number/))
+    await user.type(screen.getByLabelText(/^Mobile number/), '9123 4567')
+    await user.click(screen.getByRole('button', { name: 'Confirm and continue' }))
+    await waitFor(() => expect(calls('confirm')).toHaveLength(1))
+    expect(calls('confirm')[0][1].body).toEqual({ action: 'confirm', state: 's1', mobile: '+6591234567' })
+  })
+
+  it('shows the server\'s mobile error on the field and lets the host fix it', async () => {
+    givenCallback({
+      confirm: { data: { error: 'Enter a mobile number like 9123 4567.', field: 'mobile' }, error: null },
+    })
+    const { user } = renderAt('?code=abc&state=s1')
+    await screen.findByRole('heading', { name: 'Check your details' })
+
+    await user.click(screen.getByRole('button', { name: 'Confirm and continue' }))
+
+    expect(await screen.findByText('Enter a mobile number like 9123 4567.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Check your details' })).toBeInTheDocument()
   })
 
   it('verifies the host only after they confirm, then sends them to create a listing', async () => {
@@ -76,7 +115,7 @@ describe('SingpassReturn', () => {
 
     expect(await screen.findByRole('heading', { name: "You're verified" })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Create your listing' })).toHaveAttribute('href', '/create-listing')
-    expect(calls('confirm')[0][1].body).toEqual({ action: 'confirm', state: 's1' })
+    expect(calls('confirm')[0][1].body).toEqual({ action: 'confirm', state: 's1', mobile: '+6597399245' })
   })
 
   it('still says "under review" if the database has not switched to auto-approval', async () => {
@@ -115,6 +154,10 @@ describe('SingpassReturn', () => {
     expect(await screen.findByRole('heading', { name: "Singpass didn't go through" })).toBeInTheDocument()
     expect(screen.getByText('Hosts on TryKai must be 18 or older.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Try again' })).toHaveAttribute('href', '/verify-identity')
+    expect(screen.getByRole('link', { name: 'Upload your ID instead' })).toHaveAttribute(
+      'href',
+      '/verify-identity?upload=1'
+    )
   })
 
   it('shows the reason when confirming fails', async () => {

@@ -183,7 +183,24 @@ export function isAdult(dob: string, now = new Date()): boolean {
   return age >= MIN_HOST_AGE
 }
 
-/** What the page shows back, read-only, before the host confirms. */
+/**
+ * The mobile number the host confirms. Myinfo's mobile is self-declared, not
+ * government-verified, so Singpass's rules say the host may change it; it is
+ * also how TryKai reaches them on the day, so one is required. Accepts a
+ * Singapore number with or without +65, or any number in E.164.
+ */
+export function normalizeHostMobile(value: unknown):
+  | { ok: true; mobile: string }
+  | { ok: false; error: string } {
+  const raw = typeof value === 'string' ? value.replace(/[\s\-().]/g, '') : ''
+  if (!raw) return { ok: false, error: SINGPASS_ERRORS.mobileMissing }
+  if (/^[3689]\d{7}$/.test(raw)) return { ok: true, mobile: `+65${raw}` }
+  if (/^65[3689]\d{7}$/.test(raw)) return { ok: true, mobile: `+${raw}` }
+  if (/^\+\d{8,15}$/.test(raw)) return { ok: true, mobile: raw }
+  return { ok: false, error: SINGPASS_ERRORS.mobileInvalid }
+}
+
+/** What the page shows back before the host confirms. Name and date of birth are read-only. */
 export function singpassPreview(person: MyinfoPerson) {
   return { name: person.name, dob: person.dob, mobile: person.mobile }
 }
@@ -199,6 +216,8 @@ export const SINGPASS_ERRORS = {
   failed: 'We could not confirm your identity with Singpass. Please try again, or upload your ID instead.',
   underAge: 'Hosts on TryKai must be 18 or older.',
   nothingToConfirm: 'That Singpass check has expired. Please verify again.',
+  mobileMissing: 'Add a mobile number so we can reach you about your sessions.',
+  mobileInvalid: 'Enter a mobile number like 9123 4567, or with a country code like +44 7700 900123.',
 } as const
 
 /** Maps a database error from record_singpass_verification to copy and a status. */
