@@ -396,7 +396,7 @@ describe('ListingPhotosEditor', () => {
     await waitFor(() => expect(onChange).toHaveBeenCalled())
     const cropped = onChange.mock.calls[0][0][2]
     expect(cropped.id).toBe('c')
-    expect(cropped.file.name).toBe('cover.jpg')
+    expect(cropped.file.name).toBe('photo.jpg')
     expect(cropped.originalUrl).toBe('blob:c')
 
     onChange.mockClear()
