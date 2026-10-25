@@ -78,6 +78,7 @@ export default function PostalAddressFields({
     setPostal(next)
     setResults([])
     setStatus('')
+    setUnit('')
     const keepSaved = allowChangeAddress && !picked
     setPicked(null)
     if (!keepSaved && value) onChange('')
@@ -106,20 +107,17 @@ export default function PostalAddressFields({
         </label>
       ) : null}
       {looking ? (
-        <Button type="button" variant="secondary" loading loadingLabel="Looking up">
-          Looking up
-        </Button>
+        <p className="postal-address__looking" role="status">
+          <span className="tk-spinner" aria-hidden="true" />
+          Looking up your address…
+        </p>
       ) : null}
       {status ? (
-        <div className="postal-address__status" role="status">
-          <p className="field-hint">{status}</p>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => lookup(postal.trim(), { force: true })}
-            loading={looking}
-            loadingLabel="Looking up"
-          >
+        <div className="postal-address__status">
+          <p className="field-hint" role="status">
+            {status}
+          </p>
+          <Button type="button" variant="secondary" onClick={() => lookup(postal.trim(), { force: true })}>
             Try again
           </Button>
         </div>
@@ -157,20 +155,22 @@ export default function PostalAddressFields({
           ) : null}
         </div>
       ) : null}
-      <label className="label">
-        Unit number (optional)
-        <input
-          type="text"
-          value={unit}
-          onChange={(event) => {
-            const next = event.target.value
-            setUnit(next)
-            if (picked) onChange(composeFullAddress(picked.address, next))
-          }}
-          placeholder="#05-12"
-          className="input"
-        />
-      </label>
+      {picked ? (
+        <label className="label">
+          Unit number (optional)
+          <input
+            type="text"
+            value={unit}
+            onChange={(event) => {
+              const next = event.target.value
+              setUnit(next)
+              onChange(composeFullAddress(picked.address, next))
+            }}
+            placeholder="#05-12"
+            className="input"
+          />
+        </label>
+      ) : null}
       <label className="label" htmlFor={areaId}>
         Area guests see
         <PlanningAreaSelect

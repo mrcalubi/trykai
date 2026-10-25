@@ -130,8 +130,15 @@ describe('EditListing prefill', () => {
     expect(screen.getByText('12 Coffee Road')).toBeInTheDocument()
     expect(screen.getByText('Hidden from guests until they book.')).toBeInTheDocument()
     expect(screen.queryByLabelText('Postal code')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Unit number (optional)')).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^Full address/)).not.toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Offer group discounts' })).toBeChecked()
+  })
+
+  it('does not show Unit number until the host picks a new address', async () => {
+    await renderLoaded()
+
+    expect(screen.queryByLabelText('Unit number (optional)')).not.toBeInTheDocument()
   })
 
   it('loads the address from listing_address, not the listings row', async () => {
@@ -356,6 +363,30 @@ describe('EditListing saving', () => {
     expect(supabase.__lastCall('listings', 'update').payload).toMatchObject({
       area: 'Tampines',
       full_address: '5 Espresso Lane',
+    })
+  })
+
+  it('saves a newly picked address with a unit', async () => {
+    const { user } = await renderLoaded()
+    supabase.functions.invoke.mockResolvedValue({
+      data: {
+        results: [{ address: '5 ESPRESSO LANE SINGAPORE 520123', postal: '520123' }],
+        planning_area: 'TAMPINES',
+      },
+      error: null,
+    })
+    await user.click(screen.getByRole('button', { name: 'Change address' }))
+    expect(screen.queryByLabelText('Unit number (optional)')).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('Postal code'), '520123')
+    expect(await screen.findByText('5 ESPRESSO LANE SINGAPORE 520123')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Unit number (optional)'), '#05-12')
+    expect(screen.getByText('5 ESPRESSO LANE #05-12 SINGAPORE 520123')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'update').payload).toMatchObject({
+      full_address: '5 ESPRESSO LANE #05-12 SINGAPORE 520123',
     })
   })
 

@@ -60,9 +60,39 @@ describe('PostalAddressFields', () => {
     await user.type(screen.getByLabelText('Postal code'), '123')
 
     expect(screen.queryByRole('button', { name: 'Find addresses' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Unit number (optional)')).not.toBeInTheDocument()
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
     expect(onChange).not.toHaveBeenCalled()
     expect(screen.queryByText('Hidden from guests until they book.')).not.toBeInTheDocument()
+  })
+
+  it('shows a non-interactive lookup status under the postal field', async () => {
+    const user = userEvent.setup()
+    let finishLookup
+    supabase.functions.invoke.mockReturnValue(
+      new Promise((resolve) => {
+        finishLookup = resolve
+      }),
+    )
+    renderFields()
+
+    await user.type(screen.getByLabelText('Postal code'), '470012')
+
+    const looking = await screen.findByRole('status')
+    expect(looking).toHaveTextContent('Looking up your address…')
+    expect(looking.querySelector('.tk-spinner')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Looking up/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+
+    finishLookup({
+      data: {
+        results: [{ address: '12 COFFEE ROAD SINGAPORE 470012', postal: '470012' }],
+        planning_area: 'BEDOK',
+      },
+      error: null,
+    })
+    expect(await screen.findByText('12 COFFEE ROAD SINGAPORE 470012')).toBeInTheDocument()
+    expect(screen.getByLabelText('Unit number (optional)')).toBeInTheDocument()
   })
 
   it('looks up once six digits are entered and shows a confirmed card', async () => {
@@ -145,6 +175,7 @@ describe('PostalAddressFields', () => {
     })
 
     await user.type(screen.getByLabelText('Postal code'), '470012')
+    expect(screen.queryByLabelText('Unit number (optional)')).not.toBeInTheDocument()
     await user.click(screen.getByRole('option', { name: '12 CLAY ROAD SINGAPORE 470012' }))
     await user.type(screen.getByLabelText('Unit number (optional)'), '#05-12')
 
@@ -182,6 +213,7 @@ describe('PostalAddressFields', () => {
 
     expect(screen.getByText('12 Coffee Road')).toBeInTheDocument()
     expect(screen.queryByLabelText('Postal code')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Unit number (optional)')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Change address' }))
     expect(screen.getByText('12 Coffee Road')).toBeInTheDocument()

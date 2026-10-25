@@ -1833,6 +1833,21 @@ input[type='radio'] {
   gap: 8px;
 }
 
+.postal-address__looking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.postal-address__looking .tk-spinner {
+  width: 14px;
+  height: 14px;
+  color: var(--navy);
+}
+
 .postal-address__card {
   display: flex;
   align-items: flex-start;

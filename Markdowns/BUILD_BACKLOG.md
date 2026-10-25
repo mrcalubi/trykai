@@ -228,7 +228,7 @@ In this order after warm-contact launch:
 
 14. **Move production to Singapore.** Production was created in Mumbai (`ap-south-1`) by accident. Supabase cannot move a project: create a new `ap-southeast-1` project and cut over the database and auth users, storage, Edge Function secrets, Vault and cron, Stripe webhook URLs, Vercel env, and `PRODUCTION_SUPABASE_PROJECT_REF`. Rui Heng's call on timing; a quiet week after the first bookings.
 15. **Propose a new time to guests.** Booked sessions cannot be edited. Let a host propose a new time that each guest accepts or declines (cancel with full refund).
-16. **Auto-fill area from postal code.** The OneMap lookup already returns the address; use its planning area to preselect the area.
+16. ~~**Auto-fill area from postal code.**~~ Done 25 October: postal lookup returns OneMap's planning area and fills Area guests see (DECISIONS.md, Postal code drives the listing address and Area).
 17. **Unit number formatted `#XX-XX`.**
 18. **Book a whole session privately.** One guest pays for every spot.
 19. **Per-pair price on the booking card** when group pricing applies.
