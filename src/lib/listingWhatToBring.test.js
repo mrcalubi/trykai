@@ -34,4 +34,13 @@ describe('00038 listing what_to_bring', () => {
     expect(migration).toMatch(/create or replace function public\.guard_listing_review\(\)/)
     expect(migration).toMatch(/drop trigger if exists listings_guard_review on public\.listings/)
   })
+
+  it('grants EXECUTE on the check function so authenticated listing writes succeed', () => {
+    expect(migration).toMatch(
+      /grant execute on function public\.listings_what_to_bring_ok\(text\[\]\)\s+to anon, authenticated, service_role/,
+    )
+    expect(migration).not.toMatch(
+      /revoke\b[\s\S]*listings_what_to_bring_ok[\s\S]*authenticated/,
+    )
+  })
 })

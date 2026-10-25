@@ -37,7 +37,13 @@ as $$
     );
 $$;
 
-revoke all on function public.listings_what_to_bring_ok(text[]) from public, anon, authenticated;
+-- CHECK constraints run as the caller, not the owner. This function must
+-- stay granted: without EXECUTE, every authenticated INSERT or UPDATE on
+-- listings fails with permission denied, even when what_to_bring is
+-- unchanged (create listing, edit listing, spots, review fields). It is
+-- immutable and only checks the array shape.
+grant execute on function public.listings_what_to_bring_ok(text[])
+  to anon, authenticated, service_role;
 
 alter table public.listings drop constraint if exists listings_what_to_bring_items;
 alter table public.listings
