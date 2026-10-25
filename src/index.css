@@ -1621,6 +1621,65 @@ a {
   max-width: 520px;
 }
 
+.confirm-dialog-backdrop--sheet {
+  align-items: stretch;
+  padding: 0;
+}
+
+.confirm-dialog--sheet {
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  max-height: none;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.confirm-dialog__sheet-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 8px 8px 8px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.confirm-dialog__sheet-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.confirm-dialog__sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 20px 32px;
+}
+
+.confirm-dialog__sheet-body h2:first-child {
+  margin-top: 16px;
+}
+
+@media (min-width: 768px) {
+  .confirm-dialog-backdrop--sheet {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .confirm-dialog--sheet {
+    width: min(640px, 100%);
+    height: min(720px, 90vh);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+}
+
 .cover-crop {
   position: relative;
   width: 100%;

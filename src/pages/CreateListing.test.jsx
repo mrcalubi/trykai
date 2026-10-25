@@ -36,12 +36,12 @@ function givenVerification(status, { foundingHost = false, foundingError = null 
 
 // Mounted behind the same guard App.jsx puts it behind, so the page always has
 // a signed-in user. RequireAuth owns the signed-out case and tests it itself.
-function renderPage(route = '/create-listing') {
+function renderPage(route = '/create-listing', extra = {}) {
   return renderWithRouter(
     <RequireAuth>
       <CreateListing />
     </RequireAuth>,
-    { route, path: '/create-listing' }
+    { route, path: '/create-listing', ...extra }
   )
 }
 
@@ -163,6 +163,10 @@ async function goToPrice(user) {
 
 function imageFile(name = 'photo.png') {
   return new File(['binary'], name, { type: 'image/png' })
+}
+
+function selectFiles(files) {
+  fireEvent.change(screen.getByLabelText('Photos'), { target: { files } })
 }
 
 // Node's own experimental localStorage hides jsdom's, so drafts get a plain
@@ -391,13 +395,49 @@ describe('CreateListing validation', () => {
     await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
 
     expect(screen.getByRole('button', { name: 'Create listing' })).toBeDisabled()
-    expect(screen.getByRole('link', { name: 'Host terms' })).toHaveAttribute(
-      'href',
-      '/terms#part-2-hosting',
-    )
+    expect(screen.getByRole('button', { name: 'Host terms' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Host terms' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
     expect(screen.getByRole('button', { name: 'Create listing' })).toBeEnabled()
+  })
+
+  it('opens Host terms in a dialog without losing answers or photos', async () => {
+    const { user, currentPath } = renderPage()
+    await goToPhotos(user)
+    selectFiles([imageFile('latte.png')])
+    await screen.findByText('Maximum of 5 photos (1/5)')
+    const previewSrc = document.querySelector('.ui-card__image').getAttribute('src')
+    await next(user)
+    await stepHeading('Price and group size')
+    await completePrice(user, VALID)
+    await stepHeading('Where it happens')
+    await completeLocation(user, VALID)
+    await stepHeading('Final touches')
+
+    const terms = screen.getByRole('checkbox', { name: /I agree to the Host terms/ })
+    expect(terms).not.toBeChecked()
+
+    await user.click(screen.getByRole('button', { name: 'Host terms' }))
+
+    expect(screen.getByRole('dialog', { name: 'Host terms' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Part 2: Hosting' })).toHaveAttribute(
+      'id',
+      'part-2-hosting',
+    )
+    expect(screen.getByRole('heading', { level: 1, name: 'Final touches' })).toBeInTheDocument()
+    expect(terms).not.toBeChecked()
+    expect(document.querySelector('.ui-card__image')).toHaveAttribute('src', previewSrc)
+    expect(screen.getAllByText(VALID.title).length).toBeGreaterThan(0)
+    expect(currentPath()).toBe('/create-listing')
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Host terms' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Host terms' })).toHaveFocus()
+    expect(terms).not.toBeChecked()
+    expect(document.querySelector('.ui-card__image')).toHaveAttribute('src', previewSrc)
+    expect(screen.getByRole('heading', { level: 1, name: 'Final touches' })).toBeInTheDocument()
   })
 })
 
@@ -780,10 +820,6 @@ describe('CreateListing photos', () => {
     givenVerification('approved')
   })
 
-  function selectFiles(files) {
-    fireEvent.change(screen.getByLabelText('Photos'), { target: { files } })
-  }
-
   it('tells the host the photo maximum before they pick any', async () => {
     const { user } = renderPage()
     await goToPhotos(user)
@@ -1054,6 +1090,100 @@ describe('CreateListing drafts', () => {
 
     expect(screen.queryByText('You have a saved draft on this device.')).not.toBeInTheDocument()
     expect(window.localStorage.getItem('trykai:listing-draft:host-9')).toBeNull()
+  })
+
+  it('autosaves the looked-up address onto the same draft', async () => {
+    const { user } = renderPage()
+    await goToPrice(user)
+    await completePrice(user, VALID)
+    await stepHeading('Where it happens')
+    supabase.functions.invoke.mockResolvedValue({
+      data: {
+        results: [{ address: VALID.fullAddress, postal: '470012' }],
+        planning_area: VALID.area,
+      },
+      error: null,
+    })
+    await user.type(screen.getByLabelText('Postal code'), '470012')
+    await screen.findByText(VALID.fullAddress)
+
+    const saved = JSON.parse(window.localStorage.getItem('trykai:listing-draft:host-9'))
+    expect(saved.fullAddress).toBe(VALID.fullAddress)
+    expect(saved.area).toBe(VALID.area)
+  })
+
+  it('autosaves on Continue so Restore draft can bring answers back after a remount', async () => {
+    const first = renderPage()
+    await stepHeading('The basics')
+    await first.user.type(screen.getByLabelText('Title'), 'Pottery taster')
+    await first.user.click(screen.getByRole('radio', { name: 'Arts' }))
+    await first.user.type(screen.getByLabelText('Description'), 'Throw a bowl.')
+    await first.user.click(screen.getByRole('button', { name: 'Continue' }))
+    await stepHeading('Add photos')
+    expect(screen.queryByText(/Draft saved on this device/)).not.toBeInTheDocument()
+    first.unmount()
+
+    const second = renderPage()
+    await stepHeading('The basics')
+    expect(screen.getByText('You have a saved draft on this device.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Title')).toHaveValue('')
+
+    await second.user.click(screen.getByRole('button', { name: 'Restore draft' }))
+
+    await stepHeading('Add photos')
+    await second.user.click(screen.getByRole('button', { name: 'Back' }))
+    await stepHeading('The basics')
+    expect(screen.getByLabelText('Title')).toHaveValue('Pottery taster')
+    expect(screen.getByRole('radio', { name: 'Arts' })).toBeChecked()
+    expect(screen.getByLabelText('Description')).toHaveValue('Throw a bowl.')
+  })
+
+  it('leaves a stored draft untouched when Close is tapped while the prompt is showing', async () => {
+    const stored = JSON.stringify({
+      title: 'Keep this draft',
+      category: 'Arts',
+      step: 2,
+      extra: 'do-not-touch',
+    })
+    window.localStorage.setItem('trykai:listing-draft:host-9', stored)
+    const { user } = renderPage('/create-listing', { outlivesNavigation: true })
+    await stepHeading('The basics')
+    expect(screen.getByText('You have a saved draft on this device.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: 'Close' }))
+
+    expect(window.localStorage.getItem('trykai:listing-draft:host-9')).toBe(stored)
+  })
+
+  it('writes no draft when Create listing is opened and closed with no answers', async () => {
+    const { user } = renderPage('/create-listing', { outlivesNavigation: true })
+    await stepHeading('The basics')
+    expect(window.localStorage.getItem('trykai:listing-draft:host-9')).toBeNull()
+
+    await user.click(screen.getByRole('link', { name: 'Close' }))
+
+    expect(window.localStorage.getItem('trykai:listing-draft:host-9')).toBeNull()
+  })
+
+  it('lands Restore draft on the saved step', async () => {
+    window.localStorage.setItem(
+      'trykai:listing-draft:host-9',
+      JSON.stringify({
+        step: 2,
+        title: 'Bake a focaccia together',
+        category: 'Food',
+        price: '20',
+      }),
+    )
+    const { user } = renderPage()
+    await stepHeading('The basics')
+    expect(screen.getByText('You have a saved draft on this device.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Restore draft' }))
+
+    await stepHeading('Price and group size')
+    expect(screen.getByText('Step 3 of 5')).toBeInTheDocument()
+    expect(screen.getByLabelText('Your price per guest')).toHaveValue(20)
   })
 
   it('clears the draft once the listing is published', async () => {
