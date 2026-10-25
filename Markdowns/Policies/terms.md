@@ -1,6 +1,6 @@
 # Terms of Service
 
-Last updated: 23 October 2026
+Last updated: 25 October 2026
 
 These terms apply to everyone who uses TryKai. Part 1 applies to all users. Part 2 applies when you host. Part 3 applies when you book.
 
@@ -123,7 +123,7 @@ TryKai charges Hosts a fee of 10% of the lesson price on each confirmed booking,
 
 ### 6. Cancellations and strikes
 
-If you cancel a session with bookings, every guest gets a full refund and you receive a strike. Three strikes deactivates your listings. Not showing up is treated more seriously. Full details are in our [Cancellation Policy](/cancellation-policy).
+If you cancel a session with bookings, every guest gets a full refund and you receive a strike. Three strikes deactivates your listings. Strikes expire 12 months after they're given. Not showing up is treated more seriously. Full details are in our [Cancellation Policy](/cancellation-policy).
 
 ### 7. No payments outside TryKai
 

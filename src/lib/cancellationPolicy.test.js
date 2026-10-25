@@ -203,6 +203,7 @@ describe('CANCELLATION_POLICY_ITEMS', () => {
       'You cancel a booked session',
       'You remove a date nobody has booked',
       '3 strikes',
+      'How long a strike lasts',
     ])
   })
 
@@ -253,6 +254,12 @@ describe('CANCELLATION_POLICY_ITEMS', () => {
   it('warns that three strikes takes listings down', () => {
     expect(CANCELLATION_POLICY_ITEMS[6].resolution).toBe(
       'Your listings are taken down automatically.'
+    )
+  })
+
+  it('says strikes expire after 12 months', () => {
+    expect(CANCELLATION_POLICY_ITEMS[7].resolution).toBe(
+      "Strikes expire 12 months after they're given."
     )
   })
 })

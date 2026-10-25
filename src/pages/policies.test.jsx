@@ -29,6 +29,10 @@ describe('Cancellation Policy page', () => {
     expect(screen.getByText(/After 3 strikes, your\s+listings are automatically deactivated/)).toBeInTheDocument()
   })
 
+  it('states that strikes expire after 12 months', () => {
+    expect(screen.getByText(/Strikes expire 12 months after they.re given/)).toBeInTheDocument()
+  })
+
   it('states that removing an unbooked date is never a strike', () => {
     expect(screen.getByText(/Removing a date nobody has\s+booked is never a strike/)).toBeInTheDocument()
   })
@@ -39,6 +43,17 @@ describe('Cancellation Policy page', () => {
 
   it('gives hosts seven days to appeal a strike', () => {
     expect(screen.getByText(/submit an appeal within 7 days of the\s+cancellation/)).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        (_content, node) =>
+          node?.tagName === 'P' &&
+          Boolean(
+            node.textContent?.includes(
+              'Email hello@trykai.sg with your booking reference and what happened',
+            ),
+          ),
+      ),
+    ).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Appealing a strike' })).toHaveAttribute(
       'id',
       'appeals',
@@ -57,10 +72,11 @@ describe('Cancellation Policy page', () => {
   })
 
   it('gives a contact address for disputes', () => {
-    expect(screen.getByRole('link', { name: 'hello@trykai.sg' })).toHaveAttribute(
-      'href',
-      'mailto:hello@trykai.sg'
-    )
+    const mail = screen.getAllByRole('link', { name: 'hello@trykai.sg' })
+    expect(mail.length).toBeGreaterThan(0)
+    for (const link of mail) {
+      expect(link).toHaveAttribute('href', 'mailto:hello@trykai.sg')
+    }
   })
 
   it('tells guests to cancel from their profile, not a dashboard', () => {
@@ -181,6 +197,10 @@ describe('Terms of Service page', () => {
 
   it('states the host fee starts on the fourth confirmed booking', () => {
     expect(screen.getByText(/starting from your fourth confirmed booking/)).toBeInTheDocument()
+  })
+
+  it('says host strikes expire after 12 months', () => {
+    expect(screen.getByText(/Strikes expire 12 months after they.re given/)).toBeInTheDocument()
   })
 
   it('anchors the Host and Booking parts for the listing and checkout checkboxes', () => {

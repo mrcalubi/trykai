@@ -174,7 +174,7 @@ Once per booking, same 48 hour cutoff. Published as available. Recovers bookings
 `sessions.status` documents `'completed'`. Nothing ever writes it. Payouts key off `starts_at` + `duration_mins` + 72h, not this status, so launch can survive without it. Reviews and dispute windows were supposed to key off it.
 
 ### P2.6 — Host strike appeals
-Within 7 days, reviewed manually. Needs a submission form and an admin view.
+Within 7 days, reviewed manually. Hosts email `hello@trykai.sg` with their booking reference and what happened. SQL: `admin_remove_host_strike` (`00039`). **No admin UI (KIV).**
 
 ### P2.7 — Admin: dispute log
 Disputes arrive by email today. At launch volume that is survivable.

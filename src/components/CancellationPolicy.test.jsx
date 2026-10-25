@@ -36,6 +36,7 @@ describe('GuestCancellationNote', () => {
     expect(screen.queryByText(/You cancel a booked session/)).not.toBeInTheDocument()
     expect(screen.queryByText(/You remove a date nobody has booked/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Your listings are taken down automatically/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/How long a strike lasts/)).not.toBeInTheDocument()
   })
 
   it('collapses again on a second click', async () => {

@@ -65,8 +65,9 @@ export default function HostTermsContent() {
       <h3>6. Cancellations and strikes</h3>
       <p>
         If you cancel a session with bookings, every guest gets a full refund
-        and you receive a strike. Three strikes deactivates your listings. Not
-        showing up is treated more seriously. Full details are in our{' '}
+        and you receive a strike. Three strikes deactivates your listings.
+        Strikes expire 12 months after they&apos;re given. Not showing up is
+        treated more seriously. Full details are in our{' '}
         <a href="/cancellation-policy" target="_blank" rel="noopener noreferrer">
           Cancellation Policy
         </a>

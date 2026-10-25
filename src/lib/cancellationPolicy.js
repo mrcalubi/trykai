@@ -42,6 +42,10 @@ export const CANCELLATION_POLICY_ITEMS = [
     scenario: '3 strikes',
     resolution: 'Your listings are taken down automatically.',
   },
+  {
+    scenario: 'How long a strike lasts',
+    resolution: "Strikes expire 12 months after they're given.",
+  },
 ]
 
 export const GUEST_CANCELLATION_POLICY_ITEMS = CANCELLATION_POLICY_ITEMS.slice(0, 4)
