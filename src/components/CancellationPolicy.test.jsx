@@ -6,6 +6,8 @@ import {
   CANCELLATION_POLICY_ITEMS,
   GUEST_CANCELLATION_POLICY_ITEMS,
   GUEST_HOST_CANCEL_COPY,
+  HOST_APPEAL_HREF,
+  HOST_CANCEL_SUMMARY,
 } from '../lib/cancellationPolicy'
 
 describe('GuestCancellationNote', () => {
@@ -31,8 +33,9 @@ describe('GuestCancellationNote', () => {
       expect(screen.getByText(`${item.scenario}:`)).toBeInTheDocument()
     }
     expect(screen.getByText(GUEST_HOST_CANCEL_COPY)).toBeInTheDocument()
-    expect(screen.queryByText(/host receives a strike/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Listing is automatically deactivated/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/You cancel a booked session/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/You remove a date nobody has booked/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Your listings are taken down automatically/)).not.toBeInTheDocument()
   })
 
   it('collapses again on a second click', async () => {
@@ -49,15 +52,43 @@ describe('GuestCancellationNote', () => {
 })
 
 describe('CancellationPolicyInfo', () => {
-  it('shows the policy without needing any interaction', () => {
+  it('starts with the full policy closed', () => {
     render(<CancellationPolicyInfo />)
+    const toggle = screen.getByRole('button', { name: 'See full policy' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByText(HOST_CANCEL_SUMMARY)).toBeInTheDocument()
+    expect(screen.queryByText(`${CANCELLATION_POLICY_ITEMS[0].scenario}:`)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'appeal' })).not.toBeInTheDocument()
+  })
+
+  it('opens every row and the appeal line', async () => {
+    const user = userEvent.setup()
+    render(<CancellationPolicyInfo />)
+
+    await user.click(screen.getByRole('button', { name: 'See full policy' }))
+
+    expect(screen.getByRole('button', { name: 'See full policy' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
     for (const item of CANCELLATION_POLICY_ITEMS) {
       expect(screen.getByText(`${item.scenario}:`)).toBeInTheDocument()
     }
+    const appeal = screen.getByRole('link', { name: 'appeal' })
+    expect(appeal).toHaveAttribute('href', HOST_APPEAL_HREF)
+    expect(appeal).toHaveAttribute('target', '_blank')
+    expect(appeal).toHaveAttribute('rel', 'noopener')
   })
 
-  it('spells out the host strike consequence', () => {
+  it('collapses again on a second click', async () => {
+    const user = userEvent.setup()
     render(<CancellationPolicyInfo />)
-    expect(screen.getByText(/Listing is automatically deactivated/)).toBeInTheDocument()
+    const toggle = screen.getByRole('button', { name: 'See full policy' })
+
+    await user.click(toggle)
+    await user.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText(`${CANCELLATION_POLICY_ITEMS[0].scenario}:`)).not.toBeInTheDocument()
   })
 })
