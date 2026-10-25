@@ -1736,6 +1736,11 @@ input[type='radio'] {
 
 .planning-area-select {
   position: relative;
+  width: 100%;
+}
+
+.planning-area-select .input {
+  width: 100%;
 }
 
 .planning-area-select__list {
@@ -1819,6 +1824,40 @@ input[type='radio'] {
 .postal-address__option--on {
   border-color: var(--navy);
   background: var(--primary-bg);
+}
+
+.postal-address__status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.postal-address__card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--primary-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.postal-address__card-check {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--navy);
+}
+
+.postal-address__card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.postal-address__card-address {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-h);
 }
 
 .input--textarea {

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
-import PlanningAreaSelect from '../components/PlanningAreaSelect'
 import PostalAddressFields from '../components/PostalAddressFields'
 import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
@@ -394,13 +393,14 @@ export default function EditListing() {
           {discountExample ? <p className="hint group-discount-example">{discountExample}</p> : null}
 
           <h2 className="form-section__title">Location</h2>
-          <label className="label">
-            Area
-            <PlanningAreaSelect value={area} onChange={setArea} hideUninhabited />
-            <FieldHint>{fieldHints.area}</FieldHint>
-          </label>
-
-          <PostalAddressFields value={fullAddress} onChange={setFullAddress} />
+          <PostalAddressFields
+            value={fullAddress}
+            onChange={setFullAddress}
+            area={area}
+            onAreaChange={setArea}
+            areaHint={<FieldHint>{fieldHints.area}</FieldHint>}
+            allowChangeAddress
+          />
           <FieldHint>{fieldHints.fullAddress}</FieldHint>
 
           <h2 className="form-section__title">Photos</h2>

@@ -7,6 +7,9 @@ import {
   isCachedTokenFresh,
   isValidPostal,
   oneMapAccessToken,
+  firstSearchCoords,
+  oneMapPlanningArea,
+  planningAreaNameFromOneMap,
   publicSearchHits,
   searchOneMapPostal,
 } from './onemap.ts'
@@ -91,9 +94,45 @@ describe('onemap helpers', () => {
     const rows = await searchOneMapPostal(fetchImpl, 'tok-1', '470012')
     expect(rows).toHaveLength(1)
     expect(fetchImpl).toHaveBeenCalledWith(
-      'https://www.onemap.gov.sg/api/common/elastic/search?searchVal=470012&returnGeom=N&getAddrDetails=Y&pageNum=1',
+      'https://www.onemap.gov.sg/api/common/elastic/search?searchVal=470012&returnGeom=Y&getAddrDetails=Y&pageNum=1',
       { headers: { Authorization: 'tok-1' } },
     )
+  })
+
+  it('reads coordinates from the first OneMap hit that has them', () => {
+    expect(
+      firstSearchCoords([
+        { ADDRESS: 'A', POSTAL: '1' },
+        { ADDRESS: 'B', POSTAL: '2', LATITUDE: '1.3', LONGITUDE: '103.8' },
+      ]),
+    ).toEqual({ latitude: 1.3, longitude: 103.8 })
+    expect(firstSearchCoords([{ ADDRESS: 'A', POSTAL: '1' }])).toBeNull()
+  })
+
+  it('reads the planning-area name from OneMap popapi/getPlanningarea', async () => {
+    expect(planningAreaNameFromOneMap([{ pln_area_n: 'QUEENSTOWN', geojson: '{}' }])).toBe(
+      'QUEENSTOWN',
+    )
+    expect(planningAreaNameFromOneMap({ error: 'Invalid token' })).toBeNull()
+    expect(planningAreaNameFromOneMap([])).toBeNull()
+
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ pln_area_n: 'QUEENSTOWN', geojson: '{}' }],
+    })
+    await expect(oneMapPlanningArea(fetchImpl, 'tok-1', 1.3, 103.8)).resolves.toBe('QUEENSTOWN')
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://www.onemap.gov.sg/api/public/popapi/getPlanningarea?latitude=1.3&longitude=103.8&year=2019',
+      { headers: { Authorization: 'tok-1' } },
+    )
+  })
+
+  it('returns null when the planning-area call fails', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'Invalid token' }),
+    })
+    await expect(oneMapPlanningArea(fetchImpl, 'tok-1', 1.3, 103.8)).resolves.toBeNull()
   })
 
   it('throws when OneMap reports a token error', async () => {

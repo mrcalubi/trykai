@@ -126,8 +126,11 @@ describe('EditListing prefill', () => {
     expect(screen.getByLabelText('Description')).toHaveValue('Pull a rosetta.')
     expect(screen.getByLabelText('Category')).toHaveValue('Food')
     expect(screen.getByLabelText('Spots per session')).toHaveValue(4)
-    expect(screen.getByLabelText('Area')).toHaveValue('Bedok')
-    expect(screen.getByLabelText(/^Full address/)).toHaveValue('12 Coffee Road')
+    expect(screen.getByLabelText('Area guests see')).toHaveValue('Bedok')
+    expect(screen.getByText('12 Coffee Road')).toBeInTheDocument()
+    expect(screen.getByText('Hidden from guests until they book.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Postal code')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Full address/)).not.toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Offer group discounts' })).toBeChecked()
   })
 
@@ -135,7 +138,7 @@ describe('EditListing prefill', () => {
     givenFoundingHost(false, null, { updated: 0, held: [] }, '88 Host Lane')
     await renderLoaded()
 
-    expect(screen.getByLabelText(/^Full address/)).toHaveValue('88 Host Lane')
+    expect(screen.getByText('88 Host Lane')).toBeInTheDocument()
     expect(supabase.rpc).toHaveBeenCalledWith('listing_address', { listing_id: 'listing-1' })
     expect(supabase.__lastCall('listings', 'select').chain[0].args[0]).not.toMatch(/full_address/)
   })
@@ -333,16 +336,19 @@ describe('EditListing saving', () => {
 
   it('saves a listing that has moved to a new address', async () => {
     const { user } = await renderLoaded()
-    await user.clear(screen.getByLabelText('Area'))
-    await user.type(screen.getByLabelText('Area'), 'Tampines')
+    await user.clear(screen.getByLabelText('Area guests see'))
+    await user.type(screen.getByLabelText('Area guests see'), 'Tampines')
     await user.click(screen.getByRole('option', { name: 'Tampines' }))
     supabase.functions.invoke.mockResolvedValue({
-      data: { results: [{ address: '5 Espresso Lane', postal: '520123' }] },
+      data: {
+        results: [{ address: '5 Espresso Lane', postal: '520123' }],
+        planning_area: 'TAMPINES',
+      },
       error: null,
     })
+    await user.click(screen.getByRole('button', { name: 'Change address' }))
     await user.type(screen.getByLabelText('Postal code'), '520123')
-    await user.click(screen.getByRole('button', { name: 'Find addresses' }))
-    expect(await screen.findByLabelText(/^Full address/)).toHaveValue('5 Espresso Lane')
+    expect(await screen.findByText('5 Espresso Lane')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 

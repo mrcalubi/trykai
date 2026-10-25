@@ -1,5 +1,6 @@
 const TOKEN_URL = 'https://www.onemap.gov.sg/api/auth/post/getToken'
 const SEARCH_URL = 'https://www.onemap.gov.sg/api/common/elastic/search'
+export const PLANNING_AREA_URL = 'https://www.onemap.gov.sg/api/public/popapi/getPlanningarea'
 
 export const POSTAL_LOOKUP_LIMIT = 20
 export const POSTAL_LOOKUP_WINDOW_MS = 10 * 60 * 1000
@@ -19,6 +20,8 @@ export type OneMapSearchHit = {
   BLK_NO?: string
   ROAD_NAME?: string
   BUILDING?: string
+  LATITUDE?: string
+  LONGITUDE?: string
 }
 
 export function isValidPostal(value: string): boolean {
@@ -105,7 +108,7 @@ export async function searchOneMapPostal(
   token: string,
   postal: string,
 ): Promise<OneMapSearchHit[]> {
-  const url = `${SEARCH_URL}?searchVal=${encodeURIComponent(postal)}&returnGeom=N&getAddrDetails=Y&pageNum=1`
+  const url = `${SEARCH_URL}?searchVal=${encodeURIComponent(postal)}&returnGeom=Y&getAddrDetails=Y&pageNum=1`
   const response = await fetchImpl(url, { headers: { Authorization: token } })
   const body = (await response.json().catch(() => ({}))) as {
     error?: string
@@ -114,4 +117,37 @@ export async function searchOneMapPostal(
   if (body.error) throw new Error(body.error)
   if (!response.ok) throw new Error('OneMap search failed')
   return Array.isArray(body.results) ? body.results : []
+}
+
+export function firstSearchCoords(
+  results: OneMapSearchHit[],
+): { latitude: number; longitude: number } | null {
+  for (const row of results) {
+    const latitude = Number(row?.LATITUDE)
+    const longitude = Number(row?.LONGITUDE)
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      return { latitude, longitude }
+    }
+  }
+  return null
+}
+
+/** OneMap returns `[{ pln_area_n, geojson }]`; anything else is ignored. */
+export function planningAreaNameFromOneMap(payload: unknown): string | null {
+  if (!Array.isArray(payload) || payload.length === 0) return null
+  const name = (payload[0] as { pln_area_n?: unknown })?.pln_area_n
+  return typeof name === 'string' && name.trim() ? name.trim() : null
+}
+
+export async function oneMapPlanningArea(
+  fetchImpl: typeof fetch,
+  token: string,
+  latitude: number,
+  longitude: number,
+): Promise<string | null> {
+  const url = `${PLANNING_AREA_URL}?latitude=${encodeURIComponent(String(latitude))}&longitude=${encodeURIComponent(String(longitude))}&year=2019`
+  const response = await fetchImpl(url, { headers: { Authorization: token } })
+  const body = await response.json().catch(() => null)
+  if (!response.ok) return null
+  return planningAreaNameFromOneMap(body)
 }

@@ -133,6 +133,7 @@ test.describe('verified host create listing', () => {
         functions: {
           'lookup-postal-code': {
             results: [{ address: '12 CLAY ROAD SINGAPORE 470012', postal: '470012' }],
+            planning_area: 'BEDOK',
           },
         },
       },
@@ -180,11 +181,9 @@ test.describe('verified host create listing', () => {
     await next()
 
     await expect(page.getByRole('heading', { name: 'Where it happens' })).toBeVisible()
-    await page.getByLabel('Area').fill('Bedok')
-    await page.getByRole('option', { name: 'Bedok' }).click()
     await page.getByLabel('Postal code').fill('470012')
-    await page.getByRole('button', { name: 'Find addresses' }).click()
-    await expect(page.getByLabel(/^Full address/)).toHaveValue('12 CLAY ROAD SINGAPORE 470012')
+    await expect(page.getByText('12 CLAY ROAD SINGAPORE 470012')).toBeVisible()
+    await expect(page.getByLabel('Area guests see')).toHaveValue('Bedok')
     await next()
 
     await expect(page.getByRole('heading', { name: 'Final touches' })).toBeVisible()
@@ -258,7 +257,8 @@ test.describe('listing spots', () => {
     await expect(page).toHaveURL(/\/$/)
 
     await page.goto(`/edit-listing/${listing.id}`)
-    await expect(page.getByLabel(/^Full address/)).toHaveValue('12 Coffee Road')
+    await expect(page.getByText('12 Coffee Road')).toBeVisible()
+    await expect(page.getByText('Hidden from guests until they book.')).toBeVisible()
     await expect(page.getByLabel('Spots per session')).toHaveValue('6')
     await page.getByLabel('Spots per session').fill('4')
     await page.getByRole('button', { name: 'Save changes' }).click()
