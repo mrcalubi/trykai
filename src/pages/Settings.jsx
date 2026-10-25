@@ -68,7 +68,7 @@ export default function Settings() {
   }, [avatarPreviewUrl])
 
   useEffect(() => {
-    if (!saveStatus) return undefined
+    if (!saveStatus || saveStatusKind !== 'success') return undefined
     const fade = window.setTimeout(() => setSaveStatusFading(true), 4000)
     const clear = window.setTimeout(() => {
       setSaveStatus('')
@@ -78,7 +78,12 @@ export default function Settings() {
       window.clearTimeout(fade)
       window.clearTimeout(clear)
     }
-  }, [saveStatus])
+  }, [saveStatus, saveStatusKind])
+
+  function clearSaveFeedback() {
+    setSaveStatus('')
+    setSaveStatusFading(false)
+  }
 
   function handleAvatarChange(event) {
     const file = Array.from(event.target.files ?? []).find((candidate) =>
@@ -92,6 +97,7 @@ export default function Settings() {
       return URL.createObjectURL(file)
     })
     setAvatarFile(file)
+    clearSaveFeedback()
   }
 
   async function uploadAvatar() {
@@ -232,7 +238,10 @@ export default function Settings() {
               label="Display name"
               type="text"
               value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
+              onChange={(event) => {
+                setDisplayName(event.target.value)
+                clearSaveFeedback()
+              }}
               autoComplete="nickname"
               maxLength={40}
               hint="Shown on your profile and reviews."
@@ -245,7 +254,10 @@ export default function Settings() {
                 label="About you"
                 type="textarea"
                 value={bio}
-                onChange={(event) => setBio(event.target.value)}
+                onChange={(event) => {
+                  setBio(event.target.value)
+                  clearSaveFeedback()
+                }}
                 maxLength={500}
                 rows={4}
                 hint="Tell guests a bit about yourself and what you love sharing."
@@ -260,7 +272,10 @@ export default function Settings() {
               label="Full name"
               type="text"
               value={fullName}
-              onChange={(event) => setFullName(event.target.value)}
+              onChange={(event) => {
+                setFullName(event.target.value)
+                clearSaveFeedback()
+              }}
               autoComplete="name"
               hint="Private, never shown publicly."
               error={nameError}
@@ -279,7 +294,7 @@ export default function Settings() {
                   ]
                     .filter(Boolean)
                     .join(' ')}
-                  role="status"
+                  role={saveStatusKind === 'error' ? 'alert' : 'status'}
                 >
                   {saveStatus}
                 </p>
