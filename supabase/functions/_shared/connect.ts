@@ -180,19 +180,23 @@ function requirementItems(value: unknown): string[] {
 }
 
 /**
- * True when Stripe is only verifying: nothing currently or past due.
- * `pending_verification` is still checking, not something the host must send.
+ * True when Stripe is only verifying: nothing currently or past due, and the
+ * account is not disabled for any reason other than pending verification.
  */
 export function connectOnboardingPending(account: {
   requirements?: {
     currently_due?: unknown
     past_due?: unknown
     pending_verification?: unknown
+    disabled_reason?: unknown
   } | null
 } | null | undefined): boolean {
   const requirements = account?.requirements
   if (requirementItems(requirements?.currently_due).length > 0) return false
   if (requirementItems(requirements?.past_due).length > 0) return false
+  const disabledReason =
+    typeof requirements?.disabled_reason === 'string' ? requirements.disabled_reason : ''
+  if (disabledReason && disabledReason !== 'requirements.pending_verification') return false
   return true
 }
 

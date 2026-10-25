@@ -1975,6 +1975,8 @@ describe('Dashboard payout setup', () => {
       })
 
       expect(await screen.findByText(PAYOUT_STILL_CHECKING_COPY)).toBeInTheDocument()
+      expect(screen.getByText(/Check back in a few minutes/)).toBeInTheDocument()
+      expect(screen.queryByText(/We'll update this page/)).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /Set up payouts|Continue payout setup/ })).toBeNull()
     } finally {
       vi.useRealTimers()
