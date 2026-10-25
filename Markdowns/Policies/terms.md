@@ -123,7 +123,7 @@ TryKai charges Hosts a fee of 10% of the lesson price on each confirmed booking,
 
 ### 6. Cancellations and strikes
 
-If you cancel a session with bookings, every guest gets a full refund and you receive a strike. Three strikes deactivates your listings. Not showing up is treated more seriously. Full details are in our [Cancellation Policy](/cancellation-policy).
+If you cancel a session with bookings, every guest gets a full refund and you receive a strike. Three strikes deactivates your listings. Strikes expire 12 months after they're given. Not showing up is treated more seriously. Full details are in our [Cancellation Policy](/cancellation-policy).
 
 ### 7. No payments outside TryKai
 

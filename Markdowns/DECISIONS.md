@@ -242,10 +242,11 @@ Published at /cancellation-policy, /refund-policy, /dispute-policy. Finalised 29
 | Host deletes an empty session | No guests; `delete_empty_session` sets `sessions.status = 'cancelled'`. No refund, no strike. Not a host cancel. |
 | Host no show | Full guest refund including platform fee, discretionary compensation, 2 strikes immediately, account reviewed |
 | 3 strikes | Listings auto deactivated |
+| Strike age | Expires 12 months after it is given (`00039`). Expiry does not reactivate listings. |
 
 **Reschedule:** once per booking, same 48 hour cutoff. Not built.
 
-**Host appeals:** within 7 days, reviewed manually, strike removed if successful. Never affects the guest's refund either way. Not built.
+**Host appeals:** within 7 days, reviewed manually, strike removed if successful. Never affects the guest's refund either way. Hosts email hello@trykai.sg with the booking reference and what happened. SQL: `admin_remove_host_strike`. No admin UI.
 
 **Host no show compensation is deliberately discretionary** rather than a fixed formula, to avoid creating an incentive for collusion between a fake host and a fake guest.
 
@@ -621,6 +622,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-10-25 — Autosave must not overwrite an unanswered draft or write an empty one.** Close or Continue while "Restore draft / Discard" is showing was writing the fresh wizard over the saved draft; opening and closing Create listing untouched wrote a blank draft that Hosting showed as a card. Autosave now skips while that prompt is unanswered (Save draft may still overwrite). A wizard with no answers (title, description, category, price, duration, area, fullAddress, what's provided, what to bring all empty or default) is not written; if this session wrote the current draft and the answers later become empty, the draft is cleared. Restore draft now also restores the saved step, like Hosting's Continue.
 
 **2026-10-25 — Host cancel copy on Create listing is collapsed and talks to the host.** Hosts said "Host cancels anytime: full refund + strike" read harsh and the box was too long on a phone. The Create listing policy box now always shows a one-sentence summary (full refund plus a strike; emergencies can be appealed) and a "See full policy" toggle. The host rows are second-person and name the empty-date case (`delete_empty_session` is never a strike). The published /cancellation-policy page and markdown add one sentence that removing an unbooked date is never a strike. Guest tiers, refunds, and strike counts are unchanged.
+
+**2026-10-25 — Host strikes expire 12 months after they are given.** `users.host_strikes` was a counter that never decayed. `00039` stores each strike as a `host_strike_events` row (`host_cancel` / `no_show` / `admin`). An active strike is not removed and was given in the last 12 months. `apply_host_strike` inserts an event, writes the active count back onto `users.host_strikes`, and still takes listings down at 3. `my_account()` returns the live count. Existing counters are backfilled as `'admin'` events dated at migration time, so expiry starts then, not earlier. Expiry and a successful appeal never turn listings back on; the team does that after a review. Appeals: email hello@trykai.sg; `admin_remove_host_strike` is the SQL path. No admin UI.
 
 ---
 
