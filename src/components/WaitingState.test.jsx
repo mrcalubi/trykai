@@ -35,4 +35,15 @@ describe('WaitingState', () => {
     expect(screen.getByText(WAITING_LONG_MESSAGE)).toBeInTheDocument()
     expect(screen.queryByText(WAITING_STILL_MESSAGE)).not.toBeInTheDocument()
   })
+
+  it('keeps the first message when hold is set', () => {
+    render(<WaitingState hold message="Stripe is checking your details." />)
+
+    act(() => {
+      vi.advanceTimersByTime(WAITING_LONG_AFTER_MS)
+    })
+    expect(screen.getByText('Stripe is checking your details.')).toBeInTheDocument()
+    expect(screen.queryByText(WAITING_STILL_MESSAGE)).not.toBeInTheDocument()
+    expect(screen.queryByText(WAITING_LONG_MESSAGE)).not.toBeInTheDocument()
+  })
 })
