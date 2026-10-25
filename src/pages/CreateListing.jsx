@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { CancellationPolicyInfo } from '../components/CancellationPolicy'
-import PlanningAreaSelect from '../components/PlanningAreaSelect'
 import PostalAddressFields from '../components/PostalAddressFields'
 import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
@@ -572,13 +571,13 @@ export default function CreateListing() {
     if (current.id === 'location') {
       return (
         <>
-          <label className="label">
-            Area
-            <PlanningAreaSelect value={area} onChange={setArea} hideUninhabited />
-            <FieldHint>{fieldHints.area}</FieldHint>
-          </label>
-
-          <PostalAddressFields value={fullAddress} onChange={setFullAddress} />
+          <PostalAddressFields
+            value={fullAddress}
+            onChange={setFullAddress}
+            area={area}
+            onAreaChange={setArea}
+            areaHint={<FieldHint>{fieldHints.area}</FieldHint>}
+          />
           <FieldHint>{fieldHints.fullAddress}</FieldHint>
         </>
       )

@@ -92,25 +92,30 @@ async function completePrice(user, values) {
 }
 
 async function choosePlanningArea(user, name) {
-  const input = screen.getByLabelText('Area')
+  const input = screen.getByLabelText('Area guests see')
   await user.clear(input)
   await user.type(input, name)
   await user.click(screen.getByRole('option', { name }))
 }
 
 async function completeLocation(user, values) {
-  await choosePlanningArea(user, values.area)
   if (values.fullAddress?.trim()) {
     supabase.functions.invoke.mockImplementation(async (name) => {
       if (name !== 'lookup-postal-code') return { data: null, error: null }
       return {
-        data: { results: [{ address: values.fullAddress, postal: '470012' }] },
+        data: {
+          results: [{ address: values.fullAddress, postal: '470012' }],
+          planning_area: values.area || null,
+        },
         error: null,
       }
     })
     await user.type(screen.getByLabelText('Postal code'), '470012')
-    await user.click(screen.getByRole('button', { name: 'Find addresses' }))
-    expect(await screen.findByLabelText(/^Full address/)).toHaveValue(values.fullAddress)
+    expect(await screen.findByText(values.fullAddress)).toBeInTheDocument()
+  }
+  const areaInput = screen.getByLabelText('Area guests see')
+  if (values.area && areaInput.value !== values.area) {
+    await choosePlanningArea(user, values.area)
   }
   await next(user)
 }
@@ -362,8 +367,8 @@ describe('CreateListing validation', () => {
       error: { message: 'Edge Function returned a non-2xx status code' },
     })
     await user.type(screen.getByLabelText('Postal code'), '000000')
-    await user.click(screen.getByRole('button', { name: 'Find addresses' }))
     expect(await screen.findByText('No address matches that postal code.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
     await next(user)
 
     expect(await screen.findByText(LISTING_FIELD_HINTS.fullAddress)).toBeInTheDocument()

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EXTRA_AREA_ALIASES } from '../data/areaAliases'
-import { planningAreaForAlias, searchAreaOptions } from './areaSearch'
+import { acceptedPlanningAreaFromLookup, planningAreaForAlias, searchAreaOptions } from './areaSearch'
 
 describe('areaSearch', () => {
   it('maps official subzones and leaves the stored value as the planning area', () => {
@@ -38,5 +38,20 @@ describe('areaSearch', () => {
     expect(EXTRA_AREA_ALIASES.every((row) => row.source === 'TryKai editorial, multi-area')).toBe(
       true,
     )
+  })
+
+  it('accepts a OneMap planning-area name the host picker can store', () => {
+    expect(acceptedPlanningAreaFromLookup('QUEENSTOWN')).toBe('Queenstown')
+    expect(acceptedPlanningAreaFromLookup('queenstown')).toBe('Queenstown')
+    expect(acceptedPlanningAreaFromLookup('Kembangan')).toBe('Bedok')
+  })
+
+  it('rejects uninhabited or unknown OneMap names unless already stored', () => {
+    expect(acceptedPlanningAreaFromLookup('WESTERN ISLANDS')).toBeNull()
+    expect(acceptedPlanningAreaFromLookup('Western Islands', 'Western Islands')).toBe(
+      'Western Islands',
+    )
+    expect(acceptedPlanningAreaFromLookup('Not a place')).toBeNull()
+    expect(acceptedPlanningAreaFromLookup('')).toBeNull()
   })
 })
