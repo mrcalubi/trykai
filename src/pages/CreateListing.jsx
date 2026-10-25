@@ -14,6 +14,7 @@ import PageLoader from '../components/PageLoader'
 import WaitingState from '../components/WaitingState'
 import ListingPricePanel from '../components/ListingPricePanel'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
+import WhatToBringFields from '../components/WhatToBringFields'
 import FieldHint from '../components/FieldHint'
 import Card from '../components/ui/Card'
 import Icon from '../components/ui/Icon'
@@ -25,6 +26,7 @@ import {
   listingSaveProblem,
 } from '../lib/listingFieldHints'
 import { providedForSave } from '../lib/whatsProvided'
+import { whatToBringForSave } from '../lib/whatToBring'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import {
   formatGuestFacingPrice,
@@ -73,6 +75,7 @@ export default function CreateListing() {
   const [area, setArea] = useState(start.area)
   const [fullAddress, setFullAddress] = useState(start.fullAddress)
   const [whatsProvided, setWhatsProvided] = useState(start.whatsProvided)
+  const [whatToBring, setWhatToBring] = useState(start.whatToBring)
   const [photos, setPhotos] = useState([])
   const photosRef = useRef(photos)
   const [groupPricing, setGroupPricing] = useState(start.groupPricing)
@@ -150,6 +153,7 @@ export default function CreateListing() {
     if (typeof draft.area === 'string') setArea(draft.area)
     if (typeof draft.fullAddress === 'string') setFullAddress(draft.fullAddress)
     if (Array.isArray(draft.whatsProvided)) setWhatsProvided(draft.whatsProvided)
+    if (Array.isArray(draft.whatToBring)) setWhatToBring(draft.whatToBring)
     setDraftNote(DRAFT_RESTORED)
   }
 
@@ -178,6 +182,7 @@ export default function CreateListing() {
       area,
       fullAddress,
       whatsProvided,
+      whatToBring,
     }
     try {
       window.localStorage.setItem(draftKey(userId), JSON.stringify(values))
@@ -251,6 +256,7 @@ export default function CreateListing() {
     }
 
     const provided = providedForSave(whatsProvided)
+    const bring = whatToBringForSave(whatToBring)
 
     setLoading(true)
     const uploadCount = photos.filter((photo) => photo.file).length
@@ -289,14 +295,16 @@ export default function CreateListing() {
       area,
       full_address: fullAddress.trim(),
       whats_provided: provided,
+      what_to_bring: bring,
       photo_urls: photoUrls,
       is_active: true,
     }
     let { error: listingError } = await supabase.from('listings').insert(listingPayload)
-    if (listingError && /duration_mins|group_pricing/.test(listingError.message ?? '')) {
+    if (listingError && /duration_mins|group_pricing|what_to_bring/.test(listingError.message ?? '')) {
       const retry = { ...listingPayload }
       if (/duration_mins/.test(listingError.message ?? '')) delete retry.duration_mins
       if (/group_pricing/.test(listingError.message ?? '')) delete retry.group_pricing
+      if (/what_to_bring/.test(listingError.message ?? '')) delete retry.what_to_bring
       ;({ error: listingError } = await supabase.from('listings').insert(retry))
     }
 
@@ -579,6 +587,7 @@ export default function CreateListing() {
     return (
       <>
         <WhatsProvidedFields value={whatsProvided} onChange={setWhatsProvided} />
+        <WhatToBringFields value={whatToBring} onChange={setWhatToBring} />
 
         <div className="wizard-inline-preview">
           <p className="wizard-preview__label">How guests will see it</p>

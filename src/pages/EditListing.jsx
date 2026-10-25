@@ -11,6 +11,7 @@ import { revokePhotoUrls } from '../lib/coverCrop'
 import { photosFromUrls, uploadListingPhotos } from '../lib/listingPhotos'
 import ListingPricePanel from '../components/ListingPricePanel'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
+import WhatToBringFields from '../components/WhatToBringFields'
 import FieldHint from '../components/FieldHint'
 import Button from '../components/ui/Button'
 import PageLoader from '../components/PageLoader'
@@ -22,6 +23,7 @@ import {
   listingSaveProblem,
 } from '../lib/listingFieldHints'
 import { providedForSave } from '../lib/whatsProvided'
+import { whatToBringForSave } from '../lib/whatToBring'
 import { formatListingSpotsMessage } from '../lib/listingSpots'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { LISTING_CATEGORIES } from '../lib/listingCategories'
@@ -40,6 +42,7 @@ const LISTING_SELECT = `
   group_pricing,
   area,
   whats_provided,
+  what_to_bring,
   photo_urls,
   host_id
 `
@@ -65,6 +68,7 @@ export default function EditListing() {
   const [area, setArea] = useState('')
   const [fullAddress, setFullAddress] = useState('')
   const [whatsProvided, setWhatsProvided] = useState([])
+  const [whatToBring, setWhatToBring] = useState([])
   const [photos, setPhotos] = useState([])
   const photosRef = useRef(photos)
   const photoPickerRef = useRef(null)
@@ -91,13 +95,24 @@ export default function EditListing() {
 
   useEffect(() => {
     async function fetchListing() {
-      const [{ data, error: fetchError }, founding, addressResult] = await Promise.all([
-        withIssuedAtRetry(() =>
-          supabase.from('listings').select(LISTING_SELECT).eq('id', id).eq('host_id', userId).single()
-        ),
+      let listingResult = await withIssuedAtRetry(() =>
+        supabase.from('listings').select(LISTING_SELECT).eq('id', id).eq('host_id', userId).single()
+      )
+      if (listingResult.error && /what_to_bring/.test(listingResult.error.message ?? '')) {
+        listingResult = await withIssuedAtRetry(() =>
+          supabase
+            .from('listings')
+            .select(LISTING_SELECT.replace(/\s*what_to_bring,\n/, '\n'))
+            .eq('id', id)
+            .eq('host_id', userId)
+            .single()
+        )
+      }
+      const [founding, addressResult] = await Promise.all([
         supabase.rpc('my_is_founding_host'),
         supabase.rpc('listing_address', { listing_id: id }),
       ])
+      const { data, error: fetchError } = listingResult
 
       if (fetchError || !data) {
         setError(fetchError ? PAGE_LOAD_ERROR : 'Listing not found.')
@@ -123,6 +138,7 @@ export default function EditListing() {
       setArea(data.area ?? '')
       setFullAddress(typeof addressResult.data === 'string' ? addressResult.data : '')
       setWhatsProvided(data.whats_provided?.length ? data.whats_provided : [])
+      setWhatToBring(data.what_to_bring?.length ? data.what_to_bring : [])
       setPhotos(photosFromUrls(data.photo_urls))
       setFetching(false)
     }
@@ -162,6 +178,7 @@ export default function EditListing() {
     setFieldHints({})
     const duration = parseInt(durationMins, 10)
     const provided = providedForSave(whatsProvided)
+    const bring = whatToBringForSave(whatToBring)
 
     setLoading(true)
 
@@ -185,6 +202,7 @@ export default function EditListing() {
       area,
       full_address: fullAddress.trim(),
       whats_provided: provided,
+      what_to_bring: bring,
       photo_urls: photoUrls,
     }
     let { error: updateError } = await supabase
@@ -192,10 +210,11 @@ export default function EditListing() {
       .update(listingPayload)
       .eq('id', id)
       .eq('host_id', userId)
-    if (updateError && /duration_mins|group_pricing/.test(updateError.message ?? '')) {
+    if (updateError && /duration_mins|group_pricing|what_to_bring/.test(updateError.message ?? '')) {
       const retry = { ...listingPayload }
       if (/duration_mins/.test(updateError.message ?? '')) delete retry.duration_mins
       if (/group_pricing/.test(updateError.message ?? '')) delete retry.group_pricing
+      if (/what_to_bring/.test(updateError.message ?? '')) delete retry.what_to_bring
       ;({ error: updateError } = await supabase
         .from('listings')
         .update(retry)
@@ -395,6 +414,7 @@ export default function EditListing() {
           />
 
           <WhatsProvidedFields value={whatsProvided} onChange={setWhatsProvided} />
+          <WhatToBringFields value={whatToBring} onChange={setWhatToBring} />
 
           {error ? (
             <p className="wizard__note" role="status">

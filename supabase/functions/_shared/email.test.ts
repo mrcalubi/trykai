@@ -568,6 +568,14 @@ describe('booking confirmation emails', () => {
     expect(guestReceipt({ whatsProvided: null })).not.toContain('>What&#39;s provided<')
   })
 
+  it('adds What to bring when the listing has items, and omits it when empty', () => {
+    expect(hasDetail(guestReceipt({ whatToBring: ['Water bottle', 'Apron'] }), 'What to bring', 'Water bottle, Apron')).toBe(
+      true,
+    )
+    expect(guestReceipt({ whatToBring: [] })).not.toContain('>What to bring<')
+    expect(guestReceipt()).not.toContain('>What to bring<')
+  })
+
   it('names the card brand and last 4 when the guest paid by card', () => {
     const html = guestReceipt({
       guestsCount: 1,
@@ -1409,6 +1417,10 @@ describe('listing review emails', () => {
     expect(html).toContain('https://trykai.sg/admin/listings')
     expect(html).toContain('A new listing needs a look')
     expect(listingSubmittedSubject('Latte', false)).toBe('New listing to review: Latte')
+    expect(listingSubmittedOpsHtml({ ...submitted, whatToBring: ['Water bottle'] })).toContain(
+      'Water bottle',
+    )
+    expect(listingSubmittedOpsHtml(submitted)).not.toContain('>What to bring<')
   })
 
   it('marks a fixed listing as an update, and copes with missing details', () => {

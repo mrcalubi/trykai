@@ -1530,6 +1530,16 @@ a {
   cursor: pointer;
 }
 
+.provided-custom__chip--suggest {
+  cursor: pointer;
+  background: var(--cream);
+}
+
+.provided-custom__chip--suggest:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .provided-custom__add {
   display: flex;
   flex-direction: column;

@@ -449,6 +449,7 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00034` (teaching plan) | Applied | Applied | 23 October, before #145. |
 | `00035` (Singpass) | Applied | Applied | Staging 23 October, before #146; production 23 October, before #149 |
 | `00036` (Singpass auto-approve, listing review) | Applied | Applied | **Run before the PR's code reaches that environment**: Hosting, listing pages, I'm keen and checkout read `listings.review_status`. Run after `00035`. Existing listings stay live (they are marked approved) |
+| `00038` (what guests should bring) | Not applied | Not applied | **Run before merging.** Create/edit and the listing page select `listings.what_to_bring`. After `00037`. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 

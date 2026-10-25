@@ -64,7 +64,7 @@ async function listQueue() {
   const { data: rows, error } = await adminClient()
     .from('listings')
     .select(
-      'id, title, description, category, area, price_per_person, duration_mins, photo_urls, whats_provided, review_status, review_note, review_requested_at, users!host_id (id, full_name, display_name, email, verification_method, verified_name, teaching_plan)',
+      'id, title, description, category, area, price_per_person, duration_mins, photo_urls, whats_provided, what_to_bring, review_status, review_note, review_requested_at, users!host_id (id, full_name, display_name, email, verification_method, verified_name, teaching_plan)',
     )
     .in('review_status', ['pending', 'changes_requested'])
     .order('review_requested_at', { ascending: true, nullsFirst: true })
@@ -83,6 +83,7 @@ async function listQueue() {
       duration_mins: row.duration_mins,
       photo_urls: Array.isArray(row.photo_urls) ? row.photo_urls : [],
       whats_provided: Array.isArray(row.whats_provided) ? row.whats_provided : [],
+      what_to_bring: Array.isArray(row.what_to_bring) ? row.what_to_bring : [],
       review_status: row.review_status,
       review_note: row.review_note,
       review_requested_at: row.review_requested_at,
