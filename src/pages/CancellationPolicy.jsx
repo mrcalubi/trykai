@@ -54,7 +54,8 @@ export default function CancellationPolicy() {
       </p>
       <p>
         Cancelling adds a strike to your host account. After 3 strikes, your
-        listings are automatically deactivated.
+        listings are automatically deactivated. Removing a date nobody has
+        booked is never a strike.
       </p>
 
       <h3>If you do not show up</h3>

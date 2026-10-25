@@ -3,13 +3,37 @@ import {
   CANCELLATION_POLICY_ITEMS,
   GUEST_CANCELLATION_POLICY_ITEMS,
   GUEST_HOST_CANCEL_COPY,
+  HOST_APPEAL_HREF,
+  HOST_CANCEL_SUMMARY,
 } from '../lib/cancellationPolicy'
 
 export function CancellationPolicyInfo() {
+  const [open, setOpen] = useState(false)
+
   return (
     <div className="cancellation-policy cancellation-policy--static">
       <p className="cancellation-policy__heading">Cancellation Policy</p>
-      <CancellationPolicyContent items={CANCELLATION_POLICY_ITEMS} />
+      <p className="cancellation-policy__lede">{HOST_CANCEL_SUMMARY}</p>
+      <button
+        type="button"
+        className="guest-cancel-note__link"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        See full policy
+      </button>
+      {open ? (
+        <>
+          <CancellationPolicyContent items={CANCELLATION_POLICY_ITEMS} />
+          <p className="cancellation-policy__appeal">
+            If something outside your control made you cancel,{' '}
+            <a href={HOST_APPEAL_HREF} target="_blank" rel="noopener">
+              appeal
+            </a>{' '}
+            within 7 days and we&apos;ll remove the strike.
+          </p>
+        </>
+      ) : null}
     </div>
   )
 }

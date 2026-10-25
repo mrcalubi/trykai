@@ -19,7 +19,7 @@ Cancel anytime from the Bookings tab on your profile. The refund amount is calcu
 
 You can cancel a confirmed session at any time, but every guest booked into that session receives a full refund, including the platform fee, regardless of how close to the session it is.
 
-Cancelling adds a strike to your host account. After 3 strikes, your listings are automatically deactivated.
+Cancelling adds a strike to your host account. After 3 strikes, your listings are automatically deactivated. Removing a date nobody has booked is never a strike.
 
 ### If you do not show up
 

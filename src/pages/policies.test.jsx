@@ -29,6 +29,10 @@ describe('Cancellation Policy page', () => {
     expect(screen.getByText(/After 3 strikes, your\s+listings are automatically deactivated/)).toBeInTheDocument()
   })
 
+  it('states that removing an unbooked date is never a strike', () => {
+    expect(screen.getByText(/Removing a date nobody has\s+booked is never a strike/)).toBeInTheDocument()
+  })
+
   it('states that a host no-show costs two strikes', () => {
     expect(screen.getByText(/receives 2 strikes immediately/)).toBeInTheDocument()
   })

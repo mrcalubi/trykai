@@ -620,6 +620,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-25 — Autosave must not overwrite an unanswered draft or write an empty one.** Close or Continue while "Restore draft / Discard" is showing was writing the fresh wizard over the saved draft; opening and closing Create listing untouched wrote a blank draft that Hosting showed as a card. Autosave now skips while that prompt is unanswered (Save draft may still overwrite). A wizard with no answers (title, description, category, price, duration, area, fullAddress, what's provided, what to bring all empty or default) is not written; if this session wrote the current draft and the answers later become empty, the draft is cleared. Restore draft now also restores the saved step, like Hosting's Continue.
 
+**2026-10-25 — Host cancel copy on Create listing is collapsed and talks to the host.** Hosts said "Host cancels anytime: full refund + strike" read harsh and the box was too long on a phone. The Create listing policy box now always shows a one-sentence summary (full refund plus a strike; emergencies can be appealed) and a "See full policy" toggle. The host rows are second-person and name the empty-date case (`delete_empty_session` is never a strike). The published /cancellation-policy page and markdown add one sentence that removing an unbooked date is never a strike. Guest tiers, refunds, and strike counts are unchanged.
+
 ---
 
 # Analysed but not decided

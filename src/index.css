@@ -5834,6 +5834,20 @@ body.lightbox-open {
   color: var(--text-h);
 }
 
+.cancellation-policy__lede {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.cancellation-policy__appeal {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
 .cancellation-policy__content {
   padding: 12px 16px 16px;
   background: var(--bg);
@@ -5841,6 +5855,7 @@ body.lightbox-open {
 }
 
 .cancellation-policy--static .cancellation-policy__content {
+  margin-top: 12px;
   padding: 0;
   border-top: none;
   background: transparent;
