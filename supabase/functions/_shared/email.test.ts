@@ -18,10 +18,12 @@ import {
   formatCents,
   formatDuration,
   formatPaymentMethod,
+  formatReminderSessionDate,
   formatSessionDate,
   formatSessionDay,
   formatSessionTime,
   guestSessionReminderHtml,
+  reminderWhen,
   guestSessionReminderSubject,
   googleCalendarUrl,
   hostSessionReminderHtml,
@@ -1461,19 +1463,177 @@ describe('listing review emails', () => {
 })
 
 describe('session reminder emails', () => {
-  it('writes the guest subject with Singapore time', () => {
-    expect(guestSessionReminderSubject('Latte art', SESSION_STARTS)).toBe(
-      `Tomorrow: Latte art, ${formatSessionTime(SESSION_STARTS)}`,
+  // 25 Oct 2026 20:00 SGT / 13:00 SGT the same day.
+  const SAME_DAY_START = '2026-10-25T12:00:00.000Z'
+  const SAME_DAY_SENT = '2026-10-25T05:00:00.000Z'
+  // 25 Oct 2026 09:00 SGT, sent 24 Oct 10:00 SGT.
+  const NEXT_DAY_START = '2026-10-25T01:00:00.000Z'
+  const NEXT_DAY_SENT = '2026-10-24T02:00:00.000Z'
+  // Just after midnight SGT on 25 Oct.
+  const AFTER_MIDNIGHT = '2026-10-24T16:05:00.000Z'
+  const EVENING_BEFORE = '2026-10-24T15:00:00.000Z'
+  const JUST_AFTER_MIDNIGHT_SENT = '2026-10-24T16:10:00.000Z'
+
+  it('says Today when the session is later the same Singapore day', () => {
+    expect(reminderWhen(SAME_DAY_START, SAME_DAY_SENT)).toBe('Today')
+    expect(guestSessionReminderSubject('Latte art', SAME_DAY_START, SAME_DAY_SENT)).toBe(
+      `Today: Latte art at ${formatSessionTime(SAME_DAY_START)} 🎉`,
     )
-    expect(formatSessionTime(SESSION_STARTS)).toMatch(/7:00/i)
-    expect(guestSessionReminderSubject('Latte art', 'not-a-date')).toBe('Tomorrow: Latte art')
+    expect(hostSessionReminderSubject('Latte art', 2, SAME_DAY_START, SAME_DAY_SENT)).toBe(
+      'Today: 2 people coming to Latte art 🙌',
+    )
+    const guest = guestSessionReminderHtml({
+      guestName: 'Sam',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(SAME_DAY_START),
+      startsAt: SAME_DAY_START,
+      sentAt: SAME_DAY_SENT,
+      hostName: 'Mei',
+      bookingId: 'booking-1',
+    })
+    expect(guest).toContain('is today!')
+    const host = hostSessionReminderHtml({
+      hostName: 'Mei',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(SAME_DAY_START),
+      startsAt: SAME_DAY_START,
+      sentAt: SAME_DAY_SENT,
+      guests: [{ name: 'Sam', guestsCount: 2 }],
+      totalGuests: 2,
+    })
+    expect(host).toContain('is today, and')
   })
 
-  it('opens the guest reminder with the coming-up line and booking details', () => {
+  it('says Tomorrow when the session is the next Singapore morning', () => {
+    expect(reminderWhen(NEXT_DAY_START, NEXT_DAY_SENT)).toBe('Tomorrow')
+    expect(guestSessionReminderSubject('Latte art', NEXT_DAY_START, NEXT_DAY_SENT)).toBe(
+      `Tomorrow: Latte art at ${formatSessionTime(NEXT_DAY_START)} 🎉`,
+    )
     const html = guestSessionReminderHtml({
       guestName: 'Sam',
       listingTitle: 'Latte art',
-      sessionDate: formatSessionDate(SESSION_STARTS),
+      sessionDate: formatReminderSessionDate(NEXT_DAY_START),
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
+      hostName: 'Mei',
+      bookingId: 'booking-1',
+    })
+    expect(html).toContain('is tomorrow!')
+    expect(html).toContain('Hi Sam!')
+  })
+
+  it('treats a session just after midnight SGT as Today only after midnight', () => {
+    expect(reminderWhen(AFTER_MIDNIGHT, EVENING_BEFORE)).toBe('Tomorrow')
+    expect(reminderWhen(AFTER_MIDNIGHT, JUST_AFTER_MIDNIGHT_SENT)).toBe('Today')
+    expect(guestSessionReminderSubject('Latte art', AFTER_MIDNIGHT, EVENING_BEFORE)).toMatch(
+      /^Tomorrow:/,
+    )
+    expect(guestSessionReminderSubject('Latte art', AFTER_MIDNIGHT, JUST_AFTER_MIDNIGHT_SENT)).toMatch(
+      /^Today:/,
+    )
+  })
+
+  it('puts the weekday on the day-and-time line', () => {
+    const line = formatReminderSessionDate(SAME_DAY_START)
+    expect(line).toBe(`Sun ${formatSessionDate(SAME_DAY_START)}`)
+    expect(line).toMatch(/^Sun 25 Oct 2026/)
+    expect(line).toMatch(/8:00/i)
+  })
+
+  it('uses person or people in the host subject and opening', () => {
+    expect(hostSessionReminderSubject('Latte art', 1, NEXT_DAY_START, NEXT_DAY_SENT)).toBe(
+      'Tomorrow: 1 person coming to Latte art 🙌',
+    )
+    expect(hostSessionReminderSubject('Latte art', 3, NEXT_DAY_START, NEXT_DAY_SENT)).toBe(
+      'Tomorrow: 3 people coming to Latte art 🙌',
+    )
+    expect(
+      hostSessionReminderHtml({
+        listingTitle: 'Latte art',
+        sessionDate: 'Sun 25 Oct 2026, 9:00 am',
+        startsAt: NEXT_DAY_START,
+        sentAt: NEXT_DAY_SENT,
+        guests: [{ name: 'Sam', guestsCount: 1 }],
+        totalGuests: 1,
+      }),
+    ).toContain('1 person is coming')
+    expect(
+      hostSessionReminderHtml({
+        listingTitle: 'Latte art',
+        sessionDate: 'Sun 25 Oct 2026, 9:00 am',
+        startsAt: NEXT_DAY_START,
+        sentAt: NEXT_DAY_SENT,
+        guests: [
+          { name: 'Sam', guestsCount: 2 },
+          { name: 'Alex', guestsCount: 1 },
+        ],
+        totalGuests: 3,
+      }),
+    ).toContain('3 people are coming')
+  })
+
+  it('hides the Total row when there is only one booking', () => {
+    const single = hostSessionReminderHtml({
+      hostName: 'Mei',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(NEXT_DAY_START),
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
+      guests: [{ name: 'Sam', guestsCount: 2 }],
+      totalGuests: 2,
+    })
+    expect(single).toContain('Sam · 2 guests')
+    expect(single).not.toContain('>Total<')
+
+    const many = hostSessionReminderHtml({
+      hostName: 'Mei',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(NEXT_DAY_START),
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
+      guests: [
+        { name: 'Sam', guestsCount: 2 },
+        { name: 'Alex', guestsCount: 1 },
+      ],
+      totalGuests: 3,
+    })
+    expect(hasDetail(many, 'Total', '3 people')).toBe(true)
+  })
+
+  it('lists What to bring after the detail rows, and omits it when empty', () => {
+    const withItems = guestSessionReminderHtml({
+      guestName: 'Sam',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(NEXT_DAY_START),
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
+      whatToBring: ['Water bottle', 'Notebook and pen'],
+      hostName: 'Mei',
+      bookingId: 'booking-1',
+    })
+    expect(hasDetail(withItems, 'Don&#39;t forget to bring', 'Water bottle, Notebook and pen')).toBe(
+      true,
+    )
+    const without = guestSessionReminderHtml({
+      guestName: 'Sam',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(NEXT_DAY_START),
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
+      whatToBring: [],
+      hostName: 'Mei',
+      bookingId: 'booking-1',
+    })
+    expect(without).not.toContain('Don&#39;t forget to bring')
+  })
+
+  it('opens the guest reminder with the new copy, details, and sign-off', () => {
+    const html = guestSessionReminderHtml({
+      guestName: 'Sam',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(NEXT_DAY_START),
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
       duration: formatDuration(90),
       fullAddress: '12 Club Street, Singapore 069410',
       whatsProvided: ['Apron', 'Coffee beans'],
@@ -1481,49 +1641,47 @@ describe('session reminder emails', () => {
       bookingId: 'booking-1',
       siteUrl: 'https://trykai.sg',
     })
-    expect(html).toContain('Hi Sam,')
-    expect(html).toContain("Your session is coming up! Hope you're excited.")
-    expect(hasDetail(html, 'Day and time', formatSessionDate(SESSION_STARTS))).toBe(true)
+    expect(html).toContain('Hi Sam!')
+    expect(html).toContain("Your session is tomorrow! We hope you're excited. Here's everything you need.")
+    expect(hasDetail(html, 'Day and time', formatReminderSessionDate(NEXT_DAY_START))).toBe(true)
     expect(hasDetail(html, 'Duration', '1 hr 30 min')).toBe(true)
     expect(hasDetail(html, 'Address', '12 Club Street, Singapore 069410')).toBe(true)
     expect(hasDetail(html, "What&#39;s provided", 'Apron, Coffee beans')).toBe(true)
     expect(hasDetail(html, 'Host', 'Mei Ling')).toBe(true)
+    expect(html).toContain('say hi to Mei Ling when you get there')
     expect(html).toContain('href="https://trykai.sg/bookings/booking-1"')
     expect(html).toContain('View booking')
-    expect(html).toContain('Need to change plans? You can do that on your booking page.')
+    expect(html).toContain('Plans changed? You can manage your booking from the booking page.')
+    expect(html).toContain('Have a great time!')
     expect(html).toContain('See you there,')
     expect(html).toContain(`src="${EMAIL_LOGO_URL}"`)
   })
 
-  it('escapes titles and names in the guest reminder', () => {
+  it('escapes titles, names and bring items in the guest reminder', () => {
     const html = guestSessionReminderHtml({
       guestName: '<b>Sam</b>',
       listingTitle: '<script>alert(1)</script>',
-      sessionDate: '28 Aug 2026, 7:00 pm',
+      sessionDate: 'Sun 25 Oct 2026, 9:00 am',
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
+      whatToBring: ['<img src=x>'],
       hostName: '<img src=x>',
       bookingId: 'booking-1',
     })
     expect(html).not.toContain('<script>alert(1)</script>')
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
-    expect(html).toContain('Hi &lt;b&gt;Sam&lt;/b&gt;,')
+    expect(html).toContain('Hi &lt;b&gt;Sam&lt;/b&gt;!')
     expect(html).not.toContain('<img src=x>')
     expect(html).toContain('&lt;img src=x&gt;')
   })
 
-  it('uses person or people in the host subject', () => {
-    expect(hostSessionReminderSubject('Latte art', 1)).toBe(
-      'Tomorrow: 1 person coming to Latte art',
-    )
-    expect(hostSessionReminderSubject('Latte art', 3)).toBe(
-      'Tomorrow: 3 people coming to Latte art',
-    )
-  })
-
-  it('lists guests and group sizes on the host reminder', () => {
+  it('lists guests on the host reminder and uses the new close', () => {
     const html = hostSessionReminderHtml({
       hostName: 'Mei',
       listingTitle: 'Latte art',
-      sessionDate: formatSessionDate(SESSION_STARTS),
+      sessionDate: formatReminderSessionDate(NEXT_DAY_START),
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
       guests: [
         { name: 'Sam', guestsCount: 2 },
         { name: 'Alex', guestsCount: 1 },
@@ -1531,14 +1689,15 @@ describe('session reminder emails', () => {
       totalGuests: 3,
       siteUrl: 'https://trykai.sg',
     })
-    expect(html).toContain('Hi Mei,')
+    expect(html).toContain('Hi Mei!')
+    expect(html).toContain('Thanks for sharing what you love!')
     expect(html).toContain('Sam · 2 guests')
     expect(html).toContain('Alex · 1 guest')
-    expect(hasDetail(html, 'Total', '3 people')).toBe(true)
-    expect(hasDetail(html, 'Day and time', formatSessionDate(SESSION_STARTS))).toBe(true)
+    expect(hasDetail(html, 'Day and time', formatReminderSessionDate(NEXT_DAY_START))).toBe(true)
     expect(html).toContain('href="https://trykai.sg/hosting"')
     expect(html).toContain('View hosting')
-    expect(html).toContain('Hope it goes brilliantly.')
+    expect(html).toContain('Need to change something? You can manage this session from your Hosting page.')
+    expect(html).toContain('Hope it goes brilliantly. Have fun!')
     expect(html).toContain('See you there,')
   })
 
@@ -1546,13 +1705,15 @@ describe('session reminder emails', () => {
     const html = hostSessionReminderHtml({
       hostName: '<b>Mei</b>',
       listingTitle: '<script>x</script>',
-      sessionDate: '28 Aug 2026, 7:00 pm',
+      sessionDate: 'Sun 25 Oct 2026, 9:00 am',
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
       guests: [{ name: '<img src=x>', guestsCount: 1 }],
       totalGuests: 1,
     })
     expect(html).not.toContain('<script>x</script>')
     expect(html).toContain('&lt;script&gt;x&lt;/script&gt;')
-    expect(html).toContain('Hi &lt;b&gt;Mei&lt;/b&gt;,')
+    expect(html).toContain('Hi &lt;b&gt;Mei&lt;/b&gt;!')
     expect(html).not.toContain('<img src=x>')
     expect(html).toContain('&lt;img src=x&gt;')
   })
