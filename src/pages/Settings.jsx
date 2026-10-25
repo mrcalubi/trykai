@@ -24,7 +24,9 @@ export default function Settings() {
   const [nameError, setNameError] = useState('')
   const [displayNameError, setDisplayNameError] = useState('')
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [saveStatus, setSaveStatus] = useState('')
+  const [saveStatusKind, setSaveStatusKind] = useState('success')
+  const [saveStatusFading, setSaveStatusFading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -65,6 +67,19 @@ export default function Settings() {
     }
   }, [avatarPreviewUrl])
 
+  useEffect(() => {
+    if (!saveStatus) return undefined
+    const fade = window.setTimeout(() => setSaveStatusFading(true), 4000)
+    const clear = window.setTimeout(() => {
+      setSaveStatus('')
+      setSaveStatusFading(false)
+    }, 4400)
+    return () => {
+      window.clearTimeout(fade)
+      window.clearTimeout(clear)
+    }
+  }, [saveStatus])
+
   function handleAvatarChange(event) {
     const file = Array.from(event.target.files ?? []).find((candidate) =>
       candidate.type.startsWith('image/')
@@ -96,7 +111,8 @@ export default function Settings() {
   async function handleSave(event) {
     event.preventDefault()
     setError('')
-    setSuccess('')
+    setSaveStatus('')
+    setSaveStatusFading(false)
     setNameError('')
     setDisplayNameError('')
 
@@ -124,7 +140,8 @@ export default function Settings() {
       } catch (uploadError) {
         console.error('Avatar upload failed', uploadError)
         setSaving(false)
-        setError(uploadError.message)
+        setSaveStatusKind('error')
+        setSaveStatus(uploadError.message)
         return
       }
     }
@@ -144,7 +161,8 @@ export default function Settings() {
     setSaving(false)
 
     if (updateError) {
-      setError(updateError.message)
+      setSaveStatusKind('error')
+      setSaveStatus(updateError.message)
       return
     }
 
@@ -157,7 +175,8 @@ export default function Settings() {
       if (previous) URL.revokeObjectURL(previous)
       return ''
     })
-    setSuccess('Your profile has been saved.')
+    setSaveStatusKind('success')
+    setSaveStatus('Saved')
   }
 
   async function handleLogout() {
@@ -178,16 +197,11 @@ export default function Settings() {
         <h1 className="form-card__title">Settings</h1>
         <p className="form-card__subtitle">Your public profile and account.</p>
 
-        {success && (
-          <p className="settings-banner settings-banner--success" role="status">
-            {success}
-          </p>
-        )}
-        {error && (
+        {error ? (
           <p className="settings-banner settings-banner--error" role="alert">
             {error}
           </p>
-        )}
+        ) : null}
 
         <section className="settings-group" aria-labelledby="settings-profile-heading">
           <h2 id="settings-profile-heading" className="settings-group__title">
@@ -252,9 +266,25 @@ export default function Settings() {
               error={nameError}
             />
 
-            <Button type="submit" variant="primary" loading={saving} loadingLabel="Saving">
-              Save changes
-            </Button>
+            <div className="settings-save">
+              <Button type="submit" variant="primary" loading={saving} loadingLabel="Saving">
+                Save changes
+              </Button>
+              {saveStatus ? (
+                <p
+                  className={[
+                    'settings-save-status',
+                    saveStatusKind === 'error' ? 'settings-save-status--error' : '',
+                    saveStatusFading ? 'settings-save-status--fade' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  role="status"
+                >
+                  {saveStatus}
+                </p>
+              ) : null}
+            </div>
           </form>
         </section>
 

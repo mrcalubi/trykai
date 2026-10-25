@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Settings from './Settings'
@@ -170,7 +172,12 @@ describe('Settings profile form', () => {
     })
     expect(call.filters).toContainEqual({ method: 'eq', column: 'id', value: USER_ID })
     expect(call.chain.some((step) => step.method === 'select')).toBe(false)
-    expect(await screen.findByText('Your profile has been saved.')).toBeInTheDocument()
+    const status = await screen.findByRole('status')
+    expect(status).toHaveTextContent('Saved')
+    expect(document.querySelector('.settings-save')).toContainElement(status)
+    expect(document.querySelector('.settings-save')).toContainElement(
+      screen.getByRole('button', { name: 'Save changes' }),
+    )
   })
 
   it('uploads a new photo and writes its public URL to avatar_url', async () => {
@@ -219,7 +226,8 @@ describe('Settings profile form', () => {
 
     await screen.getByRole('button', { name: 'Save changes' }).click()
 
-    expect(await screen.findByText('storage full')).toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent('storage full')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(supabase.__calls('users', 'update')).toHaveLength(0)
   })
 
@@ -258,7 +266,16 @@ describe('Settings profile form', () => {
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText('not allowed')).toBeInTheDocument()
-    expect(screen.queryByText('Your profile has been saved.')).not.toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent('not allowed')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText('Saved')).not.toBeInTheDocument()
+  })
+
+  it('fades the save status after 4 seconds', () => {
+    const source = readFileSync(resolve(import.meta.dirname, './Settings.jsx'), 'utf8')
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    expect(source).toMatch(/setSaveStatusFading\(true\), 4000\)/)
+    expect(source).toMatch(/\}, 4400\)/)
+    expect(css).toMatch(/\.settings-save-status--fade \{[\s\S]*?opacity:\s*0;/)
   })
 })

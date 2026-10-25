@@ -3344,7 +3344,11 @@ body.lightbox-open {
   margin: 4px 0 0;
   font-size: 13px;
   font-weight: 700;
-  color: var(--success);
+  color: var(--navy);
+}
+
+.verified-badge .ui-icon {
+  color: var(--coral-ink);
 }
 
 .detail-host__avatar-link {
@@ -3419,11 +3423,15 @@ body.lightbox-open {
 .detail-host__more {
   display: inline;
   margin-left: 0.2em;
-  font-size: inherit;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
   font-weight: 600;
   color: var(--navy);
   text-decoration: none;
   text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 .detail-host__more:hover,
@@ -5218,7 +5226,7 @@ body.lightbox-open {
 }
 
 .ui-overflow__item:hover,
-.ui-overflow__item:focus {
+.ui-overflow__item:focus-visible {
   /* Flatten the tint so the row stays opaque over the listing behind it. */
   background-color: color-mix(in srgb, var(--navy) 8%, var(--bg-elevated));
   outline: none;
@@ -6280,9 +6288,27 @@ body.lightbox-open {
   border-radius: var(--radius-sm);
 }
 
-.settings-banner--success {
+.settings-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-save-status {
+  margin: 0;
+  font-size: 14px;
   color: var(--success);
-  background: var(--success-bg);
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+
+.settings-save-status--error {
+  color: var(--error);
+}
+
+.settings-save-status--fade {
+  opacity: 0;
 }
 
 .settings-banner--error {

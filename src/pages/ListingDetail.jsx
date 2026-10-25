@@ -41,6 +41,7 @@ import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import { SHARE_NOTES, shareOrCopy } from '../lib/share'
 import { BackRowActions } from '../components/BackButton'
 import Icon from '../components/ui/Icon'
+import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
@@ -85,15 +86,23 @@ function HostAvatar({ host, to }) {
   )
 }
 
-function HostBioPreview({ bio, to }) {
+function HostBioPreview({ bio }) {
+  const [open, setOpen] = useState(false)
   const { preview, truncated } = previewHostBio(bio)
+  const text = String(bio).trim()
+
   return (
     <p className="detail-host__bio">
-      {preview}
-      {truncated && to ? (
-        <Link to={to} className="detail-host__more">
-          … more
-        </Link>
+      {open || !truncated ? text : preview}
+      {truncated ? (
+        <button
+          type="button"
+          className="detail-host__more"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          {open ? 'Less' : '… more'}
+        </button>
       ) : null}
     </p>
   )
@@ -1057,17 +1066,12 @@ export default function ListingDetail() {
                     hostName
                   )}
                 </p>
-                {hostVerified ? (
-                  <p className="verified-badge">
-                    <Icon name="shield" size={15} />
-                    ID verified
-                  </p>
-                ) : null}
+                {hostVerified ? <VerifiedBadge /> : null}
                 <HostRating reviews={hostReviews} />
               </div>
             </div>
             {typeof host?.bio === 'string' && host.bio.trim() ? (
-              <HostBioPreview bio={host.bio} to={hostProfile} />
+              <HostBioPreview bio={host.bio} />
             ) : null}
             {hostProfile ? (
               <Link to={hostProfile} className="detail-host__profile">
