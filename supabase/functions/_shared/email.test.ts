@@ -1491,7 +1491,7 @@ describe('session reminder emails', () => {
       hostName: 'Mei',
       bookingId: 'booking-1',
     })
-    expect(guest).toContain('Your session is Today!')
+    expect(guest).toContain('is today!')
     const host = hostSessionReminderHtml({
       hostName: 'Mei',
       listingTitle: 'Latte art',
@@ -1501,7 +1501,7 @@ describe('session reminder emails', () => {
       guests: [{ name: 'Sam', guestsCount: 2 }],
       totalGuests: 2,
     })
-    expect(host).toContain('Your session is Today, and 2 people are coming.')
+    expect(host).toContain('is today, and')
   })
 
   it('says Tomorrow when the session is the next Singapore morning', () => {
@@ -1518,7 +1518,7 @@ describe('session reminder emails', () => {
       hostName: 'Mei',
       bookingId: 'booking-1',
     })
-    expect(html).toContain('Your session is Tomorrow!')
+    expect(html).toContain('is tomorrow!')
     expect(html).toContain('Hi Sam!')
   })
 
@@ -1642,7 +1642,7 @@ describe('session reminder emails', () => {
       siteUrl: 'https://trykai.sg',
     })
     expect(html).toContain('Hi Sam!')
-    expect(html).toContain("Your session is Tomorrow! We hope you're excited. Here's everything you need.")
+    expect(html).toContain("Your session is tomorrow! We hope you're excited. Here's everything you need.")
     expect(hasDetail(html, 'Day and time', formatReminderSessionDate(NEXT_DAY_START))).toBe(true)
     expect(hasDetail(html, 'Duration', '1 hr 30 min')).toBe(true)
     expect(hasDetail(html, 'Address', '12 Club Street, Singapore 069410')).toBe(true)

@@ -592,7 +592,7 @@ export function guestSessionReminderHtml(options: {
   return wrapEmail(
     `
     <p style="margin:0 0 16px;">${reminderGreeting(options.guestName)}</p>
-    <p style="margin:0 0 16px;">Your session is ${when}! We hope you're excited. Here's everything you need.</p>
+    <p style="margin:0 0 16px;">Your session is ${when.toLowerCase()}! We hope you're excited. Here's everything you need.</p>
     ${emailHeading(options.listingTitle)}
     ${detailRows([
       ['Day and time', escapeHtml(options.sessionDate)],
@@ -649,7 +649,7 @@ export function hostSessionReminderHtml(options: {
   return wrapEmail(
     `
     <p style="margin:0 0 16px;">${reminderGreeting(options.hostName)}</p>
-    <p style="margin:0 0 16px;">Your session is ${when}, and ${coming} coming. Thanks for sharing what you love!</p>
+    <p style="margin:0 0 16px;">Your session is ${when.toLowerCase()}, and ${coming} coming. Thanks for sharing what you love!</p>
     ${emailHeading(options.listingTitle)}
     ${detailRows([
       ["Who's coming", who],
