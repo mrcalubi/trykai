@@ -174,7 +174,7 @@ Once per booking, same 48 hour cutoff. Published as available. Recovers bookings
 `sessions.status` documents `'completed'`. Nothing ever writes it. Payouts key off `starts_at` + `duration_mins` + 72h, not this status, so launch can survive without it. Reviews and dispute windows were supposed to key off it.
 
 ### P2.6 — Host strike appeals
-Within 7 days, reviewed manually. Needs a submission form and an admin view.
+Within 7 days, reviewed manually. Hosts email `hello@trykai.sg` with their booking reference and what happened. SQL: `admin_remove_host_strike` (`00039`). **No admin UI (KIV).**
 
 ### P2.7 — Admin: dispute log
 Disputes arrive by email today. At launch volume that is survivable.
@@ -228,7 +228,7 @@ In this order after warm-contact launch:
 
 14. **Move production to Singapore.** Production was created in Mumbai (`ap-south-1`) by accident. Supabase cannot move a project: create a new `ap-southeast-1` project and cut over the database and auth users, storage, Edge Function secrets, Vault and cron, Stripe webhook URLs, Vercel env, and `PRODUCTION_SUPABASE_PROJECT_REF`. Rui Heng's call on timing; a quiet week after the first bookings.
 15. **Propose a new time to guests.** Booked sessions cannot be edited. Let a host propose a new time that each guest accepts or declines (cancel with full refund).
-16. **Auto-fill area from postal code.** The OneMap lookup already returns the address; use its planning area to preselect the area.
+16. ~~**Auto-fill area from postal code.**~~ Done 25 October: postal lookup returns OneMap's planning area and fills Area guests see (DECISIONS.md, Postal code drives the listing address and Area).
 17. **Unit number formatted `#XX-XX`.**
 18. **Book a whole session privately.** One guest pays for every spot.
 19. **Per-pair price on the booking card** when group pricing applies.

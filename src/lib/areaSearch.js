@@ -2,7 +2,7 @@ import {
   EXTRA_AREA_ALIASES,
   OFFICIAL_SUBZONE_ALIASES,
 } from '../data/areaAliases'
-import { PLANNING_AREA_NAMES } from './planningAreas'
+import { PLANNING_AREA_NAMES, hostPlanningAreaNames } from './planningAreas'
 
 function expandAliasRows(rows) {
   const out = []
@@ -40,6 +40,13 @@ export function planningAreaForAlias(query) {
   if (exactArea) return exactArea
   const areas = AREAS_BY_ALIAS.get(q) ?? []
   return areas.length === 1 ? areas[0] : null
+}
+
+/** OneMap names are uppercase; only keep values the host picker accepts. */
+export function acceptedPlanningAreaFromLookup(raw, current = '') {
+  const mapped = planningAreaForAlias(raw)
+  if (!mapped) return null
+  return hostPlanningAreaNames(current).includes(mapped) ? mapped : null
 }
 
 export function searchAreaOptions(query, names = PLANNING_AREA_NAMES) {

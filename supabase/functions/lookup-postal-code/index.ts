@@ -3,10 +3,12 @@ import { jsonResponse, textResponse } from '../_shared/http.ts'
 import {
   POSTAL_LOOKUP_LIMIT_MESSAGE,
   allowPostalLookup,
+  firstSearchCoords,
   hasBearerJwt,
   isCachedTokenFresh,
   isValidPostal,
   oneMapAccessToken,
+  oneMapPlanningArea,
   publicSearchHits,
   searchOneMapPostal,
 } from '../_shared/onemap.ts'
@@ -29,6 +31,21 @@ async function token(): Promise<string> {
 function clearToken() {
   cachedToken = ''
   cachedExpiry = 0
+}
+
+async function lookupPostal(access: string, postal: string) {
+  const raw = await searchOneMapPostal(fetch, access, postal)
+  const results = publicSearchHits(raw)
+  let planning_area: string | null = null
+  try {
+    const coords = firstSearchCoords(raw)
+    if (coords) {
+      planning_area = await oneMapPlanningArea(fetch, access, coords.latitude, coords.longitude)
+    }
+  } catch {
+    planning_area = null
+  }
+  return { results, planning_area }
 }
 
 Deno.serve(async (req) => {
@@ -61,21 +78,21 @@ Deno.serve(async (req) => {
 
     let access = await token()
     try {
-      const results = publicSearchHits(await searchOneMapPostal(fetch, access, postal))
+      const { results, planning_area } = await lookupPostal(access, postal)
       if (results.length === 0) {
         return jsonResponse({ error: 'No address matches that postal code.', results: [] }, 404)
       }
-      return jsonResponse({ results })
+      return jsonResponse({ results, planning_area })
     } catch (error) {
       const message = error instanceof Error ? error.message : ''
       if (!message.toLowerCase().includes('token')) throw error
       clearToken()
       access = await token()
-      const results = publicSearchHits(await searchOneMapPostal(fetch, access, postal))
+      const { results, planning_area } = await lookupPostal(access, postal)
       if (results.length === 0) {
         return jsonResponse({ error: 'No address matches that postal code.', results: [] }, 404)
       }
-      return jsonResponse({ results })
+      return jsonResponse({ results, planning_area })
     }
   } catch {
     console.error('lookup-postal-code failed')

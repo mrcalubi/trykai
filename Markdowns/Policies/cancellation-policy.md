@@ -1,6 +1,6 @@
 # Cancellation Policy
 
-Last updated: 29 July 2026
+Last updated: 25 October 2026
 
 This policy applies to single session bookings on TryKai. It is shown to guests before checkout and to hosts before a listing goes live, so there are no surprises on either side.
 
@@ -19,7 +19,7 @@ Cancel anytime from the Bookings tab on your profile. The refund amount is calcu
 
 You can cancel a confirmed session at any time, but every guest booked into that session receives a full refund, including the platform fee, regardless of how close to the session it is.
 
-Cancelling adds a strike to your host account. After 3 strikes, your listings are automatically deactivated.
+Cancelling adds a strike to your host account. After 3 strikes, your listings are automatically deactivated. Removing a date nobody has booked is never a strike. Strikes expire 12 months after they're given.
 
 ### If you do not show up
 
@@ -31,7 +31,7 @@ A host who does not show up for a confirmed session is treated far more seriousl
 
 ### Appealing a strike
 
-If your cancellation or no show was caused by something genuinely outside your control (for example a sudden emergency, illness, or an unexpected venue issue), you can submit an appeal within 7 days of the cancellation, with a short explanation of what happened. We review appeals manually. If an appeal is successful, the strike is removed from your account. Appeals only affect whether a host keeps a strike. They do not affect the guest's refund, which is unaffected either way.
+If your cancellation or no show was caused by something genuinely outside your control (for example a sudden emergency, illness, or an unexpected venue issue), you can submit an appeal within 7 days of the cancellation, with a short explanation of what happened. Email hello@trykai.sg with your booking reference and what happened. We review appeals manually. If an appeal is successful, the strike is removed from your account. Appeals only affect whether a host keeps a strike. They do not affect the guest's refund, which is unaffected either way.
 
 We recommend flagging any known risk in your listing description ahead of time (for example, sessions that depend on outdoor conditions), so guests know what to expect before booking.
 

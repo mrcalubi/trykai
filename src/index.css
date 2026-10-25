@@ -1621,6 +1621,65 @@ a {
   max-width: 520px;
 }
 
+.confirm-dialog-backdrop--sheet {
+  align-items: stretch;
+  padding: 0;
+}
+
+.confirm-dialog--sheet {
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  max-height: none;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.confirm-dialog__sheet-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 8px 8px 8px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.confirm-dialog__sheet-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.confirm-dialog__sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 20px 32px;
+}
+
+.confirm-dialog__sheet-body h2:first-child {
+  margin-top: 16px;
+}
+
+@media (min-width: 768px) {
+  .confirm-dialog-backdrop--sheet {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .confirm-dialog--sheet {
+    width: min(640px, 100%);
+    height: min(720px, 90vh);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+}
+
 .cover-crop {
   position: relative;
   width: 100%;
@@ -1736,6 +1795,11 @@ input[type='radio'] {
 
 .planning-area-select {
   position: relative;
+  width: 100%;
+}
+
+.planning-area-select .input {
+  width: 100%;
 }
 
 .planning-area-select__list {
@@ -1819,6 +1883,55 @@ input[type='radio'] {
 .postal-address__option--on {
   border-color: var(--navy);
   background: var(--primary-bg);
+}
+
+.postal-address__status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.postal-address__looking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.postal-address__looking .tk-spinner {
+  width: 14px;
+  height: 14px;
+  color: var(--navy);
+}
+
+.postal-address__card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--primary-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.postal-address__card-check {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--navy);
+}
+
+.postal-address__card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.postal-address__card-address {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-h);
 }
 
 .input--textarea {
@@ -5693,32 +5806,25 @@ body.lightbox-open {
   background: var(--bg-subtle);
 }
 
-.cancellation-policy__toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 12px 16px;
-  font-size: 14px;
-  font-family: inherit;
-  font-weight: 600;
-  color: var(--text-h);
-  background: var(--bg-subtle);
-  border: none;
-  cursor: pointer;
-  text-align: left;
-}
-
-.cancellation-policy__chevron {
-  font-size: 18px;
-  color: var(--text);
-}
-
 .cancellation-policy__heading {
   margin: 0 0 12px;
   font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
+}
+
+.cancellation-policy__lede {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.cancellation-policy__appeal {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
 }
 
 .cancellation-policy__content {
@@ -5728,6 +5834,7 @@ body.lightbox-open {
 }
 
 .cancellation-policy--static .cancellation-policy__content {
+  margin-top: 12px;
   padding: 0;
   border-top: none;
   background: transparent;

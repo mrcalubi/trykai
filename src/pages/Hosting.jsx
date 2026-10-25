@@ -27,7 +27,7 @@ import {
   skipReasonFromRpcMessage,
 } from '../lib/sessionBatch'
 import { singaporeDateKey } from '../lib/sessionCalendar'
-import { LISTING_STEPS, clearDraft, draftValues, readDraft } from '../lib/listingDraft'
+import { LISTING_STEPS, clearDraft, draftValues, isBlankDraft, readDraft } from '../lib/listingDraft'
 import {
   formatSgd,
   listingDatesLine,
@@ -145,7 +145,10 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
   const [hostSessions, setHostSessions] = useState([])
   const [monthSessions, setMonthSessions] = useState([])
   const [verificationStatus, setVerificationStatus] = useState(null)
-  const [draft, setDraft] = useState(() => readDraft(userId))
+  const [draft, setDraft] = useState(() => {
+    const stored = readDraft(userId)
+    return stored && !isBlankDraft(stored) ? stored : null
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [isHost, setIsHost] = useState(false)

@@ -4,7 +4,7 @@ export default function CancellationPolicy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Cancellation Policy</h1>
-      <p className="policy-page__updated">Last updated: 29 July 2026</p>
+      <p className="policy-page__updated">Last updated: 25 October 2026</p>
 
       <p>
         This policy applies to single session bookings on TryKai. It is shown to
@@ -54,7 +54,9 @@ export default function CancellationPolicy() {
       </p>
       <p>
         Cancelling adds a strike to your host account. After 3 strikes, your
-        listings are automatically deactivated.
+        listings are automatically deactivated. Removing a date nobody has
+        booked is never a strike. Strikes expire 12 months after they&apos;re
+        given.
       </p>
 
       <h3>If you do not show up</h3>
@@ -82,10 +84,12 @@ export default function CancellationPolicy() {
         If your cancellation or no show was caused by something genuinely
         outside your control (for example a sudden emergency, illness, or an
         unexpected venue issue), you can submit an appeal within 7 days of the
-        cancellation, with a short explanation of what happened. We review
-        appeals manually. If an appeal is successful, the strike is removed from
-        your account. Appeals only affect whether a host keeps a strike. They do
-        not affect the guest&apos;s refund, which is unaffected either way.
+        cancellation, with a short explanation of what happened. Email{' '}
+        <a href="mailto:hello@trykai.sg">hello@trykai.sg</a> with your booking
+        reference and what happened. We review appeals manually. If an appeal
+        is successful, the strike is removed from your account. Appeals only
+        affect whether a host keeps a strike. They do not affect the
+        guest&apos;s refund, which is unaffected either way.
       </p>
       <p>
         We recommend flagging any known risk in your listing description ahead

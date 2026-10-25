@@ -200,8 +200,10 @@ describe('CANCELLATION_POLICY_ITEMS', () => {
       'Guest cancels 24–48 hours before session',
       'Guest cancels 6–24 hours before session',
       'Guest cancels under 6 hours before session, or does not show up',
-      'Host cancels anytime',
-      '3 host strikes',
+      'You cancel a booked session',
+      'You remove a date nobody has booked',
+      '3 strikes',
+      'How long a strike lasts',
     ])
   })
 
@@ -238,13 +240,26 @@ describe('CANCELLATION_POLICY_ITEMS', () => {
 
   it('promises the host a full refund to guests plus a strike', () => {
     expect(CANCELLATION_POLICY_ITEMS[4].resolution).toBe(
-      'Full refund to guest + host receives a strike'
+      'Every guest gets a full refund and you get one strike. Guests plan their day around your session, so we keep cancellations rare.'
     )
   })
 
-  it('warns that three strikes deactivates the listing', () => {
+  it('says removing an unbooked date is never a strike', () => {
+    expect(CANCELLATION_POLICY_ITEMS[5].scenario).toBe('You remove a date nobody has booked')
     expect(CANCELLATION_POLICY_ITEMS[5].resolution).toBe(
-      'Listing is automatically deactivated'
+      'No strike. Change your calendar freely.'
+    )
+  })
+
+  it('warns that three strikes takes listings down', () => {
+    expect(CANCELLATION_POLICY_ITEMS[6].resolution).toBe(
+      'Your listings are taken down automatically.'
+    )
+  })
+
+  it('says strikes expire after 12 months', () => {
+    expect(CANCELLATION_POLICY_ITEMS[7].resolution).toBe(
+      "Strikes expire 12 months after they're given."
     )
   })
 })

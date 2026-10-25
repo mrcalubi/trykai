@@ -449,7 +449,9 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00034` (teaching plan) | Applied | Applied | 23 October, before #145. |
 | `00035` (Singpass) | Applied | Applied | Staging 23 October, before #146; production 23 October, before #149 |
 | `00036` (Singpass auto-approve, listing review) | Applied | Applied | **Run before the PR's code reaches that environment**: Hosting, listing pages, I'm keen and checkout read `listings.review_status`. Run after `00035`. Existing listings stay live (they are marked approved) |
-| `00038` (what guests should bring) | Not applied | Not applied | **Run before merging.** Create/edit and the listing page select `listings.what_to_bring`. After `00037`. |
+| `00037` (session reminders) | Applied | Applied | Staging 24 October; production 25 October, before #163 |
+| `00038` (what guests should bring) | Applied | Applied | Production 25 October, before #163. After `00037`. |
+| `00039` (host strike events, 12-month expiry) | Not applied | Not applied | **Apply on staging, then production, before merging this PR.** After `00038`. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
@@ -464,7 +466,7 @@ Merging `staging` into `main` so production runs the current tree. Owner: Rui He
 - [ ] `ONEMAP_EMAIL` and `ONEMAP_PASSWORD` set as production Edge Function secrets (`lookup-postal-code`, from #132)
 
 **After the merge:**
-- [ ] Live Stripe "Connected accounts" webhook destination for `account.updated`, and `STRIPE_CONNECT_WEBHOOK_SECRET` on production (see Connected accounts webhook below)
+- [x] Live Stripe "Connected accounts" webhook destination for `account.updated`, and `STRIPE_CONNECT_WEBHOOK_SECRET` on production (see Connected accounts webhook below). Done 25 October: `account.updated` only, snapshot payload, and `STRIPE_CONNECT_WEBHOOK_SECRET` set on production.
 - [ ] One real card booking on production, then refund it
 - [ ] Production cron `pg_net` timeout raised to about 30 seconds (the hourly `release-payout` call)
 - [ ] Production end to end test without real checkout, then on a phone
@@ -816,6 +818,8 @@ Guests and hosts get one email when an open session starts in 2–24 hours. The 
 
 Merging the GitHub PR deploys the function (CI on push to `staging`). **Apply `00037` on the project before you merge**, or the first hourly call will query columns that are not there yet. Do the same later on production, with production URLs and keys, before that deploy.
 
+Production is set up as of 25 October (`REMINDERS_CRON_SECRET` and the three Vault secrets).
+
 **Project:** trykai-staging, ref `hzgybclfvpuxkmytdoos`  
 **Dashboard:** https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos
 
@@ -1050,7 +1054,7 @@ Refunds whatever is left on the payment (after any earlier partial refund), canc
 
 ## 4. Afterwards
 
-- Strikes or warnings for the host are separate (Dispute Policy); use the existing strike process.
+- Strikes or warnings for the host are separate (Dispute Policy); use **Host strike appeal** below.
 - Production uses that project's URL, anon key, your sign-in on the production site, and (break-glass only) that project's admin secret, not the staging ref above.
 
 ## 5. Audit trail
@@ -1095,6 +1099,60 @@ If the email says the host was **already paid**, decide with the team whether to
 ## Refunds made in the Stripe Dashboard
 
 `charge.refunded` raises `refund_amount` to the charge's total refunded and adds the `re_` id to `stripe_partial_refund_ids`. It does **not** lower `host_payout_amount`, set `stripe_refund_id`, or hold the payout, so the host is still paid in full on schedule. Use `admin-dispute-booking` / `admin-cancel-booking` for refunds instead. If a Dashboard refund is unavoidable before the payout, place a hold first (Guest dispute refund, step 1) and fix the split after.
+
+---
+
+# Host strike appeal
+
+Hosts email `hello@trykai.sg` within 7 days of the cancellation with their booking reference and what happened. There is no admin UI. A successful appeal removes the strike. It never undoes the guest's refund and never turns listings back on.
+
+Apply `00039` on this project before using the SQL below. Confirm the project ref in the URL first (`hzgybclfvpuxkmytdoos` staging, `dqqlwofluvhikebtjune` production).
+
+## 0. Find the strike
+
+In **SQL Editor** (read only):
+
+```sql
+select e.id, e.host_id, e.reason, e.session_id, e.created_at, e.removed_at,
+       u.email, u.display_name, u.host_strikes
+from public.host_strike_events e
+join public.users u on u.id = e.host_id
+where e.removed_at is null
+  and (
+    u.email ilike 'host@example.com'
+    or e.session_id::text ilike 'SESSION-UUID%'
+  )
+order by e.created_at desc;
+```
+
+The booking reference is the first 8 characters of `bookings.id`, uppercase. From the booking, `sessions.host` is the listing host:
+
+```sql
+select b.id, b.session_id, l.host_id
+from public.bookings b
+join public.sessions s on s.id = b.session_id
+join public.listings l on l.id = s.listing_id
+where b.id::text ilike 'a1b2c3d4%';
+```
+
+## 1. Remove the strike
+
+```sql
+select public.admin_remove_host_strike(
+  'EVENT-UUID'::uuid,
+  'Appeal approved: venue closed on the day. Support thread 2026-10-25.'
+);
+```
+
+Run this from the SQL Editor only. Clients have no EXECUTE grant, so a signed-in admin cannot call it from the app; the `is_admin` check in the function never runs. The note is required and is kept on the event.
+
+It sets `removed_at` and `removed_note`, then sets `users.host_strikes` to the active count (not removed, and given in the last 12 months).
+
+## 2. Afterwards
+
+- Email the host yourself. There is no automatic appeal email.
+- If listings were taken down at 3 strikes, leave them down until the team reviews. Expiry and appeals do not reactivate listings.
+- Production uses that project's SQL Editor, not the staging ref.
 
 ---
 

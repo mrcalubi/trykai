@@ -30,15 +30,32 @@ export const CANCELLATION_POLICY_ITEMS = [
     resolution: 'No refund',
   },
   {
-    scenario: 'Host cancels anytime',
-    resolution: 'Full refund to guest + host receives a strike',
+    scenario: 'You cancel a booked session',
+    resolution:
+      'Every guest gets a full refund and you get one strike. Guests plan their day around your session, so we keep cancellations rare.',
   },
-  { scenario: '3 host strikes', resolution: 'Listing is automatically deactivated' },
+  {
+    scenario: 'You remove a date nobody has booked',
+    resolution: 'No strike. Change your calendar freely.',
+  },
+  {
+    scenario: '3 strikes',
+    resolution: 'Your listings are taken down automatically.',
+  },
+  {
+    scenario: 'How long a strike lasts',
+    resolution: "Strikes expire 12 months after they're given.",
+  },
 ]
 
 export const GUEST_CANCELLATION_POLICY_ITEMS = CANCELLATION_POLICY_ITEMS.slice(0, 4)
 
 export const GUEST_HOST_CANCEL_COPY = 'If the host cancels, you get a full refund'
+
+export const HOST_CANCEL_SUMMARY =
+  'If you cancel a booked session, your guests get a full refund and you get a strike. Emergencies can be appealed.'
+
+export const HOST_APPEAL_HREF = '/cancellation-policy#appeals'
 
 export function formatCents(cents) {
   const dollars = Number(cents) / 100

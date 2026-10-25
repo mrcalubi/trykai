@@ -51,6 +51,16 @@ export function readDraft(userId) {
   }
 }
 
+export function writeDraft(userId, values) {
+  if (!userId) return false
+  try {
+    window.localStorage.setItem(draftKey(userId), JSON.stringify(values))
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function clearDraft(userId) {
   try {
     window.localStorage.removeItem(draftKey(userId))
@@ -81,4 +91,20 @@ export function draftValues(draft) {
     whatsProvided: Array.isArray(draft?.whatsProvided) ? draft.whatsProvided : [],
     whatToBring: Array.isArray(draft?.whatToBring) ? draft.whatToBring : [],
   }
+}
+
+/** True when the wizard has only defaults — not enough to keep as a draft. */
+export function isBlankDraft(draft) {
+  const values = draftValues(draft)
+  return (
+    !values.title.trim() &&
+    !values.description.trim() &&
+    !values.category.trim() &&
+    !values.price.trim() &&
+    values.durationChoice == null &&
+    !values.area.trim() &&
+    !values.fullAddress.trim() &&
+    values.whatsProvided.length === 0 &&
+    values.whatToBring.length === 0
+  )
 }
