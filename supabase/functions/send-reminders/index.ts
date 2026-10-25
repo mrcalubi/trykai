@@ -6,7 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { asRecord, hasValidSecret, jsonResponse, textResponse } from '../_shared/http.ts'
 import {
   formatDuration,
-  formatSessionDate,
+  formatReminderSessionDate,
   GUEST_REPLY_TO,
   guestSessionReminderHtml,
   guestSessionReminderSubject,
@@ -76,6 +76,7 @@ Deno.serve(async (req) => {
           title,
           full_address,
           whats_provided,
+          what_to_bring,
           users:host_id (
             email,
             display_name,
@@ -160,18 +161,23 @@ Deno.serve(async (req) => {
       await sendResendEmail({
         apiKey,
         to: email,
-        subject: guestSessionReminderSubject(title, startsAt),
+        subject: guestSessionReminderSubject(title, startsAt, sentAt),
         replyTo: GUEST_REPLY_TO,
         html: guestSessionReminderHtml({
           guestName: publicDisplayName(guest),
           listingTitle: title,
-          sessionDate: formatSessionDate(startsAt),
+          sessionDate: formatReminderSessionDate(startsAt),
+          startsAt,
+          sentAt,
           duration: formatDuration(
             typeof session.duration_mins === 'number' ? session.duration_mins : null,
           ),
           fullAddress: typeof listing?.full_address === 'string' ? listing.full_address : '',
           whatsProvided: Array.isArray(listing?.whats_provided)
             ? (listing.whats_provided as string[])
+            : null,
+          whatToBring: Array.isArray(listing?.what_to_bring)
+            ? (listing.what_to_bring as string[])
             : null,
           hostName: publicDisplayName(host) || 'your host',
           bookingId: row.id,
@@ -225,11 +231,13 @@ Deno.serve(async (req) => {
       await sendResendEmail({
         apiKey,
         to: email,
-        subject: hostSessionReminderSubject(title, group.totalGuests),
+        subject: hostSessionReminderSubject(title, group.totalGuests, startsAt, sentAt),
         html: hostSessionReminderHtml({
           hostName: publicDisplayName(host),
           listingTitle: title,
-          sessionDate: formatSessionDate(startsAt),
+          sessionDate: formatReminderSessionDate(startsAt),
+          startsAt,
+          sentAt,
           guests: group.guests,
           totalGuests: group.totalGuests,
           siteUrl,

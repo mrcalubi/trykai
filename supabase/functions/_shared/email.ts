@@ -97,6 +97,36 @@ export function formatSessionTime(iso: string): string {
   })
 }
 
+/** YYYY-MM-DD in Asia/Singapore, for same-day comparison. */
+export function singaporeDateKey(iso: string | Date | number): string {
+  const date = iso instanceof Date ? iso : new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' })
+}
+
+/** Same Singapore calendar date as the send time is Today; anything else is Tomorrow. */
+export function reminderWhen(
+  startsAt: string,
+  sentAt: string | Date | number = Date.now(),
+): 'Today' | 'Tomorrow' {
+  const startKey = singaporeDateKey(startsAt)
+  const sentKey = singaporeDateKey(sentAt)
+  if (!startKey || !sentKey) return 'Tomorrow'
+  return startKey === sentKey ? 'Today' : 'Tomorrow'
+}
+
+/** Weekday plus the usual Singapore medium date and short time: "Sun 25 Oct 2026, 12:00 pm". */
+export function formatReminderSessionDate(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const weekday = date.toLocaleDateString('en-SG', {
+    weekday: 'short',
+    timeZone: 'Asia/Singapore',
+  })
+  const rest = formatSessionDate(iso)
+  return rest ? `${weekday} ${rest}` : ''
+}
+
 export function bookingConfirmedGuestSubject(listingTitle: string, startsAt: string): string {
   const day = formatSessionDay(startsAt)
   return day ? `You're in! ${listingTitle} on ${day}` : `You're in! ${listingTitle}`
@@ -160,6 +190,11 @@ export function hostRefundedGuestsLine(guestCount: number): string {
 function emailGreeting(name?: string | null): string {
   const who = (name || '').trim()
   return who ? `Hi ${escapeHtml(who)},` : 'Hi,'
+}
+
+function reminderGreeting(name?: string | null): string {
+  const who = (name || '').trim()
+  return who ? `Hi ${escapeHtml(who)}!` : 'Hi!'
 }
 
 function emailSignOff(kind: 'see-you' | 'take-care'): string {
@@ -523,31 +558,41 @@ export function bookingConfirmedHostHtml(options: {
   )
 }
 
-export function guestSessionReminderSubject(listingTitle: string, startsAt: string): string {
+export function guestSessionReminderSubject(
+  listingTitle: string,
+  startsAt: string,
+  sentAt: string | Date | number = Date.now(),
+): string {
+  const when = reminderWhen(startsAt, sentAt)
   const time = formatSessionTime(startsAt)
-  return time ? `Tomorrow: ${listingTitle}, ${time}` : `Tomorrow: ${listingTitle}`
+  return time ? `${when}: ${listingTitle} at ${time} 🎉` : `${when}: ${listingTitle} 🎉`
 }
 
 export function guestSessionReminderHtml(options: {
   guestName?: string | null
   listingTitle: string
   sessionDate: string
+  startsAt?: string
+  sentAt?: string | Date | number
   duration?: string
   fullAddress?: string
   whatsProvided?: string[] | null
+  whatToBring?: string[] | null
   hostName: string
   bookingId: string
   siteUrl?: string
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
+  const when = reminderWhen(options.startsAt || '', options.sentAt)
   const provided = whatsProvidedCopy(options.whatsProvided)
+  const bring = whatsProvidedCopy(options.whatToBring)
   const duration = options.duration ? escapeHtml(options.duration) : ''
   const address = options.fullAddress ? escapeHtml(options.fullAddress) : ''
   const hostName = escapeHtml(options.hostName || 'your host')
   return wrapEmail(
     `
-    <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
-    <p style="margin:0 0 16px;">Your session is coming up! Hope you're excited.</p>
+    <p style="margin:0 0 16px;">${reminderGreeting(options.guestName)}</p>
+    <p style="margin:0 0 16px;">Your session is ${when}! We hope you're excited. Here's everything you need.</p>
     ${emailHeading(options.listingTitle)}
     ${detailRows([
       ['Day and time', escapeHtml(options.sessionDate)],
@@ -556,29 +601,41 @@ export function guestSessionReminderHtml(options: {
       ["What's provided", provided ? escapeHtml(provided) : ''],
       ['Host', hostName],
     ])}
+    ${bring ? detailRows([["Don't forget to bring", escapeHtml(bring)]]) : ''}
+    <p style="margin:0 0 16px;">Try to arrive a few minutes early, and say hi to ${hostName} when you get there. They're looking forward to meeting you.</p>
     ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
-    <p style="margin:0 0 8px;">Need to change plans? You can do that on your booking page.</p>
+    <p style="margin:0 0 8px;">Plans changed? You can manage your booking from the booking page.</p>
+    <p style="margin:16px 0 0;">Have a great time!</p>
     ${emailSignOff('see-you')}
     `,
     siteUrl,
-    `Tomorrow: ${options.listingTitle}, ${options.sessionDate}`,
+    `${when}: ${options.listingTitle} at ${options.sessionDate}`,
   )
 }
 
-export function hostSessionReminderSubject(listingTitle: string, totalGuests: number): string {
+export function hostSessionReminderSubject(
+  listingTitle: string,
+  totalGuests: number,
+  startsAt: string,
+  sentAt: string | Date | number = Date.now(),
+): string {
+  const when = reminderWhen(startsAt, sentAt)
   const n = Math.max(0, Number(totalGuests) || 0)
-  return `Tomorrow: ${n} ${n === 1 ? 'person' : 'people'} coming to ${listingTitle}`
+  return `${when}: ${n} ${n === 1 ? 'person' : 'people'} coming to ${listingTitle} 🙌`
 }
 
 export function hostSessionReminderHtml(options: {
   hostName?: string | null
   listingTitle: string
   sessionDate: string
+  startsAt?: string
+  sentAt?: string | Date | number
   guests: Array<{ name: string; guestsCount: number }>
   totalGuests: number
   siteUrl?: string
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
+  const when = reminderWhen(options.startsAt || '', options.sentAt)
   const who = (options.guests ?? [])
     .map((guest) => {
       const name = escapeHtml(guest.name || 'A guest')
@@ -587,21 +644,25 @@ export function hostSessionReminderHtml(options: {
     .join('<br>')
   const total = Math.max(0, Number(options.totalGuests) || 0)
   const totalLabel = `${total} ${total === 1 ? 'person' : 'people'}`
+  const coming = total === 1 ? '1 person is' : `${total} people are`
+  const showTotal = (options.guests ?? []).length > 1
   return wrapEmail(
     `
-    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    <p style="margin:0 0 16px;">${reminderGreeting(options.hostName)}</p>
+    <p style="margin:0 0 16px;">Your session is ${when}, and ${coming} coming. Thanks for sharing what you love!</p>
     ${emailHeading(options.listingTitle)}
     ${detailRows([
       ["Who's coming", who],
-      ['Total', escapeHtml(totalLabel)],
+      showTotal ? ['Total', escapeHtml(totalLabel)] : null,
       ['Day and time', escapeHtml(options.sessionDate)],
     ])}
     ${primaryButton(`${siteUrl}/hosting`, 'View hosting')}
-    <p style="margin:0 0 8px;">Hope it goes brilliantly.</p>
+    <p style="margin:0 0 8px;">Need to change something? You can manage this session from your Hosting page.</p>
+    <p style="margin:16px 0 0;">Hope it goes brilliantly. Have fun!</p>
     ${emailSignOff('see-you')}
     `,
     siteUrl,
-    `Tomorrow: ${totalLabel} coming to ${options.listingTitle}`,
+    `${when}: ${totalLabel} coming to ${options.listingTitle}`,
   )
 }
 
