@@ -51,6 +51,16 @@ export function readDraft(userId) {
   }
 }
 
+export function writeDraft(userId, values) {
+  if (!userId) return false
+  try {
+    window.localStorage.setItem(draftKey(userId), JSON.stringify(values))
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function clearDraft(userId) {
   try {
     window.localStorage.removeItem(draftKey(userId))

@@ -15,6 +15,7 @@ import ListingPricePanel from '../components/ListingPricePanel'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
 import WhatToBringFields from '../components/WhatToBringFields'
 import FieldHint from '../components/FieldHint'
+import HostTermsDialog from '../components/HostTermsDialog'
 import Card from '../components/ui/Card'
 import Icon from '../components/ui/Icon'
 import { categoryIconName } from '../components/ui/categoryIcon'
@@ -36,9 +37,9 @@ import {
 import {
   LISTING_STEPS as STEPS,
   clearDraft,
-  draftKey,
   draftValues,
   readDraft,
+  writeDraft,
 } from '../lib/listingDraft'
 import { notifyListingSubmitted } from '../lib/listingReview'
 
@@ -88,9 +89,11 @@ export default function CreateListing() {
   const [publishMessage, setPublishMessage] = useState('Saving your listing')
   const [draftHandled, setDraftHandled] = useState(Boolean(resumed))
   const [photoSkipOpen, setPhotoSkipOpen] = useState(false)
+  const [hostTermsOpen, setHostTermsOpen] = useState(false)
   const headingRef = useRef(null)
   const photoPickerRef = useRef(null)
   const movedStep = useRef(false)
+  const pendingDraft = useRef({})
 
   const priceCents = parsePriceInputCents(price)
   const breakdown = hostPriceBreakdown(priceCents, isFoundingHost, maxGuests, groupPricing)
@@ -167,7 +170,12 @@ export default function CreateListing() {
     headingRef.current?.focus()
   }, [step])
 
-  function saveDraft() {
+  useEffect(() => {
+    pendingDraft.current = {}
+  })
+
+  function persistDraft(overrides = {}, { announce = false } = {}) {
+    pendingDraft.current = { ...pendingDraft.current, ...overrides }
     const values = {
       step,
       title,
@@ -182,14 +190,18 @@ export default function CreateListing() {
       fullAddress,
       whatsProvided,
       whatToBring,
+      ...pendingDraft.current,
     }
-    try {
-      window.localStorage.setItem(draftKey(userId), JSON.stringify(values))
+    if (writeDraft(userId, values)) {
       setDraftHandled(true)
-      setDraftNote('Draft saved on this device. Photos are not kept in drafts.')
-    } catch {
-      setDraftNote('Could not save a draft in this browser.')
+      if (announce) setDraftNote('Draft saved on this device. Photos are not kept in drafts.')
+      return
     }
+    if (announce) setDraftNote('Could not save a draft in this browser.')
+  }
+
+  function saveDraft() {
+    persistDraft({}, { announce: true })
   }
 
   function hintsForStep(stepId) {
@@ -217,6 +229,7 @@ export default function CreateListing() {
   }
 
   function goTo(index) {
+    persistDraft({ step: index })
     movedStep.current = true
     setError('')
     setFieldHints({})
@@ -573,9 +586,15 @@ export default function CreateListing() {
         <>
           <PostalAddressFields
             value={fullAddress}
-            onChange={setFullAddress}
+            onChange={(next) => {
+              setFullAddress(next)
+              persistDraft({ fullAddress: next })
+            }}
             area={area}
-            onAreaChange={setArea}
+            onAreaChange={(next) => {
+              setArea(next)
+              persistDraft({ area: next })
+            }}
             areaHint={<FieldHint>{fieldHints.area}</FieldHint>}
           />
           <FieldHint>{fieldHints.fullAddress}</FieldHint>
@@ -602,7 +621,18 @@ export default function CreateListing() {
             onChange={(e) => setAcceptedHostTerms(e.target.checked)}
           />
           <span>
-            I agree to the <Link to="/terms#part-2-hosting">Host terms</Link>
+            I agree to the{' '}
+            <button
+              type="button"
+              className="link-button"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                setHostTermsOpen(true)
+              }}
+            >
+              Host terms
+            </button>
           </span>
         </label>
         <FieldHint>{fieldHints.hostTerms}</FieldHint>
@@ -614,7 +644,12 @@ export default function CreateListing() {
     <div className="wizard">
       <div className="wizard__main">
         <header className="wizard__bar">
-          <Link to="/hosting" className="wizard__close" aria-label="Close">
+          <Link
+            to="/hosting"
+            className="wizard__close"
+            aria-label="Close"
+            onClick={() => persistDraft()}
+          >
             <Icon name="close" size={20} />
           </Link>
           <p className="wizard__name">New listing</p>
@@ -725,6 +760,8 @@ export default function CreateListing() {
           }}
         />
       ) : null}
+
+      {hostTermsOpen ? <HostTermsDialog onClose={() => setHostTermsOpen(false)} /> : null}
     </div>
   )
 }
