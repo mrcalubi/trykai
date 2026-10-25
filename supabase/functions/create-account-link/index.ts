@@ -2,6 +2,7 @@ import Stripe from 'https://esm.sh/stripe@13.3.0?target=deno'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   accountLinkParams,
+  connectOnboardingPending,
   createConnectedAccount,
   isAccountLinkRefresh,
   payoutsEnabledFromAccount,
@@ -49,7 +50,7 @@ Deno.serve(async (req) => {
     let accountId = profile.stripe_account_id
     if (!accountId) {
       if (refreshOnly) {
-        return jsonResponse({ stripe_payouts_enabled: false, url: null })
+        return jsonResponse({ stripe_payouts_enabled: false, url: null, pending: false })
       }
       const created = await createConnectedAccount(Deno.env.get('STRIPE_SECRET_KEY') ?? '', profile)
       accountId = created.id
@@ -68,7 +69,11 @@ Deno.serve(async (req) => {
         .update({ stripe_payouts_enabled: enabled })
         .eq('id', user.id)
       if (enabled || refreshOnly) {
-        return jsonResponse({ stripe_payouts_enabled: enabled, url: null })
+        return jsonResponse({
+          stripe_payouts_enabled: enabled,
+          url: null,
+          pending: !enabled && connectOnboardingPending(account),
+        })
       }
     }
 

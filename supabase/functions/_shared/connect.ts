@@ -174,6 +174,32 @@ export function payoutsEnabledFromAccount(account: {
   return Boolean(account?.payouts_enabled)
 }
 
+function requirementItems(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === 'string' && item.length > 0)
+}
+
+/**
+ * True when Stripe is only verifying: nothing currently or past due, and the
+ * account is not disabled for any reason other than pending verification.
+ */
+export function connectOnboardingPending(account: {
+  requirements?: {
+    currently_due?: unknown
+    past_due?: unknown
+    pending_verification?: unknown
+    disabled_reason?: unknown
+  } | null
+} | null | undefined): boolean {
+  const requirements = account?.requirements
+  if (requirementItems(requirements?.currently_due).length > 0) return false
+  if (requirementItems(requirements?.past_due).length > 0) return false
+  const disabledReason =
+    typeof requirements?.disabled_reason === 'string' ? requirements.disabled_reason : ''
+  if (disabledReason && disabledReason !== 'requirements.pending_verification') return false
+  return true
+}
+
 export function isAccountLinkRefresh(body: unknown): boolean {
   return Boolean(body && typeof body === 'object' && (body as { refresh?: unknown }).refresh === true)
 }
