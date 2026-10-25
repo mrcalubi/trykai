@@ -18,6 +18,7 @@ function makeListing(overrides = {}) {
     duration_mins: 90,
     photo_urls: ['https://cdn.test/a.jpg', 'https://cdn.test/b.jpg'],
     whats_provided: ['Milk', 'Espresso'],
+    what_to_bring: ['Apron'],
     review_status: 'pending',
     review_note: null,
     review_requested_at: '2026-10-23T02:00:00.000Z',
@@ -72,6 +73,7 @@ describe('AdminListings', () => {
     expect(within(card).getByText('Food · Tiong Bahru · S$45 per person · 1 hr 30 min')).toBeInTheDocument()
     expect(within(card).getByText('Pour hearts and tulips on your own flat white.')).toBeInTheDocument()
     expect(within(card).getByText('Provided: Milk, Espresso')).toBeInTheDocument()
+    expect(within(card).getByText('What to bring: Apron')).toBeInTheDocument()
     expect(within(card).getByText(/Singpass: TAN MEI LING/)).toBeInTheDocument()
     expect(within(card).getAllByRole('img')).toHaveLength(2)
     const [, options] = supabase.functions.invoke.mock.calls[0]

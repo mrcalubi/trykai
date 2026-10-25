@@ -444,12 +444,14 @@ export function bookingConfirmedGuestHtml(options: {
   sessionStartsAt: string
   durationMins?: number | null
   whatsProvided?: string[] | null
+  whatToBring?: string[] | null
   bookingId: string
   siteUrl?: string
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
   const hostName = escapeHtml(options.hostName || 'your host')
   const provided = whatsProvidedCopy(options.whatsProvided)
+  const bring = whatsProvidedCopy(options.whatToBring)
   const duration = options.duration ? escapeHtml(options.duration) : ''
   const address = options.fullAddress ? escapeHtml(options.fullAddress) : ''
   const calendar = googleCalendarUrl({
@@ -478,6 +480,7 @@ export function bookingConfirmedGuestHtml(options: {
       ['Address', address],
       ['Guests', guestCountLabel(options.guestsCount)],
       ["What's provided", provided ? escapeHtml(provided) : ''],
+      ['What to bring', bring ? escapeHtml(bring) : ''],
       ['Booking reference', escapeHtml(options.bookingReference)],
     ])}
     ${receiptBlock(receipt, options.paymentMethod)}
@@ -645,6 +648,7 @@ export function listingSubmittedOpsHtml(options: {
   area: string | null
   priceCents: number | null
   photoCount: number
+  whatToBring?: string[] | null
   hostName: string
   hostEmail: string
   verifiedName: string | null
@@ -658,6 +662,7 @@ export function listingSubmittedOpsHtml(options: {
   const who = options.verificationMethod === 'singpass' && options.verifiedName
     ? `${escapeHtml(options.hostName)} (Singpass: ${escapeHtml(options.verifiedName)})`
     : escapeHtml(options.hostName)
+  const bring = whatsProvidedCopy(options.whatToBring)
   return wrapEmail(
     `${emailHeading(options.resubmitted ? 'A listing was updated for review' : 'A new listing needs a look')}
     <p style="margin:0 0 16px;">It stays hidden from guests until you approve it. The host can already add dates.</p>
@@ -668,6 +673,7 @@ export function listingSubmittedOpsHtml(options: {
       ['Area', escapeHtml(options.area ?? '')],
       ['Price', escapeHtml(price)],
       ['Photos', String(options.photoCount)],
+      ['What to bring', bring ? escapeHtml(bring) : ''],
     ])}
     <p style="margin:0 0 4px;font-size:14px;color:${EMAIL_COLORS.muted};">Description</p>
     <p style="margin:0;white-space:pre-wrap;">${escapeHtml((options.description ?? '').slice(0, 1200))}</p>

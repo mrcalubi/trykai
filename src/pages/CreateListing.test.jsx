@@ -710,6 +710,65 @@ describe('CreateListing "what is provided"', () => {
   })
 })
 
+describe('CreateListing "what guests should bring"', () => {
+  beforeEach(() => {
+    givenSignedIn()
+    givenVerification('approved')
+  })
+
+  it('stores a suggestion and a custom item, and caps the list at five', async () => {
+    const { user } = renderPage()
+    await fillValidForm(user)
+    await user.click(screen.getByRole('button', { name: 'Comfortable clothes' }))
+    await user.click(screen.getByRole('button', { name: 'Water bottle' }))
+    await user.click(screen.getByRole('button', { name: 'Notebook and pen' }))
+    await user.type(screen.getByLabelText('Add something to bring'), 'Yoga mat')
+    await user.click(screen.getByRole('button', { name: '+ Add item' }))
+    await user.type(screen.getByLabelText('Add something to bring'), 'Towel')
+    await user.click(screen.getByRole('button', { name: '+ Add item' }))
+
+    expect(screen.getByText('Up to 5 items.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Add something to bring')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'insert')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'insert').payload.what_to_bring).toEqual([
+      'Comfortable clothes',
+      'Water bottle',
+      'Notebook and pen',
+      'Yoga mat',
+      'Towel',
+    ])
+  })
+
+  it('keeps a typed item to 40 characters', async () => {
+    const { user } = renderPage()
+    await fillValidForm(user)
+    await user.type(screen.getByLabelText('Add something to bring'), `${'x'.repeat(41)}extra`)
+    await user.click(screen.getByRole('button', { name: '+ Add item' }))
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'insert')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'insert').payload.what_to_bring).toEqual(['x'.repeat(40)])
+  })
+
+  it('clears the list when the host chooses nothing', async () => {
+    const { user } = renderPage()
+    await fillValidForm(user)
+    await user.click(screen.getByRole('button', { name: 'Water bottle' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Nothing, we provide everything' }))
+
+    expect(screen.queryByLabelText('Remove Water bottle')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'insert')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'insert').payload.what_to_bring).toEqual([])
+  })
+})
+
 describe('CreateListing photos', () => {
   beforeEach(() => {
     givenSignedIn('host-9')

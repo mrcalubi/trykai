@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     const { data: rows, error } = await admin
       .from('listings')
       .select(
-        'id, title, description, category, area, price_per_person, photo_urls, review_status, review_requested_at, review_notified_at, users!host_id (full_name, display_name, email, verification_method, verified_name)',
+        'id, title, description, category, area, price_per_person, photo_urls, what_to_bring, review_status, review_requested_at, review_notified_at, users!host_id (full_name, display_name, email, verification_method, verified_name)',
       )
       .eq('host_id', user.id)
       .eq('review_status', 'pending')
@@ -99,6 +99,7 @@ Deno.serve(async (req) => {
           area: row.area,
           priceCents: row.price_per_person,
           photoCount: Array.isArray(row.photo_urls) ? row.photo_urls.length : 0,
+          whatToBring: Array.isArray(row.what_to_bring) ? row.what_to_bring : [],
           hostName: host.full_name || host.display_name || 'A host',
           hostEmail: host.email || user.email || '',
           verifiedName: host.verified_name ?? null,

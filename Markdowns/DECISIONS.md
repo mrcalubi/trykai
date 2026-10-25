@@ -608,6 +608,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-24 — Session reminders the day before, claimed then sent.** Guests were only emailed at confirmation, so a booking made a week out went quiet until the session. `send-reminders` (`00037`) runs hourly (minute 17 UTC, same Vault + pg_cron pattern as `release-payout`) and emails confirmed guests and the host when an open session starts in 2–24 hours. A booking created less than 6 hours ago is skipped so the reminder does not land on top of the confirmation. Each row is claimed (`guest_reminder_sent_at` / `host_reminder_sent_at`, no client grants) before Resend is called, so two overlapping runs cannot double-send. The host gets one email per session listing first names, group sizes, and the total. Cap 200 emails per run. Apply `00037` and the three Vault secrets (`send_reminders_url`, `send_reminders_anon_key`, `reminders_cron_secret`) before merging; click-by-click in OPERATIONS.md.
 
+**2026-10-25 — Hosts can say what guests should bring.** Optional, same shape as the custom half of What's provided: up to 5 items, 40 characters each, stored on `listings.what_to_bring` (`00038`). Suggestion chips (Comfortable clothes, Water bottle, Notebook and pen) plus a free-text chip and "Nothing, we provide everything" which clears the list. Guests see it on the listing under What's provided, and again on the booking confirmation, only when there are items. The team's listing-submitted email and `/admin/listings` show it so review can catch a nonsense list. A change on a `changes_requested` listing counts as content and puts it back in the queue. Apply `00038` before merging.
+
 ---
 
 # Analysed but not decided

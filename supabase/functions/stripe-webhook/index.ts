@@ -94,6 +94,7 @@ async function confirmSucceededPayment(paymentIntent: {
           group_pricing,
           category,
           whats_provided,
+          what_to_bring,
           users:host_id (
             email,
             full_name,
@@ -227,6 +228,7 @@ async function confirmSucceededPayment(paymentIntent: {
       sessionStartsAt: session?.starts_at ?? '',
       durationMins,
       whatsProvided: listing?.whats_provided,
+      whatToBring: listing?.what_to_bring,
       bookingId: booking.id,
       siteUrl,
     }),

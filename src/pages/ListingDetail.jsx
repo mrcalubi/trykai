@@ -244,6 +244,7 @@ export default function ListingDetail() {
           max_guests,
           photo_urls,
           whats_provided,
+          what_to_bring,
           host_id,
           review_status,
           users!host_id (
@@ -256,11 +257,18 @@ export default function ListingDetail() {
       let { data: listingData, error: listingError } = await withIssuedAtRetry(() =>
         supabase.from('listings').select(listingSelect).eq('id', id).eq('is_active', true).single()
       )
-      if (listingError && /group_pricing/.test(listingError.message ?? '')) {
+      if (listingError && /group_pricing|what_to_bring/.test(listingError.message ?? '')) {
+        let retrySelect = listingSelect
+        if (/group_pricing/.test(listingError.message ?? '')) {
+          retrySelect = retrySelect.replace(/\s*group_pricing,\n/, '\n')
+        }
+        if (/what_to_bring/.test(listingError.message ?? '')) {
+          retrySelect = retrySelect.replace(/\s*what_to_bring,\n/, '\n')
+        }
         ;({ data: listingData, error: listingError } = await withIssuedAtRetry(() =>
           supabase
             .from('listings')
-            .select(listingSelect.replace(/\s*group_pricing,\n/, '\n'))
+            .select(retrySelect)
             .eq('id', id)
             .eq('is_active', true)
             .single()
@@ -1078,6 +1086,20 @@ export default function ListingDetail() {
               <h2 className="detail-section__title">What&apos;s provided</h2>
               <ul className="detail-list detail-list--checks">
                 {listing.whats_provided.map((item) => (
+                  <li key={item}>
+                    <Icon name="check" size={18} strokeWidth={2.4} />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {listing.what_to_bring?.length > 0 && (
+            <section className="detail-section">
+              <h2 className="detail-section__title">What to bring</h2>
+              <ul className="detail-list detail-list--checks">
+                {listing.what_to_bring.map((item) => (
                   <li key={item}>
                     <Icon name="check" size={18} strokeWidth={2.4} />
                     {item}

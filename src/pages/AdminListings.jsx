@@ -137,6 +137,9 @@ export default function AdminListings() {
         {listing.whats_provided.length > 0 ? (
           <p className="dashboard-card__meta">Provided: {listing.whats_provided.join(', ')}</p>
         ) : null}
+        {listing.what_to_bring?.length > 0 ? (
+          <p className="dashboard-card__meta">What to bring: {listing.what_to_bring.join(', ')}</p>
+        ) : null}
 
         <p className="listing-review__host">
           <strong>{host.name}</strong>

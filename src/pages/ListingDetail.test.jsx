@@ -500,6 +500,23 @@ describe('ListingDetail content', () => {
     expect(screen.queryByRole('heading', { name: "What's provided" })).not.toBeInTheDocument()
   })
 
+  it('lists what guests should bring under what is provided', async () => {
+    givenListing(makeListing({ what_to_bring: ['Water bottle', 'Notebook and pen'] }))
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'What to bring' })
+    expect(screen.getByText('Water bottle')).toBeInTheDocument()
+    expect(screen.getByText('Notebook and pen')).toBeInTheDocument()
+  })
+
+  it('omits the bring section when the list is empty', async () => {
+    givenListing(makeListing({ what_to_bring: [] }))
+    renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.queryByRole('heading', { name: 'What to bring' })).not.toBeInTheDocument()
+  })
+
   it('renders every photo in the gallery', async () => {
     givenListing(makeListing({ photo_urls: ['https://cdn.test/a.jpg', 'https://cdn.test/b.jpg'] }))
     renderPage()

@@ -60,6 +60,7 @@ export default function BookingDetail() {
             title,
             photo_urls,
             whats_provided,
+            what_to_bring,
             duration_mins,
             host_id,
             users:host_id (
@@ -160,6 +161,7 @@ export default function BookingDetail() {
   const startsAt = session?.starts_at
   const duration = formatDuration(session?.duration_mins ?? listing?.duration_mins)
   const provided = providedItems(listing?.whats_provided)
+  const bring = providedItems(listing?.what_to_bring)
   const calendar = startsAt
     ? googleCalendarUrl({
         title: listing?.title || 'TryKai session',
@@ -239,6 +241,17 @@ export default function BookingDetail() {
           <h2 className="booking-detail__section-title">What&apos;s provided</h2>
           <ul className="detail-list">
             {provided.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {bring.length > 0 ? (
+        <section className="booking-detail__section">
+          <h2 className="booking-detail__section-title">What to bring</h2>
+          <ul className="detail-list">
+            {bring.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>

@@ -162,8 +162,43 @@ describe('BookingDetail', () => {
 
     expect(await screen.findByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
     expect(screen.queryByText("What's provided")).not.toBeInTheDocument()
+    expect(screen.queryByText('What to bring')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Open in Google Maps' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Add to Google Calendar' })).not.toBeInTheDocument()
+  })
+
+  it('lists what guests should bring next to what is provided', async () => {
+    givenBooking(
+      detailBooking({
+        sessions: {
+          ...detailBooking().sessions,
+          listings: {
+            ...detailBooking().sessions.listings,
+            what_to_bring: ['Water bottle', 'Notebook and pen'],
+          },
+        },
+      }),
+    )
+    renderDetail()
+
+    expect(await screen.findByRole('heading', { name: 'What to bring' })).toBeInTheDocument()
+    expect(screen.getByText('Water bottle')).toBeInTheDocument()
+    expect(screen.getByText('Notebook and pen')).toBeInTheDocument()
+  })
+
+  it('omits What to bring when the listing has none', async () => {
+    givenBooking(
+      detailBooking({
+        sessions: {
+          ...detailBooking().sessions,
+          listings: { ...detailBooking().sessions.listings, what_to_bring: [] },
+        },
+      }),
+    )
+    renderDetail()
+
+    expect(await screen.findByRole('heading', { name: "What's provided" })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'What to bring' })).not.toBeInTheDocument()
   })
 
   it('sends anyone who is not the guest back to bookings', async () => {
