@@ -618,6 +618,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-25 — Create listing must not lose work when the host reads the Host terms.** The last-step Host terms control was a `<Link to="/terms#part-2-hosting">`, which unmounted the wizard; Back returned empty unless Save draft had been tapped, and photos were always gone. Host terms now open a dialog on the same page (full-screen sheet on phones, centred on desktop; Escape and Close; focus returns to the control). Part 2 lives in `HostTermsContent` and is rendered both on `/terms` and in the dialog. The checkbox stays outside and is never ticked by opening the dialog. Continue, Back, Close, and the postal lookup write the same localStorage draft as Save draft (photos still omitted). Restore draft, Discard, and clearing on publish stay. Supersedes the 10 October "checkbox links to `/terms#part-2-hosting`" wording.
 
+**2026-10-25 — Autosave must not overwrite an unanswered draft or write an empty one.** Close or Continue while "Restore draft / Discard" is showing was writing the fresh wizard over the saved draft; opening and closing Create listing untouched wrote a blank draft that Hosting showed as a card. Autosave now skips while that prompt is unanswered (Save draft may still overwrite). A wizard with no answers (title, description, category, price, duration, area, fullAddress, what's provided, what to bring all empty or default) is not written; if this session wrote the current draft and the answers later become empty, the draft is cleared. Restore draft now also restores the saved step, like Hosting's Continue.
+
 ---
 
 # Analysed but not decided

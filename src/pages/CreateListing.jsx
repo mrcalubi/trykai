@@ -38,6 +38,7 @@ import {
   LISTING_STEPS as STEPS,
   clearDraft,
   draftValues,
+  isBlankDraft,
   readDraft,
   writeDraft,
 } from '../lib/listingDraft'
@@ -94,6 +95,7 @@ export default function CreateListing() {
   const photoPickerRef = useRef(null)
   const movedStep = useRef(false)
   const pendingDraft = useRef({})
+  const wroteDraftThisSession = useRef(false)
 
   const priceCents = parsePriceInputCents(price)
   const breakdown = hostPriceBreakdown(priceCents, isFoundingHost, maxGuests, groupPricing)
@@ -144,18 +146,21 @@ export default function CreateListing() {
     const draft = readDraft(userId)
     setDraftHandled(true)
     if (!draft) return
-    if (typeof draft.title === 'string') setTitle(draft.title)
-    if (typeof draft.description === 'string') setDescription(draft.description)
-    if (typeof draft.category === 'string') setCategory(draft.category)
-    if (typeof draft.price === 'string') setPrice(draft.price)
-    if (Number.isInteger(draft.maxGuests)) setMaxGuests(draft.maxGuests)
-    if (draft.durationChoice !== undefined) setDurationChoice(draft.durationChoice)
-    if (typeof draft.otherMins === 'string') setOtherMins(draft.otherMins)
-    if (typeof draft.groupPricing === 'boolean') setGroupPricing(draft.groupPricing)
-    if (typeof draft.area === 'string') setArea(draft.area)
-    if (typeof draft.fullAddress === 'string') setFullAddress(draft.fullAddress)
-    if (Array.isArray(draft.whatsProvided)) setWhatsProvided(draft.whatsProvided)
-    if (Array.isArray(draft.whatToBring)) setWhatToBring(draft.whatToBring)
+    const values = draftValues(draft)
+    movedStep.current = true
+    setStep(values.step)
+    setTitle(values.title)
+    setDescription(values.description)
+    setCategory(values.category)
+    setPrice(values.price)
+    setMaxGuests(values.maxGuests)
+    setDurationChoice(values.durationChoice)
+    setOtherMins(values.otherMins)
+    setGroupPricing(values.groupPricing)
+    setArea(values.area)
+    setFullAddress(values.fullAddress)
+    setWhatsProvided(values.whatsProvided)
+    setWhatToBring(values.whatToBring)
     setDraftNote(DRAFT_RESTORED)
   }
 
@@ -175,6 +180,9 @@ export default function CreateListing() {
   })
 
   function persistDraft(overrides = {}, { announce = false } = {}) {
+    const promptOpen = !draftHandled && Boolean(readDraft(userId))
+    if (!announce && promptOpen) return
+
     pendingDraft.current = { ...pendingDraft.current, ...overrides }
     const values = {
       step,
@@ -192,7 +200,12 @@ export default function CreateListing() {
       whatToBring,
       ...pendingDraft.current,
     }
+    if (isBlankDraft(values)) {
+      if (wroteDraftThisSession.current) clearDraft(userId)
+      return
+    }
     if (writeDraft(userId, values)) {
+      wroteDraftThisSession.current = true
       setDraftHandled(true)
       if (announce) setDraftNote('Draft saved on this device. Photos are not kept in drafts.')
       return

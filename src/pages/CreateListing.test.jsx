@@ -36,12 +36,12 @@ function givenVerification(status, { foundingHost = false, foundingError = null 
 
 // Mounted behind the same guard App.jsx puts it behind, so the page always has
 // a signed-in user. RequireAuth owns the signed-out case and tests it itself.
-function renderPage(route = '/create-listing') {
+function renderPage(route = '/create-listing', extra = {}) {
   return renderWithRouter(
     <RequireAuth>
       <CreateListing />
     </RequireAuth>,
-    { route, path: '/create-listing' }
+    { route, path: '/create-listing', ...extra }
   )
 }
 
@@ -1130,9 +1130,60 @@ describe('CreateListing drafts', () => {
 
     await second.user.click(screen.getByRole('button', { name: 'Restore draft' }))
 
+    await stepHeading('Add photos')
+    await second.user.click(screen.getByRole('button', { name: 'Back' }))
+    await stepHeading('The basics')
     expect(screen.getByLabelText('Title')).toHaveValue('Pottery taster')
     expect(screen.getByRole('radio', { name: 'Arts' })).toBeChecked()
     expect(screen.getByLabelText('Description')).toHaveValue('Throw a bowl.')
+  })
+
+  it('leaves a stored draft untouched when Close is tapped while the prompt is showing', async () => {
+    const stored = JSON.stringify({
+      title: 'Keep this draft',
+      category: 'Arts',
+      step: 2,
+      extra: 'do-not-touch',
+    })
+    window.localStorage.setItem('trykai:listing-draft:host-9', stored)
+    const { user } = renderPage('/create-listing', { outlivesNavigation: true })
+    await stepHeading('The basics')
+    expect(screen.getByText('You have a saved draft on this device.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: 'Close' }))
+
+    expect(window.localStorage.getItem('trykai:listing-draft:host-9')).toBe(stored)
+  })
+
+  it('writes no draft when Create listing is opened and closed with no answers', async () => {
+    const { user } = renderPage('/create-listing', { outlivesNavigation: true })
+    await stepHeading('The basics')
+    expect(window.localStorage.getItem('trykai:listing-draft:host-9')).toBeNull()
+
+    await user.click(screen.getByRole('link', { name: 'Close' }))
+
+    expect(window.localStorage.getItem('trykai:listing-draft:host-9')).toBeNull()
+  })
+
+  it('lands Restore draft on the saved step', async () => {
+    window.localStorage.setItem(
+      'trykai:listing-draft:host-9',
+      JSON.stringify({
+        step: 2,
+        title: 'Bake a focaccia together',
+        category: 'Food',
+        price: '20',
+      }),
+    )
+    const { user } = renderPage()
+    await stepHeading('The basics')
+    expect(screen.getByText('You have a saved draft on this device.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Restore draft' }))
+
+    await stepHeading('Price and group size')
+    expect(screen.getByText('Step 3 of 5')).toBeInTheDocument()
+    expect(screen.getByLabelText('Your price per guest')).toHaveValue(20)
   })
 
   it('clears the draft once the listing is published', async () => {

@@ -92,3 +92,19 @@ export function draftValues(draft) {
     whatToBring: Array.isArray(draft?.whatToBring) ? draft.whatToBring : [],
   }
 }
+
+/** True when the wizard has only defaults — not enough to keep as a draft. */
+export function isBlankDraft(draft) {
+  const values = draftValues(draft)
+  return (
+    !values.title.trim() &&
+    !values.description.trim() &&
+    !values.category.trim() &&
+    !values.price.trim() &&
+    values.durationChoice == null &&
+    !values.area.trim() &&
+    !values.fullAddress.trim() &&
+    values.whatsProvided.length === 0 &&
+    values.whatToBring.length === 0
+  )
+}
