@@ -1,6 +1,6 @@
 # TryKai: Handover
 
-*Written 24 October 2026 against the repo (`staging` at `7c27da3`, PR #150). Supersedes the 19 October handover. Read this first if you are Cursor, a new Claude chat, or anyone picking up the code.*
+*Written 24 October 2026, updated 25 October against `staging` at #160 (#161 open). Supersedes the 19 October handover. Read this first if you are Cursor, a new Claude chat, or anyone picking up the code.*
 
 ---
 
@@ -74,7 +74,20 @@ Everything below is merged to `staging`; `main` has it up to #149, and #150 is o
 
 ---
 
-## State on 24 October
+## Shipped 24 to 25 October (Cursor builds, Claude reviews)
+
+From the first host's feedback (23 October onboarding) and Aakash. Details in DECISIONS.md.
+
+- **Photos** (#154, #156, #157): drag and drop files onto the drop zone, which now says "Add photos". Every photo can be cropped at 4:3; each crop starts from the original and can be undone in this session ("Undo crop" in the tile menu, "Reset to original" in the dialog). Editor tiles are 4:3. The tile menu closes on any tap outside it.
+- **Loading states** (#155): Button `loading`, `PageLoader`, and `WaitingState` with `LoadingMascot.jsx` (three bouncing dots now; the mascot replaces it later). Used on checkout, payouts, Singpass, Create listing ("Uploading photo 2 of 4") and most buttons. Checkout keeps Stripe's PaymentElement mounted behind the waiting panel; never unmount it while confirmPayment runs.
+- **Session reminders** (#158, #160, `00037`): hourly `send-reminders` emails the guest (per booking) and the host (per session) when a session starts in 2 to 24 hours, skipping bookings made in the last 6 hours. "Today" or "Tomorrow" by Singapore date, weekday in the date, warm copy, "Don't forget to bring" when the listing has items. Needs `REMINDERS_CRON_SECRET` plus three Vault secrets per project (OPERATIONS.md, Session reminders). Tested on staging 24 October.
+- **What to bring** (#159, `00038`): optional `listings.what_to_bring` (up to 5 items, 40 characters each) on Create and Edit listing, the listing page, booking detail, the confirmation email, the reminder, and the admin review card. The CHECK function must stay EXECUTE-granted to anon and authenticated, or every listing save fails.
+- **Payout return** (#161, open when this was written): back from Stripe with nothing due, Hosting says "Stripe is checking your details" and re-checks for 60 seconds instead of "needs your bank details".
+- **Decided, not built:** host pricing rounding left as it is (DECISIONS.md, 24 October).
+
+---
+
+## State on 25 October
 
 **Migrations.** See OPERATIONS.md, Migration state, for what is applied where. Added since 19 October:
 
@@ -85,6 +98,8 @@ Everything below is merged to `staging`; `main` has it up to #149, and #150 is o
 | `00034` | `users.teaching_plan` (no longer asked) |
 | `00035` | Singpass Myinfo: `singpass_sub`, `verified_name`, `verified_dob`, `verified_mobile`, `singpass_auth_sessions` |
 | `00036` | Singpass approves on the spot; listing review (`review_status`, `listing_reviews`, `review_listing`) |
+| `00037` | Session reminders: `guest_reminder_sent_at`, `host_reminder_sent_at`, hourly `invoke_send_reminders` |
+| `00038` | `listings.what_to_bring` |
 
 Earlier, from the 19 October handover:
 
@@ -103,11 +118,18 @@ Earlier, from the 19 October handover:
 
 **Singpass production.** The Myinfo app was submitted for approval on 24 October (up to 2 weeks), with the user journey PDF. Production secrets are being set. Once approved: `VITE_SINGPASS_ENABLED=true` for Production in Vercel, redeploy, test on trykai.sg (OPERATIONS.md, Singpass Myinfo).
 
-**Open, owned by Caleb.**
+**Production sync: waiting on Caleb, in this order.** `main` is at #149; `staging` has #150 to #160 (and #161 once merged).
+1. Confirm production has a backup from the last 24 hours.
+2. Run `00037` and `00038` in the production SQL Editor (`dqqlwofluvhikebtjune`). `stripe-webhook` reads `what_to_bring` for confirmation emails, so `00038` must come first.
+3. Session reminders on production: a new `REMINDERS_CRON_SECRET` (never the staging one) plus the three Vault secrets with production's URL and anon key.
+4. Stripe live "Connected accounts" webhook (`account.updated`) and `STRIPE_CONNECT_WEBHOOK_SECRET` on production. Without it a host whose payouts finish verifying after they return stays "not set up" until they tap Set up again.
+5. Merge `staging` into `main`, then check checkout and Create listing on trykai.sg.
+
+**Also open, owned by Caleb.**
+- Singpass production: app submitted 24 October (up to 2 weeks). The five production secrets are being set. On approval: `VITE_SINGPASS_ENABLED=true` for Production in Vercel, redeploy, test.
 - Production verification-alert database webhook (`notify-verification-pending`), for upload hosts.
 - Email confirmation dashboard steps on production, if not done.
-- Phone numbers for upload hosts and guests (KIV).
-- Edits to an approved listing are not re-reviewed (KIV).
+- Phone numbers for upload hosts and guests (KIV). Edits to an approved listing are not re-reviewed (KIV).
 
 **Production is on Supabase Pro** (daily backups, no inactivity pause). Production sits in Mumbai by accident; moving it to Singapore is post-launch. All TryKai money goes through Aspire.
 
@@ -115,9 +137,10 @@ Earlier, from the 19 October handover:
 
 ## Next work
 
-1. **First host's feedback**: UI and UX changes Caleb has collected (23 October onboarding).
-2. Production Singpass switch-on after approval.
-3. BUILD_BACKLOG.md for everything else.
+1. **Merge #161**, then the production sync above.
+2. **More of the first host's feedback**: Caleb has another batch.
+3. Singpass production switch-on after approval.
+4. BUILD_BACKLOG.md for everything else.
 
 ---
 
