@@ -6,6 +6,8 @@ import { formatCents } from '../lib/cancellationPolicy'
 import { formatDuration } from '../lib/duration'
 import { listingCategoryAreaLine } from '../lib/listingCategories'
 import { MAX_LISTING_REVIEW_NOTE_LENGTH } from '../../supabase/functions/_shared/listingReview.ts'
+import Button from '../components/ui/Button'
+import PageLoader from '../components/PageLoader'
 
 function formatRequestedAt(iso) {
   if (!iso) return 'Submitted date unknown'
@@ -135,6 +137,9 @@ export default function AdminListings() {
         {listing.whats_provided.length > 0 ? (
           <p className="dashboard-card__meta">Provided: {listing.whats_provided.join(', ')}</p>
         ) : null}
+        {listing.what_to_bring?.length > 0 ? (
+          <p className="dashboard-card__meta">What to bring: {listing.what_to_bring.join(', ')}</p>
+        ) : null}
 
         <p className="listing-review__host">
           <strong>{host.name}</strong>
@@ -176,14 +181,14 @@ export default function AdminListings() {
               </span>
             </label>
             <div className="listing-review__actions">
-              <button
-                type="button"
-                className="btn btn--primary"
-                disabled={busy}
+              <Button
+                variant="primary"
+                loading={busy}
+                loadingLabel="Saving"
                 onClick={() => decide(listing, 'approved')}
               >
-                {busy ? 'Saving…' : 'Approve and go live'}
-              </button>
+                Approve and go live
+              </Button>
               <button
                 type="button"
                 className="btn btn--secondary"
@@ -213,7 +218,7 @@ export default function AdminListings() {
       {error && <p className="error-message">{error}</p>}
 
       {loading ? (
-        <p className="status-message">Loading…</p>
+        <PageLoader />
       ) : listings.length === 0 ? (
         <p className="empty-state">Nothing waiting for review.</p>
       ) : (

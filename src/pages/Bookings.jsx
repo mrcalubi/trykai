@@ -5,6 +5,7 @@ import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import StarPicker from '../components/StarPicker'
 import Button from '../components/ui/Button'
+import PageLoader from '../components/PageLoader'
 import {
   awaitingPaidBookingId,
   guestBookingActions,
@@ -376,7 +377,7 @@ export default function Bookings({ embedded = false }) {
   }
 
   if (loading) {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   const awaitingBookingId = awaitingPaidBookingId({
@@ -472,14 +473,14 @@ export default function Bookings({ embedded = false }) {
                       {guestCancellationNote(booking)}
                     </p>
                     <div className="button-row">
-                      <button
-                        type="button"
-                        disabled={cancelLoading}
+                      <Button
+                        variant="destructive"
+                        loading={cancelLoading}
+                        loadingLabel="Cancelling"
                         onClick={() => handleGuestCancelBooking(booking)}
-                        className="btn btn--danger"
                       >
-                        {cancelLoading ? 'Cancelling…' : 'Confirm cancellation'}
-                      </button>
+                        Confirm cancellation
+                      </Button>
                       <button
                         type="button"
                         onClick={() => setConfirmCancelBookingId(null)}
@@ -512,13 +513,14 @@ export default function Bookings({ embedded = false }) {
                     </label>
                     {reviewError && <p className="error-message">{reviewError}</p>}
                     <div className="button-row">
-                      <button
+                      <Button
                         type="submit"
-                        disabled={reviewLoading}
-                        className="btn btn--primary"
+                        variant="primary"
+                        loading={reviewLoading}
+                        loadingLabel="Submitting"
                       >
-                        {reviewLoading ? 'Submitting…' : 'Submit review'}
-                      </button>
+                        Submit review
+                      </Button>
                       <button
                         type="button"
                         onClick={closeReviewForm}

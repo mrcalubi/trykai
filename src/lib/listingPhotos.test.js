@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { filesToPhotos, movePhoto, photosFromUrls, snapshotImageFiles } from './listingPhotos'
+import { filesToPhotos, movePhoto, photosFromUrls, snapshotImageFiles, uploadListingPhotos } from './listingPhotos'
 
 vi.mock('./compressImage', () => ({
   compressImage: vi.fn(async (file) => file),
@@ -47,5 +47,31 @@ describe('listingPhotos', () => {
     expect(photos[0].file).toBe(file)
     expect(error).toHaveBeenCalled()
     error.mockRestore()
+  })
+
+  it('reports upload progress for each new file', async () => {
+    const onProgress = vi.fn()
+    const upload = vi.fn(async () => ({ error: null }))
+    const storage = {
+      from: () => ({
+        upload,
+        getPublicUrl: (path) => ({ data: { publicUrl: `https://cdn.test/${path}` } }),
+      }),
+    }
+
+    await uploadListingPhotos(
+      [
+        { file: new File(['a'], 'a.png', { type: 'image/png' }) },
+        { remoteUrl: 'https://cdn.test/old.jpg' },
+        { file: new File(['b'], 'b.png', { type: 'image/png' }) },
+      ],
+      'host-1',
+      storage,
+      { onProgress }
+    )
+
+    expect(onProgress).toHaveBeenCalledTimes(2)
+    expect(onProgress).toHaveBeenNthCalledWith(1, { index: 1, total: 2 })
+    expect(onProgress).toHaveBeenNthCalledWith(2, { index: 2, total: 2 })
   })
 })

@@ -1530,6 +1530,16 @@ a {
   cursor: pointer;
 }
 
+.provided-custom__chip--suggest {
+  cursor: pointer;
+  background: var(--cream);
+}
+
+.provided-custom__chip--suggest:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .provided-custom__add {
   display: flex;
   flex-direction: column;
@@ -1561,6 +1571,7 @@ a {
 }
 
 .preview-item--overlay {
+  width: 160px;
   cursor: grabbing;
   box-shadow: var(--shadow-md);
 }
@@ -1975,6 +1986,136 @@ input[type='radio'] {
 
 .ui-button--destructive:hover:not(:disabled) {
   border-color: var(--error);
+}
+
+/* Stack idle + loading faces so the button width does not jump. */
+.ui-button {
+  display: inline-grid;
+  justify-items: center;
+}
+
+.ui-button__idle,
+.ui-button__busy {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ui-button--loading .ui-button__idle {
+  visibility: hidden;
+}
+
+.tk-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: tk-spin 0.7s linear infinite;
+}
+
+@keyframes tk-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.page-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  padding: 48px 16px;
+}
+
+.page-loader__spinner {
+  width: 28px;
+  height: 28px;
+  color: var(--navy);
+}
+
+.waiting-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.waiting-state__art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+}
+
+.waiting-state__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.waiting-state__message {
+  margin: 0;
+  max-width: 28em;
+  color: var(--muted);
+}
+
+.loading-mascot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.loading-mascot__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  animation: loading-mascot-bounce 0.9s ease-in-out infinite;
+}
+
+.loading-mascot__dot--navy {
+  background: var(--navy);
+}
+
+.loading-mascot__dot--coral {
+  background: var(--coral);
+}
+
+.loading-mascot__dot:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.loading-mascot__dot:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+@keyframes loading-mascot-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-spinner {
+    animation: none;
+    border-right-color: currentColor;
+    opacity: 0.7;
+  }
+
+  .loading-mascot__dot {
+    animation: none;
+  }
 }
 
 .button-row {
@@ -4119,6 +4260,24 @@ body.lightbox-open {
   text-underline-offset: 2px;
 }
 
+.payment-form-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.payment-form-wrap__wait {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--cream);
+}
+
 .payment-form {
   display: flex;
   flex-direction: column;
@@ -4182,6 +4341,7 @@ body.lightbox-open {
     padding: 18px var(--gutter) 24px;
   }
 
+  .checkout .payment-form-wrap,
   .checkout .payment-form {
     flex: 1;
   }
@@ -5079,23 +5239,30 @@ body.lightbox-open {
   font-weight: 500;
 }
 
-/* Photo previews */
+/* Photo previews: 4:3 like the crop. Two columns at 390px, three from 768px. */
 .preview-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 12px;
 }
 
 .preview-item {
   position: relative;
-  width: 148px;
+  width: 100%;
+  min-width: 0;
 }
 
 .preview-item__frame {
   position: relative;
-  width: 148px;
-  height: 148px;
+  width: 100%;
+  aspect-ratio: var(--listing-cover-aspect);
+}
+
+@media (min-width: 768px) {
+  .preview-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .preview-image {
@@ -6744,13 +6911,44 @@ body.lightbox-open {
   cursor: pointer;
 }
 
-.photo-drop:hover {
+.photo-drop:hover,
+.photo-drop--over {
   border-color: var(--navy);
+}
+
+.photo-drop--over {
+  background: var(--sand);
+  box-shadow: inset 0 0 0 1px var(--navy);
+}
+
+.photo-drop--disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .photo-drop__title {
   font-size: 16px;
   font-weight: 700;
+}
+
+.photo-drop__hint {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.photo-drop__hint--fine {
+  display: none;
+}
+
+@media (pointer: fine) {
+  .photo-drop__hint--coarse {
+    display: none;
+  }
+
+  .photo-drop__hint--fine {
+    display: block;
+  }
 }
 
 .photo-drop__count {

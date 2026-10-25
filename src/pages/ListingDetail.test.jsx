@@ -500,6 +500,23 @@ describe('ListingDetail content', () => {
     expect(screen.queryByRole('heading', { name: "What's provided" })).not.toBeInTheDocument()
   })
 
+  it('lists what guests should bring under what is provided', async () => {
+    givenListing(makeListing({ what_to_bring: ['Water bottle', 'Notebook and pen'] }))
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'What to bring' })
+    expect(screen.getByText('Water bottle')).toBeInTheDocument()
+    expect(screen.getByText('Notebook and pen')).toBeInTheDocument()
+  })
+
+  it('omits the bring section when the list is empty', async () => {
+    givenListing(makeListing({ what_to_bring: [] }))
+    renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.queryByRole('heading', { name: 'What to bring' })).not.toBeInTheDocument()
+  })
+
   it('renders every photo in the gallery', async () => {
     givenListing(makeListing({ photo_urls: ['https://cdn.test/a.jpg', 'https://cdn.test/b.jpg'] }))
     renderPage()
@@ -1240,6 +1257,92 @@ describe('ListingDetail checkout', () => {
     await screen.findByTestId('stripe-elements')
     return utils
   }
+
+  it('shows a waiting state while the payment intent is created, including PayNow', async () => {
+    givenListing()
+    givenSessions([makeSession({ id: 'session-7' })])
+    givenSignedIn()
+    let release
+    supabase.functions.invoke.mockImplementation((name) => {
+      if (name !== 'create-payment-intent') return Promise.resolve({ data: null, error: null })
+      return new Promise((resolve) => {
+        release = () =>
+          resolve({
+            data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 5100 },
+            error: null,
+          })
+      })
+    })
+    const { user } = renderPage()
+    await screen.findByText(/spots left/)
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(await screen.findByRole('button', { name: /^Card/ }))
+
+    expect(
+      await screen.findByText('Getting your payment ready, including PayNow.')
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Confirm and pay', level: 2 })).toBeInTheDocument()
+    release()
+    await screen.findByTestId('stripe-elements')
+  })
+
+  it('shows a waiting state while Stripe confirms the payment', async () => {
+    let release
+    stripe.instance.confirmPayment.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ error: null, paymentIntent: { status: 'succeeded' } })
+        })
+    )
+    const { user } = await openCheckout()
+
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Confirming your payment' })).toBeInTheDocument()
+    expect(screen.getByText(/PayNow and card payments both go through Stripe/)).toBeInTheDocument()
+    release()
+  })
+
+  it('keeps PaymentElement mounted while confirmPayment is pending', async () => {
+    let release
+    stripe.instance.confirmPayment.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ error: null, paymentIntent: { status: 'succeeded' } })
+        })
+    )
+    const { user } = await openCheckout()
+    const paymentElement = screen.getByTestId('payment-element')
+
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Confirming your payment' })).toBeInTheDocument()
+    expect(screen.getByTestId('payment-element')).toBe(paymentElement)
+    expect(screen.getByRole('button', { name: /^Pay \$/, hidden: true })).toBeDisabled()
+    release()
+  })
+
+  it('keeps the same PaymentElement after a decline and shows the error', async () => {
+    let release
+    stripe.instance.confirmPayment.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ error: { message: 'Your card was declined.' } })
+        })
+    )
+    const { user } = await openCheckout()
+    const paymentElement = screen.getByTestId('payment-element')
+
+    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
+    expect(await screen.findByRole('heading', { name: 'Confirming your payment' })).toBeInTheDocument()
+    expect(screen.getByTestId('payment-element')).toBe(paymentElement)
+
+    release()
+
+    expect(await screen.findByText('Your card was declined.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Confirming your payment' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('payment-element')).toBe(paymentElement)
+  })
 
   it('confirms the payment without leaving the page when possible', async () => {
     const { user } = await openCheckout()

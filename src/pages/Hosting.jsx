@@ -7,6 +7,8 @@ import AddSessionsForm from '../components/AddSessionsForm'
 import { hostBannerLine, hostInterestById, keenNotifiedLine } from '../lib/keen'
 import { heldByTitleMap, heldSessionLine, isHeld, sharedBatchLine } from '../lib/sharedAvailability'
 import Button from '../components/ui/Button'
+import PageLoader from '../components/PageLoader'
+import WaitingState from '../components/WaitingState'
 import OverflowMenu from '../components/ui/OverflowMenu'
 import Icon from '../components/ui/Icon'
 import { hostCancelWarning } from '../lib/hostCancelCopy'
@@ -36,6 +38,13 @@ import {
   monthStats,
 } from '../lib/hostingDashboard'
 import { parsePriceInputCents } from '../lib/pricing'
+import {
+  PAYOUT_CHECKING_COPY,
+  PAYOUT_PENDING_POLL_MS,
+  PAYOUT_PENDING_WAIT_MS,
+  PAYOUT_READY_COPY,
+  PAYOUT_STILL_CHECKING_COPY,
+} from '../lib/payoutReturn'
 import { listingReviewBadge } from '../lib/listingReview'
 
 function activeBookingsOn(session) {
@@ -113,8 +122,8 @@ function ListingDeleteDialog({
             </Button>
           ) : (
             <>
-              <Button variant="destructive" disabled={loading} onClick={onConfirm}>
-                {loading ? 'Deleting…' : 'Confirm delete'}
+              <Button variant="destructive" loading={loading} loadingLabel="Deleting" onClick={onConfirm}>
+                Confirm delete
               </Button>
               <Button variant="secondary" onClick={onClose}>
                 Keep listing
@@ -168,6 +177,8 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
   const [payoutSetupLoading, setPayoutSetupLoading] = useState(false)
   const [payoutSetupError, setPayoutSetupError] = useState('')
   const [payoutSetupIncomplete, setPayoutSetupIncomplete] = useState(false)
+  const [payoutChecking, setPayoutChecking] = useState(false)
+  const [payoutPendingCopy, setPayoutPendingCopy] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
 
@@ -278,6 +289,19 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
     if (connectStatus !== 'return' && connectStatus !== 'refresh') return
 
     let cancelled = false
+    let timeoutId = 0
+    const startedAt = Date.now()
+
+    function clearConnectParam() {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('connect')
+          return next
+        },
+        { replace: true },
+      )
+    }
 
     async function refreshPayoutStatus() {
       const {
@@ -290,29 +314,49 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
       if (cancelled) return
 
       if (fnError || data?.error) {
+        setPayoutChecking(false)
+        setPayoutPendingCopy('')
         setPayoutSetupError(await edgeFunctionErrorMessage(fnError, data))
-      } else if (data?.stripe_payouts_enabled) {
+        clearConnectParam()
+        return
+      }
+      if (data?.stripe_payouts_enabled) {
         setPayoutsEnabled(true)
         setPayoutSetupIncomplete(false)
-        setBookingStatusMessage('Payouts are set up. Guests can now book you.')
-      } else {
+        setPayoutChecking(false)
+        setPayoutPendingCopy('')
+        setBookingStatusMessage(PAYOUT_READY_COPY)
+        clearConnectParam()
+        return
+      }
+      if (data?.pending) {
+        if (Date.now() - startedAt >= PAYOUT_PENDING_WAIT_MS) {
+          setPayoutsEnabled(false)
+          setPayoutSetupIncomplete(false)
+          setPayoutChecking(false)
+          setPayoutPendingCopy(PAYOUT_STILL_CHECKING_COPY)
+          clearConnectParam()
+          return
+        }
         setPayoutsEnabled(false)
-        setPayoutSetupIncomplete(true)
+        setPayoutSetupIncomplete(false)
+        setPayoutChecking(true)
+        setPayoutPendingCopy(PAYOUT_CHECKING_COPY)
+        timeoutId = window.setTimeout(refreshPayoutStatus, PAYOUT_PENDING_POLL_MS)
+        return
       }
 
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev)
-          next.delete('connect')
-          return next
-        },
-        { replace: true },
-      )
+      setPayoutsEnabled(false)
+      setPayoutSetupIncomplete(true)
+      setPayoutChecking(false)
+      setPayoutPendingCopy('')
+      clearConnectParam()
     }
 
     void refreshPayoutStatus()
     return () => {
       cancelled = true
+      window.clearTimeout(timeoutId)
     }
   }, [loading, connectStatus, setSearchParams])
 
@@ -407,22 +451,24 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
     setPayoutSetupError('')
     setPayoutSetupLoading(true)
     const { data, error: fnError } = await invokeAuthed('create-account-link', {})
-    setPayoutSetupLoading(false)
 
     if (fnError || data?.error) {
+      setPayoutSetupLoading(false)
       setPayoutSetupError(await edgeFunctionErrorMessage(fnError, data))
       return
     }
     if (data?.stripe_payouts_enabled) {
+      setPayoutSetupLoading(false)
       setPayoutsEnabled(true)
       setPayoutSetupIncomplete(false)
-      setBookingStatusMessage('Payouts are set up. Guests can now book you.')
+      setBookingStatusMessage(PAYOUT_READY_COPY)
       return
     }
     if (data?.url) {
       window.location.assign(data.url)
       return
     }
+    setPayoutSetupLoading(false)
     setPayoutSetupError('Could not start payout setup. Please try again.')
   }
 
@@ -604,7 +650,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
   const heldByTitles = useMemo(() => heldByTitleMap(hostSessions), [hostSessions])
 
   if (loading) {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   if (!isHost) {
@@ -673,20 +719,23 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
       title: 'Set up payouts',
       hint: payoutsEnabled
         ? 'Done. Stripe pays your earnings into your bank.'
-        : payoutSetupIncomplete
-          ? "Your payout setup isn't finished yet."
-          : 'Stripe needs your bank details to pay you.',
-      action: (
-        <button
-          type="button"
-          className="btn btn--secondary btn--small"
-          disabled={payoutSetupLoading}
-          onClick={handlePayoutSetup}
-          aria-label={payoutSetupIncomplete ? 'Continue payout setup' : 'Set up payouts'}
-        >
-          {payoutSetupLoading ? 'Opening…' : payoutSetupIncomplete ? 'Continue' : 'Set up'}
-        </button>
-      ),
+        : payoutPendingCopy
+          ? payoutPendingCopy
+          : payoutSetupIncomplete
+            ? "Your payout setup isn't finished yet."
+            : 'Stripe needs your bank details to pay you.',
+      action:
+        payoutPendingCopy ? null : (
+          <button
+            type="button"
+            className="btn btn--secondary btn--small"
+            disabled={payoutSetupLoading}
+            onClick={handlePayoutSetup}
+            aria-label={payoutSetupIncomplete ? 'Continue payout setup' : 'Set up payouts'}
+          >
+            {payoutSetupIncomplete ? 'Continue' : 'Set up'}
+          </button>
+        ),
     },
     {
       id: 'session',
@@ -744,7 +793,19 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
       ) : null}
 
       <div className={setupComplete ? 'hosting__layout' : 'hosting__layout hosting__layout--setup'}>
-        {setupComplete ? null : (
+        {setupComplete ? null : payoutSetupLoading || payoutChecking ? (
+          <section className="hosting-setup" aria-labelledby="hosting-setup-title">
+            <WaitingState
+              hold={payoutChecking}
+              title={payoutChecking ? undefined : 'Setting up payouts'}
+              message={
+                payoutChecking
+                  ? PAYOUT_CHECKING_COPY
+                  : 'Opening Stripe so you can add your bank details.'
+              }
+            />
+          </section>
+        ) : (
           <section className="hosting-setup" aria-labelledby="hosting-setup-title">
             <div className="hosting-setup__head">
               <h2 id="hosting-setup-title" className="hosting-setup__title">
@@ -1193,14 +1254,15 @@ function ListingSessions({
               them.
             </p>
             <div className="hosting-sessions__confirm-actions">
-              <button
-                type="button"
-                disabled={deleteSessionLoading}
+              <Button
+                variant="primary"
+                loading={deleteSessionLoading}
+                loadingLabel="Deleting"
                 onClick={() => onBulkDelete(selectedHere)}
-                className="btn btn--primary hosting-sessions__danger"
+                className="hosting-sessions__danger"
               >
-                {deleteSessionLoading ? 'Deleting…' : 'Confirm delete'}
-              </button>
+                Confirm delete
+              </Button>
               <button type="button" onClick={onKeep} className="btn btn--ghost">
                 Keep sessions
               </button>
@@ -1322,14 +1384,15 @@ function SessionRow({
         ) : null}
         {selectable && editing ? (
           <>
-            <button
-              type="button"
-              disabled={editLoading}
+            <Button
+              variant="secondary"
+              loading={editLoading}
+              loadingLabel="Saving"
               onClick={() => onSaveEdit(session)}
-              className="btn btn--ghost hosting-session__action"
+              className="hosting-session__action"
             >
-              {editLoading ? 'Saving…' : 'Save'}
-            </button>
+              Save
+            </Button>
             <button type="button" onClick={onKeep} className="btn btn--ghost hosting-session__action">
               Cancel
             </button>
@@ -1351,14 +1414,15 @@ function SessionRow({
         <div className="cancel-confirm">
           <p className="cancel-confirm__warning">{hostCancelWarning(guestTotal)}</p>
           <div className="hosting-sessions__confirm-actions">
-            <button
-              type="button"
-              disabled={cancelLoading}
+            <Button
+              variant="primary"
+              loading={cancelLoading}
+              loadingLabel="Cancelling"
               onClick={() => onCancelSession(session)}
-              className="btn btn--primary hosting-sessions__danger"
+              className="hosting-sessions__danger"
             >
-              {cancelLoading ? 'Cancelling…' : 'Confirm cancellation'}
-            </button>
+              Confirm cancellation
+            </Button>
             <button type="button" onClick={onKeep} className="btn btn--ghost">
               Keep session
             </button>
@@ -1373,14 +1437,15 @@ function SessionRow({
             to book it.
           </p>
           <div className="hosting-sessions__confirm-actions">
-            <button
-              type="button"
-              disabled={deleteSessionLoading}
+            <Button
+              variant="primary"
+              loading={deleteSessionLoading}
+              loadingLabel="Deleting"
               onClick={() => onDeleteSession(session)}
-              className="btn btn--primary hosting-sessions__danger"
+              className="hosting-sessions__danger"
             >
-              {deleteSessionLoading ? 'Deleting…' : 'Confirm delete'}
-            </button>
+              Confirm delete
+            </Button>
             <button type="button" onClick={onKeep} className="btn btn--ghost">
               Keep session
             </button>

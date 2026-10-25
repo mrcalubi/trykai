@@ -501,6 +501,57 @@ describe('EditListing saving', () => {
   })
 })
 
+describe('EditListing what guests should bring', () => {
+  it('saves a suggestion and a custom item, and caps the list at five', async () => {
+    givenListing({ what_to_bring: [] })
+    const { user } = await renderLoaded()
+    await user.click(screen.getByRole('button', { name: 'Comfortable clothes' }))
+    await user.click(screen.getByRole('button', { name: 'Water bottle' }))
+    await user.click(screen.getByRole('button', { name: 'Notebook and pen' }))
+    await user.type(screen.getByLabelText('Add something to bring'), 'Yoga mat')
+    await user.click(screen.getByRole('button', { name: '+ Add item' }))
+    await user.type(screen.getByLabelText('Add something to bring'), 'Towel')
+    await user.click(screen.getByRole('button', { name: '+ Add item' }))
+
+    expect(screen.getByText('Up to 5 items.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'update').payload.what_to_bring).toEqual([
+      'Comfortable clothes',
+      'Water bottle',
+      'Notebook and pen',
+      'Yoga mat',
+      'Towel',
+    ])
+  })
+
+  it('keeps a typed item to 40 characters', async () => {
+    givenListing({ what_to_bring: [] })
+    const { user } = await renderLoaded()
+    await user.type(screen.getByLabelText('Add something to bring'), `${'x'.repeat(41)}extra`)
+    await user.click(screen.getByRole('button', { name: '+ Add item' }))
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'update').payload.what_to_bring).toEqual(['x'.repeat(40)])
+  })
+
+  it('clears saved items when the host chooses nothing', async () => {
+    givenListing({ what_to_bring: ['Water bottle'] })
+    const { user } = await renderLoaded()
+    expect(screen.getByLabelText('Remove Water bottle')).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: 'Nothing, we provide everything' }))
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'update').payload.what_to_bring).toEqual([])
+  })
+})
+
 describe('EditListing photos', () => {
   function selectFiles(files) {
     fireEvent.change(screen.getByLabelText('Photos'), { target: { files } })

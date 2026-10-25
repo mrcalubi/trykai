@@ -32,7 +32,7 @@ export const LISTING_STEPS = [
     id: 'finish',
     label: 'Publish',
     title: 'Final touches',
-    intro: 'Say what you provide, check the cancellation policy and publish.',
+    intro: 'Say what you provide and what guests should bring, then publish.',
   },
 ]
 
@@ -79,5 +79,6 @@ export function draftValues(draft) {
     area: text('area'),
     fullAddress: text('fullAddress'),
     whatsProvided: Array.isArray(draft?.whatsProvided) ? draft.whatsProvided : [],
+    whatToBring: Array.isArray(draft?.whatToBring) ? draft.whatToBring : [],
   }
 }

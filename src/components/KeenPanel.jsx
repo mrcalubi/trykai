@@ -12,6 +12,7 @@ import {
   keenCountsById,
   toggleChoice,
 } from '../lib/keen'
+import Button from './ui/Button'
 
 /**
  * Shown in the booking card when a listing has no upcoming sessions. A guest
@@ -173,9 +174,15 @@ export default function KeenPanel({ listingId, hostName, viewerId }) {
         </div>
       </div>
 
-      <button type="button" className="btn btn--primary keen-panel__button" onClick={submit} disabled={busy}>
-        {busy ? 'Sending…' : "I'm keen"}
-      </button>
+      <Button
+        variant="primary"
+        className="keen-panel__button"
+        onClick={submit}
+        loading={busy}
+        loadingLabel="Sending"
+      >
+        I&apos;m keen
+      </Button>
       {error ? <p className="error-message">{error}</p> : null}
     </div>
   )

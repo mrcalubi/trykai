@@ -1,7 +1,20 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { LISTING_COVER_ASPECT, LISTING_COVER_H, LISTING_COVER_W, cropImageToBlob, loadImage } from './coverCrop'
+import {
+  LISTING_COVER_ASPECT,
+  LISTING_COVER_H,
+  LISTING_COVER_W,
+  cropImageToBlob,
+  cropSourceUrl,
+  loadImage,
+  photoHasOriginal,
+  photoIsCropped,
+  rememberOriginal,
+  resetCroppedPhoto,
+  revokeIfBlobUrl,
+  revokePhotoUrls,
+} from './coverCrop'
 
 describe('coverCrop', () => {
   afterEach(() => {
@@ -23,6 +36,7 @@ describe('coverCrop', () => {
     expect(css).toMatch(/\.hosting-listing__thumb \{[\s\S]*?object-position:\s*center/)
     expect(css).toMatch(/\.checkout-summary__photo \{[\s\S]*?object-position:\s*center/)
     expect(css).toMatch(/\.preview-image \{[\s\S]*?object-position:\s*center/)
+    expect(css).toMatch(/\.preview-item__frame \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
   })
 
   it('draws the chosen pixels onto a canvas and returns a blob', async () => {
@@ -78,5 +92,59 @@ describe('coverCrop', () => {
     await expect(loadImage('https://cdn.test/bad.jpg')).rejects.toThrow('Could not load the photo')
 
     globalThis.Image = OriginalImage
+  })
+
+  it('keeps a new photo original and crops saved photos from the remote url', () => {
+    const file = new File(['a'], 'a.png', { type: 'image/png' })
+    const fresh = rememberOriginal({
+      id: 'a',
+      file,
+      previewUrl: 'blob:a',
+      remoteUrl: null,
+    })
+    expect(fresh.originalFile).toBe(file)
+    expect(fresh.originalUrl).toBe('blob:a')
+    expect(photoHasOriginal(fresh)).toBe(true)
+    expect(photoIsCropped(fresh)).toBe(false)
+    expect(cropSourceUrl({ ...fresh, previewUrl: 'blob:cropped', cropState: { zoom: 2 } })).toBe('blob:a')
+    expect(photoIsCropped({ ...fresh, previewUrl: 'blob:cropped' })).toBe(true)
+
+    const saved = { id: 'b', file: null, previewUrl: 'https://cdn.test/b.jpg', remoteUrl: 'https://cdn.test/b.jpg' }
+    expect(rememberOriginal(saved)).toBe(saved)
+    expect(photoHasOriginal(saved)).toBe(false)
+    expect(photoIsCropped({ ...saved, file: new File(['c'], 'cover.jpg'), previewUrl: 'blob:c' })).toBe(false)
+    expect(cropSourceUrl({ ...saved, previewUrl: 'blob:c' })).toBe('https://cdn.test/b.jpg')
+  })
+
+  it('revokes blob urls the editor created, not remote urls', () => {
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    revokeIfBlobUrl('https://cdn.test/a.jpg')
+    revokePhotoUrls({
+      previewUrl: 'blob:preview',
+      originalUrl: 'blob:original',
+    })
+    expect(revoke).toHaveBeenCalledWith('blob:preview')
+    expect(revoke).toHaveBeenCalledWith('blob:original')
+    expect(revoke).not.toHaveBeenCalledWith('https://cdn.test/a.jpg')
+  })
+
+  it('restores a cropped photo to its original file and url', () => {
+    const file = new File(['a'], 'a.png', { type: 'image/png' })
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const cropped = {
+      id: 'a',
+      file: new File(['c'], 'cover.jpg', { type: 'image/jpeg' }),
+      previewUrl: 'blob:cropped',
+      originalFile: file,
+      originalUrl: 'blob:a',
+      cropState: { zoom: 2 },
+    }
+    expect(resetCroppedPhoto(cropped)).toEqual({
+      ...cropped,
+      file,
+      previewUrl: 'blob:a',
+      cropState: null,
+    })
+    expect(revoke).toHaveBeenCalledWith('blob:cropped')
   })
 })

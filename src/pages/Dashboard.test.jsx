@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Route, Routes } from 'react-router-dom'
@@ -14,6 +14,13 @@ import { addSingaporeDays, singaporeDateKey } from '../lib/sessionBatch'
 import { formatSessionDateTime } from '../lib/sessionDate'
 import { renderWithRouter } from '../test/render'
 import { hoursFromNow, makeAuthSession, makeBooking } from '../test/fixtures'
+import {
+  PAYOUT_CHECKING_COPY,
+  PAYOUT_PENDING_POLL_MS,
+  PAYOUT_PENDING_WAIT_MS,
+  PAYOUT_READY_COPY,
+  PAYOUT_STILL_CHECKING_COPY,
+} from '../lib/payoutReturn'
 
 vi.mock('../lib/supabase')
 
@@ -1797,6 +1804,17 @@ describe('Dashboard payout setup', () => {
     expect(within(setup).getByRole('button', { name: 'Set up payouts' })).toHaveTextContent('Set up')
   })
 
+  it('shows a waiting state while the Stripe account link is created', async () => {
+    givenData({ listings: [makeMyListing()], payoutsEnabled: false })
+    supabase.functions.invoke.mockImplementation(() => new Promise(() => {}))
+    const { user } = await renderHosting()
+
+    await user.click(screen.getByRole('button', { name: 'Set up payouts' }))
+
+    expect(await screen.findByRole('heading', { name: 'Setting up payouts' })).toBeInTheDocument()
+    expect(screen.getByText('Opening Stripe so you can add your bank details.')).toBeInTheDocument()
+  })
+
   it('asks Stripe for an account link when payouts are not set up', async () => {
     givenData({ listings: [makeMyListing()], payoutsEnabled: false })
     supabase.functions.invoke.mockResolvedValue({
@@ -1897,6 +1915,107 @@ describe('Dashboard payout setup', () => {
       expect(assign).toHaveBeenCalledWith('https://connect.stripe.com/setup/fresh')
     } finally {
       vi.unstubAllGlobals()
+    }
+  })
+
+  function renderPayoutReturn() {
+    return renderWithRouter(
+      <RequireAuth>
+        <Hosting />
+      </RequireAuth>,
+      { route: '/hosting?connect=return', path: '/hosting' }
+    )
+  }
+
+  it('polls while Stripe is only verifying and confirms when payouts enable on the next check', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    givenData({ listings: [makeMyListing()], payoutsEnabled: false })
+    supabase.functions.invoke
+      .mockResolvedValueOnce({
+        data: { stripe_payouts_enabled: false, pending: true, url: null },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { stripe_payouts_enabled: true, pending: false, url: null },
+        error: null,
+      })
+
+    try {
+      renderPayoutReturn()
+
+      expect(await screen.findByText(PAYOUT_CHECKING_COPY)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Set up payouts|Continue payout setup/ })).toBeNull()
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(PAYOUT_PENDING_POLL_MS)
+      })
+
+      expect(await screen.findByText(PAYOUT_READY_COPY)).toBeInTheDocument()
+      expect(supabase.functions.invoke).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops asking after 60 seconds and says Stripe is still checking', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    givenData({ listings: [makeMyListing()], payoutsEnabled: false })
+    supabase.functions.invoke.mockResolvedValue({
+      data: { stripe_payouts_enabled: false, pending: true, url: null },
+      error: null,
+    })
+
+    try {
+      renderPayoutReturn()
+
+      expect(await screen.findByText(PAYOUT_CHECKING_COPY)).toBeInTheDocument()
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(PAYOUT_PENDING_WAIT_MS)
+      })
+
+      expect(await screen.findByText(PAYOUT_STILL_CHECKING_COPY)).toBeInTheDocument()
+      expect(screen.getByText(/Check back in a few minutes/)).toBeInTheDocument()
+      expect(screen.queryByText(/We'll update this page/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Set up payouts|Continue payout setup/ })).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('shows Set up when Stripe still needs something from the host', async () => {
+    givenData({ listings: [makeMyListing()], payoutsEnabled: false })
+    supabase.functions.invoke.mockResolvedValue({
+      data: { stripe_payouts_enabled: false, pending: false, url: null },
+      error: null,
+    })
+    renderPayoutReturn()
+
+    expect(await screen.findByText("Your payout setup isn't finished yet.")).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue payout setup' })).toHaveTextContent('Continue')
+    expect(screen.queryByText(PAYOUT_CHECKING_COPY)).not.toBeInTheDocument()
+  })
+
+  it('stops polling for a pending payout check when the page closes', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    givenData({ listings: [makeMyListing()], payoutsEnabled: false })
+    supabase.functions.invoke.mockResolvedValue({
+      data: { stripe_payouts_enabled: false, pending: true, url: null },
+      error: null,
+    })
+
+    try {
+      const { unmount } = renderPayoutReturn()
+      expect(await screen.findByText(PAYOUT_CHECKING_COPY)).toBeInTheDocument()
+      const calls = supabase.functions.invoke.mock.calls.length
+      unmount()
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(PAYOUT_PENDING_WAIT_MS)
+      })
+      expect(supabase.functions.invoke).toHaveBeenCalledTimes(calls)
+    } finally {
+      vi.useRealTimers()
     }
   })
 

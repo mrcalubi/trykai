@@ -8,9 +8,13 @@ import PostalAddressFields from '../components/PostalAddressFields'
 import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
+import { revokePhotoUrls } from '../lib/coverCrop'
 import { uploadListingPhotos } from '../lib/listingPhotos'
+import PageLoader from '../components/PageLoader'
+import WaitingState from '../components/WaitingState'
 import ListingPricePanel from '../components/ListingPricePanel'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
+import WhatToBringFields from '../components/WhatToBringFields'
 import FieldHint from '../components/FieldHint'
 import Card from '../components/ui/Card'
 import Icon from '../components/ui/Icon'
@@ -22,6 +26,7 @@ import {
   listingSaveProblem,
 } from '../lib/listingFieldHints'
 import { providedForSave } from '../lib/whatsProvided'
+import { whatToBringForSave } from '../lib/whatToBring'
 import { foundingHostFromRpc } from '../lib/foundingHost'
 import {
   formatGuestFacingPrice,
@@ -70,6 +75,7 @@ export default function CreateListing() {
   const [area, setArea] = useState(start.area)
   const [fullAddress, setFullAddress] = useState(start.fullAddress)
   const [whatsProvided, setWhatsProvided] = useState(start.whatsProvided)
+  const [whatToBring, setWhatToBring] = useState(start.whatToBring)
   const [photos, setPhotos] = useState([])
   const photosRef = useRef(photos)
   const [groupPricing, setGroupPricing] = useState(start.groupPricing)
@@ -80,6 +86,7 @@ export default function CreateListing() {
   const [photoError, setPhotoError] = useState('')
   const [draftNote, setDraftNote] = useState(resumed ? DRAFT_RESTORED : '')
   const [loading, setLoading] = useState(false)
+  const [publishMessage, setPublishMessage] = useState('Saving your listing')
   const [draftHandled, setDraftHandled] = useState(Boolean(resumed))
   const [photoSkipOpen, setPhotoSkipOpen] = useState(false)
   const headingRef = useRef(null)
@@ -127,7 +134,7 @@ export default function CreateListing() {
 
   useEffect(() => {
     return () => {
-      photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.previewUrl))
+      photosRef.current.forEach(revokePhotoUrls)
     }
   }, [])
 
@@ -146,6 +153,7 @@ export default function CreateListing() {
     if (typeof draft.area === 'string') setArea(draft.area)
     if (typeof draft.fullAddress === 'string') setFullAddress(draft.fullAddress)
     if (Array.isArray(draft.whatsProvided)) setWhatsProvided(draft.whatsProvided)
+    if (Array.isArray(draft.whatToBring)) setWhatToBring(draft.whatToBring)
     setDraftNote(DRAFT_RESTORED)
   }
 
@@ -174,6 +182,7 @@ export default function CreateListing() {
       area,
       fullAddress,
       whatsProvided,
+      whatToBring,
     }
     try {
       window.localStorage.setItem(draftKey(userId), JSON.stringify(values))
@@ -247,13 +256,22 @@ export default function CreateListing() {
     }
 
     const provided = providedForSave(whatsProvided)
+    const bring = whatToBringForSave(whatToBring)
 
     setLoading(true)
+    const uploadCount = photos.filter((photo) => photo.file).length
+    setPublishMessage(
+      uploadCount ? `Uploading photo 1 of ${uploadCount}` : 'Saving your listing'
+    )
 
     let photoUrls = []
     try {
       if (photos.length > 0) {
-        photoUrls = await uploadListingPhotos(photos, userId, supabase.storage)
+        photoUrls = await uploadListingPhotos(photos, userId, supabase.storage, {
+          onProgress: ({ index, total }) => {
+            setPublishMessage(`Uploading photo ${index} of ${total}`)
+          },
+        })
       }
     } catch (uploadError) {
       console.error('Listing photo upload failed', uploadError)
@@ -262,6 +280,8 @@ export default function CreateListing() {
       goTo(STEPS.findIndex((step) => step.id === 'photos'))
       return
     }
+
+    setPublishMessage('Saving your listing')
 
     const listingPayload = {
       host_id: userId,
@@ -275,14 +295,16 @@ export default function CreateListing() {
       area,
       full_address: fullAddress.trim(),
       whats_provided: provided,
+      what_to_bring: bring,
       photo_urls: photoUrls,
       is_active: true,
     }
     let { error: listingError } = await supabase.from('listings').insert(listingPayload)
-    if (listingError && /duration_mins|group_pricing/.test(listingError.message ?? '')) {
+    if (listingError && /duration_mins|group_pricing|what_to_bring/.test(listingError.message ?? '')) {
       const retry = { ...listingPayload }
       if (/duration_mins/.test(listingError.message ?? '')) delete retry.duration_mins
       if (/group_pricing/.test(listingError.message ?? '')) delete retry.group_pricing
+      if (/what_to_bring/.test(listingError.message ?? '')) delete retry.what_to_bring
       ;({ error: listingError } = await supabase.from('listings').insert(retry))
     }
 
@@ -310,16 +332,17 @@ export default function CreateListing() {
     }
 
     clearDraft(userId)
+    photosRef.current.forEach(revokePhotoUrls)
     void notifyListingSubmitted()
     navigate('/hosting', { replace: true })
   }
 
   if (!verificationChecked) {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   if (verificationStatus !== 'approved') {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   const current = STEPS[step]
@@ -564,6 +587,7 @@ export default function CreateListing() {
     return (
       <>
         <WhatsProvidedFields value={whatsProvided} onChange={setWhatsProvided} />
+        <WhatToBringFields value={whatToBring} onChange={setWhatToBring} />
 
         <div className="wizard-inline-preview">
           <p className="wizard-preview__label">How guests will see it</p>
@@ -625,62 +649,62 @@ export default function CreateListing() {
             </div>
           </div>
 
-          <div className="wizard__body">
-            <div className="wizard__intro">
-              <h1 className="wizard__title" ref={headingRef} tabIndex={-1}>
-                {current.title}
-              </h1>
-              <p className="wizard__lede">{current.intro}</p>
-            </div>
-
-            {hasSavedDraft ? (
-              <div className="wizard__note wizard__note--draft">
-                <p>You have a saved draft on this device.</p>
-                <div className="wizard__note-actions">
-                  <button type="button" className="btn btn--small btn--primary" onClick={restoreDraft}>
-                    Restore draft
-                  </button>
-                  <button type="button" className="btn btn--small btn--ghost" onClick={discardDraft}>
-                    Discard
-                  </button>
+          {loading ? (
+            <WaitingState title="Creating your listing" message={publishMessage} />
+          ) : (
+            <>
+              <div className="wizard__body">
+                <div className="wizard__intro">
+                  <h1 className="wizard__title" ref={headingRef} tabIndex={-1}>
+                    {current.title}
+                  </h1>
+                  <p className="wizard__lede">{current.intro}</p>
                 </div>
+
+                {hasSavedDraft ? (
+                  <div className="wizard__note wizard__note--draft">
+                    <p>You have a saved draft on this device.</p>
+                    <div className="wizard__note-actions">
+                      <button type="button" className="btn btn--small btn--primary" onClick={restoreDraft}>
+                        Restore draft
+                      </button>
+                      <button type="button" className="btn btn--small btn--ghost" onClick={discardDraft}>
+                        Discard
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                {draftNote ? (
+                  <p className="wizard__note" role="status">
+                    {draftNote}
+                  </p>
+                ) : null}
+
+                {renderStep()}
+
+                {error ? (
+                  <p className="wizard__note" role="status">
+                    {error}
+                  </p>
+                ) : null}
               </div>
-            ) : null}
-            {draftNote ? (
-              <p className="wizard__note" role="status">
-                {draftNote}
-              </p>
-            ) : null}
 
-            {renderStep()}
-
-            {error ? (
-              <p className="wizard__note" role="status">
-                {error}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="wizard__actions">
-            {step > 0 ? (
-              <button type="button" className="btn btn--ghost" onClick={() => goTo(step - 1)}>
-                Back
-              </button>
-            ) : null}
-            <button
-              type="submit"
-              className="btn btn--primary wizard__continue"
-              disabled={loading || (isLast && !acceptedHostTerms)}
-            >
-              {isLast
-                ? loading
-                  ? photos.length > 0
-                    ? 'Uploading…'
-                    : 'Creating…'
-                  : 'Create listing'
-                : 'Continue'}
-            </button>
-          </div>
+              <div className="wizard__actions">
+                {step > 0 ? (
+                  <button type="button" className="btn btn--ghost" onClick={() => goTo(step - 1)}>
+                    Back
+                  </button>
+                ) : null}
+                <button
+                  type="submit"
+                  className="btn btn--primary wizard__continue"
+                  disabled={isLast && !acceptedHostTerms}
+                >
+                  {isLast ? 'Create listing' : 'Continue'}
+                </button>
+              </div>
+            </>
+          )}
         </form>
       </div>
 

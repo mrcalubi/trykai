@@ -35,6 +35,7 @@ const FUNCTIONS = [
   'purge-verification-docs',
   'release-payout',
   'report-booking-problem',
+  'send-reminders',
   'singpass-callback',
   'singpass-start',
   'stripe-webhook',

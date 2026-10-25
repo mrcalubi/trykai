@@ -710,6 +710,65 @@ describe('CreateListing "what is provided"', () => {
   })
 })
 
+describe('CreateListing "what guests should bring"', () => {
+  beforeEach(() => {
+    givenSignedIn()
+    givenVerification('approved')
+  })
+
+  it('stores a suggestion and a custom item, and caps the list at five', async () => {
+    const { user } = renderPage()
+    await fillValidForm(user)
+    await user.click(screen.getByRole('button', { name: 'Comfortable clothes' }))
+    await user.click(screen.getByRole('button', { name: 'Water bottle' }))
+    await user.click(screen.getByRole('button', { name: 'Notebook and pen' }))
+    await user.type(screen.getByLabelText('Add something to bring'), 'Yoga mat')
+    await user.click(screen.getByRole('button', { name: '+ Add item' }))
+    await user.type(screen.getByLabelText('Add something to bring'), 'Towel')
+    await user.click(screen.getByRole('button', { name: '+ Add item' }))
+
+    expect(screen.getByText('Up to 5 items.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Add something to bring')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'insert')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'insert').payload.what_to_bring).toEqual([
+      'Comfortable clothes',
+      'Water bottle',
+      'Notebook and pen',
+      'Yoga mat',
+      'Towel',
+    ])
+  })
+
+  it('keeps a typed item to 40 characters', async () => {
+    const { user } = renderPage()
+    await fillValidForm(user)
+    await user.type(screen.getByLabelText('Add something to bring'), `${'x'.repeat(41)}extra`)
+    await user.click(screen.getByRole('button', { name: '+ Add item' }))
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'insert')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'insert').payload.what_to_bring).toEqual(['x'.repeat(40)])
+  })
+
+  it('clears the list when the host chooses nothing', async () => {
+    const { user } = renderPage()
+    await fillValidForm(user)
+    await user.click(screen.getByRole('button', { name: 'Water bottle' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Nothing, we provide everything' }))
+
+    expect(screen.queryByLabelText('Remove Water bottle')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'insert')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'insert').payload.what_to_bring).toEqual([])
+  })
+})
+
 describe('CreateListing photos', () => {
   beforeEach(() => {
     givenSignedIn('host-9')
@@ -816,6 +875,27 @@ describe('CreateListing photos', () => {
     expect(screen.queryByRole('button', { name: 'Set as cover' })).not.toBeInTheDocument()
   })
 
+  it('keeps the same preview after leaving the photos step and coming back', async () => {
+    const revoke = vi.spyOn(URL, 'revokeObjectURL')
+    const { user } = renderPage()
+    await goToPhotos(user)
+    selectFiles([imageFile('a.png')])
+    await screen.findByText('Maximum of 5 photos (1/5)')
+    const preview = document.querySelector('.preview-image')
+    const src = preview.getAttribute('src')
+    expect(src).toMatch(/^blob:/)
+
+    await next(user)
+    await stepHeading('Price and group size')
+    expect(revoke).not.toHaveBeenCalledWith(src)
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await stepHeading('Add photos')
+    expect(document.querySelector('.preview-image')).toHaveAttribute('src', src)
+    expect(revoke).not.toHaveBeenCalledWith(src)
+    revoke.mockRestore()
+  })
+
   it('opens the cover crop dialog', async () => {
     const { user } = renderPage()
     await goToPhotos(user)
@@ -825,7 +905,7 @@ describe('CreateListing photos', () => {
     await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
     await user.click(screen.getByRole('menuitem', { name: 'Crop' }))
 
-    expect(screen.getByText('Crop the cover to the listing card')).toBeInTheDocument()
+    expect(screen.getByText('Crop the cover')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Free' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Use this crop' })).toBeDisabled()
   })
@@ -842,6 +922,38 @@ describe('CreateListing photos', () => {
     await stepHeading('Final touches')
     await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
   }
+
+  it('shows upload progress then saving while publish is pending', async () => {
+    let finishUpload
+    supabase.__bucket('listing-photos').upload.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishUpload = () => resolve({ data: { path: 'p' }, error: null })
+        })
+    )
+    const innerFrom = supabase.from.getMockImplementation()
+    supabase.from.mockImplementation((table) => {
+      const entry = innerFrom(table)
+      if (table !== 'listings') return entry
+      return {
+        ...entry,
+        insert: () => ({ then: () => new Promise(() => {}) }),
+      }
+    })
+    try {
+      const { user } = renderPage()
+      await publishWithOnePhoto(user)
+
+      await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+      expect(await screen.findByRole('heading', { name: 'Creating your listing' })).toBeInTheDocument()
+      expect(screen.getByText('Uploading photo 1 of 1')).toBeInTheDocument()
+      finishUpload()
+      expect(await screen.findByText('Saving your listing')).toBeInTheDocument()
+    } finally {
+      supabase.from.mockImplementation(innerFrom)
+    }
+  })
 
   it('uploads the photos and saves their public URLs on the listing', async () => {
     const { user } = renderPage()

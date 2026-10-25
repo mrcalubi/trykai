@@ -88,6 +88,45 @@ export function formatSessionDay(iso: string): string {
   })
 }
 
+export function formatSessionTime(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString('en-SG', {
+    timeStyle: 'short',
+    timeZone: 'Asia/Singapore',
+  })
+}
+
+/** YYYY-MM-DD in Asia/Singapore, for same-day comparison. */
+export function singaporeDateKey(iso: string | Date | number): string {
+  const date = iso instanceof Date ? iso : new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' })
+}
+
+/** Same Singapore calendar date as the send time is Today; anything else is Tomorrow. */
+export function reminderWhen(
+  startsAt: string,
+  sentAt: string | Date | number = Date.now(),
+): 'Today' | 'Tomorrow' {
+  const startKey = singaporeDateKey(startsAt)
+  const sentKey = singaporeDateKey(sentAt)
+  if (!startKey || !sentKey) return 'Tomorrow'
+  return startKey === sentKey ? 'Today' : 'Tomorrow'
+}
+
+/** Weekday plus the usual Singapore medium date and short time: "Sun 25 Oct 2026, 12:00 pm". */
+export function formatReminderSessionDate(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const weekday = date.toLocaleDateString('en-SG', {
+    weekday: 'short',
+    timeZone: 'Asia/Singapore',
+  })
+  const rest = formatSessionDate(iso)
+  return rest ? `${weekday} ${rest}` : ''
+}
+
 export function bookingConfirmedGuestSubject(listingTitle: string, startsAt: string): string {
   const day = formatSessionDay(startsAt)
   return day ? `You're in! ${listingTitle} on ${day}` : `You're in! ${listingTitle}`
@@ -151,6 +190,11 @@ export function hostRefundedGuestsLine(guestCount: number): string {
 function emailGreeting(name?: string | null): string {
   const who = (name || '').trim()
   return who ? `Hi ${escapeHtml(who)},` : 'Hi,'
+}
+
+function reminderGreeting(name?: string | null): string {
+  const who = (name || '').trim()
+  return who ? `Hi ${escapeHtml(who)}!` : 'Hi!'
 }
 
 function emailSignOff(kind: 'see-you' | 'take-care'): string {
@@ -435,12 +479,14 @@ export function bookingConfirmedGuestHtml(options: {
   sessionStartsAt: string
   durationMins?: number | null
   whatsProvided?: string[] | null
+  whatToBring?: string[] | null
   bookingId: string
   siteUrl?: string
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
   const hostName = escapeHtml(options.hostName || 'your host')
   const provided = whatsProvidedCopy(options.whatsProvided)
+  const bring = whatsProvidedCopy(options.whatToBring)
   const duration = options.duration ? escapeHtml(options.duration) : ''
   const address = options.fullAddress ? escapeHtml(options.fullAddress) : ''
   const calendar = googleCalendarUrl({
@@ -469,6 +515,7 @@ export function bookingConfirmedGuestHtml(options: {
       ['Address', address],
       ['Guests', guestCountLabel(options.guestsCount)],
       ["What's provided", provided ? escapeHtml(provided) : ''],
+      ['What to bring', bring ? escapeHtml(bring) : ''],
       ['Booking reference', escapeHtml(options.bookingReference)],
     ])}
     ${receiptBlock(receipt, options.paymentMethod)}
@@ -508,6 +555,114 @@ export function bookingConfirmedHostHtml(options: {
     ${emailSignOff('see-you')}
     `,
     siteUrl,
+  )
+}
+
+export function guestSessionReminderSubject(
+  listingTitle: string,
+  startsAt: string,
+  sentAt: string | Date | number = Date.now(),
+): string {
+  const when = reminderWhen(startsAt, sentAt)
+  const time = formatSessionTime(startsAt)
+  return time ? `${when}: ${listingTitle} at ${time} 🎉` : `${when}: ${listingTitle} 🎉`
+}
+
+export function guestSessionReminderHtml(options: {
+  guestName?: string | null
+  listingTitle: string
+  sessionDate: string
+  startsAt?: string
+  sentAt?: string | Date | number
+  duration?: string
+  fullAddress?: string
+  whatsProvided?: string[] | null
+  whatToBring?: string[] | null
+  hostName: string
+  bookingId: string
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const when = reminderWhen(options.startsAt || '', options.sentAt)
+  const provided = whatsProvidedCopy(options.whatsProvided)
+  const bring = whatsProvidedCopy(options.whatToBring)
+  const duration = options.duration ? escapeHtml(options.duration) : ''
+  const address = options.fullAddress ? escapeHtml(options.fullAddress) : ''
+  const hostName = escapeHtml(options.hostName || 'your host')
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${reminderGreeting(options.guestName)}</p>
+    <p style="margin:0 0 16px;">Your session is ${when.toLowerCase()}! We hope you're excited. Here's everything you need.</p>
+    ${emailHeading(options.listingTitle)}
+    ${detailRows([
+      ['Day and time', escapeHtml(options.sessionDate)],
+      ['Duration', duration],
+      ['Address', address],
+      ["What's provided", provided ? escapeHtml(provided) : ''],
+      ['Host', hostName],
+    ])}
+    ${bring ? detailRows([["Don't forget to bring", escapeHtml(bring)]]) : ''}
+    <p style="margin:0 0 16px;">Try to arrive a few minutes early, and say hi to ${hostName} when you get there. They're looking forward to meeting you.</p>
+    ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
+    <p style="margin:0 0 8px;">Plans changed? You can manage your booking from the booking page.</p>
+    <p style="margin:16px 0 0;">Have a great time!</p>
+    ${emailSignOff('see-you')}
+    `,
+    siteUrl,
+    `${when}: ${options.listingTitle} at ${options.sessionDate}`,
+  )
+}
+
+export function hostSessionReminderSubject(
+  listingTitle: string,
+  totalGuests: number,
+  startsAt: string,
+  sentAt: string | Date | number = Date.now(),
+): string {
+  const when = reminderWhen(startsAt, sentAt)
+  const n = Math.max(0, Number(totalGuests) || 0)
+  return `${when}: ${n} ${n === 1 ? 'person' : 'people'} coming to ${listingTitle} 🙌`
+}
+
+export function hostSessionReminderHtml(options: {
+  hostName?: string | null
+  listingTitle: string
+  sessionDate: string
+  startsAt?: string
+  sentAt?: string | Date | number
+  guests: Array<{ name: string; guestsCount: number }>
+  totalGuests: number
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const when = reminderWhen(options.startsAt || '', options.sentAt)
+  const who = (options.guests ?? [])
+    .map((guest) => {
+      const name = escapeHtml(guest.name || 'A guest')
+      return `${name} · ${escapeHtml(guestCountLabel(guest.guestsCount))}`
+    })
+    .join('<br>')
+  const total = Math.max(0, Number(options.totalGuests) || 0)
+  const totalLabel = `${total} ${total === 1 ? 'person' : 'people'}`
+  const coming = total === 1 ? '1 person is' : `${total} people are`
+  const showTotal = (options.guests ?? []).length > 1
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${reminderGreeting(options.hostName)}</p>
+    <p style="margin:0 0 16px;">Your session is ${when.toLowerCase()}, and ${coming} coming. Thanks for sharing what you love!</p>
+    ${emailHeading(options.listingTitle)}
+    ${detailRows([
+      ["Who's coming", who],
+      showTotal ? ['Total', escapeHtml(totalLabel)] : null,
+      ['Day and time', escapeHtml(options.sessionDate)],
+    ])}
+    ${primaryButton(`${siteUrl}/hosting`, 'View hosting')}
+    <p style="margin:0 0 8px;">Need to change something? You can manage this session from your Hosting page.</p>
+    <p style="margin:16px 0 0;">Hope it goes brilliantly. Have fun!</p>
+    ${emailSignOff('see-you')}
+    `,
+    siteUrl,
+    `${when}: ${totalLabel} coming to ${options.listingTitle}`,
   )
 }
 
@@ -554,6 +709,7 @@ export function listingSubmittedOpsHtml(options: {
   area: string | null
   priceCents: number | null
   photoCount: number
+  whatToBring?: string[] | null
   hostName: string
   hostEmail: string
   verifiedName: string | null
@@ -567,6 +723,7 @@ export function listingSubmittedOpsHtml(options: {
   const who = options.verificationMethod === 'singpass' && options.verifiedName
     ? `${escapeHtml(options.hostName)} (Singpass: ${escapeHtml(options.verifiedName)})`
     : escapeHtml(options.hostName)
+  const bring = whatsProvidedCopy(options.whatToBring)
   return wrapEmail(
     `${emailHeading(options.resubmitted ? 'A listing was updated for review' : 'A new listing needs a look')}
     <p style="margin:0 0 16px;">It stays hidden from guests until you approve it. The host can already add dates.</p>
@@ -577,6 +734,7 @@ export function listingSubmittedOpsHtml(options: {
       ['Area', escapeHtml(options.area ?? '')],
       ['Price', escapeHtml(price)],
       ['Photos', String(options.photoCount)],
+      ['What to bring', bring ? escapeHtml(bring) : ''],
     ])}
     <p style="margin:0 0 4px;font-size:14px;color:${EMAIL_COLORS.muted};">Description</p>
     <p style="margin:0;white-space:pre-wrap;">${escapeHtml((options.description ?? '').slice(0, 1200))}</p>

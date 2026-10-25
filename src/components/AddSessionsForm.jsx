@@ -359,10 +359,12 @@ export default function AddSessionsForm({
           <Button
             type="button"
             variant="primary"
-            disabled={saving || preview.accepted.length === 0}
+            disabled={preview.accepted.length === 0}
+            loading={saving}
+            loadingLabel="Creating"
             onClick={confirm}
           >
-            {saving ? 'Creating…' : 'Create sessions'}
+            Create sessions
           </Button>
         ) : (
           <Button type="submit" variant="primary">

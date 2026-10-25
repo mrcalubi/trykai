@@ -13,8 +13,9 @@ import {
   guestCountLabel,
 } from '../../supabase/functions/_shared/email.ts'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
-import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import Button from '../components/ui/Button'
+import PageLoader from '../components/PageLoader'
+import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import ReportProblem from '../components/ReportProblem'
 
 function googleMapsUrl(address) {
@@ -59,6 +60,7 @@ export default function BookingDetail() {
             title,
             photo_urls,
             whats_provided,
+            what_to_bring,
             duration_mins,
             host_id,
             users:host_id (
@@ -140,7 +142,7 @@ export default function BookingDetail() {
   }
 
   if (loading) {
-    return <p className="status-message">Loading…</p>
+    return <PageLoader />
   }
 
   if (error) {
@@ -159,6 +161,7 @@ export default function BookingDetail() {
   const startsAt = session?.starts_at
   const duration = formatDuration(session?.duration_mins ?? listing?.duration_mins)
   const provided = providedItems(listing?.whats_provided)
+  const bring = providedItems(listing?.what_to_bring)
   const calendar = startsAt
     ? googleCalendarUrl({
         title: listing?.title || 'TryKai session',
@@ -244,6 +247,17 @@ export default function BookingDetail() {
         </section>
       ) : null}
 
+      {bring.length > 0 ? (
+        <section className="booking-detail__section">
+          <h2 className="booking-detail__section-title">What to bring</h2>
+          <ul className="detail-list">
+            {bring.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <p className="booking-detail__row">
         <strong>Guests</strong> {guestCountLabel(booking.guests_count)}
       </p>
@@ -282,14 +296,14 @@ export default function BookingDetail() {
         <div className="cancel-confirm">
           <p className="cancel-confirm__note">{guestCancellationNote(booking)}</p>
           <div className="booking-detail__actions">
-            <button
-              type="button"
-              disabled={cancelLoading}
+            <Button
+              variant="destructive"
+              loading={cancelLoading}
+              loadingLabel="Cancelling"
               onClick={handleCancel}
-              className="btn btn--danger"
             >
-              {cancelLoading ? 'Cancelling…' : 'Confirm cancellation'}
-            </button>
+              Confirm cancellation
+            </Button>
             <button
               type="button"
               onClick={() => setConfirmCancel(false)}
