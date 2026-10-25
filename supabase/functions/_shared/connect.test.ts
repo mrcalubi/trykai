@@ -6,6 +6,7 @@ import {
   connectedAccountFromEvent,
   createConnectedAccount,
   isAccountLinkRefresh,
+  connectOnboardingPending,
   payoutsEnabledFromAccount,
   siteUrlForAccountLinks,
   STRIPE_ACCOUNTS_V2_URL,
@@ -138,6 +139,73 @@ describe('payoutsEnabledFromAccount', () => {
     expect(payoutsEnabledFromAccount({ payouts_enabled: true })).toBe(true)
     expect(payoutsEnabledFromAccount({ payouts_enabled: false })).toBe(false)
     expect(payoutsEnabledFromAccount({})).toBe(false)
+  })
+})
+
+describe('connectOnboardingPending', () => {
+  it('is true when Stripe is only verifying', () => {
+    expect(
+      connectOnboardingPending({
+        requirements: {
+          currently_due: [],
+          past_due: [],
+          pending_verification: ['external_account'],
+        },
+      }),
+    ).toBe(true)
+    expect(
+      connectOnboardingPending({
+        requirements: { currently_due: [], past_due: [], pending_verification: [] },
+      }),
+    ).toBe(true)
+    expect(connectOnboardingPending({ requirements: {} })).toBe(true)
+    expect(connectOnboardingPending({})).toBe(true)
+  })
+
+  it('is true when nothing is due and the account is not otherwise disabled', () => {
+    expect(
+      connectOnboardingPending({
+        requirements: { currently_due: [], past_due: [], disabled_reason: null },
+      }),
+    ).toBe(true)
+    expect(
+      connectOnboardingPending({
+        requirements: {
+          currently_due: [],
+          past_due: [],
+          disabled_reason: 'requirements.pending_verification',
+        },
+      }),
+    ).toBe(true)
+  })
+
+  it('is false when the account is disabled for a reason other than pending verification', () => {
+    expect(
+      connectOnboardingPending({
+        requirements: { currently_due: [], past_due: [], disabled_reason: 'rejected.other' },
+      }),
+    ).toBe(false)
+  })
+
+  it('is false when something is currently or past due', () => {
+    expect(
+      connectOnboardingPending({
+        requirements: {
+          currently_due: ['external_account'],
+          past_due: [],
+          pending_verification: [],
+        },
+      }),
+    ).toBe(false)
+    expect(
+      connectOnboardingPending({
+        requirements: {
+          currently_due: [],
+          past_due: ['individual.verification.document'],
+          pending_verification: ['external_account'],
+        },
+      }),
+    ).toBe(false)
   })
 })
 

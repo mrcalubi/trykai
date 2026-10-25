@@ -38,6 +38,13 @@ import {
   monthStats,
 } from '../lib/hostingDashboard'
 import { parsePriceInputCents } from '../lib/pricing'
+import {
+  PAYOUT_CHECKING_COPY,
+  PAYOUT_PENDING_POLL_MS,
+  PAYOUT_PENDING_WAIT_MS,
+  PAYOUT_READY_COPY,
+  PAYOUT_STILL_CHECKING_COPY,
+} from '../lib/payoutReturn'
 import { listingReviewBadge } from '../lib/listingReview'
 
 function activeBookingsOn(session) {
@@ -170,6 +177,8 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
   const [payoutSetupLoading, setPayoutSetupLoading] = useState(false)
   const [payoutSetupError, setPayoutSetupError] = useState('')
   const [payoutSetupIncomplete, setPayoutSetupIncomplete] = useState(false)
+  const [payoutChecking, setPayoutChecking] = useState(false)
+  const [payoutPendingCopy, setPayoutPendingCopy] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
 
@@ -280,6 +289,19 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
     if (connectStatus !== 'return' && connectStatus !== 'refresh') return
 
     let cancelled = false
+    let timeoutId = 0
+    const startedAt = Date.now()
+
+    function clearConnectParam() {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('connect')
+          return next
+        },
+        { replace: true },
+      )
+    }
 
     async function refreshPayoutStatus() {
       const {
@@ -292,29 +314,49 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
       if (cancelled) return
 
       if (fnError || data?.error) {
+        setPayoutChecking(false)
+        setPayoutPendingCopy('')
         setPayoutSetupError(await edgeFunctionErrorMessage(fnError, data))
-      } else if (data?.stripe_payouts_enabled) {
+        clearConnectParam()
+        return
+      }
+      if (data?.stripe_payouts_enabled) {
         setPayoutsEnabled(true)
         setPayoutSetupIncomplete(false)
-        setBookingStatusMessage('Payouts are set up. Guests can now book you.')
-      } else {
+        setPayoutChecking(false)
+        setPayoutPendingCopy('')
+        setBookingStatusMessage(PAYOUT_READY_COPY)
+        clearConnectParam()
+        return
+      }
+      if (data?.pending) {
+        if (Date.now() - startedAt >= PAYOUT_PENDING_WAIT_MS) {
+          setPayoutsEnabled(false)
+          setPayoutSetupIncomplete(false)
+          setPayoutChecking(false)
+          setPayoutPendingCopy(PAYOUT_STILL_CHECKING_COPY)
+          clearConnectParam()
+          return
+        }
         setPayoutsEnabled(false)
-        setPayoutSetupIncomplete(true)
+        setPayoutSetupIncomplete(false)
+        setPayoutChecking(true)
+        setPayoutPendingCopy(PAYOUT_CHECKING_COPY)
+        timeoutId = window.setTimeout(refreshPayoutStatus, PAYOUT_PENDING_POLL_MS)
+        return
       }
 
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev)
-          next.delete('connect')
-          return next
-        },
-        { replace: true },
-      )
+      setPayoutsEnabled(false)
+      setPayoutSetupIncomplete(true)
+      setPayoutChecking(false)
+      setPayoutPendingCopy('')
+      clearConnectParam()
     }
 
     void refreshPayoutStatus()
     return () => {
       cancelled = true
+      window.clearTimeout(timeoutId)
     }
   }, [loading, connectStatus, setSearchParams])
 
@@ -419,7 +461,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
       setPayoutSetupLoading(false)
       setPayoutsEnabled(true)
       setPayoutSetupIncomplete(false)
-      setBookingStatusMessage('Payouts are set up. Guests can now book you.')
+      setBookingStatusMessage(PAYOUT_READY_COPY)
       return
     }
     if (data?.url) {
@@ -677,20 +719,23 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
       title: 'Set up payouts',
       hint: payoutsEnabled
         ? 'Done. Stripe pays your earnings into your bank.'
-        : payoutSetupIncomplete
-          ? "Your payout setup isn't finished yet."
-          : 'Stripe needs your bank details to pay you.',
-      action: (
-        <button
-          type="button"
-          className="btn btn--secondary btn--small"
-          disabled={payoutSetupLoading}
-          onClick={handlePayoutSetup}
-          aria-label={payoutSetupIncomplete ? 'Continue payout setup' : 'Set up payouts'}
-        >
-          {payoutSetupIncomplete ? 'Continue' : 'Set up'}
-        </button>
-      ),
+        : payoutPendingCopy
+          ? payoutPendingCopy
+          : payoutSetupIncomplete
+            ? "Your payout setup isn't finished yet."
+            : 'Stripe needs your bank details to pay you.',
+      action:
+        payoutPendingCopy ? null : (
+          <button
+            type="button"
+            className="btn btn--secondary btn--small"
+            disabled={payoutSetupLoading}
+            onClick={handlePayoutSetup}
+            aria-label={payoutSetupIncomplete ? 'Continue payout setup' : 'Set up payouts'}
+          >
+            {payoutSetupIncomplete ? 'Continue' : 'Set up'}
+          </button>
+        ),
     },
     {
       id: 'session',
@@ -748,11 +793,16 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
       ) : null}
 
       <div className={setupComplete ? 'hosting__layout' : 'hosting__layout hosting__layout--setup'}>
-        {setupComplete ? null : payoutSetupLoading ? (
+        {setupComplete ? null : payoutSetupLoading || payoutChecking ? (
           <section className="hosting-setup" aria-labelledby="hosting-setup-title">
             <WaitingState
-              title="Setting up payouts"
-              message="Opening Stripe so you can add your bank details."
+              hold={payoutChecking}
+              title={payoutChecking ? undefined : 'Setting up payouts'}
+              message={
+                payoutChecking
+                  ? PAYOUT_CHECKING_COPY
+                  : 'Opening Stripe so you can add your bank details.'
+              }
             />
           </section>
         ) : (
