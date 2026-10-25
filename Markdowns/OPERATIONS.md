@@ -1144,7 +1144,7 @@ select public.admin_remove_host_strike(
 );
 ```
 
-SQL Editor runs as `postgres`. The function also allows `service_role`, or a signed-in admin (`users.is_admin`), the same check as `admin-verifications`. The note is required and is kept on the event.
+Run this from the SQL Editor only. Clients have no EXECUTE grant, so a signed-in admin cannot call it from the app; the `is_admin` check in the function never runs. The note is required and is kept on the event.
 
 It sets `removed_at` and `removed_note`, then sets `users.host_strikes` to the active count (not removed, and given in the last 12 months).
 

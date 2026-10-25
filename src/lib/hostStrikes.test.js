@@ -122,8 +122,20 @@ describe('00039 host_strike_events', () => {
     )
   })
 
-  it('computes my_account strikes live and checks is_admin before a remove', () => {
+  it('computes my_account strikes live', () => {
     expect(sql).toMatch(/public\.host_active_strike_count\(u\.id\)/)
-    expect(sql).toMatch(/where id = auth\.uid\(\) and is_admin is true/)
+  })
+})
+
+describe('cancel-booking host strike', () => {
+  const source = readFileSync(
+    resolve(import.meta.dirname, '../../supabase/functions/cancel-booking/index.ts'),
+    'utf8',
+  )
+
+  it('links the strike to the cancelled session', () => {
+    expect(source).toMatch(
+      /rpc\('apply_host_strike', \{\s*p_host_id: user\.id,\s*p_session_id: session\.id,\s*\}\)/,
+    )
   })
 })

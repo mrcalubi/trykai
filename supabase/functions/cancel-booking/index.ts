@@ -287,7 +287,10 @@ Deno.serve(async (req) => {
       }
 
       if (results.length > 0) {
-        const { data: strikeCount } = await admin.rpc('apply_host_strike', { p_host_id: user.id })
+        const { data: strikeCount } = await admin.rpc('apply_host_strike', {
+          p_host_id: user.id,
+          p_session_id: session.id,
+        })
         const { data: hostProfile } = await admin
           .from('users')
           .select('email, full_name, display_name')

@@ -1,6 +1,6 @@
 # Terms of Service
 
-Last updated: 23 October 2026
+Last updated: 25 October 2026
 
 These terms apply to everyone who uses TryKai. Part 1 applies to all users. Part 2 applies when you host. Part 3 applies when you book.
 

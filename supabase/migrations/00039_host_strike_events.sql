@@ -56,7 +56,7 @@ revoke all on function public.host_active_strike_count(uuid) from public, anon, 
 grant execute on function public.host_active_strike_count(uuid) to service_role;
 
 -- Replace the 00005 counter. Optional reason and session; cancel-booking
--- still calls with p_host_id only (defaults to host_cancel, no session).
+-- passes p_session_id so the event links to the cancelled session.
 drop function if exists public.apply_host_strike(uuid);
 
 create or replace function public.apply_host_strike(
@@ -118,8 +118,9 @@ declare
   v_host_id uuid;
   v_strikes integer;
 begin
-  -- Same server-side admin check as admin-verifications (users.is_admin).
-  -- SQL Editor is postgres; service_role is the Edge Function path.
+  -- Run from the SQL Editor only. Clients have no EXECUTE grant, so the
+  -- is_admin branch never runs (current_user is the owner here). postgres
+  -- and service_role are the paths that actually succeed.
   if auth.role() is distinct from 'service_role'
      and current_user not in ('postgres', 'supabase_admin')
      and not exists (

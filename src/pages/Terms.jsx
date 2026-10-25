@@ -5,7 +5,7 @@ export default function Terms() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Terms of Service</h1>
-      <p className="policy-page__updated">Last updated: 23 October 2026</p>
+      <p className="policy-page__updated">Last updated: 25 October 2026</p>
 
       <p>
         These terms apply to everyone who uses TryKai. Part 1 applies to all
