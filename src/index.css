@@ -1251,8 +1251,14 @@ a {
   height: 100%;
 }
 
+.listings-grid--bookings .dashboard-card__meta {
+  margin-bottom: 16px;
+}
+
 .listings-grid--bookings .booking-card__actions {
   margin-top: auto;
+  min-height: 36px;
+  align-items: center;
 }
 
 .listings-grid--bookings .booking-card__actions .ui-button {
@@ -3681,16 +3687,6 @@ body.lightbox-open {
   pointer-events: none;
 }
 
-.profile-header__copy {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  width: 100%;
-  min-width: 0;
-}
-
-.profile-header__copy .verified-badge,
 .profile-header__primary .detail-host__bio {
   margin: 0;
 }
@@ -3712,115 +3708,64 @@ body.lightbox-open {
   width: 100%;
 }
 
-.profile-header__chips {
+.profile-header__facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  max-width: 17.5rem;
+  align-items: flex-start;
+  column-gap: 40px;
+  row-gap: 12px;
+  width: 100%;
+  min-width: 0;
   margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
-.profile-header__chip {
-  display: inline-flex;
+.profile-header__fact {
+  display: flex;
   flex: 0 0 auto;
-  align-items: center;
-  gap: 4px;
-  height: 22px;
-  padding: 0 8px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 999px;
-}
-
-.profile-header__chip--food { color: var(--tint-food-ink); background: var(--tint-food); }
-.profile-header__chip--fitness { color: var(--tint-fitness-ink); background: var(--tint-fitness); }
-.profile-header__chip--arts { color: var(--tint-arts-ink); background: var(--tint-arts); }
-.profile-header__chip--music { color: var(--tint-music-ink); background: var(--tint-music); }
-.profile-header__chip--language { color: var(--tint-language-ink); background: var(--tint-language); }
-.profile-header__chip--other { color: var(--tint-other-ink); background: var(--tint-other); }
-
-.profile-header__next {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  color: var(--navy);
-}
-
-.profile-header__next-label {
-  margin: 0 0 2px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-}
-
-.profile-header__next-link {
-  display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
-  color: var(--navy);
-  text-decoration: none;
-}
-
-.profile-header__next-link:hover,
-.profile-header__next-link:focus-visible {
-  text-decoration: none;
-}
-
-.profile-header__next-when {
-  font-weight: 650;
-  line-height: 1.35;
-  white-space: nowrap;
-}
-
-.profile-header__next-title {
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.35;
-}
-
-.profile-header__next-link:hover .profile-header__next-when,
-.profile-header__next-link:hover .profile-header__next-title,
-.profile-header__next-link:focus-visible .profile-header__next-when,
-.profile-header__next-link:focus-visible .profile-header__next-title {
-  text-decoration: underline;
-}
-
-.profile-header__stats {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 16px 32px;
-  margin: 0;
-}
-
-.profile-header__stat {
-  display: flex;
-  flex-direction: column;
   gap: 2px;
   margin: 0;
 }
 
-.profile-header__stat dt {
+.profile-header__fact--name {
+  flex: 1 1 10rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.profile-header__fact dt {
   order: 2;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
   color: var(--muted);
 }
 
-.profile-header__stat dd {
+.profile-header__fact .verified-badge {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.profile-header__fact-value {
   display: flex;
   order: 1;
   align-items: center;
   gap: 0.18em;
   margin: 0;
   font-family: var(--display);
-  font-size: clamp(28px, 4vw, 40px);
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 800;
   letter-spacing: -0.03em;
-  line-height: 1.05;
+  line-height: 1.1;
   color: var(--navy);
+}
+
+.profile-header__fact--name .profile-header__fact-value {
+  min-width: 0;
+  width: 100%;
 }
 
 .profile-header__star {
@@ -3830,14 +3775,6 @@ body.lightbox-open {
   line-height: 1;
   color: var(--navy);
   transform: translateY(-0.08em);
-}
-
-.profile-header__stat--teaches dd {
-  font-family: var(--sans);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0;
-  line-height: 1;
 }
 
 .profile-header__bio-prompt {
@@ -3914,10 +3851,8 @@ body.lightbox-open {
     padding: 0 28px;
   }
 
-  .profile-header__copy {
-    position: relative;
-    z-index: 1;
-    width: auto;
+  .profile-header__fact-value {
+    font-size: 28px;
   }
 
   .profile-header .detail-host__avatar {
@@ -3933,18 +3868,6 @@ body.lightbox-open {
 }
 
 @media (min-width: 1024px) {
-  .profile-header__identity {
-    flex-direction: row;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .profile-header__copy {
-    flex: 1;
-    width: auto;
-    min-width: 0;
-  }
-
   .profile-header__body:has(> .profile-header__aside) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
@@ -4046,11 +3969,9 @@ body.lightbox-open {
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
-  font-family: var(--heading);
-  font-size: clamp(26px, 4vw, 36px);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--text-h);
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }

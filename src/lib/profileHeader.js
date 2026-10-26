@@ -2,38 +2,12 @@ import { HOST_SESSIONS_SELECT } from './listingDelete'
 import { monthStartIso } from './hostingDashboard'
 import { singaporeDateKey } from './sessionCalendar'
 
-export const HOST_OPEN_SESSIONS_LIMIT = 80
-export const HOST_OPEN_SESSIONS_SELECT = 'id, listing_id, starts_at, status, listings!inner(title)'
-
-export function hostProfileStats(reviews, listings) {
-  const listingCount = listings?.length ?? 0
+export function hostProfileStats(reviews) {
   const reviewCount = reviews?.length ?? 0
   const average = reviewCount
     ? Number((reviews.reduce((sum, review) => sum + Number(review.rating), 0) / reviewCount).toFixed(1))
     : null
-  return { average, reviewCount, listingCount }
-}
-
-export function teachCategories(listings) {
-  const seen = []
-  for (const listing of listings ?? []) {
-    const category = typeof listing.category === 'string' ? listing.category.trim() : ''
-    if (category && !seen.includes(category)) seen.push(category)
-  }
-  return seen
-}
-
-export function fetchHostOpenSessions(client, hostId, now = new Date()) {
-  return client
-    .from('sessions')
-    .select(HOST_OPEN_SESSIONS_SELECT)
-    .eq('status', 'open')
-    .gt('starts_at', now.toISOString())
-    .eq('listings.host_id', hostId)
-    .eq('listings.is_active', true)
-    .eq('listings.review_status', 'approved')
-    .order('starts_at', { ascending: true })
-    .limit(HOST_OPEN_SESSIONS_LIMIT)
+  return { average, reviewCount }
 }
 
 /** Same sessions+bookings read Hosting uses, only for the owner. */
@@ -61,20 +35,6 @@ function isOpenSession(session) {
 
 export function confirmedBookingCount(session) {
   return (session?.bookings ?? []).filter((booking) => booking.status === 'confirmed').length
-}
-
-export function nextOpenSession(sessions, listings, now = Date.now()) {
-  const upcoming = (sessions ?? [])
-    .filter((session) => isOpenSession(session) && new Date(session.starts_at).getTime() > now)
-    .slice()
-    .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
-  const next = upcoming[0]
-  if (!next) return null
-  return {
-    listingId: next.listing_id,
-    title: sessionListingTitle(next, listings),
-    startsAt: next.starts_at,
-  }
 }
 
 /**

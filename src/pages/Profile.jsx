@@ -22,12 +22,10 @@ import {
   confirmedBookingCount,
   fetchHostOwnSessions,
   hostProfileStats,
-  nextOpenSession,
   sessionListingTitle,
   sessionsOnDay,
-  teachCategories,
 } from '../lib/profileHeader'
-import { formatSessionDateTime, formatSessionTime } from '../lib/sessionDate'
+import { formatSessionTime } from '../lib/sessionDate'
 import {
   formatDayTitle,
   shiftMonth,
@@ -35,7 +33,6 @@ import {
   singaporeMonthKey,
 } from '../lib/sessionCalendar'
 import { profileReportSubject, reportMailto } from '../lib/reportMailto'
-import { categoryIconName, categoryTint } from '../components/ui/categoryIcon'
 import SessionCalendar from '../components/SessionCalendar'
 import OverflowMenu from '../components/ui/OverflowMenu'
 import VerifiedBadge from '../components/VerifiedBadge'
@@ -124,65 +121,29 @@ function ProfileFace({ children, showCamera = false }) {
   )
 }
 
-function ProfileIdentity({ givenName, verified }) {
-  return (
-    <div className="profile-header__copy">
-      <h1 className="profile-header__name">{givenName}</h1>
-      {verified ? <VerifiedBadge /> : null}
-    </div>
-  )
-}
-
-function TeachChips({ categories }) {
-  return (
-    <ul className="profile-header__chips">
-      {categories.map((category) => (
-        <li
-          key={category}
-          className={`profile-header__chip profile-header__chip--${categoryTint(category)}`}
-        >
-          <Icon name={categoryIconName(category)} size={12} />
-          {category}
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-function NextSession({ session }) {
-  if (!session) return null
-
-  return (
-    <div className="profile-header__next">
-      <Icon name="calendar" size={16} />
-      <div>
-        <p className="profile-header__next-label">Next session</p>
-        <Link to={`/listings/${session.listingId}`} className="profile-header__next-link">
-          <span className="profile-header__next-when">{formatSessionDateTime(session.startsAt)}</span>
-          {session.title ? (
-            <span className="profile-header__next-title">{session.title}</span>
-          ) : null}
-        </Link>
-      </div>
-    </div>
-  )
-}
-
-function ProfileStats({ reviews, sessionsHeld, listings }) {
-  const stats = hostProfileStats(reviews, listings)
-  const categories = teachCategories(listings)
+function ProfileFacts({ givenName, verified, reviews, sessionsHeld }) {
+  const stats = hostProfileStats(reviews)
   const showRating = stats.reviewCount > 0 && stats.average != null
   const held = Number(sessionsHeld) || 0
-  if (!showRating && held <= 0 && categories.length === 0) return null
 
   return (
-    <dl className="profile-header__stats">
+    <dl className="profile-header__facts">
+      <div className="profile-header__fact profile-header__fact--name">
+        {verified ? (
+          <dt>
+            <VerifiedBadge />
+          </dt>
+        ) : null}
+        <dd className="profile-header__fact-value">
+          <h1 className="profile-header__name">{givenName}</h1>
+        </dd>
+      </div>
       {showRating ? (
-        <div className="profile-header__stat">
+        <div className="profile-header__fact">
           <dt>
             {stats.reviewCount} {stats.reviewCount === 1 ? 'review' : 'reviews'}
           </dt>
-          <dd>
+          <dd className="profile-header__fact-value">
             {stats.average.toFixed(1)}{' '}
             <span className="profile-header__star" aria-hidden="true">
               ★
@@ -191,16 +152,9 @@ function ProfileStats({ reviews, sessionsHeld, listings }) {
         </div>
       ) : null}
       {held > 0 ? (
-        <div className="profile-header__stat">
+        <div className="profile-header__fact">
           <dt>Sessions held</dt>
-          <dd>{held}</dd>
-        </div>
-      ) : null}
-      {categories.length > 0 ? (
-        <div className="profile-header__stat profile-header__stat--teaches">
-          <dd>
-            <TeachChips categories={categories} />
-          </dd>
+          <dd className="profile-header__fact-value">{held}</dd>
         </div>
       ) : null}
     </dl>
@@ -572,11 +526,15 @@ export default function Profile() {
     pathname: `/u/${id}`,
     search: previewSearch(searchParams, activeTab),
   }
-  const identity = <ProfileIdentity givenName={givenName} verified={verified} />
-  const next = isOwn ? nextOpenSession(sessions, listings, nowMs) : null
+  const facts = (
+    <ProfileFacts
+      givenName={givenName}
+      verified={verified}
+      reviews={isHost ? reviews : []}
+      sessionsHeld={isHost ? sessionsHeld : 0}
+    />
+  )
   const showCalendar = isOwn && isHost && listings.length > 0
-  const showStats = isHost
-  const showAside = Boolean(next || showCalendar)
   const primary = (
     <div className="profile-header__primary">
       {isOwn ? (
@@ -613,7 +571,7 @@ export default function Profile() {
                       : []),
                   ]}
                 />
-                {identity}
+                {facts}
               </div>
             )
           }}
@@ -628,26 +586,20 @@ export default function Profile() {
               className="detail-host__avatar"
             />
           </ProfileFace>
-          {identity}
+          {facts}
         </div>
       )}
-      {showStats ? (
-        <ProfileStats reviews={reviews} sessionsHeld={sessionsHeld} listings={listings} />
-      ) : null}
       <ProfileBio about={about} isOwn={isOwn} isHost={isHost} />
     </div>
   )
-  const aside = showAside ? (
+  const aside = showCalendar ? (
     <div className="profile-header__aside">
-      <NextSession session={next} />
-      {showCalendar ? (
-        <ProfileCalendar
-          sessions={sessions}
-          listings={listings}
-          hostId={id}
-          nowMs={nowMs}
-        />
-      ) : null}
+      <ProfileCalendar
+        sessions={sessions}
+        listings={listings}
+        hostId={id}
+        nowMs={nowMs}
+      />
     </div>
   ) : null
 
