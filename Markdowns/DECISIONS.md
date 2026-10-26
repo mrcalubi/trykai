@@ -659,6 +659,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-26 — Profile page matches listing-detail width; public profiles drop the calendar.** `.page--profile` is 1120px. Own desktop card is identity + stats + bio on the left (`1fr`) and Next session + month calendar on the right (340px). The name clamps to two lines. Next session keeps date/time on one line with the listing title under it. Teaches chips move into the stats row (with rating and sessions held); 2–5 chips wrap at most 3 per row. Public / signed-out / `?view=public` is one column with no calendar, no Next session, and no sessions fetch. `SessionCalendar` days with sessions show only the mark, not a sand tile (selected day still fills). Bookings cards use the browse `.listings-grid` at 1 / 2 / 3 columns, height to content; the empty state stays full width. Supersedes the 880px column and the public open-sessions calendar from the same day's header-card layout.
 
+**2026-10-26 — Profile card polish: name on the banner edge, smaller pills, equal booking cards.** The name's vertical centre sits on the banner's bottom edge in every view (`align-items: center` on the identity row). The own-profile right column starts below the banner (`padding-top: 52px`) so Next session and the calendar cannot shift the name. Past Singapore days never get an open ring (booked dots still show); today is open only while a session that day is still to come. Category pills drop the "Teaches" label, hug their content, and wrap at most 3 per row. The rating star is 60% of the number. Booking cards in a row stretch to equal height with the actions pinned to the bottom; Leave a review is a 36px secondary.
+
 ---
 
 # Analysed but not decided

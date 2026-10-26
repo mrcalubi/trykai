@@ -112,6 +112,61 @@ describe('calendarDayMarks', () => {
     })
   })
 
+  it('never paints an open ring on a past Singapore day', () => {
+    expect(
+      calendarDayMarks(
+        [
+          {
+            listing_id: 'listing-8',
+            starts_at: '2026-10-25T02:00:00.000Z',
+            status: 'open',
+            bookings: [],
+          },
+          {
+            listing_id: 'listing-9',
+            starts_at: '2026-10-24T02:00:00.000Z',
+            status: 'open',
+            bookings: [{ status: 'confirmed' }],
+          },
+        ],
+        { publicView: false, now: NOW },
+      ),
+    ).toEqual({
+      '2026-10-24': 'booked',
+    })
+  })
+
+  it('paints today open only while a session today is still to come', () => {
+    expect(
+      calendarDayMarks(
+        [
+          {
+            listing_id: 'listing-8',
+            starts_at: '2026-10-26T02:00:00.000Z',
+            status: 'open',
+            bookings: [],
+          },
+        ],
+        { publicView: false, now: NOW },
+      ),
+    ).toEqual({})
+    expect(
+      calendarDayMarks(
+        [
+          {
+            listing_id: 'listing-8',
+            starts_at: '2026-10-26T06:00:00.000Z',
+            status: 'open',
+            bookings: [],
+          },
+        ],
+        { publicView: false, now: NOW },
+      ),
+    ).toEqual({
+      '2026-10-26': 'open',
+    })
+  })
+
   it('never marks a booked day on the public calendar', () => {
     expect(calendarDayMarks(sessions, { publicView: true, now: NOW })).toEqual({
       '2026-10-28': 'open',
