@@ -8,8 +8,6 @@ import Profile from './Profile'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { hoursFromNow, makeAuthSession, makeBooking, makeListing, makeReview, makeSession } from '../test/fixtures'
-import { formatSessionDateTime } from '../lib/sessionDate'
-
 vi.mock('../lib/supabase')
 
 const HOST_ID = 'host-1'
@@ -282,7 +280,7 @@ describe('Profile public content', () => {
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
     expect(document.querySelector('.profile-header__star')).not.toBeInTheDocument()
-    expect(document.querySelector('.profile-header__stats')).not.toHaveTextContent('reviews')
+    expect(document.querySelector('.profile-header__facts')).not.toHaveTextContent('reviews')
     expect(screen.getByText('No reviews yet.')).toBeInTheDocument()
   })
 
@@ -298,9 +296,9 @@ describe('Profile public content', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Reviews (2)' })
-    const stats = document.querySelector('.profile-header__stats')
-    expect(stats.textContent.replace(/\s+/g, ' ').trim()).toContain('4.5')
-    expect(stats).toHaveTextContent('2 reviews')
+    const facts = document.querySelector('.profile-header__facts')
+    expect(facts.textContent.replace(/\s+/g, ' ').trim()).toContain('4.5')
+    expect(facts).toHaveTextContent('2 reviews')
     expect(document.querySelector('.profile-header__star')).toHaveAttribute('aria-hidden', 'true')
   })
 
@@ -481,24 +479,27 @@ describe('Profile public content', () => {
     )
   })
 
-  it('stacks header copy in a column and keeps the 1120px page', () => {
+  it('stacks the name and stats in one facts row and keeps the 1120px page', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
-    const copy = css.match(/\.profile-header__copy \{[\s\S]*?\n\}/)
-    expect(copy?.[0]).toMatch(/display:\s*flex/)
-    expect(copy?.[0]).toMatch(/flex-direction:\s*column/)
-    expect(copy?.[0]).toMatch(/gap:\s*6px/)
-    expect(css).toMatch(
-      /@media \(min-width: 1024px\) \{[\s\S]*?\.profile-header__identity \{[\s\S]*?align-items:\s*center/,
-    )
+    const facts = css.match(/\.profile-header__facts \{[\s\S]*?\n\}/)
+    expect(facts?.[0]).toMatch(/display:\s*flex/)
+    expect(facts?.[0]).toMatch(/flex-wrap:\s*wrap/)
+    expect(facts?.[0]).toMatch(/column-gap:\s*40px/)
+    const identity = css.match(/\.profile-header__identity \{[\s\S]*?\n\}/)?.[0] ?? ''
+    expect(identity).toMatch(/flex-direction:\s*column/)
+    expect(identity).toMatch(/align-items:\s*flex-start/)
+    expect(identity).not.toMatch(/align-items:\s*center/)
     expect(css).toMatch(/\.profile-header__body \{[\s\S]*?z-index:\s*1/)
     expect(css).toMatch(/\.profile-header__banner \{[\s\S]*?z-index:\s*0/)
     expect(css).toMatch(
       /\.profile-header__body:has\(> \.profile-header__aside\) \{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) 340px/,
     )
-    const statFigure = css.match(/\.profile-header__stat dd \{[\s\S]*?\n\}/)?.[0] ?? ''
-    expect(statFigure).toMatch(/color:\s*var\(--navy\)/)
-    expect(statFigure).toMatch(/font-family:\s*var\(--display\)/)
-    expect(statFigure).not.toMatch(/--coral|--success/)
+    const figure = css.match(/\.profile-header__fact-value \{[\s\S]*?\n\}/)?.[0] ?? ''
+    expect(figure).toMatch(/color:\s*var\(--navy\)/)
+    expect(figure).toMatch(/font-family:\s*var\(--display\)/)
+    expect(figure).toMatch(/font-size:\s*24px/)
+    expect(figure).toMatch(/font-weight:\s*800/)
+    expect(figure).not.toMatch(/--coral|--success/)
     expect(css).toMatch(/\.page--profile \{[\s\S]*?max-width:\s*1120px/)
     expect(css).toMatch(/\.page--detail \{[\s\S]*?max-width:\s*1120px/)
     expect(css).toMatch(/\.profile-header__name \{[\s\S]*?-webkit-line-clamp:\s*2/)
@@ -661,12 +662,12 @@ describe('Profile own tabs', () => {
   })
 
   it('keeps other query keys when switching tabs', async () => {
-    renderPage({ search: '?booking=booking-1&tab=bookings' })
+    renderPage({ search: '?connect=pending&tab=bookings' })
 
     await screen.findByRole('link', { name: 'Reviews' })
     expect(screen.getByRole('link', { name: 'Reviews' })).toHaveAttribute(
       'href',
-      `/u/${HOST_ID}?booking=booking-1&tab=reviews`
+      `/u/${HOST_ID}?connect=pending&tab=reviews`
     )
   })
 
@@ -981,7 +982,7 @@ describe('Profile card restyle', () => {
     expect(document.querySelector('.profile-header__camera')).not.toBeInTheDocument()
   })
 
-  it('lists distinct Teaches chips from the approved, active listings already on the page', async () => {
+  it('keeps categories on listing cards and never on the profile card', async () => {
     givenListings([
       makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' }),
       makeListing({ id: 'listing-8', title: 'Pour over', category: 'Food' }),
@@ -990,60 +991,57 @@ describe('Profile card restyle', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    const chips = [...document.querySelectorAll('.profile-header__chip')].map(
-      (chip) => chip.textContent,
-    )
-    expect(chips).toEqual(['Food', 'Music'])
-    expect(screen.queryByText('Fitness')).not.toBeInTheDocument()
-    expect(screen.queryByText('Teaches')).not.toBeInTheDocument()
-  })
-
-  it('hides Teaches when the host has no live listings', async () => {
-    renderPage()
-    await screen.findByRole('heading', { name: 'Mei', level: 1 })
     expect(document.querySelector('.profile-header__chips')).not.toBeInTheDocument()
-    expect(document.querySelector('.profile-header__stats')).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__chip')).not.toBeInTheDocument()
+    expect(screen.queryByText('Teaches')).not.toBeInTheDocument()
+    expect(screen.queryByText('Next session')).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-listings')).toHaveTextContent('Food')
+    expect(document.querySelector('.profile-listings')).toHaveTextContent('Music')
   })
 })
 
 describe('Profile card layout', () => {
-  it('hides stats at 0 held sessions and with no reviews', async () => {
+  it('hides rating and sessions held at 0 with no reviews', async () => {
     givenRpcs({ hostReviews: [], sessionsHeld: 0 })
     renderPage()
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    expect(document.querySelector('.profile-header__stats')).not.toBeInTheDocument()
+    const facts = document.querySelector('.profile-header__facts')
+    expect(facts).toBeInTheDocument()
+    expect(facts.querySelectorAll('.profile-header__fact-value')).toHaveLength(1)
+    expect(facts).not.toHaveTextContent('reviews')
+    expect(facts).not.toHaveTextContent('Sessions held')
   })
 
-  it('puts category pills in the stats row, hugging content at most 3 per row', async () => {
+  it('never renders Next session or category pills on any profile view', async () => {
     givenListings([
       makeListing({ id: 'listing-1', category: 'Food' }),
       makeListing({ id: 'listing-2', category: 'Fitness' }),
-      makeListing({ id: 'listing-3', category: 'Arts' }),
-      makeListing({ id: 'listing-4', category: 'Music' }),
-      makeListing({ id: 'listing-5', category: 'Language' }),
     ])
-    renderPage()
-
+    givenSignedIn(HOST_ID)
+    givenSessions([
+      makeSession({
+        id: 'soon',
+        listing_id: 'listing-1',
+        starts_at: hoursFromNow(24),
+        listings: { title: 'Latte art' },
+      }),
+    ])
+    const { unmount } = renderPage()
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    const stats = document.querySelector('.profile-header__stats')
-    const chips = stats.querySelector('.profile-header__chips')
-    expect(screen.queryByText('Teaches')).not.toBeInTheDocument()
-    expect(chips).not.toHaveClass('profile-header__chips--wrap')
-    expect(chips.querySelectorAll('.profile-header__chip')).toHaveLength(5)
-    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
-    const chipRow = css.match(/\.profile-header__chips \{[\s\S]*?\n\}/)?.[0] ?? ''
-    expect(chipRow).toMatch(/display:\s*flex/)
-    expect(chipRow).toMatch(/flex-wrap:\s*wrap/)
-    expect(chipRow).toMatch(/max-width:/)
-    expect(chipRow).not.toMatch(/grid-template-columns/)
-    const chip = css.match(/\.profile-header__chip \{[\s\S]*?\n\}/)?.[0] ?? ''
-    expect(chip).toMatch(/display:\s*inline-flex/)
-    expect(chip).toMatch(/flex:\s*0 0 auto/)
-    expect(document.querySelector('.profile-header__aside .profile-header__chips')).not.toBeInTheDocument()
+    expect(screen.queryByText('Next session')).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__chips')).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__next')).not.toBeInTheDocument()
+    unmount()
+
+    givenSignedIn('someone-else')
+    renderPage()
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(screen.queryByText('Next session')).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__chips')).not.toBeInTheDocument()
   })
 
-  it('shows navy rating and sessions-held figures', async () => {
+  it('puts name, rating and sessions in one row with labels under each', async () => {
     givenListings([makeListing({ id: 'listing-9', category: 'Food' })])
     givenRpcs({
       hostReviews: [makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })],
@@ -1052,18 +1050,31 @@ describe('Profile card layout', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    const stats = document.querySelector('.profile-header__stats')
-    expect(stats).toHaveTextContent('4.5')
-    expect(stats).toHaveTextContent('2 reviews')
-    expect(stats).toHaveTextContent('12')
-    expect(stats).toHaveTextContent('Sessions held')
+    const identity = document.querySelector('.profile-header__identity')
+    const facts = identity.querySelector('.profile-header__facts')
+    const items = [...facts.querySelectorAll('.profile-header__fact')]
+    expect(identity.contains(document.querySelector('.profile-header__face'))).toBe(true)
+    expect(facts).toContainElement(screen.getByRole('heading', { name: 'Mei', level: 1 }))
+    expect(items).toHaveLength(3)
+    expect(items.map((item) => item.querySelector('.profile-header__fact-value'))).toHaveLength(3)
+    expect(items[0]).toHaveTextContent('Mei')
+    expect(items[0]).toHaveTextContent('ID verified')
+    expect(items[1]).toHaveTextContent('4.5')
+    expect(items[1]).toHaveTextContent('2 reviews')
+    expect(items[2]).toHaveTextContent('12')
+    expect(items[2]).toHaveTextContent('Sessions held')
     expect(document.querySelector('.profile-header__star')).toBeInTheDocument()
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
-    const statFigure = css.match(/\.profile-header__stat dd \{[\s\S]*?\n\}/)?.[0] ?? ''
-    expect(statFigure).toMatch(/color:\s*var\(--navy\)/)
-    expect(statFigure).not.toMatch(/--coral|--success/)
+    const figure = css.match(/\.profile-header__fact-value \{[\s\S]*?\n\}/)?.[0] ?? ''
+    expect(figure).toMatch(/color:\s*var\(--navy\)/)
+    expect(figure).toMatch(/font-size:\s*24px/)
+    expect(figure).not.toMatch(/--coral|--success/)
     const star = css.match(/\.profile-header__star \{[\s\S]*?\n\}/)?.[0] ?? ''
     expect(star).toMatch(/font-size:\s*0\.6em/)
+    const label = css.match(/\.profile-header__fact dt \{[\s\S]*?\n\}/)?.[0] ?? ''
+    expect(label).toMatch(/order:\s*2/)
+    expect(label).toMatch(/font-size:\s*14px/)
+    expect(figure).toMatch(/order:\s*1/)
   })
 
   it('shows a solid booked mark and a hollow open mark on the own calendar', async () => {
@@ -1110,7 +1121,7 @@ describe('Profile card layout', () => {
     )
   })
 
-  it('hides the calendar, Next session, and any sessions request on a public profile', async () => {
+  it('hides the calendar and any sessions request on a public profile', async () => {
     givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' })])
     givenSessions([
       makeSession({
@@ -1130,15 +1141,14 @@ describe('Profile card layout', () => {
     expect(supabase.__calls('bookings', 'select')).toHaveLength(0)
   })
 
-  it('still renders Next session and the calendar on the own profile', async () => {
+  it('still renders the calendar on the own profile, without Next session', async () => {
     givenSignedIn(HOST_ID)
     givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' })])
-    const soon = hoursFromNow(24)
     givenSessions([
       makeSession({
         id: 'soon',
         listing_id: 'listing-9',
-        starts_at: soon,
+        starts_at: hoursFromNow(24),
         listings: { title: 'Latte art' },
       }),
     ])
@@ -1146,9 +1156,7 @@ describe('Profile card layout', () => {
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
     expect(document.querySelector('.profile-header__calendar')).toBeInTheDocument()
-    const next = screen.getByRole('link', { name: new RegExp(formatSessionDateTime(soon)) })
-    expect(next).toHaveAttribute('href', '/listings/listing-9')
-    expect(next).toHaveTextContent('Latte art')
+    expect(screen.queryByText('Next session')).not.toBeInTheDocument()
     expect(supabase.__calls('sessions', 'select').length).toBeGreaterThan(0)
   })
 
@@ -1165,20 +1173,11 @@ describe('Profile card layout', () => {
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
     expect(document.querySelector('.profile-header__calendar')).not.toBeInTheDocument()
-    expect(document.querySelector('.profile-header__stats')).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__facts')).not.toHaveTextContent('Sessions held')
+    expect(document.querySelector('.profile-header__facts')).not.toHaveTextContent('reviews')
     expect(document.querySelector('.profile-header .detail-host__bio')).toHaveTextContent(
       'I drink coffee.',
     )
-  })
-
-  it('never shows Next session when there is none', async () => {
-    givenSignedIn(HOST_ID)
-    givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' })])
-    givenSessions([])
-    renderPage()
-
-    await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    expect(screen.queryByText('Next session')).not.toBeInTheDocument()
   })
 
   it('does not fetch sessions or bookings in public preview', async () => {
@@ -1201,7 +1200,7 @@ describe('Profile card layout', () => {
     expect(supabase.__calls('bookings', 'select')).toHaveLength(0)
   })
 
-  it('keeps the mobile stack: identity, stats, bio, next session, calendar', async () => {
+  it('stacks avatar, facts, bio, then the calendar, with the calendar below the banner', async () => {
     givenSignedIn(HOST_ID)
     givenListings([
       makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' }),
@@ -1235,68 +1234,51 @@ describe('Profile card layout', () => {
     const aside = body.querySelector('.profile-header__aside')
     const identity = primary.querySelector('.profile-header__identity')
     expect(identity.contains(document.querySelector('.profile-header__face'))).toBe(true)
-    expect(identity.contains(document.querySelector('.profile-header__name'))).toBe(true)
-    expect(primary.querySelector('.profile-header__stats').contains(primary.querySelector('.profile-header__chips'))).toBe(true)
+    expect(identity.contains(document.querySelector('.profile-header__facts'))).toBe(true)
+    expect(identity.querySelector('.profile-header__next')).not.toBeInTheDocument()
     expect(
-      primary.querySelector('.profile-header__stats').compareDocumentPosition(primary.querySelector('.detail-host__bio'))
+      identity.compareDocumentPosition(primary.querySelector('.detail-host__bio'))
         & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
     expect(primary.compareDocumentPosition(aside) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(
-      aside.querySelector('.profile-header__next').compareDocumentPosition(aside.querySelector('.profile-header__calendar'))
-        & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
+    expect(aside.querySelector('.profile-header__calendar')).toBeInTheDocument()
+    expect(aside.querySelector('.profile-header__next')).not.toBeInTheDocument()
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
     expect(css).toMatch(
       /@media \(min-width: 1024px\) \{[\s\S]*?\.profile-header__body:has\(> \.profile-header__aside\) \{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) 340px/,
     )
-  })
-
-  it('keeps the name on the banner edge whether or not the right column is there', async () => {
-    givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' })])
-    givenSessions([
-      makeSession({
-        id: 'soon',
-        listing_id: 'listing-9',
-        starts_at: hoursFromNow(24),
-        listings: { title: 'Latte art' },
-      }),
-    ])
-    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
-    expect(css).toMatch(
-      /@media \(min-width: 1024px\) \{[\s\S]*?\.profile-header__identity \{[\s\S]*?align-items:\s*center/,
-    )
-    expect(css).toMatch(
-      /@media \(min-width: 1024px\) \{[\s\S]*?\.profile-header__aside \{[\s\S]*?padding-top:\s*52px/,
-    )
-
-    givenSignedIn(HOST_ID)
-    const { unmount } = renderPage()
-    await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    expect(document.querySelector('.profile-header__aside')).toBeInTheDocument()
-    expect(document.querySelector('.profile-header__identity')).toHaveClass('profile-header__identity')
-    unmount()
-
-    givenSignedIn('someone-else')
-    renderPage()
-    await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    expect(document.querySelector('.profile-header__aside')).not.toBeInTheDocument()
-    expect(document.querySelector('.profile-header__identity')).toHaveClass('profile-header__identity')
+    expect(css).toMatch(/\.profile-header__aside \{[\s\S]*?padding-top:\s*52px/)
   })
 
   it('renders Bookings cards in the listing grid', async () => {
     givenSignedIn(HOST_ID)
     givenBookings([
       makeBooking({ id: 'booking-1' }),
-      makeBooking({ id: 'booking-2', session_id: 'session-2' }),
+      makeBooking({
+        id: 'booking-2',
+        session_id: 'session-2',
+        sessions: {
+          starts_at: hoursFromNow(-5),
+          duration_mins: 90,
+          listings: { title: 'Learn latte art with me', host_id: HOST_ID },
+        },
+      }),
     ])
     renderPage()
 
     await screen.findByRole('heading', { name: 'My Bookings' })
     const grid = document.querySelector('.profile-tab-panel .listings-grid')
     expect(grid).toHaveClass('listings-grid--bookings')
-    expect(grid.querySelectorAll('.dashboard-card')).toHaveLength(2)
+    const cards = [...grid.querySelectorAll('.dashboard-card')]
+    expect(cards).toHaveLength(2)
     expect(document.querySelector('.empty-state')).not.toBeInTheDocument()
+    const actionRows = cards.map((card) => card.querySelector('.booking-card__actions'))
+    expect(actionRows).toHaveLength(2)
+    expect(actionRows[0]).toHaveClass('booking-card__actions')
+    expect(actionRows[1]).toHaveClass('booking-card__actions')
+    expect(screen.getByRole('button', { name: 'Leave a review' })).toBeInTheDocument()
+    expect(actionRows.some((row) => row.querySelector('.ui-button'))).toBe(true)
+    expect(actionRows.some((row) => !row.querySelector('.ui-button'))).toBe(true)
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
     expect(css).toMatch(
       /\.listings-grid--bookings \{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/,
@@ -1308,8 +1290,13 @@ describe('Profile card layout', () => {
     expect(css).toMatch(
       /\.listings-grid--bookings \.dashboard-card \{[\s\S]*?flex-direction:\s*column/,
     )
+    const actions = css.match(
+      /\.listings-grid--bookings \.booking-card__actions \{[\s\S]*?\n\}/,
+    )?.[0] ?? ''
+    expect(actions).toMatch(/margin-top:\s*auto/)
+    expect(actions).toMatch(/min-height:\s*36px/)
     expect(css).toMatch(
-      /\.listings-grid--bookings \.booking-card__actions \{[\s\S]*?margin-top:\s*auto/,
+      /\.listings-grid--bookings \.dashboard-card__meta \{[\s\S]*?margin-bottom:\s*16px/,
     )
   })
 })

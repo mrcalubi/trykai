@@ -661,6 +661,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-26 — Profile card polish: name on the banner edge, smaller pills, equal booking cards.** The name's vertical centre sits on the banner's bottom edge in every view (`align-items: center` on the identity row). The own-profile right column starts below the banner (`padding-top: 52px`) so Next session and the calendar cannot shift the name. Past Singapore days never get an open ring (booked dots still show); today is open only while a session that day is still to come. Category pills drop the "Teaches" label, hug their content, and wrap at most 3 per row. The rating star is 60% of the number. Booking cards in a row stretch to equal height with the actions pinned to the bottom; Leave a review is a 36px secondary.
 
+**2026-10-26 — Profile card is avatar, then a facts row, then bio; calendar only on the right.** Next session and category pills leave the card (listing cards still show category). Under the overlapping avatar, name / ID verified, rating / reviews, and sessions held sit in one left-aligned row with the same structure (main line, muted 14px label). Name and the two numbers share 24px / 28px Bricolage 800 navy; the star stays 60%. The name clamps so it cannot push the stats off. Own desktop right column is the month calendar, starting below the banner. Booking actions keep a 36px min-height and 16px above the row so a lone status pill lines up with a pill beside a button.
+
 ---
 
 # Analysed but not decided
