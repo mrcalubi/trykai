@@ -536,7 +536,7 @@ src/
 │       ├── Card.jsx             # Browse mode is live on Home and profile listings
 │       ├── OverflowMenu.jsx     # Shared ⋮/⋯ menu; Hosting rows, listing/profile/review Report
 │       ├── SelectableCard.jsx   # Category cards; /style-guide only
-│       └── Avatar.jsx           # Photo or first letter of display_name; Profile, Hosted by, Settings, TopNav, Card, booking detail, reviews
+│       └── Avatar.jsx           # Photo or first letter of display_name; ui-avatar centres the initial; Settings, Profile, Hosted by, TopNav, Card, booking detail, reviews
 ├── App.jsx
 └── main.jsx
 
