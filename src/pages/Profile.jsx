@@ -134,21 +134,14 @@ function ProfileIdentity({ givenName, verified }) {
 }
 
 function TeachChips({ categories }) {
-  const many = categories.length > 1
-
   return (
-    <ul
-      className={
-        many ? 'profile-header__chips profile-header__chips--wrap' : 'profile-header__chips'
-      }
-      aria-label="Teaches"
-    >
+    <ul className="profile-header__chips">
       {categories.map((category) => (
         <li
           key={category}
           className={`profile-header__chip profile-header__chip--${categoryTint(category)}`}
         >
-          <Icon name={categoryIconName(category)} size={14} />
+          <Icon name={categoryIconName(category)} size={12} />
           {category}
         </li>
       ))}
@@ -205,7 +198,6 @@ function ProfileStats({ reviews, sessionsHeld, listings }) {
       ) : null}
       {categories.length > 0 ? (
         <div className="profile-header__stat profile-header__stat--teaches">
-          <dt>Teaches</dt>
           <dd>
             <TeachChips categories={categories} />
           </dd>

@@ -2160,7 +2160,7 @@ describe('Dashboard reviews', () => {
     await renderBookings()
 
     const reviewButton = screen.getByRole('button', { name: 'Leave a review' })
-    expect(reviewButton).toHaveClass('ui-button', 'ui-button--secondary')
+    expect(reviewButton).toHaveClass('ui-button', 'ui-button--secondary', 'btn--small')
     expect(reviewButton.parentElement).toHaveClass('booking-card__actions')
     expect(reviewButton.parentElement.querySelector('.badge')).toHaveTextContent('confirmed')
   })

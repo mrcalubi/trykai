@@ -79,15 +79,17 @@ export function nextOpenSession(sessions, listings, now = Date.now()) {
 
 /**
  * Public: hollow 'open' for open future sessions only.
- * Own: 'booked' if any session that day has a confirmed booking, else 'open'
- * for open sessions with no confirmed bookings.
+ * Own: 'booked' if any session that day has a confirmed booking; 'open' only
+ * for a still-to-come open session. Past Singapore days never get an open ring.
  */
 export function calendarDayMarks(sessions, { publicView = true, now = Date.now() } = {}) {
   const marks = {}
+  const todayKey = singaporeDateKey(now)
   for (const session of sessions ?? []) {
     const dateKey = singaporeDateKey(session.starts_at)
+    const upcoming = new Date(session.starts_at).getTime() > now
     if (publicView) {
-      if (!isOpenSession(session) || new Date(session.starts_at).getTime() <= now) continue
+      if (!isOpenSession(session) || !upcoming) continue
       marks[dateKey] = 'open'
       continue
     }
@@ -96,6 +98,7 @@ export function calendarDayMarks(sessions, { publicView = true, now = Date.now()
       marks[dateKey] = 'booked'
       continue
     }
+    if (dateKey < todayKey || !upcoming) continue
     if (isOpenSession(session) && marks[dateKey] !== 'booked') {
       marks[dateKey] = 'open'
     }

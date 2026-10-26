@@ -453,6 +453,7 @@ export default function Bookings({ embedded = false, hostCta = null }) {
                     <Button
                       type="button"
                       variant="secondary"
+                      className="btn--small"
                       onClick={() => openReviewForm(booking.id)}
                     >
                       Leave a review

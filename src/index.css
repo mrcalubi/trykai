@@ -1242,7 +1242,24 @@ a {
 
 .listings-grid--bookings {
   grid-template-columns: minmax(0, 1fr);
-  align-items: start;
+  align-items: stretch;
+}
+
+.listings-grid--bookings .dashboard-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.listings-grid--bookings .booking-card__actions {
+  margin-top: auto;
+}
+
+.listings-grid--bookings .booking-card__actions .ui-button {
+  min-height: 36px;
+  height: 36px;
+  padding: 6px 14px;
+  font-size: 14px;
 }
 
 @media (min-width: 768px) {
@@ -3696,27 +3713,23 @@ body.lightbox-open {
 }
 
 .profile-header__chips {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
+  max-width: 17.5rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.profile-header__chips--wrap {
-  display: grid;
-  grid-template-columns: repeat(3, auto);
-  justify-content: start;
-}
-
 .profile-header__chip {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 5px;
-  height: 26px;
-  padding: 0 10px;
-  font-size: 13px;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 12px;
   font-weight: 600;
   border-radius: 999px;
 }
@@ -3797,7 +3810,10 @@ body.lightbox-open {
 }
 
 .profile-header__stat dd {
+  display: flex;
   order: 1;
+  align-items: center;
+  gap: 0.18em;
   margin: 0;
   font-family: var(--display);
   font-size: clamp(28px, 4vw, 40px);
@@ -3808,7 +3824,12 @@ body.lightbox-open {
 }
 
 .profile-header__star {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.6em;
+  line-height: 1;
   color: var(--navy);
+  transform: translateY(-0.08em);
 }
 
 .profile-header__stat--teaches dd {
@@ -3836,6 +3857,12 @@ body.lightbox-open {
 
 .profile-header__calendar {
   width: 100%;
+}
+
+.profile-header__calendar .session-calendar__day {
+  min-height: 36px;
+  padding: 2px 0;
+  gap: 2px;
 }
 
 .profile-header__legend {
@@ -3908,7 +3935,7 @@ body.lightbox-open {
 @media (min-width: 1024px) {
   .profile-header__identity {
     flex-direction: row;
-    align-items: flex-end;
+    align-items: center;
     gap: 16px;
   }
 
@@ -3928,7 +3955,12 @@ body.lightbox-open {
 
   .profile-header__aside {
     width: 340px;
+    padding-top: 52px;
     justify-self: end;
+  }
+
+  .profile-header__calendar .session-calendar__day {
+    min-height: 38px;
   }
 }
 
