@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Settings from './Settings'
 import RequireAuth from '../components/RequireAuth'
+import SiteNav from '../components/SiteNav'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession } from '../test/fixtures'
@@ -34,6 +35,8 @@ vi.mock('../lib/coverCrop', async (importOriginal) => {
 
 const USER_ID = 'user-42'
 
+let account = {}
+
 function givenSignedIn(userId = USER_ID) {
   supabase.auth.getSession.mockResolvedValue({
     data: { session: makeAuthSession({ user: { id: userId } }) },
@@ -48,28 +51,25 @@ function givenProfile({
   email = 'mei@example.com',
   avatar_url: avatarUrl = null,
 } = {}) {
+  account = {
+    full_name: fullName,
+    display_name: displayName,
+    bio,
+    email,
+    avatar_url: avatarUrl,
+  }
   supabase.rpc.mockImplementation(async (fn) => {
     if (fn === 'my_account') {
-      return {
-        data: [
-          {
-            full_name: fullName,
-            display_name: displayName,
-            bio,
-            email,
-            avatar_url: avatarUrl,
-          },
-        ],
-        error: null,
-      }
+      return { data: [{ ...account }], error: null }
     }
     return { data: null, error: null }
   })
 }
 
-async function renderSettings() {
+async function renderSettings({ withNav = false } = {}) {
   const utils = renderWithRouter(
     <RequireAuth>
+      {withNav ? <SiteNav /> : null}
       <Settings />
     </RequireAuth>,
     { route: '/settings', path: '/settings' }
@@ -86,6 +86,10 @@ beforeEach(() => {
   supabase.__reset()
   givenSignedIn()
   givenProfile()
+  supabase.__on('users', 'update', ({ payload }) => {
+    Object.assign(account, payload)
+    return { data: null, error: null }
+  })
 })
 
 afterEach(() => {
@@ -242,6 +246,35 @@ describe('Settings profile form', () => {
       display_name: 'Mei',
       bio: null,
     })
+  })
+
+  it('updates the nav face after a photo change without a reload', async () => {
+    const { user } = await renderSettings({ withNav: true })
+    const nav = await screen.findByRole('link', { name: 'Your profile' })
+    await waitFor(() => expect(nav).toHaveTextContent('M'))
+
+    fireEvent.change(screen.getByLabelText('Profile photo'), {
+      target: { files: [imageFile('face.png')] },
+    })
+    expect(await screen.findByText('Crop your photo')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Use this crop' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Use this crop' }))
+
+    await waitFor(() => expect(nav.querySelector('img')).toBeTruthy())
+    expect(nav.querySelector('img').getAttribute('src')).toMatch(/\/avatar-.+\.jpg$/)
+  })
+
+  it('updates the nav initial after a display name save without a reload', async () => {
+    const { user } = await renderSettings({ withNav: true })
+    const nav = await screen.findByRole('link', { name: 'Your profile' })
+    await waitFor(() => expect(nav).toHaveTextContent('M'))
+
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.type(screen.getByLabelText('Display name'), 'Latte Queen')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(nav).toHaveTextContent('L'))
+    expect(nav).not.toHaveTextContent('M')
   })
 
   it('keeps the existing photo when the form is saved', async () => {

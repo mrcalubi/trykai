@@ -7,7 +7,7 @@ import Button from '../components/ui/Button'
 import PageLoader from '../components/PageLoader'
 import Avatar from '../components/ui/Avatar'
 import ProfilePhotoFlow from '../components/ProfilePhotoFlow'
-import { firstAccountRow } from '../lib/myAccount'
+import { firstAccountRow, notifyAccountUpdated } from '../lib/myAccount'
 import { hasAvatarPhoto } from '../lib/avatarPhoto'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 
@@ -127,6 +127,7 @@ export default function Settings() {
     setBio(bio.trim())
     setSaveStatusKind('success')
     setSaveStatus('Saved')
+    notifyAccountUpdated()
   }
 
   async function handleLogout() {

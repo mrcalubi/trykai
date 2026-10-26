@@ -12,6 +12,7 @@ import {
   saveAvatarUrl,
   uploadAvatarFile,
 } from '../lib/avatarPhoto'
+import { notifyAccountUpdated } from '../lib/myAccount'
 
 export default function ProfilePhotoFlow({ userId, onAvatarUrlChange, children }) {
   const inputId = useId()
@@ -84,6 +85,7 @@ export default function ProfilePhotoFlow({ userId, onAvatarUrlChange, children }
       const publicUrl = await uploadAvatarFile(compressed, userId)
       await saveAvatarUrl(userId, publicUrl)
       onAvatarUrlChange?.(publicUrl)
+      notifyAccountUpdated()
       setStatusKind('success')
       setStatus(PHOTO_UPDATED)
       closeCrop()
@@ -104,6 +106,7 @@ export default function ProfilePhotoFlow({ userId, onAvatarUrlChange, children }
     try {
       await saveAvatarUrl(userId, null)
       onAvatarUrlChange?.(null)
+      notifyAccountUpdated()
       setStatusKind('success')
       setStatus(PHOTO_REMOVED)
       setConfirmRemove(false)
