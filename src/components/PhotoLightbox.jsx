@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 const FOCUSABLE = 'button:not([disabled])'
 
-export default function PhotoLightbox({ photos, title, startIndex = 0, onClose }) {
+export default function PhotoLightbox({ photos, title, label, startIndex = 0, onClose }) {
   const count = photos.length
   const [index, setIndex] = useState(() => {
     if (count === 0) return 0
@@ -107,7 +107,7 @@ export default function PhotoLightbox({ photos, title, startIndex = 0, onClose }
       className="lightbox"
       role="dialog"
       aria-modal="true"
-      aria-label={`${title} photos`}
+      aria-label={label || `${title} photos`}
       onClick={handleBackdropClick}
     >
       <button
@@ -123,9 +123,11 @@ export default function PhotoLightbox({ photos, title, startIndex = 0, onClose }
         Close
       </button>
 
-      <p className="lightbox__position" aria-live="polite">
-        {index + 1} / {count}
-      </p>
+      {hasMany ? (
+        <p className="lightbox__position" aria-live="polite">
+          {index + 1} / {count}
+        </p>
+      ) : null}
 
       {hasMany && (
         <button

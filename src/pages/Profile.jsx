@@ -7,6 +7,10 @@ import HostRating from '../components/HostRating'
 import ReviewCard from '../components/ReviewCard'
 import Avatar from '../components/ui/Avatar'
 import Card from '../components/ui/Card'
+import PhotoLightbox from '../components/PhotoLightbox'
+import ProfilePhotoFlow from '../components/ProfilePhotoFlow'
+import ViewableAvatar from '../components/ViewableAvatar'
+import { hasAvatarPhoto } from '../lib/avatarPhoto'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
@@ -133,6 +137,7 @@ export default function Profile() {
   const [error, setError] = useState('')
   const [viewerId, setViewerId] = useState(null)
   const [viewerReady, setViewerReady] = useState(false)
+  const [viewingPhoto, setViewingPhoto] = useState(false)
   // Delete on the Hosting tab soft-deletes the row. A profile fetch that
   // started before that delete can still return the listing; drop those ids.
   const removedListingIds = useRef(new Set())
@@ -278,11 +283,47 @@ export default function Profile() {
   return (
     <div className="page page--detail">
       <header className="profile-header">
-        <Avatar
-          avatarUrl={profile.avatar_url}
-          displayName={publicName(profile)}
-          className="detail-host__avatar"
-        />
+        {isOwn ? (
+          <ProfilePhotoFlow
+            userId={id}
+            onAvatarUrlChange={(next) =>
+              setProfile((current) => (current ? { ...current, avatar_url: next } : current))
+            }
+          >
+            {({ changePhoto, removePhoto }) => {
+              const photo = hasAvatarPhoto(profile.avatar_url)
+              return (
+                <OverflowMenu
+                  label="Profile photo"
+                  className="ui-overflow--avatar"
+                  icon={
+                    <Avatar
+                      avatarUrl={profile.avatar_url}
+                      displayName={publicName(profile)}
+                      className="detail-host__avatar"
+                    />
+                  }
+                  items={[
+                    ...(photo
+                      ? [{ label: 'View photo', onSelect: () => setViewingPhoto(true) }]
+                      : []),
+                    { label: 'Change photo', onSelect: changePhoto },
+                    ...(photo
+                      ? [{ label: 'Remove photo', destructive: true, onSelect: removePhoto }]
+                      : []),
+                  ]}
+                />
+              )
+            }}
+          </ProfilePhotoFlow>
+        ) : (
+          <ViewableAvatar
+            avatarUrl={profile.avatar_url}
+            displayName={publicName(profile)}
+            name={givenName}
+            className="detail-host__avatar"
+          />
+        )}
         <div className="profile-header__copy">
           <div className="profile-header__name-row">
             <h1 className="profile-header__name">{givenName}</h1>
@@ -313,6 +354,15 @@ export default function Profile() {
           </Link>
         ) : null}
       </header>
+
+      {viewingPhoto && hasAvatarPhoto(profile.avatar_url) ? (
+        <PhotoLightbox
+          photos={[profile.avatar_url]}
+          title={`${givenName}'s photo`}
+          label={`${givenName}'s photo`}
+          onClose={() => setViewingPhoto(false)}
+        />
+      ) : null}
 
       {about ? (
         <section className="profile-about" aria-labelledby="profile-about-heading">

@@ -5,6 +5,7 @@ import SiteNav from './SiteNav'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession } from '../test/fixtures'
+import { ACCOUNT_UPDATED_EVENT, notifyAccountUpdated } from '../lib/myAccount'
 
 vi.mock('../lib/supabase')
 
@@ -91,6 +92,37 @@ describe('SiteNav when signed in', () => {
     await screen.findByRole('link', { name: 'Your profile' })
     await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('my_account'))
     expect(supabase.__calls('users')).toHaveLength(0)
+  })
+
+  it('refetches the face when the account is updated, and drops the listener on unmount', async () => {
+    signedIn()
+    givenAccount({ display_name: 'Mei', avatar_url: null })
+    const { unmount } = renderNav()
+
+    const account = await screen.findByRole('link', { name: 'Your profile' })
+    await waitFor(() => expect(account).toHaveTextContent('M'))
+
+    givenAccount({ display_name: 'Mei', avatar_url: 'https://cdn.test/new.jpg' })
+    await act(async () => {
+      notifyAccountUpdated()
+    })
+    await waitFor(() =>
+      expect(account.querySelector('img')).toHaveAttribute('src', 'https://cdn.test/new.jpg'),
+    )
+
+    givenAccount({ display_name: 'Latte Queen', avatar_url: null })
+    await act(async () => {
+      notifyAccountUpdated()
+    })
+    await waitFor(() => expect(account).toHaveTextContent('L'))
+    expect(account.querySelector('img')).not.toBeInTheDocument()
+
+    const callsAfter = supabase.rpc.mock.calls.filter(([fn]) => fn === 'my_account').length
+    unmount()
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(ACCOUNT_UPDATED_EVENT))
+    })
+    expect(supabase.rpc.mock.calls.filter(([fn]) => fn === 'my_account')).toHaveLength(callsAfter)
   })
 
   it('takes the avatar to the signed-in user own profile', async () => {

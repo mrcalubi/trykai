@@ -326,7 +326,11 @@ describe('ListingDetail content', () => {
     const more = screen.getByRole('button', { name: '… more' })
     expect(more).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('link', { name: '… more' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: "Mei's profile" })).toHaveAttribute('href', '/u/host-1')
+    expect(screen.getByRole('link', { name: "View Mei's profile" })).toHaveAttribute(
+      'href',
+      '/u/host-1',
+    )
+    expect(screen.queryByRole('button', { name: "View Mei's photo" })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /More about/ })).not.toBeInTheDocument()
     expect(supabase.auth.getSession).toHaveBeenCalled()
   })
@@ -410,6 +414,24 @@ describe('ListingDetail content', () => {
       '/u/host-1'
     )
     expect(document.querySelector('.detail-host__avatar')).toHaveTextContent('?')
+    expect(screen.queryByRole('button', { name: "View Anonymous's photo" })).not.toBeInTheDocument()
+  })
+
+  it('opens the host photo in a viewer and leaves initials inert', async () => {
+    givenListing(
+      makeListing({
+        users: { display_name: 'Mei', avatar_url: 'https://cdn.test/mei.jpg' },
+      }),
+    )
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: "View Mei's photo" }))
+    expect(screen.getByRole('dialog', { name: "Mei's photo" })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: "Mei's photo 1" })).toHaveAttribute(
+      'src',
+      'https://cdn.test/mei.jpg',
+    )
+    expect(screen.getByRole('link', { name: 'Mei' })).toHaveAttribute('href', '/u/host-1')
   })
 
   it('falls back to Anonymous when the host profile is missing', async () => {

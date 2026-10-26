@@ -1,17 +1,41 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Settings from './Settings'
 import RequireAuth from '../components/RequireAuth'
+import SiteNav from '../components/SiteNav'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession } from '../test/fixtures'
 import { HEIC_READ_ERROR, IMAGE_ACCEPT, heicLoader } from '../lib/heicImage'
+import { PHOTO_REMOVED, PHOTO_UPDATED } from '../lib/avatarPhoto'
 
 vi.mock('../lib/supabase')
 
+vi.mock('react-easy-crop', () => ({
+  default: function CropperMock({ image, onCropComplete }) {
+    useEffect(() => {
+      onCropComplete(null, { x: 0, y: 0, width: 120, height: 120 })
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [image])
+    return <div data-testid="cropper" />
+  },
+}))
+
+vi.mock('../lib/coverCrop', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    loadImage: vi.fn(async () => ({})),
+    cropImageToBlob: vi.fn(async () => new Blob(['crop'], { type: 'image/jpeg' })),
+  }
+})
+
 const USER_ID = 'user-42'
+
+let account = {}
 
 function givenSignedIn(userId = USER_ID) {
   supabase.auth.getSession.mockResolvedValue({
@@ -27,28 +51,25 @@ function givenProfile({
   email = 'mei@example.com',
   avatar_url: avatarUrl = null,
 } = {}) {
+  account = {
+    full_name: fullName,
+    display_name: displayName,
+    bio,
+    email,
+    avatar_url: avatarUrl,
+  }
   supabase.rpc.mockImplementation(async (fn) => {
     if (fn === 'my_account') {
-      return {
-        data: [
-          {
-            full_name: fullName,
-            display_name: displayName,
-            bio,
-            email,
-            avatar_url: avatarUrl,
-          },
-        ],
-        error: null,
-      }
+      return { data: [{ ...account }], error: null }
     }
     return { data: null, error: null }
   })
 }
 
-async function renderSettings() {
+async function renderSettings({ withNav = false } = {}) {
   const utils = renderWithRouter(
     <RequireAuth>
+      {withNav ? <SiteNav /> : null}
       <Settings />
     </RequireAuth>,
     { route: '/settings', path: '/settings' }
@@ -65,11 +86,14 @@ beforeEach(() => {
   supabase.__reset()
   givenSignedIn()
   givenProfile()
+  supabase.__on('users', 'update', ({ payload }) => {
+    Object.assign(account, payload)
+    return { data: null, error: null }
+  })
 })
 
 afterEach(() => {
   vi.useRealTimers()
-  vi.restoreAllMocks()
 })
 
 describe('Settings access', () => {
@@ -195,30 +219,69 @@ describe('Settings profile form', () => {
     )
   })
 
-  it('uploads a new photo and writes its public URL to avatar_url', async () => {
-    await renderSettings()
+  it('saves a cropped photo straight away and leaves form Save for names', async () => {
+    const { user } = await renderSettings()
+    expect(screen.getByRole('button', { name: 'Change photo' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove photo' })).not.toBeInTheDocument()
+
     fireEvent.change(screen.getByLabelText('Profile photo'), {
       target: { files: [imageFile('face.png')] },
     })
+    expect(await screen.findByText('Crop your photo')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Use this crop' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Use this crop' }))
 
-    await screen.getByRole('button', { name: 'Save changes' }).click()
-
-    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
-    expect(supabase.__bucket('listing-photos').upload).toHaveBeenCalledOnce()
+    await waitFor(() => expect(supabase.__bucket('listing-photos').upload).toHaveBeenCalledOnce())
     const uploadedPath = supabase.__bucket('listing-photos').upload.mock.calls[0][0]
-    expect(uploadedPath).toMatch(new RegExp(`^${USER_ID}/avatar-.+\\.png$`))
+    expect(uploadedPath).toMatch(new RegExp(`^${USER_ID}/avatar-.+\\.jpg$`))
     expect(supabase.__lastCall('users', 'update').payload).toEqual({
+      avatar_url: `https://cdn.test/listing-photos/${uploadedPath}`,
+    })
+    expect(screen.getByRole('status')).toHaveTextContent(PHOTO_UPDATED)
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(2))
+    expect(supabase.__calls('users', 'update')[1].payload).toEqual({
       full_name: 'Mei Ling',
       display_name: 'Mei',
       bio: null,
-      avatar_url: `https://cdn.test/listing-photos/${uploadedPath}`,
     })
   })
 
-  it('keeps the existing photo when none is chosen', async () => {
+  it('updates the nav face after a photo change without a reload', async () => {
+    const { user } = await renderSettings({ withNav: true })
+    const nav = await screen.findByRole('link', { name: 'Your profile' })
+    await waitFor(() => expect(nav).toHaveTextContent('M'))
+
+    fireEvent.change(screen.getByLabelText('Profile photo'), {
+      target: { files: [imageFile('face.png')] },
+    })
+    expect(await screen.findByText('Crop your photo')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Use this crop' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Use this crop' }))
+
+    await waitFor(() => expect(nav.querySelector('img')).toBeTruthy())
+    expect(nav.querySelector('img').getAttribute('src')).toMatch(/\/avatar-.+\.jpg$/)
+  })
+
+  it('updates the nav initial after a display name save without a reload', async () => {
+    const { user } = await renderSettings({ withNav: true })
+    const nav = await screen.findByRole('link', { name: 'Your profile' })
+    await waitFor(() => expect(nav).toHaveTextContent('M'))
+
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.type(screen.getByLabelText('Display name'), 'Latte Queen')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(nav).toHaveTextContent('L'))
+    expect(nav).not.toHaveTextContent('M')
+  })
+
+  it('keeps the existing photo when the form is saved', async () => {
     givenProfile({ avatar_url: 'https://cdn.test/existing.jpg' })
     const { user } = await renderSettings()
 
+    expect(screen.getByRole('button', { name: 'Remove photo' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
     await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
@@ -231,18 +294,19 @@ describe('Settings profile form', () => {
   })
 
   it('shows a storage error and does not update the profile', async () => {
-    await renderSettings()
+    const { user } = await renderSettings()
     supabase
       .__bucket('listing-photos')
       .upload.mockResolvedValue({ data: null, error: { message: 'storage full' } })
     fireEvent.change(screen.getByLabelText('Profile photo'), {
       target: { files: [imageFile()] },
     })
-
-    await screen.getByRole('button', { name: 'Save changes' }).click()
+    expect(await screen.findByText('Crop your photo')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Use this crop' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Use this crop' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('storage full')
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.queryByText(PHOTO_UPDATED)).not.toBeInTheDocument()
     expect(supabase.__calls('users', 'update')).toHaveLength(0)
   })
 
@@ -252,17 +316,31 @@ describe('Settings profile form', () => {
   })
 
   it('does not upload a HEIC that cannot be read', async () => {
-    vi.spyOn(heicLoader, 'importConverter').mockRejectedValue(new Error('wasm'))
+    const load = vi.spyOn(heicLoader, 'importConverter').mockRejectedValue(new Error('wasm'))
     await renderSettings()
     fireEvent.change(screen.getByLabelText('Profile photo'), {
       target: { files: [new File(['h'], 'face.heic', { type: 'image/heic' })] },
     })
 
-    await screen.getByRole('button', { name: 'Save changes' }).click()
-
     expect(await screen.findByRole('alert')).toHaveTextContent(HEIC_READ_ERROR)
+    expect(screen.queryByText('Crop your photo')).not.toBeInTheDocument()
     expect(supabase.__bucket('listing-photos').upload).not.toHaveBeenCalled()
     expect(supabase.__calls('users', 'update')).toHaveLength(0)
+    load.mockRestore()
+  })
+
+  it('removes the photo after confirm and says Photo removed', async () => {
+    givenProfile({ avatar_url: 'https://cdn.test/existing.jpg' })
+    const { user } = await renderSettings()
+
+    await user.click(screen.getByRole('button', { name: 'Remove photo' }))
+    const confirm = screen.getByRole('dialog')
+    expect(confirm).toHaveTextContent('Remove your profile photo?')
+    await user.click(within(confirm).getByRole('button', { name: 'Remove photo' }))
+
+    await waitFor(() => expect(supabase.__lastCall('users', 'update').payload).toEqual({ avatar_url: null }))
+    expect(screen.getByRole('status')).toHaveTextContent(PHOTO_REMOVED)
+    expect(screen.queryByRole('button', { name: 'Remove photo' })).not.toBeInTheDocument()
   })
 
   it('counts About you live and saves a trimmed bio', async () => {

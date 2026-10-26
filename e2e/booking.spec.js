@@ -20,7 +20,7 @@ test.describe('listing detail', () => {
 
     await expect(page.getByText('Your host')).toBeVisible()
     await expect(page.getByRole('link', { name: 'Mei', exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: "Mei's profile", exact: true })).toHaveAttribute(
+    await expect(page.getByRole('link', { name: "View Mei's profile" })).toHaveAttribute(
       'href',
       '/u/host-1'
     )

@@ -40,7 +40,7 @@ import { listingReportSubject, reportMailto } from '../lib/reportMailto'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import { SHARE_NOTES, shareOrCopy } from '../lib/share'
 import { BackRowActions } from '../components/BackButton'
-import Avatar from '../components/ui/Avatar'
+import ViewableAvatar from '../components/ViewableAvatar'
 import Icon from '../components/ui/Icon'
 import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
@@ -72,20 +72,14 @@ function previewHostBio(bio) {
   return { preview, truncated }
 }
 
-function HostAvatar({ host, to }) {
-  const name = publicName(host) || 'Anonymous'
-  const avatar = (
-    <Avatar
+function HostAvatar({ host }) {
+  return (
+    <ViewableAvatar
       avatarUrl={host?.avatar_url}
       displayName={publicName(host)}
+      name={publicName(host) || 'Anonymous'}
       className="detail-host__avatar"
     />
-  )
-  if (!to) return avatar
-  return (
-    <Link to={to} className="detail-host__avatar-link" aria-label={`${name}'s profile`}>
-      {avatar}
-    </Link>
   )
 }
 
@@ -1057,7 +1051,7 @@ export default function ListingDetail() {
 
           <div className="detail-host">
             <div className="detail-host__top">
-              <HostAvatar host={host} to={hostProfile} />
+              <HostAvatar host={host} />
               <div className="detail-host__copy">
                 <p className="detail-host__label">Your host</p>
                 <p className="detail-host__name">

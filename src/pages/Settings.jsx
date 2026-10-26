@@ -6,9 +6,9 @@ import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import PageLoader from '../components/PageLoader'
 import Avatar from '../components/ui/Avatar'
-import { firstAccountRow } from '../lib/myAccount'
-import { compressImage } from '../lib/compressImage'
-import { HEIC_READ_ERROR, IMAGE_ACCEPT, isHeicFile, isHeicReadError, isImageFile } from '../lib/heicImage'
+import ProfilePhotoFlow from '../components/ProfilePhotoFlow'
+import { firstAccountRow, notifyAccountUpdated } from '../lib/myAccount'
+import { hasAvatarPhoto } from '../lib/avatarPhoto'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 
 export default function Settings() {
@@ -20,8 +20,6 @@ export default function Settings() {
   const [bio, setBio] = useState('')
   const [email, setEmail] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
-  const [avatarFile, setAvatarFile] = useState(null)
-  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('')
   const [nameError, setNameError] = useState('')
   const [displayNameError, setDisplayNameError] = useState('')
   const [error, setError] = useState('')
@@ -63,12 +61,6 @@ export default function Settings() {
   }, [loadProfile])
 
   useEffect(() => {
-    return () => {
-      if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl)
-    }
-  }, [avatarPreviewUrl])
-
-  useEffect(() => {
     if (!saveStatus || saveStatusKind !== 'success') return undefined
     const fade = window.setTimeout(() => setSaveStatusFading(true), 4000)
     const clear = window.setTimeout(() => {
@@ -84,34 +76,6 @@ export default function Settings() {
   function clearSaveFeedback() {
     setSaveStatus('')
     setSaveStatusFading(false)
-  }
-
-  function handleAvatarChange(event) {
-    const file = Array.from(event.target.files ?? []).find(isImageFile)
-    event.target.value = ''
-    if (!file) return
-
-    setAvatarPreviewUrl((previous) => {
-      if (previous) URL.revokeObjectURL(previous)
-      return URL.createObjectURL(file)
-    })
-    setAvatarFile(file)
-    clearSaveFeedback()
-  }
-
-  async function uploadAvatar() {
-    const file = await compressImage(avatarFile)
-    if (isHeicFile(file)) throw new Error(HEIC_READ_ERROR)
-    const ext = file.name.split('.').pop() || 'jpg'
-    const path = `${userId}/avatar-${crypto.randomUUID()}.${ext}`
-    const { error: uploadError } = await supabase.storage
-      .from('listing-photos')
-      .upload(path, file)
-
-    if (uploadError) throw uploadError
-
-    const { data } = supabase.storage.from('listing-photos').getPublicUrl(path)
-    return data.publicUrl
   }
 
   async function handleSave(event) {
@@ -139,25 +103,11 @@ export default function Settings() {
 
     setSaving(true)
 
-    let nextAvatarUrl = avatarUrl
-    if (avatarFile) {
-      try {
-        nextAvatarUrl = await uploadAvatar()
-      } catch (uploadError) {
-        console.error('Avatar upload failed', uploadError)
-        setSaving(false)
-        setSaveStatusKind('error')
-        setSaveStatus(isHeicReadError(uploadError) ? HEIC_READ_ERROR : uploadError.message)
-        return
-      }
-    }
-
     const payload = {
       full_name: name,
       display_name: handle,
       bio: bio.trim() || null,
     }
-    if (avatarFile) payload.avatar_url = nextAvatarUrl
 
     const { error: updateError } = await supabase
       .from('users')
@@ -175,14 +125,9 @@ export default function Settings() {
     setFullName(name)
     setDisplayName(handle)
     setBio(bio.trim())
-    setAvatarUrl(nextAvatarUrl)
-    setAvatarFile(null)
-    setAvatarPreviewUrl((previous) => {
-      if (previous) URL.revokeObjectURL(previous)
-      return ''
-    })
     setSaveStatusKind('success')
     setSaveStatus('Saved')
+    notifyAccountUpdated()
   }
 
   async function handleLogout() {
@@ -194,7 +139,7 @@ export default function Settings() {
     return <PageLoader />
   }
 
-  const previewSrc = avatarPreviewUrl || avatarUrl
+  const hasPhoto = hasAvatarPhoto(avatarUrl)
 
   return (
     <div className="page page--form settings-page">
@@ -214,22 +159,49 @@ export default function Settings() {
           </h2>
 
           <form onSubmit={handleSave} className="form">
-            <div className="settings-avatar">
-              <Avatar
-                avatarUrl={previewSrc}
-                displayName={displayName}
-                size={72}
-                className={previewSrc ? 'settings-avatar__image' : ''}
-              />
-            </div>
-
-            <Input
-              id="settings-avatar"
-              label="Profile photo"
-              type="file"
-              accept={IMAGE_ACCEPT}
-              onChange={handleAvatarChange}
-            />
+            <ProfilePhotoFlow userId={userId} onAvatarUrlChange={setAvatarUrl}>
+              {({ changePhoto, removePhoto, status, statusKind, busy }) => (
+                <div className="settings-photo">
+                  <div className="settings-avatar">
+                    <Avatar
+                      avatarUrl={avatarUrl}
+                      displayName={displayName}
+                      size={72}
+                      className={hasPhoto ? 'settings-avatar__image' : ''}
+                    />
+                  </div>
+                  <div className="settings-photo__actions">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={changePhoto}
+                      loading={busy}
+                      loadingLabel="Updating photo"
+                    >
+                      Change photo
+                    </Button>
+                    {hasPhoto ? (
+                      <Button type="button" variant="secondary" onClick={removePhoto} disabled={busy}>
+                        Remove photo
+                      </Button>
+                    ) : null}
+                    {status ? (
+                      <p
+                        className={[
+                          'settings-photo-status',
+                          statusKind === 'error' ? 'settings-photo-status--error' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        role={statusKind === 'error' ? 'alert' : 'status'}
+                      >
+                        {status}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            </ProfilePhotoFlow>
 
             <Input
               id="settings-display-name"
