@@ -10,7 +10,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). When the guest cancels, the host is emailed their payout only. When the host cancels a session, they get a strike email with no guest amounts.
 > 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00036`**).** There is no `supabase/schema.sql`. Migrations are applied by hand: staging first, then production in the same sitting, after checking the project ref in the URL and that production has a backup from the last 24 hours. Refs, deploy rules and current state per environment: OPERATIONS.md, Environments and production SQL.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
-> 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home shows the Lane 1 headline above the kit's** `Card` **in browse mode, with a rating on the meta line only when** `listing_ratings` **returns reviews.** `ListingCard.jsx` still exists but no page renders it. Button is live on Settings and Hosting listing rows. Input is live on Settings and Login. SelectableCard is still used only by `/style-guide`.
+> 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home shows the Lane 1 headline above the kit's** `Card` **in browse mode, with a rating on the meta line only when** `listing_ratings` **returns reviews.** Button is live on Settings and Hosting listing rows. Input is live on Settings and Login. SelectableCard is still used only by `/style-guide`.
 > 6. **All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a hex value in a component. See section 2, Styling.
 > 7. **Who builds.** From 24 October Cursor builds most code again; Claude (Claude Code in the TryKai Project chat) reviews, writes docs and handles Singpass (Claude built everything from 19 to 24 October; HANDOVER.md has the catch-up). Either way: branch from `staging`, run `npm run verify`, open a PR into `staging`. Caleb reviews and merges. Never push to `staging` or `main` directly; a push to either deploys every Edge Function. Nobody but Caleb and Rui Heng holds Supabase access tokens or secrets.
 
@@ -510,8 +510,7 @@ src/
 │   ├── Footer.jsx               # Policy links, UEN, privacy@trykai.sg
 │   ├── RequireAuth.jsx
 │   ├── RequireAdmin.jsx         # is_admin via my_verification(); renders only
-│   ├── ListingCard.jsx          # Superseded by ui/Card browse mode; no page renders it
-│   ├── ReviewCard.jsx           # Public review; ⋮ menu with Report review
+│   ├── ReviewCard.jsx           # Public review; Avatar + ⋮ menu with Report review
 │   ├── HostRating.jsx           # Profile header and listing-detail Hosted by star + average
 │   ├── VerifiedBadge.jsx        # Shield-with-tick + "ID verified"; Profile and listing Hosted by
 │   ├── StarPicker.jsx
@@ -534,7 +533,7 @@ src/
 │       ├── Card.jsx             # Browse mode is live on Home and profile listings
 │       ├── OverflowMenu.jsx     # Shared ⋮/⋯ menu; Hosting rows, listing/profile/review Report
 │       ├── SelectableCard.jsx   # Category cards; /style-guide only
-│       └── Avatar.jsx           # Photo or first letter of display_name; Profile, Hosted by, Settings, TopNav, Card
+│       └── Avatar.jsx           # Photo or first letter of display_name; Profile, Hosted by, Settings, TopNav, Card, booking detail, reviews
 ├── App.jsx
 └── main.jsx
 
@@ -773,7 +772,7 @@ Caleb rejects at `/admin/verifications` with a reason, or Stripe Identity fails 
 
 **Bookings.jsx** — guest: upcoming and past bookings with guest count on each card; the title links to `/bookings/:id`. Dates show the year only when it is not the current year. Cancel with calculated refund shown (whole booking only), leave review after the session ends on confirmed only. Polls `?booking=` after Payment Element return, then drops only that key so `tab` stays. Mounted on the own-profile Bookings tab; `/bookings` itself is a redirect.
 
-**BookingDetail.jsx** — `/bookings/:bookingId`, guest only (anyone else, including the host, is sent to `/bookings`). Listing photo and title to the listing, host avatar and display name to `/u/:id`, date (year only when it is not this year), time, duration, Add to Google Calendar, `listing_address` plus Open in Google Maps, What's provided, What to bring when the listing has items, guests, total paid, payment method, booking reference, status, and the same cancel + refund preview as the list.
+**BookingDetail.jsx** — `/bookings/:bookingId`, guest only (anyone else, including the host, is sent to `/bookings`). Listing photo and title to the listing, host `Avatar` (`display_name` / `avatar_url`) and display name to `/u/:id`, date (year only when it is not this year), time, duration, Add to Google Calendar, `listing_address` plus Open in Google Maps, What's provided, What to bring when the listing has items, guests, total paid, payment method, booking reference, status, and the same cancel + refund preview as the list.
 
 **Hosting.jsx** — host. Own `is_host` and `stripe_payouts_enabled` come from `my_account()`. Upcoming at the top is every session with a confirmed booking, across listings, chronological (listing name, date, time, guests booked; empty copy “No upcoming bookings yet.”). Then My Listings with “+ New listing”; one full-width card per row. Each card is a thumbnail plus title on one line (opens Edit), a ⋯ menu in the top-right corner (View listing, Edit, Delete), a full-width Add session button, then that listing’s empty upcoming sessions (next 3, then “Show all N open sessions” / “Show fewer”). The category/area line omits a dangling “·” when area is empty. Booked sessions are not repeated there. Add session is a calendar + times form with preview. Delete confirms through `delete_listing` (blocked copy when upcoming bookings exist). Empty sessions: Delete or tick-select + Delete selected (`delete_empty_session`). Booked sessions: Cancel from Upcoming with "refunds your guest / both guests / all N guests in full" plus a strike, never per-guest amounts. Session dates show the year only when it is not this year; Connect payout setup. Admins with `pending_count > 0` see a one-line “N verifications waiting · Review” banner. A listing in review shows an **In review** badge and "we'll email you when it's live"; one sent back shows **Changes needed**, the reviewer's note and an Edit listing link. The host's own listing page shows "Only you can see this for now" until it is approved. Reads `?connect=` (return/refresh re-read payouts from Stripe, then drop only that key). A signed-in user who is not a host is redirected to `/bookings` if this page is mounted directly. Mounted on the own-profile Hosting tab; `/hosting` itself is a redirect.
 
@@ -802,7 +801,7 @@ Ordered roughly by consequence. Sequencing is in BUILD_BACKLOG.md.
 **Serious**
 
 - Host no-show reporting, reschedule, session auto-complete, host→guest reviews: not built. Guest→host insert and uniqueness are in `00011` (P2.3 done).
-- UI kit only partly wired: the nav, the browse `Card`, Settings (`Button`, `Input`), Hosting listing rows (`Button`, `OverflowMenu`), and Login (`Input`) are live, but SelectableCard is still `/style-guide` only. `ListingCard.jsx` and its `.listing-card` CSS are now dead code that only its own test renders; deleting them is a separate cleanup.
+- UI kit only partly wired: the nav, the browse `Card`, Settings (`Button`, `Input`), Hosting listing rows (`Button`, `OverflowMenu`), and Login (`Input`) are live, but SelectableCard is still `/style-guide` only.
 - ~~A host who exits Stripe Connect onboarding without completing it still sees a "Payout setup submitted" success message on the dashboard, because `?connect=return` is treated as success without re-checking `stripe_payouts_enabled`.~~ **Bug 4 fixed 13 October 2026.** Return and refresh re-read `payouts_enabled` from Stripe via `create-account-link` `{ refresh: true }` before showing a message. `account.updated` still syncs the same column.
 - ~~Public pages show `display_name`. They still SELECT `full_name` as a fallback when `display_name` is empty. The `full_name` column is still granted SELECT to anon (`00005`).~~ **Resolved 17 October 2026:** `00023` revokes SELECT on `full_name` and the other PII columns. Public pages use `display_name` only. Own PII is `my_account()`.
 

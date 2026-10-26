@@ -13,6 +13,7 @@ import {
   guestCountLabel,
 } from '../../supabase/functions/_shared/email.ts'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
+import Avatar from '../components/ui/Avatar'
 import Button from '../components/ui/Button'
 import PageLoader from '../components/PageLoader'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
@@ -188,13 +189,11 @@ export default function BookingDetail() {
 
       {listing?.host_id ? (
         <Link to={`/u/${listing.host_id}`} className="detail-host booking-detail__host">
-          {host?.avatar_url ? (
-            <img src={host.avatar_url} alt="" className="detail-host__avatar" />
-          ) : (
-            <div className="detail-host__avatar-placeholder">
-              {hostName[0]?.toUpperCase() || '?'}
-            </div>
-          )}
+          <Avatar
+            avatarUrl={host?.avatar_url}
+            displayName={publicName(host)}
+            className="detail-host__avatar"
+          />
           <p className="detail-host__name">{hostName}</p>
         </Link>
       ) : null}

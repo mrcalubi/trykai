@@ -107,6 +107,10 @@ describe('BookingDetail', () => {
       'https://cdn.test/latte.jpg',
     )
     expect(screen.getByRole('link', { name: 'Mei Ling' })).toHaveAttribute('href', '/u/host-1')
+    expect(document.querySelector('.detail-host__avatar')).toHaveAttribute(
+      'src',
+      'https://cdn.test/mei.jpg',
+    )
     expect(screen.getByText(formatSessionDay(startsAt))).toBeInTheDocument()
     expect(screen.getByText(formatSessionTime(startsAt))).toBeInTheDocument()
     expect(screen.getByText('1 hr 30 min')).toBeInTheDocument()
@@ -116,6 +120,9 @@ describe('BookingDetail', () => {
     )
     expect(supabase.rpc).toHaveBeenCalledWith('listing_address', { listing_id: 'listing-1' })
     expect(supabase.__lastCall('bookings', 'select').chain[0].args[0]).not.toMatch(/full_address/)
+    expect(supabase.__lastCall('bookings', 'select').chain[0].args[0]).toMatch(/display_name/)
+    expect(supabase.__lastCall('bookings', 'select').chain[0].args[0]).toMatch(/avatar_url/)
+    expect(supabase.__lastCall('bookings', 'select').chain[0].args[0]).not.toMatch(/full_name/)
     expect(screen.getByText(/12 Club Street, Singapore 069410/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Open in Google Maps' })).toHaveAttribute(
       'href',
@@ -161,6 +168,7 @@ describe('BookingDetail', () => {
     renderDetail()
 
     expect(await screen.findByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
+    expect(document.querySelector('.detail-host__avatar')).toHaveTextContent('M')
     expect(screen.queryByText("What's provided")).not.toBeInTheDocument()
     expect(screen.queryByText('What to bring')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Open in Google Maps' })).not.toBeInTheDocument()
