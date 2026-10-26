@@ -276,7 +276,7 @@ test.describe('signed-in navigation', () => {
       `/u/${SIGNED_IN_USER.id}`
     )
     await expect(menu.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-    await expect(menu.getByRole('button', { name: 'Log out' })).toBeVisible()
+    await expect(menu.getByRole('link', { name: 'Log out' })).toHaveAttribute('href', '/logout')
     await expect(menu.getByRole('link', { name: 'My bookings' })).toHaveCount(0)
     await expect(menu.getByRole('link', { name: 'Hosting' })).toHaveCount(0)
   })

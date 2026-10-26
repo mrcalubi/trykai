@@ -2,12 +2,14 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { useEffect } from 'react'
+import { Route } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Settings from './Settings'
+import Logout from './Logout'
 import RequireAuth from '../components/RequireAuth'
 import SiteNav from '../components/SiteNav'
 import { supabase } from '../lib/supabase'
-import { renderWithRouter } from '../test/render'
+import { renderWithDataRouter } from '../test/render'
 import { makeAuthSession } from '../test/fixtures'
 import { HEIC_READ_ERROR, IMAGE_ACCEPT, heicLoader } from '../lib/heicImage'
 import { PHOTO_REMOVED, PHOTO_UPDATED } from '../lib/avatarPhoto'
@@ -66,13 +68,13 @@ function givenProfile({
   })
 }
 
-async function renderSettings({ withNav = false } = {}) {
-  const utils = renderWithRouter(
+async function renderSettings({ withNav = false, extraRoutes = null } = {}) {
+  const utils = renderWithDataRouter(
     <RequireAuth>
       {withNav ? <SiteNav /> : null}
       <Settings />
     </RequireAuth>,
-    { route: '/settings', path: '/settings' }
+    { route: '/settings', path: '/settings', extraRoutes },
   )
   await screen.findByRole('heading', { name: 'Settings', level: 1 })
   return utils
@@ -126,7 +128,7 @@ describe('Settings access', () => {
 
   it('reports a load failure', async () => {
     supabase.rpc.mockResolvedValue({ data: null, error: { message: 'permission denied' } })
-    renderWithRouter(
+    renderWithDataRouter(
       <RequireAuth>
         <Settings />
       </RequireAuth>,
@@ -165,11 +167,11 @@ describe('Settings profile form', () => {
   })
 
   it('signs the user out and sends them home', async () => {
-    const { user, currentPath } = await renderSettings()
+    const { user, currentPath } = await renderSettings({ extraRoutes: logoutRoutes() })
 
-    await user.click(screen.getByRole('button', { name: 'Log out' }))
+    await user.click(screen.getByRole('link', { name: 'Log out' }))
 
-    expect(supabase.auth.signOut).toHaveBeenCalledOnce()
+    expect(supabase.auth.signOut).toHaveBeenCalled()
     await waitFor(() => expect(currentPath()).toBe('/'))
   })
 
@@ -406,5 +408,120 @@ describe('Settings profile form', () => {
     expect(source).toMatch(/setSaveStatusFading\(true\), 4000\)/)
     expect(source).toMatch(/\}, 4400\)/)
     expect(css).toMatch(/\.settings-save-status--fade \{[\s\S]*?opacity:\s*0;/)
+  })
+})
+
+function logoutRoutes() {
+  return (
+    <>
+      <Route path="/" element={<h1>Home</h1>} />
+      <Route path="/logout" element={<Logout />} />
+    </>
+  )
+}
+
+describe('Settings unsaved changes', () => {
+  const homeRoute = <Route path="/" element={<h1>Home</h1>} />
+
+  async function renderWithLeave() {
+    return renderSettings({
+      withNav: true,
+      extraRoutes: homeRoute,
+    })
+  }
+
+  it('asks before leaving when the display name is dirty, and Keep editing stays', async () => {
+    const { user } = await renderWithLeave()
+
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.type(screen.getByLabelText('Display name'), 'Latte Queen')
+    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+
+    expect(screen.getByRole('dialog', { name: 'Discard your changes?' })).toBeInTheDocument()
+    expect(screen.getByText("You have changes you haven't saved.")).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument()
+    expect(screen.getByLabelText('Display name')).toHaveValue('Latte Queen')
+  })
+
+  it('leaves after Discard', async () => {
+    const { user } = await renderWithLeave()
+
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.type(screen.getByLabelText('Display name'), 'Latte Queen')
+    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+    await user.click(screen.getByRole('button', { name: 'Discard' }))
+
+    expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Settings', level: 1 })).not.toBeInTheDocument()
+  })
+
+  it('navigates without a dialog when nothing has changed', async () => {
+    const { user } = await renderWithLeave()
+
+    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+
+    expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('does not ask after a successful Save', async () => {
+    const { user } = await renderWithLeave()
+
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.type(screen.getByLabelText('Display name'), 'Latte Queen')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await screen.findByText('Saved')
+
+    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+
+    expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('asks before logging out when dirty, and Keep editing stays signed in', async () => {
+    const { user } = await renderSettings({ extraRoutes: logoutRoutes() })
+
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.type(screen.getByLabelText('Display name'), 'Latte Queen')
+    await user.click(screen.getByRole('link', { name: 'Log out' }))
+
+    expect(screen.getByRole('dialog', { name: 'Discard your changes?' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument()
+    expect(screen.getByLabelText('Display name')).toHaveValue('Latte Queen')
+    expect(supabase.auth.signOut).not.toHaveBeenCalled()
+  })
+
+  it('signs out and lands on home after Discard from Log out', async () => {
+    const { user, currentPath } = await renderSettings({ extraRoutes: logoutRoutes() })
+
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.type(screen.getByLabelText('Display name'), 'Latte Queen')
+    await user.click(screen.getByRole('link', { name: 'Log out' }))
+    await user.click(screen.getByRole('button', { name: 'Discard' }))
+
+    expect(supabase.auth.signOut).toHaveBeenCalled()
+    await waitFor(() => expect(currentPath()).toBe('/'))
+    expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
+  })
+
+  it('does not treat restoring the original display name as dirty', async () => {
+    const { user } = await renderWithLeave()
+
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.type(screen.getByLabelText('Display name'), 'Latte Queen')
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.type(screen.getByLabelText('Display name'), 'Mei')
+    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+
+    expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

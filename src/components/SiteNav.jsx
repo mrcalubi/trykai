@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ACCOUNT_UPDATED_EVENT, firstAccountRow } from '../lib/myAccount'
 import TopNav from './ui/TopNav'
@@ -11,17 +10,11 @@ import TopNav from './ui/TopNav'
  * TopNav directly with made-up props; this is the only place it reads auth.
  */
 export default function SiteNav() {
-  const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [displayName, setDisplayName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState(null)
-
-  async function handleLogOut() {
-    await supabase.auth.signOut()
-    navigate('/')
-  }
 
   useEffect(() => {
     function applySession(session) {
@@ -83,7 +76,6 @@ export default function SiteNav() {
       userId={user?.id}
       avatarUrl={avatarUrl || undefined}
       name={displayName}
-      onLogOut={handleLogOut}
     />
   )
 }

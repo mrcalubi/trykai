@@ -29,7 +29,7 @@ function loggedInItems({ isAdmin, verificationStatus, userId }) {
           { label: 'Verification review', to: '/admin/verifications', icon: 'shield' },
         ]
       : []),
-    { label: 'Log out', action: 'logout', icon: 'logout', divided: true },
+    { label: 'Log out', to: '/logout', icon: 'logout', divided: true },
   ]
 }
 
@@ -46,7 +46,6 @@ function itemId(label) {
 export default function HamburgerMenu({
   open = false,
   onClose,
-  onLogOut,
   isLoggedIn = false,
   isAdmin = false,
   verificationStatus,
@@ -59,11 +58,6 @@ export default function HamburgerMenu({
 
   function handleLinkClick() {
     onClose?.()
-  }
-
-  async function handleLogOut() {
-    onClose?.()
-    await onLogOut?.()
   }
 
   const classes = ['ui-hamburger', open ? 'ui-hamburger--open' : '', className]
@@ -85,7 +79,7 @@ export default function HamburgerMenu({
             const itemClasses = [
               'ui-hamburger__item',
               item.divided ? 'ui-hamburger__item--divided' : '',
-              item.action === 'logout' ? 'ui-hamburger__item--logout' : '',
+              item.to === '/logout' ? 'ui-hamburger__item--logout' : '',
             ]
               .filter(Boolean)
               .join(' ')
@@ -104,17 +98,7 @@ export default function HamburgerMenu({
                 className={itemClasses}
                 style={{ transitionDelay: `${open ? index * STAGGER_MS : 0}ms` }}
               >
-                {item.action === 'logout' ? (
-                  <button
-                    type="button"
-                    className={linkClasses}
-                    tabIndex={open ? 0 : -1}
-                    onClick={handleLogOut}
-                  >
-                    <Icon name={item.icon} size={20} />
-                    {item.label}
-                  </button>
-                ) : item.promo ? (
+                {item.promo ? (
                   <Link
                     to={item.to}
                     className={linkClasses}
