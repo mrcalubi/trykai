@@ -639,6 +639,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-26 — Log out goes through `/logout` so a dirty form can ask first.** Settings and the hamburger used to `signOut` then `navigate('/')`, which dropped the session before the guard ran. Both now link to `/logout`; that page signs out (and clears the local session if that fails) and replaces the URL with Home. Keep editing on a dirty Settings form stays signed in.
 
+**2026-10-26 — Delete listing on Edit listing; own profile drops the Listings tab.** Hosting already had Edit and Delete. Edit listing now has the same `ListingDeleteDialog` (blocked when upcoming sessions have bookings; otherwise confirm). Counts come from the Hosting sessions query. A successful delete goes to Hosting without the unsaved-changes prompt. Own-profile tabs are Bookings, Hosting (hosts only), Reviews; `?tab=listings` falls back to Bookings. "See your public profile" opens `/u/:id?view=public` — the guest layout plus a preview bar. Report stays hidden on your own preview. A non-host sees the host CTA on the Bookings empty state.
+
 **2026-10-26 — Profile photo required to host is deferred.** Trust layer used to say non-negotiable. Not enforced today; hosts can publish and remove their photo. Enforce later at publish and block Remove while a listing is live.
 
 **2026-10-26 — Avatar centres its own initial.** The shared face was a bare span when there was no photo. Settings passed no class, so the letter sat in the top-left and the circle clipped it; the profile header only looked right because `.detail-host__avatar` flex-centred the span. `Avatar` now always adds `ui-avatar` (circle, flex centre; initials navy on cream, letter about 40% of `size`). Callers keep only size and border.

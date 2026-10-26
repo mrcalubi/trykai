@@ -23,7 +23,7 @@ import PageLoader from '../components/PageLoader'
 import Bookings from './Bookings'
 import Hosting from './Hosting'
 
-const OWN_TABS = ['bookings', 'hosting', 'listings', 'reviews']
+const OWN_TABS = ['bookings', 'hosting', 'reviews']
 const PROFILE_COLUMNS = 'id, display_name, bio, avatar_url, is_host, is_id_verified'
 const PROFILE_COLUMNS_WITHOUT_BADGE = 'id, display_name, bio, avatar_url, is_host'
 
@@ -266,7 +266,9 @@ export default function Profile() {
     typeof profile.is_id_verified === 'boolean'
       ? profile.is_id_verified
       : profile.verification_status === 'approved'
-  const isOwn = viewerId === id
+  const isOwner = viewerId === id
+  const publicPreview = isOwner && searchParams.get('view') === 'public'
+  const isOwn = isOwner && !publicPreview
   const about = typeof profile.bio === 'string' ? profile.bio.trim() : ''
   const isHost = Boolean(profile.is_host)
   const hostCta = hostEntry(profile.verification_status)
@@ -276,12 +278,17 @@ export default function Profile() {
   const tabs = [
     { id: 'bookings', label: 'Bookings' },
     ...(isHost ? [{ id: 'hosting', label: 'Hosting' }] : []),
-    { id: 'listings', label: 'Listings' },
     { id: 'reviews', label: 'Reviews' },
   ]
 
   return (
     <div className="page page--detail">
+      {publicPreview ? (
+        <div className="profile-preview-bar" role="status">
+          <span>This is how guests see your profile</span>
+          <Link to={`/u/${id}`}>Back to your profile</Link>
+        </div>
+      ) : null}
       <header className="profile-header">
         {isOwn ? (
           <ProfilePhotoFlow
@@ -328,7 +335,7 @@ export default function Profile() {
         <div className="profile-header__copy">
           <div className="profile-header__name-row">
             <h1 className="profile-header__name">{givenName}</h1>
-            {!isOwn ? (
+            {!isOwner ? (
               <OverflowMenu
                 label="More actions"
                 icon="⋮"
@@ -348,6 +355,11 @@ export default function Profile() {
           </div>
           {verified ? <VerifiedBadge /> : null}
           <HostRating reviews={reviews} />
+          {isOwn ? (
+            <Link to={`/u/${id}?view=public`} className="profile-header__public">
+              See your public profile
+            </Link>
+          ) : null}
         </div>
         {isOwn ? (
           <Link to="/settings" className="profile-header__settings" aria-label="Settings">
@@ -401,7 +413,7 @@ export default function Profile() {
           {activeTab === 'bookings' ? (
             <div className="profile-tab-panel">
               <AuthedUserContext.Provider value={viewerId}>
-                <Bookings embedded />
+                <Bookings embedded hostCta={isHost ? null : hostCta} />
               </AuthedUserContext.Provider>
             </div>
           ) : null}
@@ -412,19 +424,6 @@ export default function Profile() {
                 <Hosting embedded onListingDeleted={forgetListing} />
               </AuthedUserContext.Provider>
             </div>
-          ) : null}
-
-          {activeTab === 'listings' ? (
-            <section className="detail-section" aria-label="Listings">
-              {!isHost ? (
-                <div className="empty-state">
-                  <p>Share a skill on TryKai.</p>
-                  <Link to={hostCta.to}>{hostCta.label}</Link>
-                </div>
-              ) : (
-                <ListingCards listings={listings} ratings={ratings} />
-              )}
-            </section>
           ) : null}
 
           {activeTab === 'reviews' ? (

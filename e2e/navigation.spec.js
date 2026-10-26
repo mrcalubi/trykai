@@ -317,8 +317,8 @@ test.describe('signed-in navigation', () => {
 
     await page.getByRole('link', { name: 'Your profile' }).click()
     await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}`))
-    await page.getByRole('navigation', { name: 'Profile' }).getByRole('link', { name: 'Listings' }).click()
-    await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}\\?tab=listings`))
+    await page.getByRole('navigation', { name: 'Profile' }).getByRole('link', { name: 'Reviews' }).click()
+    await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}\\?tab=reviews`))
 
     await page.goBack()
     await expect(page).toHaveURL(/\/$/)
