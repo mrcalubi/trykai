@@ -68,13 +68,13 @@ function givenProfile({
   })
 }
 
-async function renderSettings({ withNav = false, extraRoutes = null } = {}) {
+async function renderSettings({ withNav = false, extraRoutes = null, route = '/settings' } = {}) {
   const utils = renderWithDataRouter(
     <RequireAuth>
       {withNav ? <SiteNav /> : null}
       <Settings />
     </RequireAuth>,
-    { route: '/settings', path: '/settings', extraRoutes },
+    { route, path: '/settings', extraRoutes },
   )
   await screen.findByRole('heading', { name: 'Settings', level: 1 })
   return utils
@@ -372,6 +372,12 @@ describe('Settings profile form', () => {
   it('caps About you at 500 characters', async () => {
     await renderSettings()
     expect(screen.getByLabelText('About you')).toHaveAttribute('maxLength', '500')
+    expect(screen.getByLabelText('About you')).toHaveAttribute('id', 'bio')
+  })
+
+  it('focuses About you when opened at #bio', async () => {
+    await renderSettings({ route: '/settings#bio' })
+    expect(screen.getByLabelText('About you')).toHaveFocus()
   })
 
   it('shows an update error from the database', async () => {

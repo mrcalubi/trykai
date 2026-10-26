@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { AuthedUserContext } from '../lib/authedUser'
 import { publicName } from '../lib/publicName'
 import HostRating from '../components/HostRating'
+import BioPreview from '../components/BioPreview'
 import ReviewCard from '../components/ReviewCard'
 import Avatar from '../components/ui/Avatar'
 import Card from '../components/ui/Card'
@@ -67,23 +68,82 @@ function ownerSearch(searchParams) {
   return query ? `?${query}` : ''
 }
 
-function SettingsGearIcon() {
+function ProfileHeaderCopy({
+  givenName,
+  profile,
+  verified,
+  reviews,
+  about,
+  isOwner,
+  isOwn,
+  isHost,
+  previewTo,
+  changePhoto,
+}) {
+  const needsPhoto = isOwn && !hasAvatarPhoto(profile.avatar_url)
+  const needsBio = isOwn && !about
+  const showNudge = needsPhoto || needsBio
+
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
+    <div className="profile-header__copy">
+      <div className="profile-header__name-row">
+        <h1 className="profile-header__name">{givenName}</h1>
+        {!isOwner ? (
+          <OverflowMenu
+            label="More actions"
+            icon="⋮"
+            className="ui-overflow--quiet profile-header__menu"
+            items={[
+              {
+                label: 'Report profile',
+                href: reportMailto({
+                  subject: profileReportSubject(givenName),
+                  url: typeof window === 'undefined' ? '' : window.location.href,
+                  id: profile.id,
+                }),
+              },
+            ]}
+          />
+        ) : null}
+      </div>
+      {verified ? <VerifiedBadge /> : null}
+      <HostRating reviews={reviews} />
+      {about ? <BioPreview bio={about} lines={3} maxChars={240} /> : null}
+      {isOwn ? (
+        <div className="profile-header__actions">
+          <Link to="/settings" className="ui-button ui-button--secondary">
+            Edit profile
+          </Link>
+          <Link to={previewTo} className="ui-button ui-button--secondary">
+            See public profile
+          </Link>
+        </div>
+      ) : null}
+      {showNudge ? (
+        <div className="profile-nudge">
+          <h2 className="profile-nudge__title">Finish your profile</h2>
+          {isHost ? (
+            <p className="profile-nudge__hint">Guests book hosts they can picture.</p>
+          ) : null}
+          <div className="profile-nudge__actions">
+            {needsPhoto ? (
+              <button
+                type="button"
+                className="ui-button ui-button--secondary"
+                onClick={changePhoto}
+              >
+                Add a photo
+              </button>
+            ) : null}
+            {needsBio ? (
+              <Link to="/settings#bio" className="ui-button ui-button--secondary">
+                Write a short bio
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -294,9 +354,26 @@ export default function Profile() {
     ...(isHost ? [{ id: 'hosting', label: 'Hosting' }] : []),
     { id: 'reviews', label: 'Reviews' },
   ]
+  const previewTo = {
+    pathname: `/u/${id}`,
+    search: previewSearch(searchParams, activeTab),
+  }
+  const headerCopy = (
+    <ProfileHeaderCopy
+      givenName={givenName}
+      profile={profile}
+      verified={verified}
+      reviews={reviews}
+      about={about}
+      isOwner={isOwner}
+      isOwn={isOwn}
+      isHost={isHost}
+      previewTo={previewTo}
+    />
+  )
 
   return (
-    <div className="page page--detail">
+    <div className="page page--profile">
       {publicPreview ? (
         <div className="profile-preview-bar" role="status">
           <span>This is how guests see your profile</span>
@@ -316,75 +393,55 @@ export default function Profile() {
             {({ changePhoto, removePhoto }) => {
               const photo = hasAvatarPhoto(profile.avatar_url)
               return (
-                <OverflowMenu
-                  label="Profile photo"
-                  align="start"
-                  className="ui-overflow--avatar"
-                  icon={
-                    <Avatar
-                      avatarUrl={profile.avatar_url}
-                      displayName={publicName(profile)}
-                      className="detail-host__avatar"
-                    />
-                  }
-                  items={[
-                    ...(photo
-                      ? [{ label: 'View photo', onSelect: () => setViewingPhoto(true) }]
-                      : []),
-                    { label: 'Change photo', onSelect: changePhoto },
-                    ...(photo
-                      ? [{ label: 'Remove photo', destructive: true, onSelect: removePhoto }]
-                      : []),
-                  ]}
-                />
+                <>
+                  <OverflowMenu
+                    label="Profile photo"
+                    align="start"
+                    className="ui-overflow--avatar"
+                    icon={
+                      <Avatar
+                        avatarUrl={profile.avatar_url}
+                        displayName={publicName(profile)}
+                        className="detail-host__avatar"
+                      />
+                    }
+                    items={[
+                      ...(photo
+                        ? [{ label: 'View photo', onSelect: () => setViewingPhoto(true) }]
+                        : []),
+                      { label: 'Change photo', onSelect: changePhoto },
+                      ...(photo
+                        ? [{ label: 'Remove photo', destructive: true, onSelect: removePhoto }]
+                        : []),
+                    ]}
+                  />
+                  <ProfileHeaderCopy
+                    givenName={givenName}
+                    profile={profile}
+                    verified={verified}
+                    reviews={reviews}
+                    about={about}
+                    isOwner={isOwner}
+                    isOwn={isOwn}
+                    isHost={isHost}
+                    previewTo={previewTo}
+                    changePhoto={changePhoto}
+                  />
+                </>
               )
             }}
           </ProfilePhotoFlow>
         ) : (
-          <ViewableAvatar
-            avatarUrl={profile.avatar_url}
-            displayName={publicName(profile)}
-            name={givenName}
-            className="detail-host__avatar"
-          />
+          <>
+            <ViewableAvatar
+              avatarUrl={profile.avatar_url}
+              displayName={publicName(profile)}
+              name={givenName}
+              className="detail-host__avatar"
+            />
+            {headerCopy}
+          </>
         )}
-        <div className="profile-header__copy">
-          <div className="profile-header__name-row">
-            <h1 className="profile-header__name">{givenName}</h1>
-            {!isOwner ? (
-              <OverflowMenu
-                label="More actions"
-                icon="⋮"
-                className="ui-overflow--quiet profile-header__menu"
-                items={[
-                  {
-                    label: 'Report profile',
-                    href: reportMailto({
-                      subject: profileReportSubject(givenName),
-                      url: typeof window === 'undefined' ? '' : window.location.href,
-                      id: profile.id,
-                    }),
-                  },
-                ]}
-              />
-            ) : null}
-          </div>
-          {verified ? <VerifiedBadge /> : null}
-          <HostRating reviews={reviews} />
-          {isOwn ? (
-            <Link
-              to={{ pathname: `/u/${id}`, search: previewSearch(searchParams, activeTab) }}
-              className="profile-header__public"
-            >
-              See your public profile
-            </Link>
-          ) : null}
-        </div>
-        {isOwn ? (
-          <Link to="/settings" className="profile-header__settings" aria-label="Settings">
-            <SettingsGearIcon />
-          </Link>
-        ) : null}
       </header>
 
       {viewingPhoto && hasAvatarPhoto(profile.avatar_url) ? (
@@ -394,19 +451,6 @@ export default function Profile() {
           label={`${givenName}'s photo`}
           onClose={() => setViewingPhoto(false)}
         />
-      ) : null}
-
-      {about ? (
-        <section className="profile-about" aria-labelledby="profile-about-heading">
-          <h2 id="profile-about-heading" className="detail-section__title">
-            About
-          </h2>
-          <p className="profile-about__body">{about}</p>
-        </section>
-      ) : isOwn ? (
-        <p className="profile-about__empty">
-          <Link to="/settings">Add a short bio</Link>
-        </p>
       ) : null}
 
       {isOwn ? (

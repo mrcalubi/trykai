@@ -5,6 +5,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { supabase } from '../lib/supabase'
 import ReviewCard from '../components/ReviewCard'
 import HostRating from '../components/HostRating'
+import BioPreview from '../components/BioPreview'
 import PhotoLightbox from '../components/PhotoLightbox'
 import SessionCalendar from '../components/SessionCalendar'
 import { GuestCancellationNote } from '../components/CancellationPolicy'
@@ -56,22 +57,6 @@ function upcomingSessions(listingId, columns) {
     .gt('starts_at', new Date().toISOString())
 }
 
-const HOST_BIO_PREVIEW_LINES = 2
-const HOST_BIO_PREVIEW_CHARS = 160
-
-function previewHostBio(bio) {
-  const text = String(bio).trim()
-  const lines = text.split('\n')
-  let preview = lines.slice(0, HOST_BIO_PREVIEW_LINES).join('\n')
-  let truncated = lines.length > HOST_BIO_PREVIEW_LINES
-  if (preview.length > HOST_BIO_PREVIEW_CHARS) {
-    const cut = preview.slice(0, HOST_BIO_PREVIEW_CHARS)
-    preview = cut.replace(/\s+\S*$/, '').trimEnd() || cut.trimEnd()
-    truncated = true
-  }
-  return { preview, truncated }
-}
-
 function HostAvatar({ host }) {
   return (
     <ViewableAvatar
@@ -80,28 +65,6 @@ function HostAvatar({ host }) {
       name={publicName(host) || 'Anonymous'}
       className="detail-host__avatar"
     />
-  )
-}
-
-function HostBioPreview({ bio }) {
-  const [open, setOpen] = useState(false)
-  const { preview, truncated } = previewHostBio(bio)
-  const text = String(bio).trim()
-
-  return (
-    <p className="detail-host__bio">
-      {open || !truncated ? text : preview}
-      {truncated ? (
-        <button
-          type="button"
-          className="detail-host__more"
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? 'Less' : '… more'}
-        </button>
-      ) : null}
-    </p>
   )
 }
 
@@ -1068,7 +1031,7 @@ export default function ListingDetail() {
               </div>
             </div>
             {typeof host?.bio === 'string' && host.bio.trim() ? (
-              <HostBioPreview bio={host.bio} />
+              <BioPreview bio={host.bio} />
             ) : null}
             {hostProfile ? (
               <Link to={hostProfile} className="detail-host__profile">

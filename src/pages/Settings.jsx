@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import Input from '../components/ui/Input'
@@ -15,6 +15,7 @@ import { useUnsavedChangesGuard } from '../lib/useUnsavedChangesGuard'
 
 export default function Settings() {
   const userId = useAuthedUserId()
+  const location = useLocation()
 
   const [fullName, setFullName] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -71,6 +72,12 @@ export default function Settings() {
       cancelled = true
     }
   }, [loadProfile])
+
+  useEffect(() => {
+    if (loading) return
+    if (location.hash !== '#bio') return
+    document.getElementById('bio')?.focus()
+  }, [loading, location.hash])
 
   useEffect(() => {
     if (!saveStatus || saveStatusKind !== 'success') return undefined
@@ -236,7 +243,7 @@ export default function Settings() {
 
             <div className="settings-bio">
               <Input
-                id="settings-bio"
+                id="bio"
                 label="About you"
                 type="textarea"
                 value={bio}
