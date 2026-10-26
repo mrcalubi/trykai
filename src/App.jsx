@@ -25,6 +25,7 @@ import Dashboard from './pages/Dashboard'
 import RedirectToOwnProfile from './pages/RedirectToOwnProfile'
 import BookingDetail from './pages/BookingDetail'
 import Settings from './pages/Settings'
+import Logout from './pages/Logout'
 import AdminVerifications from './pages/AdminVerifications'
 import AdminListings from './pages/AdminListings'
 import AdminSingpassKeys from './pages/AdminSingpassKeys'
@@ -124,6 +125,7 @@ function appRoutes() {
           </RequireAuth>
         }
       />
+      <Route path="/logout" element={<Logout />} />
       <Route
         path="/verify-identity/singpass"
         element={

@@ -637,6 +637,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-26 — Warn before leaving Settings or Edit listing with unsaved changes.** App now uses `createBrowserRouter` so `useBlocker` works. A shared guard asks "Discard your changes?" on in-app navigation (links, back, browser back) and registers `beforeunload` for tab close or refresh. Dirty means the current values differ from the last saved snapshot, not "touched"; photo on Settings is excluded because it saves straight away. Create listing is unchanged (it autosaves). Profile photo required to host is deferred: not enforced; hosts can publish and remove their photo.
 
+**2026-10-26 — Log out goes through `/logout` so a dirty form can ask first.** Settings and the hamburger used to `signOut` then `navigate('/')`, which dropped the session before the guard ran. Both now link to `/logout`; that page signs out (and clears the local session if that fails) and replaces the URL with Home. Keep editing on a dirty Settings form stays signed in.
+
 **2026-10-26 — Profile photo required to host is deferred.** Trust layer used to say non-negotiable. Not enforced today; hosts can publish and remove their photo. Enforce later at publish and block Remove while a listing is live.
 
 **2026-10-26 — Avatar centres its own initial.** The shared face was a bare span when there was no photo. Settings passed no class, so the letter sat in the top-left and the circle clipped it; the profile header only looked right because `.detail-host__avatar` flex-centred the span. `Avatar` now always adds `ui-avatar` (circle, flex centre; initials navy on cream, letter about 40% of `size`). Callers keep only size and border.

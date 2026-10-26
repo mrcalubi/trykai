@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import Input from '../components/ui/Input'
@@ -15,7 +15,6 @@ import { useUnsavedChangesGuard } from '../lib/useUnsavedChangesGuard'
 
 export default function Settings() {
   const userId = useAuthedUserId()
-  const navigate = useNavigate()
 
   const [fullName, setFullName] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -145,11 +144,6 @@ export default function Settings() {
     setSaveStatusKind('success')
     setSaveStatus('Saved')
     notifyAccountUpdated()
-  }
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    navigate('/')
   }
 
   const currentDraft = settingsDraft({ fullName, displayName, bio })
@@ -325,9 +319,9 @@ export default function Settings() {
         </section>
 
         <div className="settings-logout">
-          <Button type="button" variant="secondary" onClick={handleLogout}>
+          <Link to="/logout" className="ui-button ui-button--secondary">
             Log out
-          </Button>
+          </Link>
         </div>
       </div>
     </div>

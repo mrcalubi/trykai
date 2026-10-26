@@ -46,7 +46,7 @@ describe('HamburgerMenu', () => {
     )
     expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/u/user-77')
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Log out' })).toHaveAttribute('href', '/logout')
     expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Create listing' })).not.toBeInTheDocument()
@@ -72,7 +72,7 @@ describe('HamburgerMenu', () => {
     )
     expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/u/user-77')
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Log out' })).toHaveAttribute('href', '/logout')
     expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Become a host' })).not.toBeInTheDocument()
@@ -132,14 +132,12 @@ describe('HamburgerMenu', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('logs out with the existing sign-out handler and closes', async () => {
+  it('closes when Log out is pressed', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
-    const onLogOut = vi.fn()
-    renderMenu({ open: true, isLoggedIn: true, userId: 'user-77', onClose, onLogOut })
+    renderMenu({ open: true, isLoggedIn: true, userId: 'user-77', onClose })
 
-    await user.click(screen.getByRole('button', { name: 'Log out' }))
+    await user.click(screen.getByRole('link', { name: 'Log out' }))
     expect(onClose).toHaveBeenCalledTimes(1)
-    expect(onLogOut).toHaveBeenCalledTimes(1)
   })
 })

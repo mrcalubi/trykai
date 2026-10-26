@@ -152,23 +152,23 @@ describe('SiteNav hamburger', () => {
       `/u/${makeAuthSession().user.id}`
     )
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Log out' })).toHaveAttribute('href', '/logout')
     expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Create listing' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Verification review' })).not.toBeInTheDocument()
   })
 
-  it('signs the user out from the menu and sends them home', async () => {
+  it('sends the hamburger Log out row to /logout without signing out itself', async () => {
     signedIn()
     const { user, currentPath } = renderNav()
 
     await screen.findByRole('link', { name: 'Your profile' })
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
-    await user.click(screen.getByRole('button', { name: 'Log out' }))
+    await user.click(screen.getByRole('link', { name: 'Log out' }))
 
-    expect(supabase.auth.signOut).toHaveBeenCalledOnce()
-    await waitFor(() => expect(currentPath()).toBe('/'))
+    expect(supabase.auth.signOut).not.toHaveBeenCalled()
+    await waitFor(() => expect(currentPath()).toBe('/logout'))
   })
 
   it('labels Host a session once my_verification reports approved', async () => {

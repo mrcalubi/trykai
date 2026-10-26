@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { Route } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Settings from './Settings'
+import Logout from './Logout'
 import RequireAuth from '../components/RequireAuth'
 import SiteNav from '../components/SiteNav'
 import { supabase } from '../lib/supabase'
@@ -166,11 +167,11 @@ describe('Settings profile form', () => {
   })
 
   it('signs the user out and sends them home', async () => {
-    const { user, currentPath } = await renderSettings()
+    const { user, currentPath } = await renderSettings({ extraRoutes: logoutRoutes() })
 
-    await user.click(screen.getByRole('button', { name: 'Log out' }))
+    await user.click(screen.getByRole('link', { name: 'Log out' }))
 
-    expect(supabase.auth.signOut).toHaveBeenCalledOnce()
+    expect(supabase.auth.signOut).toHaveBeenCalled()
     await waitFor(() => expect(currentPath()).toBe('/'))
   })
 
@@ -410,6 +411,15 @@ describe('Settings profile form', () => {
   })
 })
 
+function logoutRoutes() {
+  return (
+    <>
+      <Route path="/" element={<h1>Home</h1>} />
+      <Route path="/logout" element={<Logout />} />
+    </>
+  )
+}
+
 describe('Settings unsaved changes', () => {
   const homeRoute = <Route path="/" element={<h1>Home</h1>} />
 
@@ -470,6 +480,36 @@ describe('Settings unsaved changes', () => {
 
     expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('asks before logging out when dirty, and Keep editing stays signed in', async () => {
+    const { user } = await renderSettings({ extraRoutes: logoutRoutes() })
+
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.type(screen.getByLabelText('Display name'), 'Latte Queen')
+    await user.click(screen.getByRole('link', { name: 'Log out' }))
+
+    expect(screen.getByRole('dialog', { name: 'Discard your changes?' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument()
+    expect(screen.getByLabelText('Display name')).toHaveValue('Latte Queen')
+    expect(supabase.auth.signOut).not.toHaveBeenCalled()
+  })
+
+  it('signs out and lands on home after Discard from Log out', async () => {
+    const { user, currentPath } = await renderSettings({ extraRoutes: logoutRoutes() })
+
+    await user.clear(screen.getByLabelText('Display name'))
+    await user.type(screen.getByLabelText('Display name'), 'Latte Queen')
+    await user.click(screen.getByRole('link', { name: 'Log out' }))
+    await user.click(screen.getByRole('button', { name: 'Discard' }))
+
+    expect(supabase.auth.signOut).toHaveBeenCalled()
+    await waitFor(() => expect(currentPath()).toBe('/'))
+    expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
   })
 
   it('does not treat restoring the original display name as dirty', async () => {
