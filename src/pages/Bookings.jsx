@@ -420,7 +420,7 @@ export default function Bookings({ embedded = false, hostCta = null }) {
             ) : null}
           </div>
         ) : (
-          <div className="dashboard-list">
+          <div className="listings-grid listings-grid--bookings">
             {visibleBookings.map((booking) => {
               const actions = actionsFor(booking)
               return (

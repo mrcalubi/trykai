@@ -530,7 +530,7 @@ describe('ListingDetail content', () => {
     expect([...css.matchAll(/overflow-wrap:\s*break-word/g)]).toHaveLength(1)
     expect(css).not.toMatch(/overflow-wrap:\s*anywhere/)
     expect(css).toMatch(
-      /\.detail-title,\s*\n\.detail-description,\s*\n\.detail-area,\s*\n\.detail-list li,\s*\n\.review-card__comment,\s*\n\.ui-card__title,\s*\n\.dashboard-card__title,\s*\n\.dashboard-card__meta,\s*\n\.profile-about__body,\s*\n\.detail-host__bio/
+      /\.detail-title,\s*\n\.detail-description,\s*\n\.detail-area,\s*\n\.detail-list li,\s*\n\.review-card__comment,\s*\n\.ui-card__title,\s*\n\.dashboard-card__title,\s*\n\.dashboard-card__meta,\s*\n\.profile-about__body,\s*\n\.detail-host__bio,\s*\n\.profile-header__name/
     )
     expect(css).toMatch(/\.detail-host__more \{[\s\S]*?display:\s*inline/)
     expect(css).toMatch(/\.detail-host \{[\s\S]*?align-items:\s*flex-start/)
