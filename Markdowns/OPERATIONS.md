@@ -451,7 +451,7 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00036` (Singpass auto-approve, listing review) | Applied | Applied | **Run before the PR's code reaches that environment**: Hosting, listing pages, I'm keen and checkout read `listings.review_status`. Run after `00035`. Existing listings stay live (they are marked approved) |
 | `00037` (session reminders) | Applied | Applied | Staging 24 October; production 25 October, before #163 |
 | `00038` (what guests should bring) | Applied | Applied | Production 25 October, before #163. After `00037`. |
-| `00039` (host strike events, 12-month expiry) | Not applied | Not applied | **Apply on staging, then production, before merging this PR.** After `00038`. |
+| `00039` (host strike events, 12-month expiry) | Applied | Applied | 25 October, after `00038`. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 

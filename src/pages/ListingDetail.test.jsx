@@ -323,10 +323,40 @@ describe('ListingDetail content', () => {
     expect(document.querySelector('.detail-host__bio').textContent).toBe(
       'I pull rosettas.\nAlso pour-overs.… more',
     )
-    expect(screen.getByRole('link', { name: '… more' })).toHaveAttribute('href', '/u/host-1')
+    const more = screen.getByRole('button', { name: '… more' })
+    expect(more).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('link', { name: '… more' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: "Mei's profile" })).toHaveAttribute('href', '/u/host-1')
     expect(screen.queryByRole('link', { name: /More about/ })).not.toBeInTheDocument()
     expect(supabase.auth.getSession).toHaveBeenCalled()
+  })
+
+  it('expands the host bio in place and collapses with Less', async () => {
+    givenListing(
+      makeListing({
+        users: {
+          display_name: 'Mei',
+          full_name: 'Mei Ling',
+          bio: 'I pull rosettas.\nAlso pour-overs.\nAnd cortados.',
+          avatar_url: null,
+        },
+      }),
+    )
+    const { user } = renderPage()
+
+    await screen.findByRole('link', { name: 'Mei' })
+    await user.click(screen.getByRole('button', { name: '… more' }))
+
+    expect(document.querySelector('.detail-host__bio').textContent).toBe(
+      'I pull rosettas.\nAlso pour-overs.\nAnd cortados.Less',
+    )
+    expect(screen.getByRole('button', { name: 'Less' })).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(screen.getByRole('button', { name: 'Less' }))
+    expect(screen.getByRole('button', { name: '… more' })).toHaveAttribute('aria-expanded', 'false')
+    expect(document.querySelector('.detail-host__bio').textContent).toBe(
+      'I pull rosettas.\nAlso pour-overs.… more',
+    )
   })
 
   it('keeps a short host bio without a more link', async () => {
@@ -345,6 +375,7 @@ describe('ListingDetail content', () => {
     await screen.findByRole('link', { name: 'Mei' })
     expect(document.querySelector('.detail-host__bio').textContent).toBe('I pull rosettas.')
     expect(screen.queryByRole('link', { name: '… more' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '… more' })).not.toBeInTheDocument()
   })
 
   it('hides the host About when there is no bio', async () => {
@@ -354,7 +385,20 @@ describe('ListingDetail content', () => {
     await screen.findByRole('link', { name: 'Mei' })
     expect(document.querySelector('.detail-host__bio')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '… more' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '… more' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /More about/ })).not.toBeInTheDocument()
+  })
+
+  it('shows the shared ID verified badge when the host is approved', async () => {
+    givenListing()
+    supabase.__once('users', 'select', {
+      data: { is_id_verified: true },
+      error: null,
+    })
+    renderPage()
+
+    expect(await screen.findByText('ID verified')).toBeInTheDocument()
+    expect(document.querySelector('.verified-badge .ui-icon')).toBeInTheDocument()
   })
 
   it('shows Anonymous when display_name is missing', async () => {

@@ -13,6 +13,7 @@ import { hostEntry } from '../lib/hostEntry'
 import { firstAccountRow } from '../lib/myAccount'
 import { profileReportSubject, reportMailto } from '../lib/reportMailto'
 import OverflowMenu from '../components/ui/OverflowMenu'
+import VerifiedBadge from '../components/VerifiedBadge'
 import PageLoader from '../components/PageLoader'
 import Bookings from './Bookings'
 import Hosting from './Hosting'
@@ -304,7 +305,7 @@ export default function Profile() {
               />
             ) : null}
           </div>
-          {verified ? <p className="profile-verified">ID verified</p> : null}
+          {verified ? <VerifiedBadge /> : null}
           <HostRating reviews={reviews} />
         </div>
         {isOwn ? (

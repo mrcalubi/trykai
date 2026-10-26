@@ -110,6 +110,18 @@ describe('OverflowMenu', () => {
     expect(css).toMatch(
       /\.ui-overflow__item \{[\s\S]*?display:\s*flex[\s\S]*?align-items:\s*center[\s\S]*?padding:\s*10px 14px/
     )
+    expect(css).toMatch(/\.ui-overflow__item:hover,\s*\.ui-overflow__item:focus-visible/)
+    expect(css).not.toMatch(/\.ui-overflow__item:focus \{/)
+  })
+
+  it('focuses the first item on open so keyboard users can move from there', async () => {
+    const { user } = renderMenu([
+      { label: 'View listing', to: '/listings/l-1' },
+      { label: 'Edit', to: '/edit-listing/l-1' },
+    ])
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    expect(screen.getByRole('menuitem', { name: 'View listing' })).toHaveFocus()
   })
 
   it('runs the action and closes after a choice', async () => {
