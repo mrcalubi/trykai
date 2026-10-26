@@ -10,6 +10,8 @@ import ProfilePhotoFlow from '../components/ProfilePhotoFlow'
 import { firstAccountRow, notifyAccountUpdated } from '../lib/myAccount'
 import { hasAvatarPhoto } from '../lib/avatarPhoto'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
+import { settingsDraft } from '../lib/unsavedDraft'
+import { useUnsavedChangesGuard } from '../lib/useUnsavedChangesGuard'
 
 export default function Settings() {
   const userId = useAuthedUserId()
@@ -28,6 +30,7 @@ export default function Settings() {
   const [saveStatusFading, setSaveStatusFading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savedDraft, setSavedDraft] = useState(null)
 
   const loadProfile = useCallback(async () => {
     const { data, error: loadError } = await withIssuedAtRetry(() =>
@@ -41,11 +44,21 @@ export default function Settings() {
       return
     }
 
-    setFullName(row.full_name || '')
-    setDisplayName(row.display_name || '')
-    setBio(row.bio || '')
+    const nextFullName = row.full_name || ''
+    const nextDisplayName = row.display_name || ''
+    const nextBio = row.bio || ''
+    setFullName(nextFullName)
+    setDisplayName(nextDisplayName)
+    setBio(nextBio)
     setEmail(row.email || '')
     setAvatarUrl(row.avatar_url || '')
+    setSavedDraft(
+      settingsDraft({
+        fullName: nextFullName,
+        displayName: nextDisplayName,
+        bio: nextBio,
+      }),
+    )
     setLoading(false)
   }, [])
 
@@ -122,9 +135,13 @@ export default function Settings() {
       return
     }
 
+    const nextBio = bio.trim()
     setFullName(name)
     setDisplayName(handle)
-    setBio(bio.trim())
+    setBio(nextBio)
+    setSavedDraft(
+      settingsDraft({ fullName: name, displayName: handle, bio: nextBio }),
+    )
     setSaveStatusKind('success')
     setSaveStatus('Saved')
     notifyAccountUpdated()
@@ -135,6 +152,10 @@ export default function Settings() {
     navigate('/')
   }
 
+  const currentDraft = settingsDraft({ fullName, displayName, bio })
+  const isDirty = !loading && !saving && savedDraft != null && currentDraft !== savedDraft
+  const unsavedGuard = useUnsavedChangesGuard(isDirty)
+
   if (loading) {
     return <PageLoader />
   }
@@ -143,6 +164,7 @@ export default function Settings() {
 
   return (
     <div className="page page--form settings-page">
+      {unsavedGuard}
       <div className="form-card">
         <h1 className="form-card__title">Settings</h1>
         <p className="form-card__subtitle">Your public profile and account.</p>

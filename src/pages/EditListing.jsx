@@ -27,6 +27,8 @@ import { formatListingSpotsMessage } from '../lib/listingSpots'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { LISTING_CATEGORIES } from '../lib/listingCategories'
 import { notifyListingSubmitted } from '../lib/listingReview'
+import { listingEditorDraft } from '../lib/unsavedDraft'
+import { useUnsavedChangesGuard } from '../lib/useUnsavedChangesGuard'
 
 const MAX_PHOTOS = 5
 
@@ -77,6 +79,7 @@ export default function EditListing() {
   const [error, setError] = useState('')
   const [photoError, setPhotoError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [savedDraft, setSavedDraft] = useState(null)
   const priceCents = parsePriceInputCents(price)
   const guests = parseInt(maxGuests, 10)
   const guestCount = Number.isInteger(guests) ? guests : 1
@@ -127,18 +130,46 @@ export default function EditListing() {
 
       setIsFoundingHost(foundingHostFromRpc(founding.data, founding.error))
 
-      setTitle(data.title)
-      setDescription(data.description)
-      setCategory(data.category)
-      setPrice(centsToDollars(data.price_per_person))
-      setMaxGuests(String(data.max_guests))
-      setDurationMins(data.duration_mins != null ? String(data.duration_mins) : '')
-      setGroupPricing(data.group_pricing !== false)
-      setArea(data.area ?? '')
-      setFullAddress(typeof addressResult.data === 'string' ? addressResult.data : '')
-      setWhatsProvided(data.whats_provided?.length ? data.whats_provided : [])
-      setWhatToBring(data.what_to_bring?.length ? data.what_to_bring : [])
-      setPhotos(photosFromUrls(data.photo_urls))
+      const nextTitle = data.title
+      const nextDescription = data.description
+      const nextCategory = data.category
+      const nextPrice = centsToDollars(data.price_per_person)
+      const nextMaxGuests = String(data.max_guests)
+      const nextDurationMins = data.duration_mins != null ? String(data.duration_mins) : ''
+      const nextGroupPricing = data.group_pricing !== false
+      const nextArea = data.area ?? ''
+      const nextAddress = typeof addressResult.data === 'string' ? addressResult.data : ''
+      const nextProvided = data.whats_provided?.length ? data.whats_provided : []
+      const nextBring = data.what_to_bring?.length ? data.what_to_bring : []
+      const nextPhotos = photosFromUrls(data.photo_urls)
+      setTitle(nextTitle)
+      setDescription(nextDescription)
+      setCategory(nextCategory)
+      setPrice(nextPrice)
+      setMaxGuests(nextMaxGuests)
+      setDurationMins(nextDurationMins)
+      setGroupPricing(nextGroupPricing)
+      setArea(nextArea)
+      setFullAddress(nextAddress)
+      setWhatsProvided(nextProvided)
+      setWhatToBring(nextBring)
+      setPhotos(nextPhotos)
+      setSavedDraft(
+        listingEditorDraft({
+          title: nextTitle,
+          description: nextDescription,
+          category: nextCategory,
+          price: nextPrice,
+          maxGuests: nextMaxGuests,
+          durationMins: nextDurationMins,
+          groupPricing: nextGroupPricing,
+          area: nextArea,
+          fullAddress: nextAddress,
+          whatsProvided: nextProvided,
+          whatToBring: nextBring,
+          photos: nextPhotos,
+        }),
+      )
       setFetching(false)
     }
 
@@ -235,13 +266,13 @@ export default function EditListing() {
       p_spots: guests,
     })
 
-    setLoading(false)
-
     if (spotsError) {
+      setLoading(false)
       showSaveProblem(spotsError)
       return
     }
 
+    // Stay "saving" so the unsaved-changes guard does not fire on this leave.
     // Only does anything when this edit put the listing back in the queue.
     photosRef.current.forEach(revokePhotoUrls)
     void notifyListingSubmitted()
@@ -267,6 +298,23 @@ export default function EditListing() {
     await saveListing()
   }
 
+  const currentDraft = listingEditorDraft({
+    title,
+    description,
+    category,
+    price,
+    maxGuests,
+    durationMins,
+    groupPricing,
+    area,
+    fullAddress,
+    whatsProvided,
+    whatToBring,
+    photos,
+  })
+  const isDirty = !fetching && !loading && savedDraft != null && currentDraft !== savedDraft
+  const unsavedGuard = useUnsavedChangesGuard(isDirty)
+
   if (fetching) {
     return <PageLoader />
   }
@@ -281,6 +329,7 @@ export default function EditListing() {
 
   return (
     <div className="page page--form">
+      {unsavedGuard}
       <div className="form-card form-card--wide">
         <h1 className="form-card__title">Edit listing</h1>
         <p className="form-card__subtitle">Update your experience details</p>

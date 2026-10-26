@@ -9,8 +9,8 @@ vi.mock('./lib/supabase')
 
 /**
  * App owns the route table and the persistent chrome. These tests drive the real
- * BrowserRouter through window.history so a mis-wired path shows up here rather
- * than as a blank page in production.
+ * createBrowserRouter through window.history so a mis-wired path shows up here
+ * rather than as a blank page in production.
  */
 
 function renderAt(path) {

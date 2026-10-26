@@ -41,7 +41,7 @@ Hosts pick a URA planning area (55 names, FK to `planning_areas`). Public listin
 ### Trust layer
 Reviews are the core trust mechanism, not vetting.
 - Reviews only after a confirmed booking, once the session has ended. Guest→host insert is enforced in RLS (`00011`: reviewer is the guest, booking `confirmed`, `now()` after `starts_at + duration_mins`, reviewee is the listing host, one review per booking per role). Host→guest reviews still have no insert path. See BUILD_BACKLOG P2.4.
-- Profile photo required to host, non negotiable
+- Profile photo required to host: deferred (Caleb, 26 October). Not enforced; hosts can publish and remove their photo. Enforce later at publish and block Remove while a listing is live.
 - Phone OTP on signup
 - Trust badges on listings: phone verified, ID verified, review count
 
@@ -634,6 +634,11 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-10-26 — Profile photos can be changed, cropped, removed, and viewed.** Settings no longer waits for form Save: Change photo picks through `compressImage` (so HEIC is a JPEG before crop), then the shared listing crop dialog at 1:1 with a circular mask, then upload and `avatar_url`. Remove asks "Remove your profile photo?" and writes null; old files in `listing-photos` stay. Own profile: tap the avatar for View / Change / Remove (OverflowMenu). Any profile and the listing Hosted by avatar open a larger viewer when there is a photo; initials do not. The header updates in place. A successful photo save/remove or Settings profile Save fires `trykai:account-updated`; SiteNav re-reads `my_account()` so the top-nav face updates without a reload.
 
 **2026-10-26 — OverflowMenu can open to the start so a left-side avatar stays on screen.** The menu was always `right: 0`, so View / Change / Remove on the profile photo grew left and clipped on phones. `align="start"` pins that menu to the left of the trigger. Every menu also caps at `calc(100vw - 32px)` and wraps item text.
+
+**2026-10-26 — Warn before leaving Settings or Edit listing with unsaved changes.** App now uses `createBrowserRouter` so `useBlocker` works. A shared guard asks "Discard your changes?" on in-app navigation (links, back, browser back) and registers `beforeunload` for tab close or refresh. Dirty means the current values differ from the last saved snapshot, not "touched"; photo on Settings is excluded because it saves straight away. Create listing is unchanged (it autosaves). Profile photo required to host is deferred: not enforced; hosts can publish and remove their photo.
+
+**2026-10-26 — Profile photo required to host is deferred.** Trust layer used to say non-negotiable. Not enforced today; hosts can publish and remove their photo. Enforce later at publish and block Remove while a listing is live.
+
 **2026-10-26 — Avatar centres its own initial.** The shared face was a bare span when there was no photo. Settings passed no class, so the letter sat in the top-left and the circle clipped it; the profile header only looked right because `.detail-host__avatar` flex-centred the span. `Avatar` now always adds `ui-avatar` (circle, flex centre; initials navy on cream, letter about 40% of `size`). Callers keep only size and border.
 
 ---

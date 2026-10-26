@@ -1,4 +1,11 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { useState } from 'react'
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Outlet,
+  Route,
+  RouterProvider,
+} from 'react-router-dom'
 import SiteNav from './components/SiteNav'
 import BackButton, { BackSlotProvider } from './components/BackButton'
 import ScrollToTop from './components/ScrollToTop'
@@ -30,132 +37,143 @@ import Privacy from './pages/Privacy'
 import StyleGuide from './pages/StyleGuide'
 import NotFound from './pages/NotFound'
 
-export default function App() {
+function AppLayout() {
   return (
-    <BrowserRouter>
+    <>
       <ScrollToTop />
       <SiteNav />
       <BackSlotProvider>
         <BackButton />
-        <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/listings/:id" element={<ListingDetail />} />
-        <Route path="/u/:id" element={<Profile />} />
-        <Route
-          path="/create-listing"
-          element={
-            <RequireAuth>
-              <CreateListing />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/verify-identity"
-          element={
-            <RequireAuth>
-              <VerifyIdentity />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/edit-listing/:id"
-          element={
-            <RequireAuth>
-              <EditListing />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/bookings/:bookingId"
-          element={
-            <RequireAuth>
-              <BookingDetail />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/bookings"
-          element={
-            <RequireAuth>
-              <RedirectToOwnProfile tab="bookings" />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/hosting"
-          element={
-            <RequireAuth>
-              <RedirectToOwnProfile tab="hosting" />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <RequireAuth>
-              <Dashboard />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <RequireAuth>
-              <Settings />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/verify-identity/singpass"
-          element={
-            <RequireAuth>
-              <SingpassReturn />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin/singpass-keys"
-          element={
-            <RequireAuth>
-              <RequireAdmin>
-                <AdminSingpassKeys />
-              </RequireAdmin>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin/listings"
-          element={
-            <RequireAuth>
-              <RequireAdmin>
-                <AdminListings />
-              </RequireAdmin>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin/verifications"
-          element={
-            <RequireAuth>
-              <RequireAdmin>
-                <AdminVerifications />
-              </RequireAdmin>
-            </RequireAuth>
-          }
-        />
-        <Route path="/refund-policy" element={<RefundPolicy />} />
-        <Route path="/cancellation-policy" element={<CancellationPolicy />} />
-        <Route path="/dispute-policy" element={<DisputePolicy />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/style-guide" element={<StyleGuide />} />
-        <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Outlet />
       </BackSlotProvider>
       <Footer />
-    </BrowserRouter>
+    </>
   )
+}
+
+function appRoutes() {
+  return createRoutesFromElements(
+    <Route element={<AppLayout />}>
+      <Route path="/" element={<Home />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/listings/:id" element={<ListingDetail />} />
+      <Route path="/u/:id" element={<Profile />} />
+      <Route
+        path="/create-listing"
+        element={
+          <RequireAuth>
+            <CreateListing />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/verify-identity"
+        element={
+          <RequireAuth>
+            <VerifyIdentity />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/edit-listing/:id"
+        element={
+          <RequireAuth>
+            <EditListing />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/bookings/:bookingId"
+        element={
+          <RequireAuth>
+            <BookingDetail />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/bookings"
+        element={
+          <RequireAuth>
+            <RedirectToOwnProfile tab="bookings" />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/hosting"
+        element={
+          <RequireAuth>
+            <RedirectToOwnProfile tab="hosting" />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <RequireAuth>
+            <Dashboard />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <RequireAuth>
+            <Settings />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/verify-identity/singpass"
+        element={
+          <RequireAuth>
+            <SingpassReturn />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/singpass-keys"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AdminSingpassKeys />
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/listings"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AdminListings />
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/verifications"
+        element={
+          <RequireAuth>
+            <RequireAdmin>
+              <AdminVerifications />
+            </RequireAdmin>
+          </RequireAuth>
+        }
+      />
+      <Route path="/refund-policy" element={<RefundPolicy />} />
+      <Route path="/cancellation-policy" element={<CancellationPolicy />} />
+      <Route path="/dispute-policy" element={<DisputePolicy />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/style-guide" element={<StyleGuide />} />
+      <Route path="*" element={<NotFound />} />
+    </Route>,
+  )
+}
+
+export default function App() {
+  const [router] = useState(() => createBrowserRouter(appRoutes()))
+  return <RouterProvider router={router} />
 }

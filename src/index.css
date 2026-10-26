@@ -1544,6 +1544,10 @@ a {
   color: var(--navy);
 }
 
+.confirm-dialog__copy + .confirm-dialog__copy {
+  margin-top: 8px;
+}
+
 .confirm-dialog--wide {
   max-width: 520px;
 }

@@ -1,9 +1,11 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { Route } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import EditListing from './EditListing'
 import RequireAuth from '../components/RequireAuth'
+import SiteNav from '../components/SiteNav'
 import { supabase } from '../lib/supabase'
-import { renderWithRouter } from '../test/render'
+import { renderWithDataRouter } from '../test/render'
 import { makeAuthSession, makeListing } from '../test/fixtures'
 import {
   LISTING_FIELD_HINTS,
@@ -61,17 +63,22 @@ function givenListing(overrides = {}) {
 
 // Mounted behind the same guard App.jsx puts it behind, so the page always has
 // a signed-in user. RequireAuth owns the signed-out case and tests it itself.
-function renderPage() {
-  return renderWithRouter(
+function renderPage(options = {}) {
+  return renderWithDataRouter(
     <RequireAuth>
+      {options.withNav ? <SiteNav /> : null}
       <EditListing />
     </RequireAuth>,
-    { route: '/edit-listing/listing-1', path: '/edit-listing/:id' }
+    {
+      route: '/edit-listing/listing-1',
+      path: '/edit-listing/:id',
+      extraRoutes: options.extraRoutes,
+    },
   )
 }
 
-async function renderLoaded() {
-  const utils = renderPage()
+async function renderLoaded(options = {}) {
+  const utils = renderPage(options)
   await screen.findByRole('heading', { name: 'Edit listing' })
   return utils
 }
@@ -613,6 +620,22 @@ describe('EditListing photos', () => {
 
     await user.click(screen.getAllByRole('button', { name: 'Remove photo' })[0])
 
+    expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
+  })
+
+  it('treats removing a photo as dirty and asks before leaving', async () => {
+    givenListing({ photo_urls: ['https://cdn.test/one.jpg', 'https://cdn.test/two.jpg'] })
+    const { user } = await renderLoaded({
+      withNav: true,
+      extraRoutes: <Route path="/" element={<h1>Home</h1>} />,
+    })
+
+    await user.click(screen.getAllByRole('button', { name: 'Remove photo' })[0])
+    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+
+    expect(screen.getByRole('dialog', { name: 'Discard your changes?' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
     expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
   })
 
