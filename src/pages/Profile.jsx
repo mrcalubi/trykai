@@ -111,7 +111,7 @@ function ProfileHeaderCopy({
       {about ? <BioPreview bio={about} lines={3} maxChars={240} /> : null}
       {isOwn ? (
         <div className="profile-header__actions">
-          <Link to="/settings" className="ui-button ui-button--secondary" aria-label="Settings">
+          <Link to="/settings" className="ui-button ui-button--secondary">
             Edit profile
           </Link>
           <Link to={previewTo} className="ui-button ui-button--secondary">

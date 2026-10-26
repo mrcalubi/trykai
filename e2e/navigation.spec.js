@@ -225,7 +225,7 @@ test.describe('signed-in navigation', () => {
     await page.getByRole('link', { name: 'Your profile' }).click()
     await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}`))
     await expect(page.getByRole('navigation', { name: 'Profile' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Edit profile' })).toBeVisible()
     await expect(page.getByRole('menu')).toHaveCount(0)
   })
 
