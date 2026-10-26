@@ -409,6 +409,7 @@ describe('ListingDetail content', () => {
       'href',
       '/u/host-1'
     )
+    expect(document.querySelector('.detail-host__avatar')).toHaveTextContent('?')
   })
 
   it('falls back to Anonymous when the host profile is missing', async () => {

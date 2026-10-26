@@ -184,6 +184,22 @@ describe('Card', () => {
     expect(metaLine?.[0]).toMatch(/justify-content:\s*space-between/)
   })
 
+  it('shows the first letter of the host display name', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Card
+          mode="browse"
+          to="/listings/latte"
+          title="Learn latte art with me"
+          host={{ name: 'Latte Queen' }}
+        />
+      </MemoryRouter>
+    )
+
+    expect(container.querySelector('.ui-card__host')).toHaveTextContent('L')
+    expect(container.querySelector('.ui-card__host')).not.toHaveTextContent('LQ')
+  })
+
   it('lets the title column shrink inside the grid instead of overflowing', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../../index.css'), 'utf8')
     const body = css.match(/\.ui-card__body \{[\s\S]*?\n\}/)

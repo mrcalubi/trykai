@@ -71,6 +71,15 @@ afterEach(() => {
 })
 
 describe('Settings access', () => {
+  it('shows the first letter of the display name when there is no photo', async () => {
+    givenProfile({ full_name: 'Mei Ling Tan', display_name: 'Latte Queen', avatar_url: null })
+    await renderSettings()
+
+    expect(document.querySelector('.settings-avatar')).toHaveTextContent('L')
+    expect(document.querySelector('.settings-avatar')).not.toHaveTextContent('ML')
+    expect(document.querySelector('.settings-avatar')).not.toHaveTextContent('LQ')
+  })
+
   it('loads the signed-in user own profile', async () => {
     await renderSettings()
 

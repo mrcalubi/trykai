@@ -12,7 +12,18 @@ describe('ReviewCard', () => {
   it('shows the reviewer display name from the RPC jsonb and their initial', () => {
     renderReview({ users: { full_name: 'Latte Queen' } })
     expect(screen.getByText('Latte Queen')).toBeInTheDocument()
-    expect(screen.getByText('L')).toBeInTheDocument()
+    expect(document.querySelector('.review-card__avatar')).toHaveTextContent('L')
+  })
+
+  it('shows a review photo only when the payload already has avatar_url', () => {
+    renderReview({
+      users: { full_name: 'Latte Queen', avatar_url: 'https://cdn.test/latte.jpg' },
+    })
+    expect(document.querySelector('.review-card__avatar')).toHaveAttribute(
+      'src',
+      'https://cdn.test/latte.jpg',
+    )
+    expect(screen.queryByText('L')).not.toBeInTheDocument()
   })
 
   it('renders the listing title when the review is on a host profile', () => {
@@ -28,7 +39,7 @@ describe('ReviewCard', () => {
   it('falls back to "Guest" when the reviewer has no name', () => {
     renderReview({ users: null })
     expect(screen.getByText('Guest')).toBeInTheDocument()
-    expect(screen.getByText('G')).toBeInTheDocument()
+    expect(document.querySelector('.review-card__avatar')).toHaveTextContent('?')
   })
 
   it('exposes the rating to assistive technology', () => {

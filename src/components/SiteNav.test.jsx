@@ -57,7 +57,7 @@ describe('SiteNav when signed in', () => {
     renderNav()
 
     const account = await screen.findByRole('link', { name: 'Your profile' })
-    await waitFor(() => expect(account).toHaveTextContent('ML'))
+    await waitFor(() => expect(account).toHaveTextContent('M'))
     expect(account.querySelector('.ui-topnav__account')).toHaveClass('ui-topnav__account--initials')
     expect(screen.queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument()
   })
@@ -74,13 +74,13 @@ describe('SiteNav when signed in', () => {
     expect(account.querySelector('img')).toHaveAttribute('src', 'https://cdn.test/avatar.jpg')
   })
 
-  it('falls back to the email initial when the profile has no name', async () => {
+  it('shows ? when the profile has no display name', async () => {
     signedIn(makeAuthSession({ user: { email: 'kai@example.com', full_name: null } }))
     givenAccount(null)
     renderNav()
 
     const account = await screen.findByRole('link', { name: 'Your profile' })
-    await waitFor(() => expect(account).toHaveTextContent('K'))
+    await waitFor(() => expect(account).toHaveTextContent('?'))
   })
 
   it('loads the signed-in account through my_account', async () => {

@@ -5,7 +5,7 @@ import { useAuthedUserId } from '../lib/authedUser'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import PageLoader from '../components/PageLoader'
-import { getInitials } from '../components/ui/getInitials'
+import Avatar from '../components/ui/Avatar'
 import { firstAccountRow } from '../lib/myAccount'
 import { compressImage } from '../lib/compressImage'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
@@ -195,7 +195,6 @@ export default function Settings() {
   }
 
   const previewSrc = avatarPreviewUrl || avatarUrl
-  const initials = getInitials(fullName)
 
   return (
     <div className="page page--form settings-page">
@@ -216,13 +215,12 @@ export default function Settings() {
 
           <form onSubmit={handleSave} className="form">
             <div className="settings-avatar">
-              {previewSrc ? (
-                <img src={previewSrc} alt="" className="settings-avatar__image" />
-              ) : (
-                <span className="settings-avatar__initials" aria-hidden="true">
-                  {initials || '?'}
-                </span>
-              )}
+              <Avatar
+                avatarUrl={previewSrc}
+                displayName={displayName}
+                size={72}
+                className={previewSrc ? 'settings-avatar__image' : ''}
+              />
             </div>
 
             <Input

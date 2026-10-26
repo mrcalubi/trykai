@@ -242,6 +242,7 @@ describe('Profile public content', () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Anonymous', level: 1 })).toBeInTheDocument()
+    expect(document.querySelector('.detail-host__avatar')).toHaveTextContent('?')
   })
 
   it('shows the ID verified badge only when the host is approved', async () => {

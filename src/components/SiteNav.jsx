@@ -75,7 +75,7 @@ export default function SiteNav() {
       verificationStatus={verificationStatus}
       userId={user?.id}
       avatarUrl={avatarUrl || undefined}
-      name={displayName || user?.email || ''}
+      name={displayName}
       onLogOut={handleLogOut}
     />
   )

@@ -5,6 +5,7 @@ import { AuthedUserContext } from '../lib/authedUser'
 import { publicName } from '../lib/publicName'
 import HostRating from '../components/HostRating'
 import ReviewCard from '../components/ReviewCard'
+import Avatar from '../components/ui/Avatar'
 import Card from '../components/ui/Card'
 import { formatGuestFacingPrice } from '../lib/pricing'
 import { ratingsByListingId } from '../lib/listingRatings'
@@ -277,13 +278,11 @@ export default function Profile() {
   return (
     <div className="page page--detail">
       <header className="profile-header">
-        {profile.avatar_url ? (
-          <img src={profile.avatar_url} alt="" className="detail-host__avatar" />
-        ) : (
-          <div className="detail-host__avatar-placeholder">
-            {givenName[0]?.toUpperCase() || '?'}
-          </div>
-        )}
+        <Avatar
+          avatarUrl={profile.avatar_url}
+          displayName={publicName(profile)}
+          className="detail-host__avatar"
+        />
         <div className="profile-header__copy">
           <div className="profile-header__name-row">
             <h1 className="profile-header__name">{givenName}</h1>

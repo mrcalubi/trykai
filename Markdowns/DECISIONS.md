@@ -627,6 +627,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-25 — The ID verified badge is the homepage shield, everywhere.** Profile used a green pill and listing detail used a shield in `--success`. Both now render `VerifiedBadge`: the same shield-with-tick as the homepage "ID-verified hosts" trust pill, in `--coral-ink`, then the words "ID verified". Hosting's checklist title is not this badge.
 
+**2026-10-26 — Avatar initials are the first letter of display_name.** Profile and listing detail used one letter of the public name; Settings used two letters of `full_name`; TopNav and browse cards used two letters of whatever name they were given. One person could read as "C" in one place and "LC" in another. Profile, Hosted by, Settings, TopNav, browse cards, booking detail, and review cards now render `Avatar`: the photo when `avatar_url` is set, otherwise the first letter of `display_name` (or "?"). `full_name` is never used for initials. Review RPCs still return only the reviewer's `display_name` in jsonb `users.full_name`, so review faces are initials until those functions also return `avatar_url`.
+
 ---
 
 # Analysed but not decided

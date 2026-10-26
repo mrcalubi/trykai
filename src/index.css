@@ -509,9 +509,15 @@ a {
 }
 
 .ui-topnav__account--initials {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
   color: var(--cream);
   background: var(--navy);
   border-color: var(--navy);
+  user-select: none;
 }
 
 .ui-topnav__avatar-img {
@@ -519,15 +525,6 @@ a {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.ui-topnav__avatar-initials {
-  font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  user-select: none;
 }
 
 .ui-topnav__account-link {
@@ -1316,86 +1313,6 @@ a {
     justify-content: space-between;
     padding: 36px 48px;
   }
-}
-
-/* Listing card (kept for ListingCard) */
-.listing-card {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  color: inherit;
-  text-decoration: none;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.25s var(--ease), transform 0.25s var(--ease);
-}
-
-.listing-card:hover {
-  box-shadow: var(--shadow-hover);
-  transform: translateY(-2px);
-}
-
-.listing-card__image-wrap {
-  position: relative;
-  aspect-ratio: var(--listing-cover-aspect);
-  overflow: hidden;
-  background: var(--sand);
-}
-
-.listing-card__image {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-}
-
-.listing-card__placeholder {
-  width: 100%;
-  height: 100%;
-  background: var(--tint-other);
-}
-
-.listing-card__category {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 1;
-  padding: 4px 10px;
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-h);
-  background: var(--cream);
-  border-radius: 999px;
-}
-
-.listing-card__body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px 14px;
-}
-
-.listing-card__title {
-  margin: 0;
-  font-family: var(--display);
-  font-size: 1.0625rem;
-  font-weight: 700;
-  line-height: 1.3;
-  color: var(--text-h);
-}
-
-.listing-card__meta {
-  margin: 0;
-  font-family: var(--sans);
-  font-size: 14px;
-  line-height: 1.35;
-  color: var(--muted);
 }
 
 /* Forms */
@@ -3366,20 +3283,13 @@ body.lightbox-open {
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-}
-
-.detail-host__avatar-placeholder {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--navy);
-  color: var(--cream);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
   font-weight: 700;
-  flex-shrink: 0;
+  color: var(--cream);
+  background: var(--navy);
 }
 
 .detail-host__copy {
@@ -3468,8 +3378,7 @@ body.lightbox-open {
   box-shadow: var(--shadow-sm);
 }
 
-.profile-header .detail-host__avatar,
-.profile-header .detail-host__avatar-placeholder {
+.profile-header .detail-host__avatar {
   width: 80px;
   height: 80px;
   font-size: 30px;
@@ -3480,8 +3389,7 @@ body.lightbox-open {
     padding: 28px;
   }
 
-  .profile-header .detail-host__avatar,
-  .profile-header .detail-host__avatar-placeholder {
+  .profile-header .detail-host__avatar {
     width: 104px;
     height: 104px;
     font-size: 38px;
@@ -5443,6 +5351,7 @@ body.lightbox-open {
   width: 40px;
   height: 40px;
   border-radius: 50%;
+  object-fit: cover;
   background: var(--sand);
   color: var(--text-h);
   display: flex;
@@ -6312,9 +6221,15 @@ body.lightbox-open {
   overflow: hidden;
   width: 72px;
   height: 72px;
+  font-family: var(--sans);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
   color: var(--cream);
   background: var(--navy);
   border-radius: 50%;
+  user-select: none;
 }
 
 .settings-avatar__image {
@@ -6322,15 +6237,6 @@ body.lightbox-open {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.settings-avatar__initials {
-  font-family: var(--sans);
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  user-select: none;
 }
 
 .settings-email {

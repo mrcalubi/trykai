@@ -29,7 +29,6 @@ describe('coverCrop', () => {
     expect(css).toMatch(/--listing-cover-aspect:\s*4 \/ 3/)
     expect(css).toMatch(/\.ui-card__image-wrap \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
     expect(css).toMatch(/\.ui-card--browse \.ui-card__image-wrap \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
-    expect(css).toMatch(/\.listing-card__image-wrap \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
     expect(css).toMatch(/\.detail-gallery__photo \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
     expect(css).toMatch(/\.booking-detail__photo \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)
     expect(css).toMatch(/\.skeleton-card__media \{[\s\S]*?aspect-ratio:\s*var\(--listing-cover-aspect\)/)

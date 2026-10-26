@@ -1,5 +1,6 @@
 import { publicName } from '../lib/publicName'
 import { reportMailto, reviewReportSubject } from '../lib/reportMailto'
+import Avatar from './ui/Avatar'
 import OverflowMenu from './ui/OverflowMenu'
 
 function formatReviewDate(iso) {
@@ -24,8 +25,8 @@ function StarDisplay({ rating }) {
 }
 
 export default function ReviewCard({ review, listingTitle, viewerId }) {
-  const name = publicName({ display_name: review.users?.full_name }) || 'Guest'
-  const initial = name[0]?.toUpperCase() || '?'
+  const displayName = publicName({ display_name: review.users?.full_name })
+  const name = displayName || 'Guest'
   const listing = listingTitle || review.listing_title || 'listing'
   const isOwnReview = Boolean(viewerId && review.reviewer_id && viewerId === review.reviewer_id)
   const reportHref = reportMailto({
@@ -37,7 +38,12 @@ export default function ReviewCard({ review, listingTitle, viewerId }) {
   return (
     <div className="review-card">
       <div className="review-card__header">
-        <div className="review-card__avatar">{initial}</div>
+        <Avatar
+          avatarUrl={review.users?.avatar_url}
+          displayName={displayName}
+          size={40}
+          className="review-card__avatar"
+        />
         <div className="review-card__author">
           <p className="review-card__name">{name}</p>
           {review.listing_title ? (

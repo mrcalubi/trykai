@@ -23,7 +23,7 @@ const ACCOUNT_PREVIEWS = [
   },
   {
     label: 'Initials',
-    usage: 'No photo — first letters of first and last name',
+    usage: 'No photo — first letter of display name',
     name: 'Mei Ling',
   },
 ]
