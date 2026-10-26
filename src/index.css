@@ -3593,6 +3593,8 @@ body.lightbox-open {
 }
 
 .profile-header__body {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -3779,12 +3781,13 @@ body.lightbox-open {
 
   .profile-header__identity {
     flex-direction: row;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: 16px;
   }
 
   .profile-header__copy {
     width: auto;
+    padding-top: 52px;
   }
 
   .profile-header__tiles {
