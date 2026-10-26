@@ -4,12 +4,20 @@ function avatarInitial(displayName) {
   return trimmed ? trimmed.charAt(0).toUpperCase() : '?'
 }
 
+function avatarClassName(className) {
+  return ['ui-avatar', className].filter(Boolean).join(' ')
+}
+
 export default function Avatar({ avatarUrl, displayName, size, className = '' }) {
   const photo = typeof avatarUrl === 'string' && avatarUrl.trim() ? avatarUrl.trim() : ''
-  const style =
-    typeof size === 'number'
-      ? { width: size, height: size }
-      : undefined
+  const sized = typeof size === 'number'
+  const style = sized
+    ? {
+        width: size,
+        height: size,
+        ...(photo ? {} : { fontSize: Math.round(size * 0.4) }),
+      }
+    : undefined
 
   if (photo) {
     return (
@@ -18,14 +26,14 @@ export default function Avatar({ avatarUrl, displayName, size, className = '' })
         alt=""
         width={size}
         height={size}
-        className={className}
+        className={avatarClassName(className)}
         style={style}
       />
     )
   }
 
   return (
-    <span className={className} style={style} aria-hidden="true">
+    <span className={avatarClassName(className)} style={style} aria-hidden="true">
       {avatarInitial(displayName)}
     </span>
   )
