@@ -7,7 +7,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Profile from './Profile'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
-import { makeAuthSession, makeListing, makeReview } from '../test/fixtures'
+import { hoursFromNow, makeAuthSession, makeListing, makeReview, makeSession } from '../test/fixtures'
+import { HOST_OPEN_SESSIONS_SELECT } from '../lib/profileHeader'
+import { formatSessionDateTime } from '../lib/sessionDate'
 
 vi.mock('../lib/supabase')
 
@@ -30,6 +32,14 @@ function givenProfile(profile = {
 
 function givenListings(listings) {
   supabase.__on('listings', 'select', { data: listings, error: null })
+}
+
+function givenSessions(sessions) {
+  supabase.__on('sessions', 'select', { data: sessions, error: null })
+}
+
+function headerTile(name) {
+  return screen.getByRole('region', { name })
 }
 
 function givenRpcs({ hostReviews = [], listingRatings = [], account } = {}) {
@@ -270,10 +280,10 @@ describe('Profile public content', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    const stats = document.querySelector('.profile-header__stats')
-    expect(stats).toHaveTextContent('Live listings')
-    expect(stats).not.toHaveTextContent('Rating')
-    expect(stats).not.toHaveTextContent('Reviews')
+    const hosting = headerTile('Hosting')
+    expect(hosting).toHaveTextContent('1 live listing')
+    expect(hosting).not.toHaveTextContent('★')
+    expect(hosting).not.toHaveTextContent('reviews')
     expect(screen.getByText('No reviews yet.')).toBeInTheDocument()
   })
 
@@ -289,11 +299,9 @@ describe('Profile public content', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Reviews (2)' })
-    const stats = document.querySelector('.profile-header__stats')
-    expect(stats.textContent.replace(/\s+/g, ' ').trim()).toContain('★ 4.5')
-    expect(stats).toHaveTextContent('Rating')
-    expect(stats).toHaveTextContent('Reviews')
-    expect(stats).toHaveTextContent('Live listings')
+    const hosting = headerTile('Hosting')
+    expect(hosting.textContent.replace(/\s+/g, ' ').trim()).toContain('★ 4.5 · 2 reviews')
+    expect(hosting).toHaveTextContent('2 live listings')
     expect(document.querySelector('.profile-header__star')).toHaveAttribute('aria-hidden', 'true')
   })
 
@@ -435,6 +443,7 @@ describe('Profile public content', () => {
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
     expect(document.querySelector('.profile-header .detail-host__bio')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'About' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'About' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
   })
@@ -479,6 +488,9 @@ describe('Profile public content', () => {
     expect(copy?.[0]).toMatch(/display:\s*flex/)
     expect(copy?.[0]).toMatch(/flex-direction:\s*column/)
     expect(copy?.[0]).toMatch(/gap:\s*6px/)
+    expect(css).toMatch(/\.profile-header__identity \{[\s\S]*?align-items:\s*flex-end/)
+    expect(css).toMatch(/\.profile-header__tiles \{[\s\S]*?grid-template-columns:\s*1\.4fr 1fr 1fr/)
+    expect(css).toMatch(/\.profile-header__tile:only-child \{[\s\S]*?grid-column:\s*1 \/ -1/)
     expect(css).toMatch(/\.page--profile \{[\s\S]*?max-width:\s*880px/)
     expect(css).toMatch(/\.page--detail \{[\s\S]*?max-width:\s*1120px/)
   })
@@ -968,7 +980,7 @@ describe('Profile card restyle', () => {
     ])
     renderPage()
 
-    await screen.findByText('Teaches')
+    await screen.findByRole('region', { name: 'Teaches' })
     const chips = [...document.querySelectorAll('.profile-header__chip')].map(
       (chip) => chip.textContent,
     )
@@ -979,7 +991,192 @@ describe('Profile card restyle', () => {
   it('hides Teaches when the host has no live listings', async () => {
     renderPage()
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    expect(screen.queryByText('Teaches')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Teaches' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(document.querySelector('.profile-header__stats')).not.toBeInTheDocument()
+  })
+})
+
+describe('Profile card tiles', () => {
+  it('shows three tiles for a host with a bio, categories and sessions', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      bio: 'I pull rosettas.',
+      avatar_url: null,
+      is_id_verified: true,
+      is_host: true,
+    })
+    givenListings([
+      makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' }),
+      makeListing({ id: 'listing-8', title: 'Open mic', category: 'Music' }),
+    ])
+    const soon = hoursFromNow(48)
+    givenSessions([
+      makeSession({
+        id: 'session-soon',
+        listing_id: 'listing-9',
+        starts_at: soon,
+        listings: { title: 'Latte art' },
+      }),
+    ])
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(headerTile('About')).toHaveTextContent('I pull rosettas.')
+    expect(headerTile('Teaches')).toHaveTextContent('Food')
+    expect(headerTile('Teaches')).toHaveTextContent('Music')
+    expect(headerTile('Hosting')).toHaveTextContent('Next session')
+    expect(document.querySelectorAll('.profile-header__tile')).toHaveLength(3)
+  })
+
+  it('shows one full-width About tile for a non-host', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      bio: 'I drink coffee.',
+      avatar_url: null,
+      is_id_verified: true,
+      is_host: false,
+    })
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(headerTile('About')).toHaveTextContent('I drink coffee.')
+    expect(screen.queryByRole('region', { name: 'Teaches' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Hosting' })).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.profile-header__tile')).toHaveLength(1)
+  })
+
+  it('shows the soonest open session as a link to its listing', async () => {
+    givenListings([
+      makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' }),
+      makeListing({ id: 'listing-8', title: 'Open mic', category: 'Music' }),
+    ])
+    const later = hoursFromNow(96)
+    const soon = hoursFromNow(24)
+    givenSessions([
+      makeSession({
+        id: 'later',
+        listing_id: 'listing-8',
+        starts_at: later,
+        listings: { title: 'Open mic' },
+      }),
+      makeSession({
+        id: 'soon',
+        listing_id: 'listing-9',
+        starts_at: soon,
+        listings: { title: 'Latte art' },
+      }),
+    ])
+    renderPage()
+
+    const next = await screen.findByRole('link', { name: new RegExp(formatSessionDateTime(soon)) })
+    expect(next).toHaveAttribute('href', '/listings/listing-9')
+    expect(next).toHaveTextContent('Latte art')
+    expect(next).not.toHaveTextContent('Open mic')
+  })
+
+  it('says no sessions are scheduled when the host has none', async () => {
+    givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' })])
+    givenSessions([])
+    renderPage()
+
+    expect(await screen.findByText('No sessions scheduled yet')).toBeInTheDocument()
+    expect(screen.queryByText(/open in the next 30 days/)).not.toBeInTheDocument()
+  })
+
+  it('counts only open sessions that start within 30 days', async () => {
+    givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' })])
+    givenSessions([
+      makeSession({
+        id: 'soon',
+        listing_id: 'listing-9',
+        starts_at: hoursFromNow(24),
+        listings: { title: 'Latte art' },
+      }),
+      makeSession({
+        id: 'also-soon',
+        listing_id: 'listing-9',
+        starts_at: hoursFromNow(48),
+        listings: { title: 'Latte art' },
+      }),
+      makeSession({
+        id: 'far',
+        listing_id: 'listing-9',
+        starts_at: hoursFromNow(40 * 24),
+        listings: { title: 'Latte art' },
+      }),
+      makeSession({
+        id: 'full',
+        listing_id: 'listing-9',
+        starts_at: hoursFromNow(12),
+        status: 'full',
+        listings: { title: 'Latte art' },
+      }),
+    ])
+    renderPage()
+
+    expect(await screen.findByText('2 open in the next 30 days')).toBeInTheDocument()
+    expect(screen.queryByText('3 open in the next 30 days')).not.toBeInTheDocument()
+    expect(screen.queryByText('4 open in the next 30 days')).not.toBeInTheDocument()
+  })
+
+  it('hides empty tiles', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      bio: null,
+      avatar_url: null,
+      is_id_verified: true,
+      is_host: true,
+    })
+    givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: '  ' })])
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(screen.queryByRole('region', { name: 'About' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Teaches' })).not.toBeInTheDocument()
+    expect(headerTile('Hosting')).toBeInTheDocument()
+  })
+
+  it('shows the add-bio prompt only on your own profile', async () => {
+    givenSignedIn(HOST_ID)
+    renderPage()
+    expect(
+      await screen.findByRole('link', {
+        name: 'Guests book hosts they can picture. Add a short bio →',
+      }),
+    ).toBeInTheDocument()
+    expect(headerTile('About')).toBeInTheDocument()
+  })
+
+  it('never shows the add-bio prompt in public preview', async () => {
+    givenSignedIn(HOST_ID)
+    renderPage({ search: '?view=public' })
+
+    await screen.findByText('This is how guests see your profile')
+    expect(screen.queryByRole('link', { name: /Add a short bio/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'About' })).not.toBeInTheDocument()
+  })
+
+  it('selects no private columns on the host sessions query', async () => {
+    renderPage()
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+
+    const call = supabase.__calls('sessions', 'select')[0]
+    expect(call.chain[0].args[0]).toBe(HOST_OPEN_SESSIONS_SELECT)
+    expect(call.chain[0].args[0]).not.toMatch(/review_note|host_reminder|full_address|bookings/)
+    expect(call.filters).toEqual(
+      expect.arrayContaining([
+        { method: 'eq', column: 'status', value: 'open' },
+        { method: 'eq', column: 'listings.host_id', value: HOST_ID },
+        { method: 'eq', column: 'listings.is_active', value: true },
+        { method: 'eq', column: 'listings.review_status', value: 'approved' },
+      ]),
+    )
+    expect(call.filters.some((filter) => filter.method === 'gt' && filter.column === 'starts_at')).toBe(
+      true,
+    )
   })
 })
