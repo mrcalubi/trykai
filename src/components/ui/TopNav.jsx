@@ -48,7 +48,7 @@ export function TopNavAccount({ avatarUrl, name, className = '' }) {
       <Avatar
         avatarUrl={avatarUrl}
         displayName={name}
-        size={36}
+        fill
         className={avatarUrl ? 'ui-topnav__avatar-img' : ''}
       />
     </span>

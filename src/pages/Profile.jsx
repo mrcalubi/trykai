@@ -557,6 +557,7 @@ export default function Profile() {
                       <Avatar
                         avatarUrl={profile.avatar_url}
                         displayName={publicName(profile)}
+                        fill
                         className="detail-host__avatar"
                       />
                     </ProfileFace>
@@ -583,6 +584,7 @@ export default function Profile() {
               avatarUrl={profile.avatar_url}
               displayName={publicName(profile)}
               name={givenName}
+              fill
               className="detail-host__avatar"
             />
           </ProfileFace>

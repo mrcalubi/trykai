@@ -171,6 +171,12 @@ img {
   user-select: none;
 }
 
+.ui-card__host .ui-avatar:not(img),
+.ui-topnav__account .ui-avatar:not(img),
+.profile-header__face .ui-avatar:not(img) {
+  font-size: var(--avatar-font, 40%);
+}
+
 /* Small uppercase label above a section title. */
 .eyebrow {
   margin: 0 0 8px;
@@ -518,6 +524,7 @@ a {
   overflow: hidden;
   width: 36px;
   height: 36px;
+  --avatar-font: 14px;
   color: var(--text-h);
   background: var(--primary-bg);
   border: 1px solid var(--border);
@@ -926,27 +933,27 @@ a {
 
   .home-hero__badge--1 {
     width: 24%;
-    top: 0;
+    top: 6%;
     left: 0;
     --badge-img-scale: 190%;
   }
   .home-hero__badge--2 {
     width: 24%;
-    top: 0;
+    top: -4%;
     right: 0;
     --badge-img-scale: 172%;
   }
   .home-hero__badge--2 .home-hero__badge-inner { animation-delay: -1.5s; }
   .home-hero__badge--3 {
     width: 24%;
-    bottom: 0;
+    bottom: 6%;
     left: 0;
     --badge-img-scale: 170%;
   }
   .home-hero__badge--3 .home-hero__badge-inner { animation-delay: -3s; }
   .home-hero__badge--4 {
     width: 24%;
-    bottom: 0;
+    bottom: -4%;
     right: 0;
     --badge-img-scale: 170%;
   }
@@ -2693,9 +2700,13 @@ input[type='password']::-webkit-password-reveal-button {
   bottom: 10px;
   left: 10px;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
   width: 36px;
   height: 36px;
+  --avatar-font: 12px;
   border: 2.5px solid var(--cream);
   border-radius: 50%;
   box-shadow: var(--shadow-sm);
@@ -3659,16 +3670,26 @@ body.lightbox-open {
 
 .profile-header__face {
   position: relative;
-  display: inline-block;
+  display: block;
   flex-shrink: 0;
+  width: 80px;
+  height: 80px;
   line-height: 0;
+  --avatar-font: 32px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px var(--surface), var(--shadow-sm);
+}
+
+.profile-header__face .avatar-photo-button {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .profile-header .detail-host__avatar {
-  width: 80px;
-  height: 80px;
-  font-size: 30px;
-  box-shadow: 0 0 0 4px var(--surface), var(--shadow-sm);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .profile-header__camera {
@@ -3855,10 +3876,10 @@ body.lightbox-open {
     font-size: 28px;
   }
 
-  .profile-header .detail-host__avatar {
+  .profile-header__face {
     width: 104px;
     height: 104px;
-    font-size: 38px;
+    --avatar-font: 42px;
   }
 
   .profile-header__tools {

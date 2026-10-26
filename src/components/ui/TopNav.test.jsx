@@ -42,7 +42,10 @@ describe('TopNav', () => {
     expect(screen.queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument()
     expect(profileLink()).toHaveAttribute('href', '/u/user-77')
     expect(accountFace()).toHaveClass('ui-topnav__account--photo')
-    expect(profileLink().querySelector('img')).toHaveAttribute('src', '/trykai.png')
+    const photo = profileLink().querySelector('img')
+    expect(photo).toHaveAttribute('src', '/trykai.png')
+    expect(photo).toHaveStyle({ width: '100%', height: '100%' })
+    expect(photo.getAttribute('style') ?? '').not.toMatch(/36px/)
     expect(screen.queryByRole('button', { name: 'Account' })).not.toBeInTheDocument()
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
@@ -52,6 +55,9 @@ describe('TopNav', () => {
 
     expect(accountFace()).toHaveClass('ui-topnav__account--initials')
     expect(profileLink()).toHaveTextContent('M')
+    const face = accountFace().querySelector('.ui-avatar')
+    expect(face).toHaveStyle({ width: '100%', height: '100%' })
+    expect(face.getAttribute('style') ?? '').not.toMatch(/36px/)
   })
 
   it('opens and closes the hamburger menu from the icon', async () => {

@@ -663,6 +663,10 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-26 — Profile card is avatar, then a facts row, then bio; calendar only on the right.** Next session and category pills leave the card (listing cards still show category). Under the overlapping avatar, name / ID verified, rating / reviews, and sessions held sit in one left-aligned row with the same structure (main line, muted 14px label). Name and the two numbers share 24px / 28px Bricolage 800 navy; the star stays 60%. The name clamps so it cannot push the stats off. Own desktop right column is the month calendar, starting below the banner. Booking actions keep a 36px min-height and 16px above the row so a lone status pill lines up with a pill beside a button.
 
+**2026-10-26 — Hero badges stagger clockwise, vertically only.** Same 24% size, rims, and poke. Food (`--1`) sits 6% lower, music (`--2`) 4% higher, arts (`--3`) 6% higher (`bottom: 6%`), fitness (`--4`) 4% lower (`bottom: -4%`). Percent of the art box, so 1024–1920 keep the same tilt. Music stays above the art and still has to clear the nav.
+
+**2026-10-26 — Avatar `fill` sits inside bordered wrappers so initials stay centred.** Card host is 36px including a 2.5px cream ring; TopNav account is 36px including a 1px border. Passing `size={36}` overflowed the content box and the ring clipped the face down-right. `fill` is width/height 100% and letter size from `--avatar-font` on the wrapper (about 40% of the inner hole). Profile header does the same: the white ring lives on `.profile-header__face`, and the avatar fills it (menu trigger and `ViewableAvatar`). Listing Hosted by, booking detail, review cards, and Settings keep a fixed `size` or class size — those wrappers have no inset ring.
+
 ---
 
 # Analysed but not decided

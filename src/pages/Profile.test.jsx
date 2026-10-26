@@ -511,7 +511,7 @@ describe('Profile public content', () => {
     expect(css).toMatch(/\.profile-header__banner \{[\s\S]*?background:\s*var\(--sand\)/)
     expect(css).toMatch(/\.profile-header__banner \{[\s\S]*?height:\s*120px/)
     expect(css).toMatch(
-      /\.profile-header \.detail-host__avatar \{[\s\S]*?box-shadow:\s*0 0 0 4px var\(--surface\)/,
+      /\.profile-header__face \{[\s\S]*?box-shadow:\s*0 0 0 4px var\(--surface\)/,
     )
     expect(css).toMatch(/\.profile-header__body \{[\s\S]*?margin-top:\s*-40px/)
     expect(css).toMatch(/\.profile-header__icon-btn \{[\s\S]*?width:\s*44px/)
