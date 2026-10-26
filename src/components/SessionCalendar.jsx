@@ -65,7 +65,6 @@ export default function SessionCalendar({
           const isSelected = cell.dateKey === selectedDateKey
           const classes = [
             'session-calendar__day',
-            count > 0 && 'session-calendar__day--available',
             isSelected && 'session-calendar__day--selected',
             cell.dateKey === todayKey && 'session-calendar__day--today',
           ]

@@ -20,7 +20,6 @@ import { firstAccountRow } from '../lib/myAccount'
 import {
   calendarDayMarks,
   confirmedBookingCount,
-  fetchHostOpenSessions,
   fetchHostOwnSessions,
   hostProfileStats,
   nextOpenSession,
@@ -134,12 +133,16 @@ function ProfileIdentity({ givenName, verified }) {
   )
 }
 
-function TeachChips({ listings }) {
-  const categories = teachCategories(listings)
-  if (!categories.length) return null
+function TeachChips({ categories }) {
+  const many = categories.length > 1
 
   return (
-    <ul className="profile-header__chips" aria-label="Teaches">
+    <ul
+      className={
+        many ? 'profile-header__chips profile-header__chips--wrap' : 'profile-header__chips'
+      }
+      aria-label="Teaches"
+    >
       {categories.map((category) => (
         <li
           key={category}
@@ -161,19 +164,23 @@ function NextSession({ session }) {
       <Icon name="calendar" size={16} />
       <div>
         <p className="profile-header__next-label">Next session</p>
-        <Link to={`/listings/${session.listingId}`} className="profile-header__next-when">
-          {formatSessionDateTime(session.startsAt)}
+        <Link to={`/listings/${session.listingId}`} className="profile-header__next-link">
+          <span className="profile-header__next-when">{formatSessionDateTime(session.startsAt)}</span>
+          {session.title ? (
+            <span className="profile-header__next-title">{session.title}</span>
+          ) : null}
         </Link>
       </div>
     </div>
   )
 }
 
-function ProfileStats({ reviews, sessionsHeld }) {
-  const stats = hostProfileStats(reviews, [{ id: 'live' }])
+function ProfileStats({ reviews, sessionsHeld, listings }) {
+  const stats = hostProfileStats(reviews, listings)
+  const categories = teachCategories(listings)
   const showRating = stats.reviewCount > 0 && stats.average != null
   const held = Number(sessionsHeld) || 0
-  if (!showRating && held <= 0) return null
+  if (!showRating && held <= 0 && categories.length === 0) return null
 
   return (
     <dl className="profile-header__stats">
@@ -194,6 +201,14 @@ function ProfileStats({ reviews, sessionsHeld }) {
         <div className="profile-header__stat">
           <dt>Sessions held</dt>
           <dd>{held}</dd>
+        </div>
+      ) : null}
+      {categories.length > 0 ? (
+        <div className="profile-header__stat profile-header__stat--teaches">
+          <dt>Teaches</dt>
+          <dd>
+            <TeachChips categories={categories} />
+          </dd>
         </div>
       ) : null}
     </dl>
@@ -218,10 +233,10 @@ function sessionsHeldCount(data) {
   return Number(data) || 0
 }
 
-function ProfileCalendar({ sessions, listings, publicView, hostId, nowMs }) {
+function ProfileCalendar({ sessions, listings, hostId, nowMs }) {
   const todayKey = singaporeDateKey(nowMs)
   const todayMonth = singaporeMonthKey(nowMs)
-  const marks = calendarDayMarks(sessions, { publicView, now: nowMs })
+  const marks = calendarDayMarks(sessions, { publicView: false, now: nowMs })
   const months = [...new Set(Object.keys(marks).map((key) => key.slice(0, 7)))].sort()
   const firstMonth = months[0] ?? todayMonth
   const lastMonth = months[months.length - 1] ?? todayMonth
@@ -236,7 +251,7 @@ function ProfileCalendar({ sessions, listings, publicView, hostId, nowMs }) {
     Object.entries(marks).filter(([dateKey]) => dateKey.startsWith(visibleMonth)),
   )
   const daySessions = selectedDateKey
-    ? sessionsOnDay(sessions, selectedDateKey, { publicView, now: nowMs })
+    ? sessionsOnDay(sessions, selectedDateKey, { publicView: false, now: nowMs })
     : []
 
   return (
@@ -253,19 +268,10 @@ function ProfileCalendar({ sessions, listings, publicView, hostId, nowMs }) {
         canGoNext={visibleMonth < lastMonth}
       />
       <p className="profile-header__legend">
-        {publicView ? (
-          <>
-            <span className="session-calendar__dot session-calendar__dot--open" aria-hidden="true" />
-            Open sessions
-          </>
-        ) : (
-          <>
-            <span className="session-calendar__dot session-calendar__dot--booked" aria-hidden="true" />
-            Booked
-            <span className="session-calendar__dot session-calendar__dot--open" aria-hidden="true" />
-            Open
-          </>
-        )}
+        <span className="session-calendar__dot session-calendar__dot--booked" aria-hidden="true" />
+        Booked
+        <span className="session-calendar__dot session-calendar__dot--open" aria-hidden="true" />
+        Open
       </p>
       {selectedDateKey ? (
         <div className="profile-header__day">
@@ -277,18 +283,11 @@ function ProfileCalendar({ sessions, listings, publicView, hostId, nowMs }) {
               const time = formatSessionTime(session.starts_at)
               return (
                 <li key={session.id ?? `${session.listing_id}-${session.starts_at}`}>
-                  {publicView ? (
-                    <Link to={`/listings/${session.listing_id}`}>
-                      {time}
-                      {title ? ` · ${title}` : ''}
-                    </Link>
-                  ) : (
-                    <Link to={`/u/${hostId}?tab=hosting`}>
-                      {time}
-                      {title ? ` · ${title}` : ''}
-                      {` · ${booked > 0 ? `${booked} booked` : 'Open'}`}
-                    </Link>
-                  )}
+                  <Link to={`/u/${hostId}?tab=hosting`}>
+                    {time}
+                    {title ? ` · ${title}` : ''}
+                    {` · ${booked > 0 ? `${booked} booked` : 'Open'}`}
+                  </Link>
                 </li>
               )
             })}
@@ -524,10 +523,8 @@ export default function Profile() {
         .filter((listingId) => !removedListingIds.current.has(listingId))
 
       let sessionsResult = { data: [], error: null }
-      if (userData.is_host && listingIds.length > 0) {
-        sessionsResult = viewingOwn
-          ? await fetchHostOwnSessions(supabase, listingIds)
-          : await fetchHostOpenSessions(supabase, id)
+      if (viewingOwn && userData.is_host && listingIds.length > 0) {
+        sessionsResult = await fetchHostOwnSessions(supabase, listingIds)
       }
 
       if (sessionsResult.error) {
@@ -584,32 +581,83 @@ export default function Profile() {
     search: previewSearch(searchParams, activeTab),
   }
   const identity = <ProfileIdentity givenName={givenName} verified={verified} />
-  const next = nextOpenSession(sessions, listings, nowMs)
-  const showCalendar = isHost && listings.length > 0
+  const next = isOwn ? nextOpenSession(sessions, listings, nowMs) : null
+  const showCalendar = isOwn && isHost && listings.length > 0
   const showStats = isHost
-  const aside = (
-    <div className="profile-header__aside">
-      {isHost ? <TeachChips listings={listings} /> : null}
-      <NextSession session={next} />
+  const showAside = Boolean(next || showCalendar)
+  const primary = (
+    <div className="profile-header__primary">
+      {isOwn ? (
+        <ProfilePhotoFlow
+          userId={id}
+          onAvatarUrlChange={(nextUrl) =>
+            setProfile((current) => (current ? { ...current, avatar_url: nextUrl } : current))
+          }
+        >
+          {({ changePhoto, removePhoto }) => {
+            const photo = hasAvatarPhoto(profile.avatar_url)
+            return (
+              <div className="profile-header__identity">
+                <OverflowMenu
+                  label="Profile photo"
+                  align="start"
+                  className="ui-overflow--avatar"
+                  icon={
+                    <ProfileFace showCamera={!photo}>
+                      <Avatar
+                        avatarUrl={profile.avatar_url}
+                        displayName={publicName(profile)}
+                        className="detail-host__avatar"
+                      />
+                    </ProfileFace>
+                  }
+                  items={[
+                    ...(photo
+                      ? [{ label: 'View photo', onSelect: () => setViewingPhoto(true) }]
+                      : []),
+                    { label: photo ? 'Change photo' : 'Add photo', onSelect: changePhoto },
+                    ...(photo
+                      ? [{ label: 'Remove photo', destructive: true, onSelect: removePhoto }]
+                      : []),
+                  ]}
+                />
+                {identity}
+              </div>
+            )
+          }}
+        </ProfilePhotoFlow>
+      ) : (
+        <div className="profile-header__identity">
+          <ProfileFace>
+            <ViewableAvatar
+              avatarUrl={profile.avatar_url}
+              displayName={publicName(profile)}
+              name={givenName}
+              className="detail-host__avatar"
+            />
+          </ProfileFace>
+          {identity}
+        </div>
+      )}
+      {showStats ? (
+        <ProfileStats reviews={reviews} sessionsHeld={sessionsHeld} listings={listings} />
+      ) : null}
+      <ProfileBio about={about} isOwn={isOwn} isHost={isHost} />
     </div>
   )
-  const main = (
-    <div className="profile-header__main">
-      <div className="profile-header__col">
-        {showStats ? <ProfileStats reviews={reviews} sessionsHeld={sessionsHeld} /> : null}
-        <ProfileBio about={about} isOwn={isOwn} isHost={isHost} />
-      </div>
+  const aside = showAside ? (
+    <div className="profile-header__aside">
+      <NextSession session={next} />
       {showCalendar ? (
         <ProfileCalendar
           sessions={sessions}
           listings={listings}
-          publicView={!isOwn}
           hostId={id}
           nowMs={nowMs}
         />
       ) : null}
     </div>
-  )
+  ) : null
 
   return (
     <div className="page page--profile">
@@ -631,61 +679,8 @@ export default function Profile() {
           previewTo={previewTo}
         />
         <div className="profile-header__body">
-          {isOwn ? (
-            <ProfilePhotoFlow
-              userId={id}
-              onAvatarUrlChange={(next) =>
-                setProfile((current) => (current ? { ...current, avatar_url: next } : current))
-              }
-            >
-              {({ changePhoto, removePhoto }) => {
-                const photo = hasAvatarPhoto(profile.avatar_url)
-                return (
-                  <div className="profile-header__identity">
-                    <OverflowMenu
-                      label="Profile photo"
-                      align="start"
-                      className="ui-overflow--avatar"
-                      icon={
-                        <ProfileFace showCamera={!photo}>
-                          <Avatar
-                            avatarUrl={profile.avatar_url}
-                            displayName={publicName(profile)}
-                            className="detail-host__avatar"
-                          />
-                        </ProfileFace>
-                      }
-                      items={[
-                        ...(photo
-                          ? [{ label: 'View photo', onSelect: () => setViewingPhoto(true) }]
-                          : []),
-                        { label: photo ? 'Change photo' : 'Add photo', onSelect: changePhoto },
-                        ...(photo
-                          ? [{ label: 'Remove photo', destructive: true, onSelect: removePhoto }]
-                          : []),
-                      ]}
-                    />
-                    {identity}
-                    {aside}
-                  </div>
-                )
-              }}
-            </ProfilePhotoFlow>
-          ) : (
-            <div className="profile-header__identity">
-              <ProfileFace>
-                <ViewableAvatar
-                  avatarUrl={profile.avatar_url}
-                  displayName={publicName(profile)}
-                  name={givenName}
-                  className="detail-host__avatar"
-                />
-              </ProfileFace>
-              {identity}
-              {aside}
-            </div>
-          )}
-          {main}
+          {primary}
+          {aside}
         </div>
       </header>
 
