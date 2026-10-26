@@ -110,4 +110,21 @@ describe('SessionCalendar', () => {
       expect(button).toHaveAttribute('type', 'button')
     }
   })
+
+  it('paints a solid booked mark and a hollow open mark', () => {
+    renderCalendar({
+      countsByDay: {},
+      marksByDay: { '2026-10-09': 'booked', '2026-10-27': 'open' },
+    })
+
+    expect(
+      screen.getByRole('button', { name: 'Friday, 9 October, 1 session' }).querySelector('.session-calendar__dot'),
+    ).toHaveClass('session-calendar__dot--booked')
+    expect(
+      screen.getByRole('button', { name: 'Tuesday, 27 October, 1 session' }).querySelector('.session-calendar__dot'),
+    ).toHaveClass('session-calendar__dot--open')
+    expect(document.querySelector('.session-calendar__dot--booked')).not.toHaveClass(
+      'session-calendar__dot--open',
+    )
+  })
 })

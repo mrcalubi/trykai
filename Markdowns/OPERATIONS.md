@@ -452,6 +452,7 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00037` (session reminders) | Applied | Applied | Staging 24 October; production 25 October, before #163 |
 | `00038` (what guests should bring) | Applied | Applied | Production 25 October, before #163. After `00037`. |
 | `00039` (host strike events, 12-month expiry) | Applied | Applied | 25 October, after `00038`. |
+| `00040` (host_sessions_held) | Not applied | Not applied | Apply on staging, then production, before merging the profile card layout. After `00039`. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
