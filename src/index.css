@@ -823,6 +823,12 @@ a {
   display: none;
 }
 
+@media (min-width: 768px) {
+  .home-hero__art {
+    justify-self: center;
+  }
+}
+
 @media (min-width: 1024px) {
   .home-hero {
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
@@ -836,7 +842,11 @@ a {
     width: 100%;
     max-width: 260px;
     aspect-ratio: 1;
-    justify-self: end;
+    /* Badges sit at left: -5% / right: -4% / bottom: -3%. A slice of the
+       1fr column on each side keeps them off the page edge, the trust
+       pills, and the category row. */
+    margin-inline: 16px;
+    margin-block-end: 12px;
     background:
       radial-gradient(circle at 50% 50%, var(--surface) 0 40%, transparent 40.3%),
       var(--sand);
@@ -865,6 +875,12 @@ a {
   .home-hero__badge--2 { top: 8%; right: -4%; animation-delay: -1.5s; }
   .home-hero__badge--3 { bottom: 4%; left: -5%; animation-delay: -3s; }
   .home-hero__badge--4 { bottom: -3%; right: 10%; animation-delay: -4.5s; }
+}
+
+@media (min-width: 1280px) {
+  .home-hero__art {
+    max-width: 320px;
+  }
 }
 
 @keyframes hero-float {

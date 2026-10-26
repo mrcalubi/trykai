@@ -488,6 +488,24 @@ describe('Home hero', () => {
     )
     expect(css).toMatch(/\.home-hero__art \{[^}]*max-width:\s*260px/)
   })
+
+  it('centres the mascot in its column and lets it grow from 1280px', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    expect(css).toMatch(/\.home-hero__art \{\s*display:\s*none/)
+    expect(css).toMatch(
+      /@media \(min-width: 768px\) \{\s*\.home-hero__art \{\s*justify-self:\s*center/,
+    )
+    expect(css).not.toMatch(/\.home-hero__art \{[^}]*justify-self:\s*end/)
+    expect(css).toMatch(
+      /@media \(min-width: 1280px\) \{\s*\.home-hero__art \{\s*max-width:\s*320px/,
+    )
+    expect(css).toMatch(/\.home-hero__badge--2 \{[^}]*right:\s*-4%/)
+    expect(css).toMatch(/\.home-hero__badge--3 \{[^}]*left:\s*-5%/)
+    expect(css).toMatch(/\.home-hero__badge--4 \{[^}]*bottom:\s*-3%/)
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.home-hero__badge,/,
+    )
+  })
 })
 
 describe('Home card details', () => {
