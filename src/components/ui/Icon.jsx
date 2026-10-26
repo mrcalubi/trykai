@@ -110,6 +110,18 @@ const PATHS = {
       <path d="M21 16l-5-5-8 8" />
     </>
   ),
+  pencil: (
+    <>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
+      <circle cx="12" cy="12" r="2.5" />
+    </>
+  ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   // Categories
   grid: (

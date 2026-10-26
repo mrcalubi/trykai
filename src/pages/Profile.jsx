@@ -3,11 +3,11 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { AuthedUserContext } from '../lib/authedUser'
 import { publicName } from '../lib/publicName'
-import HostRating from '../components/HostRating'
 import BioPreview from '../components/BioPreview'
 import ReviewCard from '../components/ReviewCard'
 import Avatar from '../components/ui/Avatar'
 import Card from '../components/ui/Card'
+import Icon from '../components/ui/Icon'
 import PhotoLightbox from '../components/PhotoLightbox'
 import ProfilePhotoFlow from '../components/ProfilePhotoFlow'
 import ViewableAvatar from '../components/ViewableAvatar'
@@ -17,7 +17,9 @@ import { ratingsByListingId } from '../lib/listingRatings'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { hostEntry } from '../lib/hostEntry'
 import { firstAccountRow } from '../lib/myAccount'
+import { hostProfileStats, teachCategories } from '../lib/profileHeader'
 import { profileReportSubject, reportMailto } from '../lib/reportMailto'
+import { categoryIconName } from '../components/ui/categoryIcon'
 import OverflowMenu from '../components/ui/OverflowMenu'
 import VerifiedBadge from '../components/VerifiedBadge'
 import PageLoader from '../components/PageLoader'
@@ -27,6 +29,7 @@ import Hosting from './Hosting'
 const OWN_TABS = ['bookings', 'hosting', 'reviews']
 const PROFILE_COLUMNS = 'id, display_name, bio, avatar_url, is_host, is_id_verified'
 const PROFILE_COLUMNS_WITHOUT_BADGE = 'id, display_name, bio, avatar_url, is_host'
+const BANNER_MARKS = ['1', '2', '3', '4', '5', '6', '7', '8']
 
 /**
  * 00023 adds generated `is_id_verified`. Until that migration is applied,
@@ -68,81 +71,142 @@ function ownerSearch(searchParams) {
   return query ? `?${query}` : ''
 }
 
-function ProfileHeaderCopy({
-  givenName,
-  profile,
-  verified,
-  reviews,
-  about,
-  isOwner,
-  isOwn,
-  isHost,
-  previewTo,
-  changePhoto,
-}) {
-  const needsPhoto = isOwn && !hasAvatarPhoto(profile.avatar_url)
+function ProfileBanner() {
+  return (
+    <div className="profile-header__banner" aria-hidden="true">
+      {BANNER_MARKS.map((mark) => (
+        <span key={mark} className={`profile-header__mark profile-header__mark--${mark}`} />
+      ))}
+    </div>
+  )
+}
+
+function ProfileIconLink({ to, label, icon }) {
+  return (
+    <Link to={to} className="profile-header__icon-btn" aria-label={label}>
+      <span className="profile-header__icon-face">
+        <Icon name={icon} size={18} />
+      </span>
+      <span className="profile-header__tooltip" aria-hidden="true">
+        {label}
+      </span>
+    </Link>
+  )
+}
+
+function ProfileFace({ children, showCamera = false }) {
+  return (
+    <span className="profile-header__face">
+      {children}
+      {showCamera ? (
+        <span className="profile-header__camera" aria-hidden="true">
+          <Icon name="camera" size={14} />
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
+function HostStats({ reviews, listings }) {
+  const stats = hostProfileStats(reviews, listings)
+  if (!stats) return null
+
+  return (
+    <dl className="profile-header__stats">
+      {stats.average != null ? (
+        <div className="profile-header__stat">
+          <dt>Rating</dt>
+          <dd>
+            <span className="profile-header__star" aria-hidden="true">
+              ★
+            </span>{' '}
+            {stats.average.toFixed(1)}
+          </dd>
+        </div>
+      ) : null}
+      {stats.reviewCount > 0 ? (
+        <div className="profile-header__stat">
+          <dt>Reviews</dt>
+          <dd>{stats.reviewCount}</dd>
+        </div>
+      ) : null}
+      <div className="profile-header__stat">
+        <dt>Live listings</dt>
+        <dd>{stats.listingCount}</dd>
+      </div>
+    </dl>
+  )
+}
+
+function TeachChips({ listings }) {
+  const categories = teachCategories(listings)
+  if (!categories.length) return null
+
+  return (
+    <div className="profile-header__teaches">
+      <p className="profile-header__teaches-label">Teaches</p>
+      <ul className="profile-header__chips">
+        {categories.map((category) => (
+          <li key={category} className="profile-header__chip">
+            <Icon name={categoryIconName(category)} size={14} />
+            {category}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function ProfileHeaderCopy({ givenName, verified, reviews, listings, about, isOwn, isHost }) {
   const needsBio = isOwn && !about
-  const showNudge = needsPhoto || needsBio
 
   return (
     <div className="profile-header__copy">
-      <div className="profile-header__name-row">
-        <h1 className="profile-header__name">{givenName}</h1>
-        {!isOwner ? (
-          <OverflowMenu
-            label="More actions"
-            icon="⋮"
-            className="ui-overflow--quiet profile-header__menu"
-            items={[
-              {
-                label: 'Report profile',
-                href: reportMailto({
-                  subject: profileReportSubject(givenName),
-                  url: typeof window === 'undefined' ? '' : window.location.href,
-                  id: profile.id,
-                }),
-              },
-            ]}
-          />
-        ) : null}
-      </div>
+      <h1 className="profile-header__name">{givenName}</h1>
       {verified ? <VerifiedBadge /> : null}
-      <HostRating reviews={reviews} />
+      {isHost ? <HostStats reviews={reviews} listings={listings} /> : null}
+      {isHost ? <TeachChips listings={listings} /> : null}
       {about ? <BioPreview bio={about} lines={3} maxChars={240} /> : null}
-      {isOwn ? (
-        <div className="profile-header__actions">
-          <Link to="/settings" className="ui-button ui-button--secondary">
-            Edit profile
-          </Link>
-          <Link to={previewTo} className="ui-button ui-button--secondary">
-            See public profile
-          </Link>
-        </div>
+      {needsBio ? (
+        <Link to="/settings#bio" className="profile-header__bio-prompt">
+          {isHost
+            ? 'Guests book hosts they can picture. Add a short bio →'
+            : 'Add a short bio so guests know who you are →'}
+        </Link>
       ) : null}
-      {showNudge ? (
-        <div className="profile-nudge">
-          <h2 className="profile-nudge__title">Finish your profile</h2>
-          {isHost ? (
-            <p className="profile-nudge__hint">Guests book hosts they can picture.</p>
-          ) : null}
-          <div className="profile-nudge__actions">
-            {needsPhoto ? (
-              <button
-                type="button"
-                className="ui-button ui-button--secondary"
-                onClick={changePhoto}
-              >
-                Add a photo
-              </button>
-            ) : null}
-            {needsBio ? (
-              <Link to="/settings#bio" className="ui-button ui-button--secondary">
-                Write a short bio
-              </Link>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+    </div>
+  )
+}
+
+function ProfileTools({ isOwn, isOwner, givenName, profile, previewTo }) {
+  if (isOwn) {
+    return (
+      <div className="profile-header__tools">
+        <ProfileIconLink to="/settings" label="Edit profile" icon="pencil" />
+        <ProfileIconLink to={previewTo} label="See how guests see you" icon="eye" />
+      </div>
+    )
+  }
+
+  if (isOwner) return null
+
+  return (
+    <div className="profile-header__tools">
+      <OverflowMenu
+        label="More actions"
+        icon="⋮"
+        className="ui-overflow--quiet profile-header__menu"
+        items={[
+          {
+            label: 'Report profile',
+            href: reportMailto({
+              subject: profileReportSubject(givenName),
+              url: typeof window === 'undefined' ? '' : window.location.href,
+              id: profile.id,
+            }),
+          },
+        ]}
+      />
     </div>
   )
 }
@@ -361,14 +425,12 @@ export default function Profile() {
   const headerCopy = (
     <ProfileHeaderCopy
       givenName={givenName}
-      profile={profile}
       verified={verified}
       reviews={reviews}
+      listings={listings}
       about={about}
-      isOwner={isOwner}
       isOwn={isOwn}
       isHost={isHost}
-      previewTo={previewTo}
     />
   )
 
@@ -383,65 +445,76 @@ export default function Profile() {
         </div>
       ) : null}
       <header className="profile-header">
-        {isOwn ? (
-          <ProfilePhotoFlow
-            userId={id}
-            onAvatarUrlChange={(next) =>
-              setProfile((current) => (current ? { ...current, avatar_url: next } : current))
-            }
-          >
-            {({ changePhoto, removePhoto }) => {
-              const photo = hasAvatarPhoto(profile.avatar_url)
-              return (
-                <>
-                  <OverflowMenu
-                    label="Profile photo"
-                    align="start"
-                    className="ui-overflow--avatar"
-                    icon={
-                      <Avatar
-                        avatarUrl={profile.avatar_url}
-                        displayName={publicName(profile)}
-                        className="detail-host__avatar"
-                      />
-                    }
-                    items={[
-                      ...(photo
-                        ? [{ label: 'View photo', onSelect: () => setViewingPhoto(true) }]
-                        : []),
-                      { label: 'Change photo', onSelect: changePhoto },
-                      ...(photo
-                        ? [{ label: 'Remove photo', destructive: true, onSelect: removePhoto }]
-                        : []),
-                    ]}
-                  />
-                  <ProfileHeaderCopy
-                    givenName={givenName}
-                    profile={profile}
-                    verified={verified}
-                    reviews={reviews}
-                    about={about}
-                    isOwner={isOwner}
-                    isOwn={isOwn}
-                    isHost={isHost}
-                    previewTo={previewTo}
-                    changePhoto={changePhoto}
-                  />
-                </>
-              )
-            }}
-          </ProfilePhotoFlow>
-        ) : (
-          <>
-            <ViewableAvatar
-              avatarUrl={profile.avatar_url}
-              displayName={publicName(profile)}
-              name={givenName}
-              className="detail-host__avatar"
-            />
-            {headerCopy}
-          </>
-        )}
+        <ProfileBanner />
+        <ProfileTools
+          isOwn={isOwn}
+          isOwner={isOwner}
+          givenName={givenName}
+          profile={profile}
+          previewTo={previewTo}
+        />
+        <div className="profile-header__body">
+          {isOwn ? (
+            <ProfilePhotoFlow
+              userId={id}
+              onAvatarUrlChange={(next) =>
+                setProfile((current) => (current ? { ...current, avatar_url: next } : current))
+              }
+            >
+              {({ changePhoto, removePhoto }) => {
+                const photo = hasAvatarPhoto(profile.avatar_url)
+                return (
+                  <>
+                    <OverflowMenu
+                      label="Profile photo"
+                      align="start"
+                      className="ui-overflow--avatar"
+                      icon={
+                        <ProfileFace showCamera={!photo}>
+                          <Avatar
+                            avatarUrl={profile.avatar_url}
+                            displayName={publicName(profile)}
+                            className="detail-host__avatar"
+                          />
+                        </ProfileFace>
+                      }
+                      items={[
+                        ...(photo
+                          ? [{ label: 'View photo', onSelect: () => setViewingPhoto(true) }]
+                          : []),
+                        { label: photo ? 'Change photo' : 'Add photo', onSelect: changePhoto },
+                        ...(photo
+                          ? [{ label: 'Remove photo', destructive: true, onSelect: removePhoto }]
+                          : []),
+                      ]}
+                    />
+                    <ProfileHeaderCopy
+                      givenName={givenName}
+                      verified={verified}
+                      reviews={reviews}
+                      listings={listings}
+                      about={about}
+                      isOwn={isOwn}
+                      isHost={isHost}
+                    />
+                  </>
+                )
+              }}
+            </ProfilePhotoFlow>
+          ) : (
+            <>
+              <ProfileFace>
+                <ViewableAvatar
+                  avatarUrl={profile.avatar_url}
+                  displayName={publicName(profile)}
+                  name={givenName}
+                  className="detail-host__avatar"
+                />
+              </ProfileFace>
+              {headerCopy}
+            </>
+          )}
+        </div>
       </header>
 
       {viewingPhoto && hasAvatarPhoto(profile.avatar_url) ? (

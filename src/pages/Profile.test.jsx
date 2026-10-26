@@ -210,7 +210,7 @@ describe('Profile public content', () => {
     expect(screen.queryByRole('link', { name: 'Edit profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
     const more = screen.getByRole('button', { name: 'More actions' })
-    expect(more.closest('.profile-header__name-row')).toBeInTheDocument()
+    expect(more.closest('.profile-header__tools')).toBeInTheDocument()
     await user.click(more)
     const report = screen.getByRole('menuitem', { name: 'Report profile' })
     expect(decodeURIComponent(report.getAttribute('href'))).toContain('Report: profile Mei')
@@ -266,14 +266,22 @@ describe('Profile public content', () => {
 
   it('averages reviews they received as a host and hides the rating when there are none', async () => {
     givenHostReviews([])
+    givenListings([makeListing({ id: 'listing-9', category: 'Food' })])
     renderPage()
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    expect(document.querySelector('.detail-host__rating')).not.toBeInTheDocument()
+    const stats = document.querySelector('.profile-header__stats')
+    expect(stats).toHaveTextContent('Live listings')
+    expect(stats).not.toHaveTextContent('Rating')
+    expect(stats).not.toHaveTextContent('Reviews')
     expect(screen.getByText('No reviews yet.')).toBeInTheDocument()
   })
 
   it('rates the host from every listing they have reviews on', async () => {
+    givenListings([
+      makeListing({ id: 'listing-9', category: 'Food' }),
+      makeListing({ id: 'listing-8', category: 'Music' }),
+    ])
     givenHostReviews([
       makeReview({ id: 'r1', rating: 5, listing_title: 'Latte art' }),
       makeReview({ id: 'r2', rating: 4, listing_title: 'Pour over' }),
@@ -281,10 +289,12 @@ describe('Profile public content', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Reviews (2)' })
-    expect(document.querySelector('.detail-host__rating').textContent.replace(/\s+/g, ' ').trim()).toBe(
-      '★ 4.5 · 2 reviews'
-    )
-    expect(document.querySelector('.detail-host__star')).toHaveAttribute('aria-hidden', 'true')
+    const stats = document.querySelector('.profile-header__stats')
+    expect(stats.textContent.replace(/\s+/g, ' ').trim()).toContain('★ 4.5')
+    expect(stats).toHaveTextContent('Rating')
+    expect(stats).toHaveTextContent('Reviews')
+    expect(stats).toHaveTextContent('Live listings')
+    expect(document.querySelector('.profile-header__star')).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('loads reviews through reviews_for_host, not a bookings embed', async () => {
@@ -463,7 +473,7 @@ describe('Profile public content', () => {
     )
   })
 
-  it('stacks header copy in a column so the badge and actions never share a line', () => {
+  it('stacks header copy in a column and keeps the 880px page', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
     const copy = css.match(/\.profile-header__copy \{[\s\S]*?\n\}/)
     expect(copy?.[0]).toMatch(/display:\s*flex/)
@@ -471,6 +481,20 @@ describe('Profile public content', () => {
     expect(copy?.[0]).toMatch(/gap:\s*6px/)
     expect(css).toMatch(/\.page--profile \{[\s\S]*?max-width:\s*880px/)
     expect(css).toMatch(/\.page--detail \{[\s\S]*?max-width:\s*1120px/)
+  })
+
+  it('paints a sand banner and overlaps the avatar with a surface ring', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    expect(css).toMatch(/\.profile-header__banner \{[\s\S]*?height:\s*96px/)
+    expect(css).toMatch(/\.profile-header__banner \{[\s\S]*?background:\s*var\(--sand\)/)
+    expect(css).toMatch(/\.profile-header__banner \{[\s\S]*?height:\s*120px/)
+    expect(css).toMatch(
+      /\.profile-header \.detail-host__avatar \{[\s\S]*?box-shadow:\s*0 0 0 4px var\(--surface\)/,
+    )
+    expect(css).toMatch(/\.profile-header__body \{[\s\S]*?margin-top:\s*-40px/)
+    expect(css).toMatch(/\.profile-header__icon-btn \{[\s\S]*?width:\s*44px/)
+    expect(css).toMatch(/\.profile-header__icon-btn:hover \.profile-header__tooltip/)
+    expect(css).toMatch(/\.profile-header__icon-btn:focus-visible \.profile-header__tooltip/)
   })
 })
 
@@ -491,18 +515,18 @@ describe('Profile own tabs', () => {
     expect(screen.getByRole('link', { name: 'Hosting' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Listings' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Reviews' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'See public profile' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'See how guests see you' })).toHaveAttribute(
       'href',
       `/u/${HOST_ID}?tab=bookings&view=public`,
     )
     expect(screen.getByRole('link', { name: 'Edit profile' })).toHaveAttribute('href', '/settings')
-    expect(screen.getByRole('heading', { name: 'Finish your profile' })).toBeInTheDocument()
-    expect(screen.getByText('Guests book hosts they can picture.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add a photo' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Write a short bio' })).toHaveAttribute(
-      'href',
-      '/settings#bio',
-    )
+    expect(
+      screen.getByRole('link', {
+        name: 'Guests book hosts they can picture. Add a short bio →',
+      }),
+    ).toHaveAttribute('href', '/settings#bio')
+    expect(document.querySelector('.profile-header__camera')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Finish your profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
@@ -511,7 +535,8 @@ describe('Profile own tabs', () => {
     const photo = screen.getByRole('button', { name: 'Profile photo' })
     await user.click(photo)
     expect(screen.getByRole('menu')).toHaveClass('ui-overflow__menu--start')
-    expect(screen.getByRole('menuitem', { name: 'Change photo' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Add photo' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Change photo' })).not.toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'View photo' })).not.toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Remove photo' })).not.toBeInTheDocument()
   })
@@ -570,7 +595,7 @@ describe('Profile own tabs', () => {
 
     await waitFor(() => expect(screen.queryByText('fr')).not.toBeInTheDocument())
 
-    await user.click(screen.getByRole('link', { name: 'See public profile' }))
+    await user.click(screen.getByRole('link', { name: 'See how guests see you' }))
 
     expect(await screen.findByText('This is how guests see your profile')).toBeInTheDocument()
     expect(screen.getByText('No listings yet.')).toBeInTheDocument()
@@ -697,8 +722,8 @@ describe('Profile own tabs', () => {
       'I pull rosettas.',
     )
     expect(screen.queryByRole('heading', { name: 'About' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Write a short bio' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add a photo' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Add a short bio/ })).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__camera')).toBeInTheDocument()
   })
 
   it('lets you view, change and remove your photo, and updates the header', async () => {
@@ -741,12 +766,12 @@ describe('Profile public preview', () => {
   it('carries the current tab into public preview and back', async () => {
     const { user } = renderPage({ search: '?tab=hosting' })
 
-    expect(await screen.findByRole('link', { name: 'See public profile' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'See how guests see you' })).toHaveAttribute(
       'href',
       `/u/${HOST_ID}?tab=hosting&view=public`,
     )
 
-    await user.click(screen.getByRole('link', { name: 'See public profile' }))
+    await user.click(screen.getByRole('link', { name: 'See how guests see you' }))
 
     expect(await screen.findByText('This is how guests see your profile')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to your profile' })).toHaveAttribute(
@@ -784,11 +809,12 @@ describe('Profile public preview', () => {
     expect(screen.getByRole('heading', { name: 'Reviews' })).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Edit profile' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'See public profile' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'See how guests see you' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Profile photo' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Finish your profile' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Add a short bio/ })).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__camera')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Back to your profile' }))
     expect(await screen.findByRole('navigation', { name: 'Profile' })).toBeInTheDocument()
@@ -805,7 +831,9 @@ describe('Profile of another user', () => {
     expect(screen.queryByRole('link', { name: 'Bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Edit profile' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Finish your profile' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'See how guests see you' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument()
+    expect(document.querySelector('.profile-header__camera')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Listings' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Reviews' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'My Bookings' })).not.toBeInTheDocument()
@@ -828,28 +856,56 @@ describe('Profile of another user', () => {
   })
 })
 
-describe('Profile finish nudge', () => {
-  beforeEach(() => {
-    givenSignedIn(HOST_ID)
-  })
-
-  it('shows only the missing photo when a bio is already there', async () => {
-    givenProfile({
-      id: HOST_ID,
-      display_name: 'Mei',
-      bio: 'I pull rosettas.',
-      avatar_url: null,
-      is_id_verified: true,
-      is_host: true,
-    })
+describe('Profile card restyle', () => {
+  it('renders the banner and an overlapping avatar', async () => {
     renderPage()
 
-    await screen.findByRole('heading', { name: 'Finish your profile' })
-    expect(screen.getByRole('button', { name: 'Add a photo' })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Write a short bio' })).not.toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(document.querySelector('.profile-header__banner')).toHaveAttribute('aria-hidden', 'true')
+    expect(document.querySelectorAll('.profile-header__banner .profile-header__mark')).toHaveLength(8)
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    expect(css).toMatch(/url\('\.\/assets\/categories\/food\.png'\)/)
+    expect(css).toMatch(/url\('\.\/assets\/categories\/music\.png'\)/)
+    expect(css).toMatch(/url\('\.\/assets\/categories\/arts\.png'\)/)
+    expect(css).toMatch(/url\('\.\/assets\/categories\/fitness\.png'\)/)
+    expect(document.querySelector('.profile-header__face .detail-host__avatar')).toBeInTheDocument()
   })
 
-  it('shows only the missing bio when a photo is already there', async () => {
+  it('shows the pencil and eye on your own profile, with their labels', async () => {
+    givenSignedIn(HOST_ID)
+    renderPage()
+
+    const edit = await screen.findByRole('link', { name: 'Edit profile' })
+    expect(edit).toHaveAttribute('href', '/settings')
+    expect(edit.querySelector('.profile-header__tooltip')).toHaveTextContent('Edit profile')
+    const preview = screen.getByRole('link', { name: 'See how guests see you' })
+    expect(preview).toHaveAttribute('href', `/u/${HOST_ID}?tab=bookings&view=public`)
+    expect(preview.querySelector('.profile-header__tooltip')).toHaveTextContent(
+      'See how guests see you',
+    )
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+  })
+
+  it('keeps Report on other people and hides owner actions', async () => {
+    givenSignedIn(OTHER_ID)
+    const { user } = renderPage()
+
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(screen.queryByRole('link', { name: 'Edit profile' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'See how guests see you' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    expect(screen.getByRole('menuitem', { name: 'Report profile' })).toBeInTheDocument()
+  })
+
+  it('shows the camera badge only when your own profile has no photo', async () => {
+    givenSignedIn(HOST_ID)
+    renderPage()
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(document.querySelector('.profile-header__camera')).toBeInTheDocument()
+  })
+
+  it('hides the camera badge once a photo is there', async () => {
+    givenSignedIn(HOST_ID)
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
@@ -859,35 +915,22 @@ describe('Profile finish nudge', () => {
       is_host: true,
     })
     renderPage()
-
-    await screen.findByRole('heading', { name: 'Finish your profile' })
-    expect(screen.getByRole('link', { name: 'Write a short bio' })).toHaveAttribute(
-      'href',
-      '/settings#bio',
-    )
-    expect(screen.queryByRole('button', { name: 'Add a photo' })).not.toBeInTheDocument()
-  })
-
-  it('hides the nudge when the photo and bio are both done', async () => {
-    givenProfile({
-      id: HOST_ID,
-      display_name: 'Mei',
-      bio: 'I pull rosettas.',
-      avatar_url: 'https://cdn.test/mei.jpg',
-      is_id_verified: true,
-      is_host: true,
-    })
-    renderPage()
-
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    expect(screen.queryByRole('heading', { name: 'Finish your profile' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Add a photo' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Write a short bio' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Edit profile' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'See public profile' })).toBeInTheDocument()
+    expect(document.querySelector('.profile-header__camera')).not.toBeInTheDocument()
   })
 
-  it('omits the host line for a non-host', async () => {
+  it('uses host wording for the bio prompt', async () => {
+    givenSignedIn(HOST_ID)
+    renderPage()
+    expect(
+      await screen.findByRole('link', {
+        name: 'Guests book hosts they can picture. Add a short bio →',
+      }),
+    ).toHaveAttribute('href', '/settings#bio')
+  })
+
+  it('uses guest wording for a non-host bio prompt', async () => {
+    givenSignedIn(HOST_ID)
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
@@ -897,25 +940,46 @@ describe('Profile finish nudge', () => {
       is_host: false,
     })
     renderPage()
-
-    await screen.findByRole('heading', { name: 'Finish your profile' })
-    expect(screen.queryByText('Guests book hosts they can picture.')).not.toBeInTheDocument()
+    expect(
+      await screen.findByRole('link', {
+        name: 'Add a short bio so guests know who you are →',
+      }),
+    ).toHaveAttribute('href', '/settings#bio')
+    expect(
+      screen.queryByRole('link', { name: 'Guests book hosts they can picture. Add a short bio →' }),
+    ).not.toBeInTheDocument()
   })
 
-  it('never shows the nudge on someone else or in public preview', async () => {
-    givenProfile({
-      id: HOST_ID,
-      display_name: 'Mei',
-      bio: null,
-      avatar_url: null,
-      is_id_verified: true,
-      is_host: true,
-    })
-    givenSignedIn(OTHER_ID)
+  it('never shows the bio prompt in public preview', async () => {
+    givenSignedIn(HOST_ID)
+    renderPage({ search: '?view=public' })
+
+    await screen.findByText('This is how guests see your profile')
+    expect(screen.queryByRole('link', { name: /Add a short bio/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Edit profile' })).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__camera')).not.toBeInTheDocument()
+  })
+
+  it('lists distinct Teaches chips from the approved, active listings already on the page', async () => {
+    givenListings([
+      makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' }),
+      makeListing({ id: 'listing-8', title: 'Pour over', category: 'Food' }),
+      makeListing({ id: 'listing-7', title: 'Open mic', category: 'Music' }),
+    ])
     renderPage()
 
+    await screen.findByText('Teaches')
+    const chips = [...document.querySelectorAll('.profile-header__chip')].map(
+      (chip) => chip.textContent,
+    )
+    expect(chips).toEqual(['Food', 'Music'])
+    expect(screen.queryByText('Fitness')).not.toBeInTheDocument()
+  })
+
+  it('hides Teaches when the host has no live listings', async () => {
+    renderPage()
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    expect(screen.queryByRole('heading', { name: 'Finish your profile' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument()
+    expect(screen.queryByText('Teaches')).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__stats')).not.toBeInTheDocument()
   })
 })
