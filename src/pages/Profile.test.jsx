@@ -457,7 +457,7 @@ describe('Profile own tabs', () => {
     expect(screen.getByRole('link', { name: 'Reviews' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'See your public profile' })).toHaveAttribute(
       'href',
-      `/u/${HOST_ID}?view=public`,
+      `/u/${HOST_ID}?tab=bookings&view=public`,
     )
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
     expect(screen.getByRole('link', { name: 'Add a short bio' })).toHaveAttribute(
@@ -692,6 +692,30 @@ describe('Profile own tabs', () => {
 describe('Profile public preview', () => {
   beforeEach(() => {
     givenSignedIn(HOST_ID)
+  })
+
+  it('carries the current tab into public preview and back', async () => {
+    const { user } = renderPage({ search: '?tab=hosting' })
+
+    expect(await screen.findByRole('link', { name: 'See your public profile' })).toHaveAttribute(
+      'href',
+      `/u/${HOST_ID}?tab=hosting&view=public`,
+    )
+
+    await user.click(screen.getByRole('link', { name: 'See your public profile' }))
+
+    expect(await screen.findByText('This is how guests see your profile')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to your profile' })).toHaveAttribute(
+      'href',
+      `/u/${HOST_ID}?tab=hosting`,
+    )
+
+    await user.click(screen.getByRole('link', { name: 'Back to your profile' }))
+
+    expect(await screen.findByRole('link', { name: 'Hosting' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
   })
 
   it('shows the public layout plus the bar, and no owner controls', async () => {

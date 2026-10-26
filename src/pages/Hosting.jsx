@@ -47,7 +47,11 @@ import {
 } from '../lib/payoutReturn'
 import { listingReviewBadge } from '../lib/listingReview'
 import ListingDeleteDialog from '../components/ListingDeleteDialog'
-import { HOST_SESSIONS_SELECT, listingUpcomingStats } from '../lib/listingDelete'
+import {
+  HOST_SESSIONS_SELECT,
+  listingDeleteErrorMessage,
+  listingUpcomingStats,
+} from '../lib/listingDelete'
 
 function activeBookingsOn(session) {
   // Pending rows are unpaid checkouts, not guests the host has to refund.
@@ -530,7 +534,8 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
     setDeleteLoading(false)
 
     if (rpcError) {
-      setDeleteError(rpcError.message)
+      console.error('Listing delete failed', rpcError)
+      setDeleteError(listingDeleteErrorMessage(rpcError))
       return
     }
 

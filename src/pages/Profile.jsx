@@ -53,6 +53,20 @@ function tabSearch(searchParams, tab) {
   return `?${params.toString()}`
 }
 
+function previewSearch(searchParams, tab) {
+  const params = new URLSearchParams(searchParams)
+  params.set('tab', tab)
+  params.set('view', 'public')
+  return `?${params.toString()}`
+}
+
+function ownerSearch(searchParams) {
+  const params = new URLSearchParams(searchParams)
+  params.delete('view')
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
 function SettingsGearIcon() {
   return (
     <svg
@@ -286,7 +300,9 @@ export default function Profile() {
       {publicPreview ? (
         <div className="profile-preview-bar" role="status">
           <span>This is how guests see your profile</span>
-          <Link to={`/u/${id}`}>Back to your profile</Link>
+          <Link to={{ pathname: `/u/${id}`, search: ownerSearch(searchParams) }}>
+            Back to your profile
+          </Link>
         </div>
       ) : null}
       <header className="profile-header">
@@ -356,7 +372,10 @@ export default function Profile() {
           {verified ? <VerifiedBadge /> : null}
           <HostRating reviews={reviews} />
           {isOwn ? (
-            <Link to={`/u/${id}?view=public`} className="profile-header__public">
+            <Link
+              to={{ pathname: `/u/${id}`, search: previewSearch(searchParams, activeTab) }}
+              className="profile-header__public"
+            >
               See your public profile
             </Link>
           ) : null}

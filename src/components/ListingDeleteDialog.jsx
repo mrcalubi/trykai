@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import Button from './ui/Button'
+import { LISTING_DELETE_SESSIONS_UNAVAILABLE } from '../lib/listingDelete'
 
 function sessionLabel(count) {
   return count === 1 ? '1 upcoming session' : `${count} upcoming sessions`
@@ -15,10 +16,11 @@ export default function ListingDeleteDialog({
   bookingCount,
   loading,
   error,
+  unavailable = false,
   onClose,
   onConfirm,
 }) {
-  const blocked = bookingCount > 0
+  const blocked = unavailable || bookingCount > 0
   const title = listing.title
 
   useEffect(() => {
@@ -43,13 +45,15 @@ export default function ListingDeleteDialog({
         aria-labelledby="listing-delete-title"
       >
         <p id="listing-delete-title" className="cancel-confirm__warning">
-          {blocked
-            ? `'${title}' has ${bookingLabel(bookingCount)}. Cancel those sessions first. Guests are refunded in full.`
-            : `Delete '${title}'? This can't be undone.${
-                sessionCount > 0
-                  ? ` Its ${sessionLabel(sessionCount)} will be removed too.`
-                  : ''
-              }`}
+          {unavailable
+            ? LISTING_DELETE_SESSIONS_UNAVAILABLE
+            : blocked
+              ? `'${title}' has ${bookingLabel(bookingCount)}. Cancel those sessions first. Guests are refunded in full.`
+              : `Delete '${title}'? This can't be undone.${
+                  sessionCount > 0
+                    ? ` Its ${sessionLabel(sessionCount)} will be removed too.`
+                    : ''
+                }`}
         </p>
         {error ? (
           <p className="error-message" role="alert">

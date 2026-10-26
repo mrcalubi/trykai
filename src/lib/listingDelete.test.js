@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { listingUpcomingStats, upcomingSessionsFrom } from './listingDelete'
+import {
+  LISTING_DELETE_ACTIVE_BOOKINGS,
+  LISTING_DELETE_FAILED,
+  listingDeleteErrorMessage,
+  listingUpcomingStats,
+  upcomingSessionsFrom,
+} from './listingDelete'
 
 describe('listingUpcomingStats', () => {
   it('counts upcoming sessions and confirmed bookings for one listing', () => {
@@ -29,6 +35,19 @@ describe('listingUpcomingStats', () => {
       sessionCount: 2,
       bookingCount: 1,
     })
+  })
+})
+
+describe('listingDeleteErrorMessage', () => {
+  it('maps the active-bookings RPC to a cancel-those-sessions line', () => {
+    expect(listingDeleteErrorMessage({ message: 'listing has active bookings' })).toBe(
+      LISTING_DELETE_ACTIVE_BOOKINGS,
+    )
+  })
+
+  it('maps any other error to a retry line', () => {
+    expect(listingDeleteErrorMessage({ message: 'not your listing' })).toBe(LISTING_DELETE_FAILED)
+    expect(listingDeleteErrorMessage(null)).toBe(LISTING_DELETE_FAILED)
   })
 })
 

@@ -30,7 +30,12 @@ import { notifyListingSubmitted } from '../lib/listingReview'
 import { listingEditorDraft } from '../lib/unsavedDraft'
 import { useUnsavedChangesGuard } from '../lib/useUnsavedChangesGuard'
 import ListingDeleteDialog from '../components/ListingDeleteDialog'
-import { HOST_SESSIONS_SELECT, listingUpcomingStats, upcomingSessionsFrom } from '../lib/listingDelete'
+import {
+  HOST_SESSIONS_SELECT,
+  listingDeleteErrorMessage,
+  listingUpcomingStats,
+  upcomingSessionsFrom,
+} from '../lib/listingDelete'
 import { monthStartIso } from '../lib/hostingDashboard'
 
 const MAX_PHOTOS = 5
@@ -85,6 +90,7 @@ export default function EditListing() {
   const [savedDraft, setSavedDraft] = useState(null)
   const [listingTitle, setListingTitle] = useState('')
   const [upcomingSessions, setUpcomingSessions] = useState([])
+  const [sessionsFailed, setSessionsFailed] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -146,9 +152,13 @@ export default function EditListing() {
 
       setIsFoundingHost(foundingHostFromRpc(founding.data, founding.error))
       setListingTitle(data.title)
-      setUpcomingSessions(
-        sessionsResult.error ? [] : upcomingSessionsFrom(sessionsResult.data),
-      )
+      if (sessionsResult.error) {
+        setUpcomingSessions([])
+        setSessionsFailed(true)
+      } else {
+        setUpcomingSessions(upcomingSessionsFrom(sessionsResult.data))
+        setSessionsFailed(false)
+      }
 
       const nextTitle = data.title
       const nextDescription = data.description
@@ -328,8 +338,9 @@ export default function EditListing() {
     setDeleteLoading(false)
 
     if (rpcError) {
+      console.error('Listing delete failed', rpcError)
       setLeaving(false)
-      setDeleteError(rpcError.message)
+      setDeleteError(listingDeleteErrorMessage(rpcError))
       return
     }
 
@@ -543,6 +554,7 @@ export default function EditListing() {
           bookingCount={deleteStats.bookingCount}
           loading={deleteLoading}
           error={deleteError}
+          unavailable={sessionsFailed}
           onClose={() => setDeleteOpen(false)}
           onConfirm={handleDeleteListing}
         />

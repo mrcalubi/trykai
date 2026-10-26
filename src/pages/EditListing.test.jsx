@@ -12,6 +12,11 @@ import {
   LISTING_SAVE_ERROR,
   PHOTO_UPLOAD_ERROR,
 } from '../lib/listingFieldHints'
+import {
+  LISTING_DELETE_ACTIVE_BOOKINGS,
+  LISTING_DELETE_FAILED,
+  LISTING_DELETE_SESSIONS_UNAVAILABLE,
+} from '../lib/listingDelete'
 
 vi.mock('../lib/supabase')
 
@@ -777,15 +782,50 @@ describe('EditListing delete', () => {
     expect(screen.queryByRole('dialog', { name: 'Discard your changes?' })).not.toBeInTheDocument()
   })
 
-  it('keeps the form and shows the error in the dialog when delete fails', async () => {
+  it('maps an active-bookings RPC error to a cancel-those-sessions line', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    givenDeleteListing({ data: null, error: { message: 'listing has active bookings' } })
+    const { user, currentPath } = await renderLoaded()
+
+    await user.click(screen.getByRole('button', { name: 'Delete listing' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(LISTING_DELETE_ACTIVE_BOOKINGS)
+    expect(log).toHaveBeenCalledWith(
+      'Listing delete failed',
+      expect.objectContaining({ message: 'listing has active bookings' }),
+    )
+    expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
+    expect(currentPath()).toBe('/edit-listing/listing-1')
+    log.mockRestore()
+  })
+
+  it('keeps the form and shows a retry line when delete fails', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     givenDeleteListing({ data: null, error: { message: 'not your listing' } })
     const { user, currentPath } = await renderLoaded()
 
     await user.click(screen.getByRole('button', { name: 'Delete listing' }))
     await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('not your listing')
+    expect(await screen.findByRole('alert')).toHaveTextContent(LISTING_DELETE_FAILED)
+    expect(log).toHaveBeenCalledWith(
+      'Listing delete failed',
+      expect.objectContaining({ message: 'not your listing' }),
+    )
     expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
     expect(currentPath()).toBe('/edit-listing/listing-1')
+    log.mockRestore()
+  })
+
+  it('hides Confirm when the sessions query fails', async () => {
+    supabase.__on('sessions', 'select', { data: null, error: { message: 'permission denied' } })
+    const { user } = await renderLoaded()
+
+    await user.click(screen.getByRole('button', { name: 'Delete listing' }))
+
+    expect(screen.getByRole('dialog')).toHaveTextContent(LISTING_DELETE_SESSIONS_UNAVAILABLE)
+    expect(screen.queryByRole('button', { name: 'Confirm delete' })).not.toBeInTheDocument()
+    expect(supabase.rpc.mock.calls.some(([name]) => name === 'delete_listing')).toBe(false)
   })
 })
