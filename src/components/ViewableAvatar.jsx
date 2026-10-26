@@ -8,13 +8,20 @@ export default function ViewableAvatar({
   displayName,
   className = '',
   size,
+  fill = false,
   name,
 }) {
   const [open, setOpen] = useState(false)
   const photo = hasAvatarPhoto(avatarUrl) ? avatarUrl.trim() : ''
   const labelName = name || displayName || 'Anonymous'
   const avatar = (
-    <Avatar avatarUrl={photo} displayName={displayName} className={className} size={size} />
+    <Avatar
+      avatarUrl={photo}
+      displayName={displayName}
+      className={className}
+      size={size}
+      fill={fill}
+    />
   )
 
   if (!photo) return avatar

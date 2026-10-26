@@ -49,4 +49,11 @@ describe('Avatar', () => {
     expect(screen.getByText('?')).toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
+
+  it('fills the wrapper instead of a fixed pixel size', () => {
+    render(<Avatar displayName="Mei" fill />)
+    const face = screen.getByText('M')
+    expect(face).toHaveStyle({ width: '100%', height: '100%' })
+    expect(face.style.fontSize).toBe('')
+  })
 })

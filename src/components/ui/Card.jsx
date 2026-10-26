@@ -89,7 +89,7 @@ export default function Card({
         <Avatar
           avatarUrl={host.avatarUrl}
           displayName={hostName}
-          size={36}
+          fill
           className={host.avatarUrl ? 'ui-card__host-img' : ''}
         />
       </span>

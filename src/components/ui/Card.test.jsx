@@ -198,6 +198,9 @@ describe('Card', () => {
 
     expect(container.querySelector('.ui-card__host')).toHaveTextContent('L')
     expect(container.querySelector('.ui-card__host')).not.toHaveTextContent('LQ')
+    const face = container.querySelector('.ui-card__host .ui-avatar')
+    expect(face).toHaveStyle({ width: '100%', height: '100%' })
+    expect(face.getAttribute('style') ?? '').not.toMatch(/36px/)
   })
 
   it('lets the title column shrink inside the grid instead of overflowing', () => {
