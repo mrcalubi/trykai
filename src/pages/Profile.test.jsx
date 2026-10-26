@@ -466,6 +466,7 @@ describe('Profile own tabs', () => {
     expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
     const photo = screen.getByRole('button', { name: 'Profile photo' })
     await user.click(photo)
+    expect(screen.getByRole('menu')).toHaveClass('ui-overflow__menu--start')
     expect(screen.getByRole('menuitem', { name: 'Change photo' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'View photo' })).not.toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Remove photo' })).not.toBeInTheDocument()
