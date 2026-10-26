@@ -1,3 +1,5 @@
+import { convertHeicIfNeeded, isHeicReadError } from './heicImage'
+
 const MAX_EDGE = 1600
 const QUALITY = 0.82
 
@@ -65,19 +67,22 @@ async function sourceFromFile(file) {
 
 /**
  * Shrink an image on the main thread before upload: long edge 1600px, JPEG 0.82.
- * No workers, no eval. Any failure returns the original file so upload can proceed.
+ * HEIC/HEIF is converted to JPEG first. No workers, no eval. A failed HEIC
+ * conversion throws; any other failure returns the file we can already read
+ * (the converted JPEG, never the raw HEIC).
  */
 export async function compressImage(file, { maxEdge = MAX_EDGE, quality = QUALITY } = {}) {
+  const working = await convertHeicIfNeeded(file)
   let close = () => {}
   try {
-    if (!file || !String(file.type || '').startsWith('image/')) return file
+    if (!working || !String(working.type || '').startsWith('image/')) return working
 
-    const source = await sourceFromFile(file)
+    const source = await sourceFromFile(working)
     close = source.close
     const image = source.image
     const sourceWidth = image.naturalWidth || image.width
     const sourceHeight = image.naturalHeight || image.height
-    if (!sourceWidth || !sourceHeight) return fallback(file, new Error('Could not read the photo'))
+    if (!sourceWidth || !sourceHeight) return fallback(working, new Error('Could not read the photo'))
 
     const scale = Math.min(1, maxEdge / Math.max(sourceWidth, sourceHeight))
     const width = Math.max(1, Math.round(sourceWidth * scale))
@@ -87,14 +92,15 @@ export async function compressImage(file, { maxEdge = MAX_EDGE, quality = QUALIT
     canvas.width = width
     canvas.height = height
     const ctx = canvas.getContext('2d')
-    if (!ctx) return fallback(file, new Error('no 2d context'))
+    if (!ctx) return fallback(working, new Error('no 2d context'))
 
     ctx.drawImage(image, 0, 0, width, height)
     const blob = await canvasToBlob(canvas, 'image/jpeg', quality)
-    const base = String(file.name || 'photo').replace(/\.[^.]+$/, '') || 'photo'
+    const base = String(working.name || 'photo').replace(/\.[^.]+$/, '') || 'photo'
     return new File([blob], `${base}.jpg`, { type: 'image/jpeg', lastModified: Date.now() })
   } catch (error) {
-    return fallback(file, error)
+    if (isHeicReadError(error)) throw error
+    return fallback(working, error)
   } finally {
     close()
   }

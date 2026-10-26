@@ -7,6 +7,7 @@ import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession } from '../test/fixtures'
+import { HEIC_READ_ERROR, IMAGE_ACCEPT, heicLoader } from '../lib/heicImage'
 
 vi.mock('../lib/supabase')
 
@@ -68,6 +69,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 
 describe('Settings access', () => {
@@ -241,6 +243,25 @@ describe('Settings profile form', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('storage full')
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(supabase.__calls('users', 'update')).toHaveLength(0)
+  })
+
+  it('offers HEIC files in the profile photo picker', async () => {
+    await renderSettings()
+    expect(screen.getByLabelText('Profile photo')).toHaveAttribute('accept', IMAGE_ACCEPT)
+  })
+
+  it('does not upload a HEIC that cannot be read', async () => {
+    vi.spyOn(heicLoader, 'importConverter').mockRejectedValue(new Error('wasm'))
+    await renderSettings()
+    fireEvent.change(screen.getByLabelText('Profile photo'), {
+      target: { files: [new File(['h'], 'face.heic', { type: 'image/heic' })] },
+    })
+
+    await screen.getByRole('button', { name: 'Save changes' }).click()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(HEIC_READ_ERROR)
+    expect(supabase.__bucket('listing-photos').upload).not.toHaveBeenCalled()
     expect(supabase.__calls('users', 'update')).toHaveLength(0)
   })
 

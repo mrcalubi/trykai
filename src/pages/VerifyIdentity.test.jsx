@@ -5,6 +5,7 @@ import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession } from '../test/fixtures'
+import { HEIC_READ_ERROR, IMAGE_ACCEPT, heicLoader } from '../lib/heicImage'
 
 vi.mock('../lib/supabase')
 
@@ -84,6 +85,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
+  vi.restoreAllMocks()
 })
 
 describe('VerifyIdentity access control', () => {
@@ -233,6 +235,26 @@ describe('VerifyIdentity submission', () => {
     await waitFor(() => expect(bucket.upload).toHaveBeenCalledTimes(2))
     expect(bucket.upload.mock.calls[0][0]).toBe('host-9/id-photo.jpg')
     expect(bucket.upload.mock.calls[1][0]).toBe('host-9/selfie.jpg')
+  })
+
+  it('offers HEIC files on the ID and selfie pickers', async () => {
+    await openForm()
+    expect(screen.getByLabelText(/^Passport or NRIC photo/)).toHaveAttribute('accept', IMAGE_ACCEPT)
+    expect(screen.getByLabelText(/^Selfie/)).toHaveAttribute('accept', IMAGE_ACCEPT)
+  })
+
+  it('does not upload when a HEIC photo cannot be read', async () => {
+    vi.spyOn(heicLoader, 'importConverter').mockRejectedValue(new Error('wasm'))
+    const { user } = await openForm()
+    attach(/^Passport or NRIC photo/, new File(['h'], 'id.heic', { type: 'image/heic' }))
+    attach(/^Selfie/, imageFile('selfie.png'))
+    fireEvent.click(screen.getByRole('checkbox'))
+
+    await user.click(screen.getByRole('button', { name: 'Submit for review' }))
+
+    expect(await screen.findByText(HEIC_READ_ERROR)).toBeInTheDocument()
+    expect(supabase.__bucket('verification-docs').upload).not.toHaveBeenCalled()
+    expect(submitCalls()).toHaveLength(0)
   })
 
   it('overwrites a previous submission rather than failing', async () => {

@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { filesToPhotos, movePhoto, photosFromUrls, snapshotImageFiles, uploadListingPhotos } from './listingPhotos'
+import { HEIC_READ_ERROR } from './heicImage'
 
 vi.mock('./compressImage', () => ({
   compressImage: vi.fn(async (file) => file),
@@ -8,6 +9,11 @@ vi.mock('./compressImage', () => ({
 import { compressImage } from './compressImage'
 
 describe('listingPhotos', () => {
+  afterEach(() => {
+    compressImage.mockReset()
+    compressImage.mockImplementation(async (file) => file)
+  })
+
   it('rebuilds remote photos in the given order', () => {
     expect(photosFromUrls(['https://cdn.test/a.jpg', 'https://cdn.test/b.jpg']).map((p) => p.remoteUrl)).toEqual([
       'https://cdn.test/a.jpg',
@@ -41,12 +47,52 @@ describe('listingPhotos', () => {
     compressImage.mockRejectedValueOnce(new Error('eval blocked'))
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const photos = await filesToPhotos([file], 5)
+    const { photos } = await filesToPhotos([file], 5)
 
     expect(photos).toHaveLength(1)
     expect(photos[0].file).toBe(file)
     expect(error).toHaveBeenCalled()
     error.mockRestore()
+  })
+
+  it('copies a typeless HEIC so the picker is not dropped', () => {
+    const heic = new File(['h'], 'IMG_001.HEIC', { type: '' })
+    expect(snapshotImageFiles([heic])).toEqual([heic])
+  })
+
+  it('skips a HEIC that cannot be read and reports the error', async () => {
+    const heic = new File(['h'], 'shot.heic', { type: 'image/heic' })
+    compressImage.mockRejectedValueOnce(new Error(HEIC_READ_ERROR))
+
+    const { photos, error } = await filesToPhotos([heic], 5)
+
+    expect(photos).toHaveLength(0)
+    expect(error.message).toBe(HEIC_READ_ERROR)
+  })
+
+  it('keeps a JPEG when a sibling HEIC cannot be read', async () => {
+    const jpeg = new File(['j'], 'a.jpg', { type: 'image/jpeg' })
+    const heic = new File(['h'], 'b.heic', { type: 'image/heic' })
+    compressImage.mockImplementation(async (file) => {
+      if (file.name.endsWith('.heic')) throw new Error(HEIC_READ_ERROR)
+      return file
+    })
+
+    const { photos, error } = await filesToPhotos([jpeg, heic], 5)
+
+    expect(photos).toHaveLength(1)
+    expect(photos[0].file).toBe(jpeg)
+    expect(error.message).toBe(HEIC_READ_ERROR)
+  })
+
+  it('never keeps a raw HEIC even when compressImage returns it', async () => {
+    const heic = new File(['h'], 'shot.heic', { type: 'image/heic' })
+    compressImage.mockResolvedValueOnce(heic)
+
+    const { photos, error } = await filesToPhotos([heic], 5)
+
+    expect(photos).toHaveLength(0)
+    expect(error.message).toBe(HEIC_READ_ERROR)
   })
 
   it('reports upload progress for each new file', async () => {
