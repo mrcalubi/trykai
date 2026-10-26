@@ -913,19 +913,39 @@ a {
 
   .home-hero__badge-inner img {
     display: block;
-    width: 170%;
-    height: 170%;
+    width: var(--badge-img-scale, 170%);
+    height: var(--badge-img-scale, 170%);
     max-width: none;
-    margin: -35%;
+    margin: calc((100% - var(--badge-img-scale, 170%)) / 2);
     pointer-events: none;
   }
 
-  .home-hero__badge--1 { width: 26%; top: -1%; left: 1%; }
-  .home-hero__badge--2 { width: 17%; top: 6%; right: 1%; }
+  .home-hero__badge--1 {
+    width: 24%;
+    top: 0;
+    left: 0;
+    --badge-img-scale: 190%;
+  }
+  .home-hero__badge--2 {
+    width: 24%;
+    top: 0;
+    right: 0;
+    --badge-img-scale: 172%;
+  }
   .home-hero__badge--2 .home-hero__badge-inner { animation-delay: -1.5s; }
-  .home-hero__badge--3 { width: 24%; bottom: 0; left: 0; }
+  .home-hero__badge--3 {
+    width: 24%;
+    bottom: 0;
+    left: 0;
+    --badge-img-scale: 170%;
+  }
   .home-hero__badge--3 .home-hero__badge-inner { animation-delay: -3s; }
-  .home-hero__badge--4 { width: 16%; bottom: 2%; right: 9%; }
+  .home-hero__badge--4 {
+    width: 24%;
+    bottom: 0;
+    right: 0;
+    --badge-img-scale: 170%;
+  }
   .home-hero__badge--4 .home-hero__badge-inner { animation-delay: -4.5s; }
 }
 
