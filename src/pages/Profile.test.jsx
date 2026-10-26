@@ -154,8 +154,8 @@ describe('Profile loading and failure', () => {
     })
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'About' })).toBeInTheDocument()
-    expect(screen.getByText('I pull rosettas.')).toBeInTheDocument()
+    expect(await screen.findByText('I pull rosettas.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'About' })).not.toBeInTheDocument()
     expect(
       screen.queryByText('Something went wrong loading this page. Please refresh.')
     ).not.toBeInTheDocument()
@@ -207,6 +207,7 @@ describe('Profile public content', () => {
     expect(screen.queryByText('Mei Ling Tan')).not.toBeInTheDocument()
     expect(supabase.auth.getSession).toHaveBeenCalled()
     expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Edit profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
     const more = screen.getByRole('button', { name: 'More actions' })
@@ -400,7 +401,7 @@ describe('Profile public content', () => {
     )
   })
 
-  it('shows About when a bio exists, even when signed out', async () => {
+  it('shows the bio in the header card when it exists, even when signed out', async () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
@@ -411,23 +412,49 @@ describe('Profile public content', () => {
     })
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'About' })).toBeInTheDocument()
-    expect(document.querySelector('.profile-about__body').textContent).toBe(
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(document.querySelector('.profile-header .detail-host__bio').textContent).toBe(
       'I pull rosettas.\nAlso pour-overs.',
     )
+    expect(screen.queryByRole('heading', { name: 'About' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
   })
 
-  it('hides About for other people when there is no bio', async () => {
+  it('hides the bio for other people when there is none', async () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(document.querySelector('.profile-header .detail-host__bio')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'About' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
   })
 
-  it('keeps typed line breaks and wraps long words in About', () => {
+  it('clamps a long bio to three lines with … more and Less', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      bio: 'One.\nTwo.\nThree.\nFour.',
+      avatar_url: null,
+      is_id_verified: true,
+      is_host: true,
+    })
+    const { user } = renderPage()
+
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    const bio = document.querySelector('.profile-header .detail-host__bio')
+    expect(bio.textContent).toBe('One.\nTwo.\nThree.… more')
+    expect(screen.getByRole('button', { name: '… more' })).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(screen.getByRole('button', { name: '… more' }))
+    expect(bio.textContent).toBe('One.\nTwo.\nThree.\nFour.Less')
+    expect(screen.getByRole('button', { name: 'Less' })).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(screen.getByRole('button', { name: 'Less' }))
+    expect(bio.textContent).toBe('One.\nTwo.\nThree.… more')
+  })
+
+  it('keeps typed line breaks and wraps long words in the bio', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
     expect(css).toMatch(
       /\.profile-about__body,\s*\n\.detail-host__bio \{\s*\n\s*overflow-wrap:\s*break-word/
@@ -436,6 +463,16 @@ describe('Profile public content', () => {
       /\.detail-description,\s*\n\.profile-about__body,\s*\n\.detail-host__bio \{[\s\S]*?white-space:\s*pre-wrap/
     )
   })
+
+  it('stacks header copy in a column so the badge and actions never share a line', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    const copy = css.match(/\.profile-header__copy \{[\s\S]*?\n\}/)
+    expect(copy?.[0]).toMatch(/display:\s*flex/)
+    expect(copy?.[0]).toMatch(/flex-direction:\s*column/)
+    expect(copy?.[0]).toMatch(/gap:\s*6px/)
+    expect(css).toMatch(/\.page--profile \{[\s\S]*?max-width:\s*880px/)
+    expect(css).toMatch(/\.page--detail \{[\s\S]*?max-width:\s*1120px/)
+  })
 })
 
 describe('Profile own tabs', () => {
@@ -443,7 +480,7 @@ describe('Profile own tabs', () => {
     givenSignedIn(HOST_ID)
   })
 
-  it('shows private tabs and a settings gear on your own profile', async () => {
+  it('shows private tabs and owner actions on your own profile', async () => {
     const { user } = renderPage()
 
     expect(await screen.findByRole('navigation', { name: 'Profile' })).toBeInTheDocument()
@@ -455,15 +492,20 @@ describe('Profile own tabs', () => {
     expect(screen.getByRole('link', { name: 'Hosting' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Listings' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Reviews' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'See your public profile' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'See public profile' })).toHaveAttribute(
       'href',
       `/u/${HOST_ID}?tab=bookings&view=public`,
     )
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-    expect(screen.getByRole('link', { name: 'Add a short bio' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveTextContent('Edit profile')
+    expect(screen.getByRole('heading', { name: 'Finish your profile' })).toBeInTheDocument()
+    expect(screen.getByText('Guests book hosts they can picture.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add a photo' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Write a short bio' })).toHaveAttribute(
       'href',
-      '/settings'
+      '/settings#bio',
     )
+    expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
@@ -530,7 +572,7 @@ describe('Profile own tabs', () => {
 
     await waitFor(() => expect(screen.queryByText('fr')).not.toBeInTheDocument())
 
-    await user.click(screen.getByRole('link', { name: 'See your public profile' }))
+    await user.click(screen.getByRole('link', { name: 'See public profile' }))
 
     expect(await screen.findByText('This is how guests see your profile')).toBeInTheDocument()
     expect(screen.getByText('No listings yet.')).toBeInTheDocument()
@@ -641,7 +683,7 @@ describe('Profile own tabs', () => {
     expect(screen.queryByRole('heading', { name: 'Your listings' })).not.toBeInTheDocument()
   })
 
-  it('shows your own About when a bio is saved', async () => {
+  it('shows your own bio in the header when it is saved', async () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
@@ -652,9 +694,13 @@ describe('Profile own tabs', () => {
     })
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'About' })).toBeInTheDocument()
-    expect(screen.getByText('I pull rosettas.')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(document.querySelector('.profile-header .detail-host__bio').textContent).toBe(
+      'I pull rosettas.',
+    )
+    expect(screen.queryByRole('heading', { name: 'About' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Write a short bio' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add a photo' })).toBeInTheDocument()
   })
 
   it('lets you view, change and remove your photo, and updates the header', async () => {
@@ -697,12 +743,12 @@ describe('Profile public preview', () => {
   it('carries the current tab into public preview and back', async () => {
     const { user } = renderPage({ search: '?tab=hosting' })
 
-    expect(await screen.findByRole('link', { name: 'See your public profile' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'See public profile' })).toHaveAttribute(
       'href',
       `/u/${HOST_ID}?tab=hosting&view=public`,
     )
 
-    await user.click(screen.getByRole('link', { name: 'See your public profile' }))
+    await user.click(screen.getByRole('link', { name: 'See public profile' }))
 
     expect(await screen.findByText('This is how guests see your profile')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to your profile' })).toHaveAttribute(
@@ -740,9 +786,11 @@ describe('Profile public preview', () => {
     expect(screen.getByRole('heading', { name: 'Reviews' })).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'See your public profile' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'See public profile' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Edit profile')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Profile photo' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Finish your profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Back to your profile' }))
@@ -759,7 +807,9 @@ describe('Profile of another user', () => {
     expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Edit profile' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Finish your profile' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Listings' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Reviews' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'My Bookings' })).not.toBeInTheDocument()
@@ -779,5 +829,97 @@ describe('Profile of another user', () => {
     await user.click(await screen.findByRole('button', { name: "View Mei's photo" }))
     expect(screen.getByRole('dialog', { name: "Mei's photo" })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Profile photo' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Profile finish nudge', () => {
+  beforeEach(() => {
+    givenSignedIn(HOST_ID)
+  })
+
+  it('shows only the missing photo when a bio is already there', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      bio: 'I pull rosettas.',
+      avatar_url: null,
+      is_id_verified: true,
+      is_host: true,
+    })
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Finish your profile' })
+    expect(screen.getByRole('button', { name: 'Add a photo' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Write a short bio' })).not.toBeInTheDocument()
+  })
+
+  it('shows only the missing bio when a photo is already there', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      bio: null,
+      avatar_url: 'https://cdn.test/mei.jpg',
+      is_id_verified: true,
+      is_host: true,
+    })
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Finish your profile' })
+    expect(screen.getByRole('link', { name: 'Write a short bio' })).toHaveAttribute(
+      'href',
+      '/settings#bio',
+    )
+    expect(screen.queryByRole('button', { name: 'Add a photo' })).not.toBeInTheDocument()
+  })
+
+  it('hides the nudge when the photo and bio are both done', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      bio: 'I pull rosettas.',
+      avatar_url: 'https://cdn.test/mei.jpg',
+      is_id_verified: true,
+      is_host: true,
+    })
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(screen.queryByRole('heading', { name: 'Finish your profile' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add a photo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Write a short bio' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveTextContent('Edit profile')
+    expect(screen.getByRole('link', { name: 'See public profile' })).toBeInTheDocument()
+  })
+
+  it('omits the host line for a non-host', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      bio: null,
+      avatar_url: null,
+      is_id_verified: true,
+      is_host: false,
+    })
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Finish your profile' })
+    expect(screen.queryByText('Guests book hosts they can picture.')).not.toBeInTheDocument()
+  })
+
+  it('never shows the nudge on someone else or in public preview', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      bio: null,
+      avatar_url: null,
+      is_id_verified: true,
+      is_host: true,
+    })
+    givenSignedIn(OTHER_ID)
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(screen.queryByRole('heading', { name: 'Finish your profile' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument()
   })
 })

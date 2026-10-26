@@ -314,6 +314,10 @@ a {
   max-width: 1120px;
 }
 
+.page--profile {
+  max-width: 880px;
+}
+
 .page--form {
   display: flex;
   align-items: center;
@@ -3454,14 +3458,9 @@ body.lightbox-open {
   margin: 0;
 }
 
-.profile-about__empty {
-  margin: 0 0 16px;
-  font-size: 14px;
-}
-
 .profile-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 18px;
   margin-bottom: 20px;
   padding: 20px;
@@ -3490,8 +3489,18 @@ body.lightbox-open {
 }
 
 .profile-header__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   flex: 1;
   min-width: 0;
+}
+
+.profile-header__copy .verified-badge,
+.profile-header__copy .detail-host__rating,
+.profile-header__copy .detail-host__bio {
+  margin: 0;
 }
 
 .profile-header__name-row {
@@ -3503,28 +3512,44 @@ body.lightbox-open {
   min-width: 0;
 }
 
-.profile-header__settings {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  margin-left: auto;
-  color: var(--navy);
-  border-radius: 50%;
+.profile-header__actions,
+.profile-nudge__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.profile-header__settings:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+.profile-header__actions .ui-button,
+.profile-nudge__actions .ui-button {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 13px;
 }
 
-.profile-header__public {
-  display: inline-block;
-  margin-top: 8px;
+.profile-nudge {
+  width: 100%;
+  margin-top: 2px;
+  padding: 12px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius);
+}
+
+.profile-nudge__title {
+  margin: 0 0 4px;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.profile-nudge__hint {
+  margin: 0 0 10px;
   font-size: 14px;
-  font-weight: 500;
-  color: var(--primary);
+  color: var(--muted);
+}
+
+.profile-nudge__actions {
+  margin-top: 10px;
 }
 
 .profile-preview-bar {
