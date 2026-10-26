@@ -17,10 +17,27 @@ import { ratingsByListingId } from '../lib/listingRatings'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { hostEntry } from '../lib/hostEntry'
 import { firstAccountRow } from '../lib/myAccount'
-import { fetchHostOpenSessions, hostingSummary, teachCategories } from '../lib/profileHeader'
-import { formatSessionDateTime } from '../lib/sessionDate'
+import {
+  calendarDayMarks,
+  confirmedBookingCount,
+  fetchHostOpenSessions,
+  fetchHostOwnSessions,
+  hostProfileStats,
+  nextOpenSession,
+  sessionListingTitle,
+  sessionsOnDay,
+  teachCategories,
+} from '../lib/profileHeader'
+import { formatSessionDateTime, formatSessionTime } from '../lib/sessionDate'
+import {
+  formatDayTitle,
+  shiftMonth,
+  singaporeDateKey,
+  singaporeMonthKey,
+} from '../lib/sessionCalendar'
 import { profileReportSubject, reportMailto } from '../lib/reportMailto'
-import { categoryIconName } from '../components/ui/categoryIcon'
+import { categoryIconName, categoryTint } from '../components/ui/categoryIcon'
+import SessionCalendar from '../components/SessionCalendar'
 import OverflowMenu from '../components/ui/OverflowMenu'
 import VerifiedBadge from '../components/VerifiedBadge'
 import PageLoader from '../components/PageLoader'
@@ -117,103 +134,167 @@ function ProfileIdentity({ givenName, verified }) {
   )
 }
 
-function AboutTile({ about, isOwn, isHost }) {
-  if (about) {
-    return (
-      <section className="profile-header__tile" aria-label="About">
-        <p className="eyebrow profile-header__tile-label">About</p>
-        <BioPreview bio={about} lines={3} maxChars={240} />
-      </section>
-    )
-  }
-
-  if (!isOwn) return null
-
-  return (
-    <section className="profile-header__tile" aria-label="About">
-      <p className="eyebrow profile-header__tile-label">About</p>
-      <Link to="/settings#bio" className="profile-header__bio-prompt">
-        {isHost
-          ? 'Guests book hosts they can picture. Add a short bio →'
-          : 'Add a short bio so guests know who you are →'}
-      </Link>
-    </section>
-  )
-}
-
-function TeachesTile({ listings }) {
+function TeachChips({ listings }) {
   const categories = teachCategories(listings)
   if (!categories.length) return null
 
   return (
-    <section className="profile-header__tile" aria-label="Teaches">
-      <p className="eyebrow profile-header__tile-label">Teaches</p>
-      <ul className="profile-header__chips">
-        {categories.map((category) => (
-          <li key={category} className="profile-header__chip">
-            <Icon name={categoryIconName(category)} size={14} />
-            {category}
-          </li>
-        ))}
-      </ul>
-    </section>
+    <ul className="profile-header__chips" aria-label="Teaches">
+      {categories.map((category) => (
+        <li
+          key={category}
+          className={`profile-header__chip profile-header__chip--${categoryTint(category)}`}
+        >
+          <Icon name={categoryIconName(category)} size={14} />
+          {category}
+        </li>
+      ))}
+    </ul>
   )
 }
 
-function HostingTile({ reviews, listings, sessions }) {
-  const summary = hostingSummary({ reviews, listings, sessions })
-  if (!summary) return null
+function NextSession({ session }) {
+  if (!session) return null
 
   return (
-    <section className="profile-header__tile" aria-label="Hosting">
-      <p className="eyebrow profile-header__tile-label">Hosting</p>
-      <p className="profile-header__hosting-kicker">Next session</p>
-      {summary.next ? (
-        <Link to={`/listings/${summary.next.listingId}`} className="profile-header__next">
-          <span className="profile-header__next-when">
-            {formatSessionDateTime(summary.next.startsAt)}
-          </span>
-          {summary.next.title ? (
-            <span className="profile-header__next-title">{summary.next.title}</span>
-          ) : null}
+    <div className="profile-header__next">
+      <Icon name="calendar" size={16} />
+      <div>
+        <p className="profile-header__next-label">Next session</p>
+        <Link to={`/listings/${session.listingId}`} className="profile-header__next-when">
+          {formatSessionDateTime(session.startsAt)}
         </Link>
-      ) : (
-        <p className="profile-header__next-empty">No sessions scheduled yet</p>
-      )}
-      {summary.openIn30Days > 0 ? (
-        <p className="profile-header__hosting-line">
-          {summary.openIn30Days} open in the next 30 days
-        </p>
-      ) : null}
-      <p className="profile-header__hosting-line">
-        {summary.listingCount === 1
-          ? '1 live listing'
-          : `${summary.listingCount} live listings`}
-      </p>
-      {summary.reviewCount > 0 && summary.average != null ? (
-        <p className="profile-header__hosting-line">
-          <span className="profile-header__star" aria-hidden="true">
-            ★
-          </span>{' '}
-          {summary.average.toFixed(1)} · {summary.reviewCount}{' '}
-          {summary.reviewCount === 1 ? 'review' : 'reviews'}
-        </p>
-      ) : null}
-    </section>
+      </div>
+    </div>
   )
 }
 
-function ProfileTiles({ about, isOwn, isHost, reviews, listings, sessions }) {
-  const aboutTile = about || isOwn
-  const teaches = isHost ? teachCategories(listings) : []
-  const hosting = isHost && listings.length > 0
-  if (!aboutTile && !teaches.length && !hosting) return null
+function ProfileStats({ reviews, sessionsHeld }) {
+  const stats = hostProfileStats(reviews, [{ id: 'live' }])
+  const showRating = stats.reviewCount > 0 && stats.average != null
+  const held = Number(sessionsHeld) || 0
+  if (!showRating && held <= 0) return null
 
   return (
-    <div className="profile-header__tiles">
-      {aboutTile ? <AboutTile about={about} isOwn={isOwn} isHost={isHost} /> : null}
-      {isHost ? <TeachesTile listings={listings} /> : null}
-      {isHost ? <HostingTile reviews={reviews} listings={listings} sessions={sessions} /> : null}
+    <dl className="profile-header__stats">
+      {showRating ? (
+        <div className="profile-header__stat">
+          <dt>
+            {stats.reviewCount} {stats.reviewCount === 1 ? 'review' : 'reviews'}
+          </dt>
+          <dd>
+            {stats.average.toFixed(1)}{' '}
+            <span className="profile-header__star" aria-hidden="true">
+              ★
+            </span>
+          </dd>
+        </div>
+      ) : null}
+      {held > 0 ? (
+        <div className="profile-header__stat">
+          <dt>Sessions held</dt>
+          <dd>{held}</dd>
+        </div>
+      ) : null}
+    </dl>
+  )
+}
+
+function ProfileBio({ about, isOwn, isHost }) {
+  if (about) return <BioPreview bio={about} lines={3} maxChars={240} />
+  if (!isOwn) return null
+  return (
+    <Link to="/settings#bio" className="profile-header__bio-prompt">
+      {isHost
+        ? 'Guests book hosts they can picture. Add a short bio →'
+        : 'Add a short bio so guests know who you are →'}
+    </Link>
+  )
+}
+
+function sessionsHeldCount(data) {
+  if (typeof data === 'number') return data
+  if (Array.isArray(data)) return Number(data[0]) || 0
+  return Number(data) || 0
+}
+
+function ProfileCalendar({ sessions, listings, publicView, hostId, nowMs }) {
+  const todayKey = singaporeDateKey(nowMs)
+  const todayMonth = singaporeMonthKey(nowMs)
+  const marks = calendarDayMarks(sessions, { publicView, now: nowMs })
+  const months = [...new Set(Object.keys(marks).map((key) => key.slice(0, 7)))].sort()
+  const firstMonth = months[0] ?? todayMonth
+  const lastMonth = months[months.length - 1] ?? todayMonth
+  const [monthOverride, setMonthOverride] = useState(null)
+  const [selectedDateKey, setSelectedDateKey] = useState(null)
+  const visibleMonth =
+    monthOverride && monthOverride >= firstMonth && monthOverride <= lastMonth
+      ? monthOverride
+      : firstMonth
+
+  const monthMarks = Object.fromEntries(
+    Object.entries(marks).filter(([dateKey]) => dateKey.startsWith(visibleMonth)),
+  )
+  const daySessions = selectedDateKey
+    ? sessionsOnDay(sessions, selectedDateKey, { publicView, now: nowMs })
+    : []
+
+  return (
+    <div className="profile-header__calendar">
+      <SessionCalendar
+        monthKey={visibleMonth}
+        marksByDay={monthMarks}
+        selectedDateKey={selectedDateKey}
+        todayKey={todayKey}
+        onSelectDate={setSelectedDateKey}
+        onPrevMonth={() => setMonthOverride(shiftMonth(visibleMonth, -1))}
+        onNextMonth={() => setMonthOverride(shiftMonth(visibleMonth, 1))}
+        canGoPrev={visibleMonth > firstMonth}
+        canGoNext={visibleMonth < lastMonth}
+      />
+      <p className="profile-header__legend">
+        {publicView ? (
+          <>
+            <span className="session-calendar__dot session-calendar__dot--open" aria-hidden="true" />
+            Open sessions
+          </>
+        ) : (
+          <>
+            <span className="session-calendar__dot session-calendar__dot--booked" aria-hidden="true" />
+            Booked
+            <span className="session-calendar__dot session-calendar__dot--open" aria-hidden="true" />
+            Open
+          </>
+        )}
+      </p>
+      {selectedDateKey ? (
+        <div className="profile-header__day">
+          <p className="session-day__title">{formatDayTitle(selectedDateKey)}</p>
+          <ul className="profile-header__day-list">
+            {daySessions.map((session) => {
+              const title = sessionListingTitle(session, listings)
+              const booked = confirmedBookingCount(session)
+              const time = formatSessionTime(session.starts_at)
+              return (
+                <li key={session.id ?? `${session.listing_id}-${session.starts_at}`}>
+                  {publicView ? (
+                    <Link to={`/listings/${session.listing_id}`}>
+                      {time}
+                      {title ? ` · ${title}` : ''}
+                    </Link>
+                  ) : (
+                    <Link to={`/u/${hostId}?tab=hosting`}>
+                      {time}
+                      {title ? ` · ${title}` : ''}
+                      {` · ${booked > 0 ? `${booked} booked` : 'Open'}`}
+                    </Link>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -310,6 +391,7 @@ export default function Profile() {
   const [profile, setProfile] = useState(null)
   const [listings, setListings] = useState([])
   const [sessions, setSessions] = useState([])
+  const [sessionsHeld, setSessionsHeld] = useState(0)
   const [ratings, setRatings] = useState({})
   const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
@@ -317,6 +399,7 @@ export default function Profile() {
   const [viewerId, setViewerId] = useState(null)
   const [viewerReady, setViewerReady] = useState(false)
   const [viewingPhoto, setViewingPhoto] = useState(false)
+  const [nowMs, setNowMs] = useState(0)
   // Delete on the Hosting tab soft-deletes the row. A profile fetch that
   // started before that delete can still return the listing; drop those ids.
   const removedListingIds = useRef(new Set())
@@ -355,6 +438,7 @@ export default function Profile() {
       setProfile(null)
       setListings([])
       setSessions([])
+      setSessionsHeld(0)
       setRatings({})
       setReviews([])
 
@@ -370,6 +454,7 @@ export default function Profile() {
 
       if (userError || !userData) {
         setError(userError ? PAGE_LOAD_ERROR : 'Profile not found.')
+        setNowMs(Date.now())
         setLoading(false)
         return
       }
@@ -388,7 +473,9 @@ export default function Profile() {
         verification_status: account?.verification_status ?? null,
       })
 
-      const [listingsResult, reviewsResult, sessionsResult] = await Promise.all([
+      const viewingOwn = session?.user?.id === id && searchParams.get('view') !== 'public'
+
+      const [listingsResult, reviewsResult, heldResult] = await Promise.all([
         supabase
           .from('listings')
           .select('id, title, area, price_per_person, category, photo_urls')
@@ -397,7 +484,9 @@ export default function Profile() {
           .eq('review_status', 'approved')
           .order('created_at', { ascending: false }),
         supabase.rpc('reviews_for_host', { p_host_id: id }),
-        userData.is_host ? fetchHostOpenSessions(supabase, id) : Promise.resolve({ data: [], error: null }),
+        userData.is_host
+          ? supabase.rpc('host_sessions_held', { p_host_id: id })
+          : Promise.resolve({ data: 0, error: null }),
       ])
 
       if (listingsResult.error) {
@@ -424,21 +513,39 @@ export default function Profile() {
         setReviews(await attachReviewerIds(reviewsResult.data ?? []))
       }
 
+      if (heldResult.error) {
+        setSessionsHeld(0)
+      } else {
+        setSessionsHeld(sessionsHeldCount(heldResult.data))
+      }
+
+      const listingIds = (listingsResult.data ?? [])
+        .map((listing) => listing.id)
+        .filter((listingId) => !removedListingIds.current.has(listingId))
+
+      let sessionsResult = { data: [], error: null }
+      if (userData.is_host && listingIds.length > 0) {
+        sessionsResult = viewingOwn
+          ? await fetchHostOwnSessions(supabase, listingIds)
+          : await fetchHostOpenSessions(supabase, id)
+      }
+
       if (sessionsResult.error) {
         setSessions([])
       } else {
         setSessions(
           (sessionsResult.data ?? []).filter(
-            (session) => !removedListingIds.current.has(session.listing_id),
+            (row) => !removedListingIds.current.has(row.listing_id),
           ),
         )
       }
 
+      setNowMs(Date.now())
       setLoading(false)
     }
 
     fetchProfile()
-  }, [id])
+  }, [id, searchParams])
 
   if (loading || !viewerReady) {
     return <PageLoader />
@@ -477,15 +584,31 @@ export default function Profile() {
     search: previewSearch(searchParams, activeTab),
   }
   const identity = <ProfileIdentity givenName={givenName} verified={verified} />
-  const tiles = (
-    <ProfileTiles
-      about={about}
-      isOwn={isOwn}
-      isHost={isHost}
-      reviews={reviews}
-      listings={listings}
-      sessions={sessions}
-    />
+  const next = nextOpenSession(sessions, listings, nowMs)
+  const showCalendar = isHost && listings.length > 0
+  const showStats = isHost
+  const aside = (
+    <div className="profile-header__aside">
+      {isHost ? <TeachChips listings={listings} /> : null}
+      <NextSession session={next} />
+    </div>
+  )
+  const main = (
+    <div className="profile-header__main">
+      <div className="profile-header__col">
+        {showStats ? <ProfileStats reviews={reviews} sessionsHeld={sessionsHeld} /> : null}
+        <ProfileBio about={about} isOwn={isOwn} isHost={isHost} />
+      </div>
+      {showCalendar ? (
+        <ProfileCalendar
+          sessions={sessions}
+          listings={listings}
+          publicView={!isOwn}
+          hostId={id}
+          nowMs={nowMs}
+        />
+      ) : null}
+    </div>
   )
 
   return (
@@ -543,6 +666,7 @@ export default function Profile() {
                       ]}
                     />
                     {identity}
+                    {aside}
                   </div>
                 )
               }}
@@ -558,9 +682,10 @@ export default function Profile() {
                 />
               </ProfileFace>
               {identity}
+              {aside}
             </div>
           )}
-          {tiles}
+          {main}
         </div>
       </header>
 
