@@ -7,8 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Profile from './Profile'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
-import { hoursFromNow, makeAuthSession, makeListing, makeReview, makeSession } from '../test/fixtures'
-import { HOST_OPEN_SESSIONS_SELECT } from '../lib/profileHeader'
+import { hoursFromNow, makeAuthSession, makeBooking, makeListing, makeReview, makeSession } from '../test/fixtures'
 import { formatSessionDateTime } from '../lib/sessionDate'
 
 vi.mock('../lib/supabase')
@@ -36,6 +35,11 @@ function givenListings(listings) {
 
 function givenSessions(sessions) {
   supabase.__on('sessions', 'select', { data: sessions, error: null })
+}
+
+function givenBookings(bookings) {
+  supabase.__on('bookings', 'select', { data: bookings, error: null })
+  supabase.__on('reviews', 'select', { data: [], error: null })
 }
 
 function givenRpcs({ hostReviews = [], listingRatings = [], account, sessionsHeld = 0 } = {}) {
@@ -277,7 +281,8 @@ describe('Profile public content', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    expect(document.querySelector('.profile-header__stats')).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__star')).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__stats')).not.toHaveTextContent('reviews')
     expect(screen.getByText('No reviews yet.')).toBeInTheDocument()
   })
 
@@ -469,14 +474,14 @@ describe('Profile public content', () => {
   it('keeps typed line breaks and wraps long words in the bio', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
     expect(css).toMatch(
-      /\.profile-about__body,\s*\n\.detail-host__bio \{\s*\n\s*overflow-wrap:\s*break-word/
+      /\.profile-about__body,\s*\n\.detail-host__bio,\s*\n\.profile-header__name \{\s*\n\s*overflow-wrap:\s*break-word/
     )
     expect(css).toMatch(
       /\.detail-description,\s*\n\.profile-about__body,\s*\n\.detail-host__bio \{[\s\S]*?white-space:\s*pre-wrap/
     )
   })
 
-  it('stacks header copy in a column and keeps the 880px page', () => {
+  it('stacks header copy in a column and keeps the 1120px page', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
     const copy = css.match(/\.profile-header__copy \{[\s\S]*?\n\}/)
     expect(copy?.[0]).toMatch(/display:\s*flex/)
@@ -485,13 +490,16 @@ describe('Profile public content', () => {
     expect(css).toMatch(/\.profile-header__identity \{[\s\S]*?align-items:\s*flex-end/)
     expect(css).toMatch(/\.profile-header__body \{[\s\S]*?z-index:\s*1/)
     expect(css).toMatch(/\.profile-header__banner \{[\s\S]*?z-index:\s*0/)
-    expect(css).toMatch(/\.profile-header__main \{[\s\S]*?grid-template-columns:\s*1fr 300px/)
+    expect(css).toMatch(
+      /\.profile-header__body:has\(> \.profile-header__aside\) \{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) 340px/,
+    )
     const statFigure = css.match(/\.profile-header__stat dd \{[\s\S]*?\n\}/)?.[0] ?? ''
     expect(statFigure).toMatch(/color:\s*var\(--navy\)/)
     expect(statFigure).toMatch(/font-family:\s*var\(--display\)/)
     expect(statFigure).not.toMatch(/--coral|--success/)
-    expect(css).toMatch(/\.page--profile \{[\s\S]*?max-width:\s*880px/)
+    expect(css).toMatch(/\.page--profile \{[\s\S]*?max-width:\s*1120px/)
     expect(css).toMatch(/\.page--detail \{[\s\S]*?max-width:\s*1120px/)
+    expect(css).toMatch(/\.profile-header__name \{[\s\S]*?-webkit-line-clamp:\s*2/)
   })
 
   it('paints a sand banner and overlaps the avatar with a surface ring', () => {
@@ -997,12 +1005,34 @@ describe('Profile card restyle', () => {
 
 describe('Profile card layout', () => {
   it('hides stats at 0 held sessions and with no reviews', async () => {
-    givenListings([makeListing({ id: 'listing-9', category: 'Food' })])
     givenRpcs({ hostReviews: [], sessionsHeld: 0 })
     renderPage()
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
     expect(document.querySelector('.profile-header__stats')).not.toBeInTheDocument()
+  })
+
+  it('puts Teaches chips in the stats row, wrapping at most 3 per row', async () => {
+    givenListings([
+      makeListing({ id: 'listing-1', category: 'Food' }),
+      makeListing({ id: 'listing-2', category: 'Fitness' }),
+      makeListing({ id: 'listing-3', category: 'Arts' }),
+      makeListing({ id: 'listing-4', category: 'Music' }),
+      makeListing({ id: 'listing-5', category: 'Language' }),
+    ])
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    const stats = document.querySelector('.profile-header__stats')
+    const chips = stats.querySelector('.profile-header__chips')
+    expect(within(stats).getByText('Teaches')).toBeInTheDocument()
+    expect(chips).toHaveClass('profile-header__chips--wrap')
+    expect(chips.querySelectorAll('.profile-header__chip')).toHaveLength(5)
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    expect(css).toMatch(
+      /\.profile-header__chips--wrap \{[\s\S]*?grid-template-columns:\s*repeat\(3, auto\)/,
+    )
+    expect(document.querySelector('.profile-header__aside .profile-header__chips')).not.toBeInTheDocument()
   })
 
   it('shows navy rating and sessions-held figures', async () => {
@@ -1055,17 +1085,21 @@ describe('Profile card layout', () => {
     const openDay = document.querySelector('.session-calendar__day .session-calendar__dot--open')
     expect(bookedDay).toBeInTheDocument()
     expect(openDay).toBeInTheDocument()
+    expect(bookedDay.closest('button')).not.toHaveClass('session-calendar__day--available')
+    expect(openDay.closest('button')).not.toHaveClass('session-calendar__day--available')
     expect(document.querySelector('.profile-header__legend')).toHaveTextContent('Booked')
     expect(document.querySelector('.profile-header__legend')).toHaveTextContent('Open')
 
     await user.click(bookedDay.closest('button'))
+    expect(bookedDay.closest('button')).toHaveClass('session-calendar__day--selected')
+    expect(bookedDay.closest('button')).not.toHaveClass('session-calendar__day--available')
     expect(await screen.findByRole('link', { name: /1 booked/ })).toHaveAttribute(
       'href',
       `/u/${HOST_ID}?tab=hosting`,
     )
   })
 
-  it('never renders a booked mark or count on the public calendar, and does not query bookings', async () => {
+  it('hides the calendar, Next session, and any sessions request on a public profile', async () => {
     givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' })])
     givenSessions([
       makeSession({
@@ -1079,35 +1113,14 @@ describe('Profile card layout', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    expect(document.querySelector('.session-calendar__dot--booked')).not.toBeInTheDocument()
-    expect(document.querySelector('.session-calendar__dot--open')).toBeInTheDocument()
-    expect(screen.getByText('Open sessions')).toBeInTheDocument()
-    expect(screen.queryByText('Booked')).not.toBeInTheDocument()
-    expect(screen.queryByText(/booked/i)).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__calendar')).not.toBeInTheDocument()
+    expect(screen.queryByText('Next session')).not.toBeInTheDocument()
+    expect(supabase.__calls('sessions', 'select')).toHaveLength(0)
     expect(supabase.__calls('bookings', 'select')).toHaveLength(0)
-    const sessionSelect = supabase.__calls('sessions', 'select')[0].chain[0].args[0]
-    expect(sessionSelect).toBe(HOST_OPEN_SESSIONS_SELECT)
-    expect(sessionSelect).not.toMatch(/bookings/)
   })
 
-  it('renders the calendar from public data when signed out', async () => {
-    givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' })])
-    givenSessions([
-      makeSession({
-        id: 'open',
-        listing_id: 'listing-9',
-        starts_at: hoursFromNow(24),
-        listings: { title: 'Latte art' },
-      }),
-    ])
-    renderPage()
-
-    await screen.findByRole('heading', { name: 'Mei', level: 1 })
-    expect(document.querySelector('.profile-header__calendar')).toBeInTheDocument()
-    expect(supabase.__calls('sessions', 'select')[0].chain[0].args[0]).toBe(HOST_OPEN_SESSIONS_SELECT)
-  })
-
-  it('links Next session to its listing', async () => {
+  it('still renders Next session and the calendar on the own profile', async () => {
+    givenSignedIn(HOST_ID)
     givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' })])
     const soon = hoursFromNow(24)
     givenSessions([
@@ -1120,8 +1133,12 @@ describe('Profile card layout', () => {
     ])
     renderPage()
 
-    const next = await screen.findByRole('link', { name: formatSessionDateTime(soon) })
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(document.querySelector('.profile-header__calendar')).toBeInTheDocument()
+    const next = screen.getByRole('link', { name: new RegExp(formatSessionDateTime(soon)) })
     expect(next).toHaveAttribute('href', '/listings/listing-9')
+    expect(next).toHaveTextContent('Latte art')
+    expect(supabase.__calls('sessions', 'select').length).toBeGreaterThan(0)
   })
 
   it('hides the calendar and stats for a non-host', async () => {
@@ -1144,6 +1161,7 @@ describe('Profile card layout', () => {
   })
 
   it('never shows Next session when there is none', async () => {
+    givenSignedIn(HOST_ID)
     givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' })])
     givenSessions([])
     renderPage()
@@ -1152,7 +1170,7 @@ describe('Profile card layout', () => {
     expect(screen.queryByText('Next session')).not.toBeInTheDocument()
   })
 
-  it('does not fetch bookings in public preview', async () => {
+  it('does not fetch sessions or bookings in public preview', async () => {
     givenSignedIn(HOST_ID)
     givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' })])
     givenSessions([
@@ -1166,12 +1184,14 @@ describe('Profile card layout', () => {
     renderPage({ search: '?view=public' })
 
     await screen.findByText('This is how guests see your profile')
-    expect(document.querySelector('.session-calendar__dot--booked')).not.toBeInTheDocument()
+    expect(document.querySelector('.profile-header__calendar')).not.toBeInTheDocument()
+    expect(screen.queryByText('Next session')).not.toBeInTheDocument()
+    expect(supabase.__calls('sessions', 'select')).toHaveLength(0)
     expect(supabase.__calls('bookings', 'select')).toHaveLength(0)
-    expect(String(supabase.__calls('sessions', 'select')[0].chain[0].args[0])).not.toMatch(/bookings/)
   })
 
-  it('keeps the mobile stack: avatar, name, chips, next, stats, bio, calendar', async () => {
+  it('keeps the mobile stack: identity, stats, bio, next session, calendar', async () => {
+    givenSignedIn(HOST_ID)
     givenListings([
       makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' }),
       makeListing({ id: 'listing-8', title: 'Open mic', category: 'Music' }),
@@ -1200,17 +1220,46 @@ describe('Profile card layout', () => {
 
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
     const body = document.querySelector('.profile-header__body')
-    const identity = body.querySelector('.profile-header__identity')
-    const aside = identity.querySelector('.profile-header__aside')
-    const main = body.querySelector('.profile-header__main')
-    const col = main.querySelector('.profile-header__col')
+    const primary = body.querySelector('.profile-header__primary')
+    const aside = body.querySelector('.profile-header__aside')
+    const identity = primary.querySelector('.profile-header__identity')
     expect(identity.contains(document.querySelector('.profile-header__face'))).toBe(true)
     expect(identity.contains(document.querySelector('.profile-header__name'))).toBe(true)
-    expect(aside.querySelector('.profile-header__chips').compareDocumentPosition(aside.querySelector('.profile-header__next')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(col.querySelector('.profile-header__stats').compareDocumentPosition(col.querySelector('.detail-host__bio')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(col.compareDocumentPosition(main.querySelector('.profile-header__calendar')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(identity.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(primary.querySelector('.profile-header__stats').contains(primary.querySelector('.profile-header__chips'))).toBe(true)
+    expect(
+      primary.querySelector('.profile-header__stats').compareDocumentPosition(primary.querySelector('.detail-host__bio'))
+        & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(primary.compareDocumentPosition(aside) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(
+      aside.querySelector('.profile-header__next').compareDocumentPosition(aside.querySelector('.profile-header__calendar'))
+        & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
-    expect(css).toMatch(/@media \(min-width: 1024px\) \{[\s\S]*?\.profile-header__main \{[\s\S]*?grid-template-columns:\s*1fr 300px/)
+    expect(css).toMatch(
+      /@media \(min-width: 1024px\) \{[\s\S]*?\.profile-header__body:has\(> \.profile-header__aside\) \{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) 340px/,
+    )
+  })
+
+  it('renders Bookings cards in the listing grid', async () => {
+    givenSignedIn(HOST_ID)
+    givenBookings([
+      makeBooking({ id: 'booking-1' }),
+      makeBooking({ id: 'booking-2', session_id: 'session-2' }),
+    ])
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'My Bookings' })
+    const grid = document.querySelector('.profile-tab-panel .listings-grid')
+    expect(grid).toHaveClass('listings-grid--bookings')
+    expect(grid.querySelectorAll('.dashboard-card')).toHaveLength(2)
+    expect(document.querySelector('.empty-state')).not.toBeInTheDocument()
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    expect(css).toMatch(
+      /\.listings-grid--bookings \{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/,
+    )
+    expect(css).toMatch(
+      /@media \(min-width: 1024px\) \{\s*\.listings-grid--bookings \{[\s\S]*?repeat\(3, minmax\(0, 1fr\)\)/,
+    )
   })
 })
