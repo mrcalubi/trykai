@@ -17,7 +17,8 @@ import { ratingsByListingId } from '../lib/listingRatings'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { hostEntry } from '../lib/hostEntry'
 import { firstAccountRow } from '../lib/myAccount'
-import { hostProfileStats, teachCategories } from '../lib/profileHeader'
+import { fetchHostOpenSessions, hostingSummary, teachCategories } from '../lib/profileHeader'
+import { formatSessionDateTime } from '../lib/sessionDate'
 import { profileReportSubject, reportMailto } from '../lib/reportMailto'
 import { categoryIconName } from '../components/ui/categoryIcon'
 import OverflowMenu from '../components/ui/OverflowMenu'
@@ -107,44 +108,46 @@ function ProfileFace({ children, showCamera = false }) {
   )
 }
 
-function HostStats({ reviews, listings }) {
-  const stats = hostProfileStats(reviews, listings)
-  if (!stats) return null
-
+function ProfileIdentity({ givenName, verified }) {
   return (
-    <dl className="profile-header__stats">
-      {stats.average != null ? (
-        <div className="profile-header__stat">
-          <dt>Rating</dt>
-          <dd>
-            <span className="profile-header__star" aria-hidden="true">
-              ★
-            </span>{' '}
-            {stats.average.toFixed(1)}
-          </dd>
-        </div>
-      ) : null}
-      {stats.reviewCount > 0 ? (
-        <div className="profile-header__stat">
-          <dt>Reviews</dt>
-          <dd>{stats.reviewCount}</dd>
-        </div>
-      ) : null}
-      <div className="profile-header__stat">
-        <dt>Live listings</dt>
-        <dd>{stats.listingCount}</dd>
-      </div>
-    </dl>
+    <div className="profile-header__copy">
+      <h1 className="profile-header__name">{givenName}</h1>
+      {verified ? <VerifiedBadge /> : null}
+    </div>
   )
 }
 
-function TeachChips({ listings }) {
+function AboutTile({ about, isOwn, isHost }) {
+  if (about) {
+    return (
+      <section className="profile-header__tile" aria-label="About">
+        <p className="eyebrow profile-header__tile-label">About</p>
+        <BioPreview bio={about} lines={3} maxChars={240} />
+      </section>
+    )
+  }
+
+  if (!isOwn) return null
+
+  return (
+    <section className="profile-header__tile" aria-label="About">
+      <p className="eyebrow profile-header__tile-label">About</p>
+      <Link to="/settings#bio" className="profile-header__bio-prompt">
+        {isHost
+          ? 'Guests book hosts they can picture. Add a short bio →'
+          : 'Add a short bio so guests know who you are →'}
+      </Link>
+    </section>
+  )
+}
+
+function TeachesTile({ listings }) {
   const categories = teachCategories(listings)
   if (!categories.length) return null
 
   return (
-    <div className="profile-header__teaches">
-      <p className="profile-header__teaches-label">Teaches</p>
+    <section className="profile-header__tile" aria-label="Teaches">
+      <p className="eyebrow profile-header__tile-label">Teaches</p>
       <ul className="profile-header__chips">
         {categories.map((category) => (
           <li key={category} className="profile-header__chip">
@@ -153,27 +156,64 @@ function TeachChips({ listings }) {
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   )
 }
 
-function ProfileHeaderCopy({ givenName, verified, reviews, listings, about, isOwn, isHost }) {
-  const needsBio = isOwn && !about
+function HostingTile({ reviews, listings, sessions }) {
+  const summary = hostingSummary({ reviews, listings, sessions })
+  if (!summary) return null
 
   return (
-    <div className="profile-header__copy">
-      <h1 className="profile-header__name">{givenName}</h1>
-      {verified ? <VerifiedBadge /> : null}
-      {isHost ? <HostStats reviews={reviews} listings={listings} /> : null}
-      {isHost ? <TeachChips listings={listings} /> : null}
-      {about ? <BioPreview bio={about} lines={3} maxChars={240} /> : null}
-      {needsBio ? (
-        <Link to="/settings#bio" className="profile-header__bio-prompt">
-          {isHost
-            ? 'Guests book hosts they can picture. Add a short bio →'
-            : 'Add a short bio so guests know who you are →'}
+    <section className="profile-header__tile" aria-label="Hosting">
+      <p className="eyebrow profile-header__tile-label">Hosting</p>
+      <p className="profile-header__hosting-kicker">Next session</p>
+      {summary.next ? (
+        <Link to={`/listings/${summary.next.listingId}`} className="profile-header__next">
+          <span className="profile-header__next-when">
+            {formatSessionDateTime(summary.next.startsAt)}
+          </span>
+          {summary.next.title ? (
+            <span className="profile-header__next-title">{summary.next.title}</span>
+          ) : null}
         </Link>
+      ) : (
+        <p className="profile-header__next-empty">No sessions scheduled yet</p>
+      )}
+      {summary.openIn30Days > 0 ? (
+        <p className="profile-header__hosting-line">
+          {summary.openIn30Days} open in the next 30 days
+        </p>
       ) : null}
+      <p className="profile-header__hosting-line">
+        {summary.listingCount === 1
+          ? '1 live listing'
+          : `${summary.listingCount} live listings`}
+      </p>
+      {summary.reviewCount > 0 && summary.average != null ? (
+        <p className="profile-header__hosting-line">
+          <span className="profile-header__star" aria-hidden="true">
+            ★
+          </span>{' '}
+          {summary.average.toFixed(1)} · {summary.reviewCount}{' '}
+          {summary.reviewCount === 1 ? 'review' : 'reviews'}
+        </p>
+      ) : null}
+    </section>
+  )
+}
+
+function ProfileTiles({ about, isOwn, isHost, reviews, listings, sessions }) {
+  const aboutTile = about || isOwn
+  const teaches = isHost ? teachCategories(listings) : []
+  const hosting = isHost && listings.length > 0
+  if (!aboutTile && !teaches.length && !hosting) return null
+
+  return (
+    <div className="profile-header__tiles">
+      {aboutTile ? <AboutTile about={about} isOwn={isOwn} isHost={isHost} /> : null}
+      {isHost ? <TeachesTile listings={listings} /> : null}
+      {isHost ? <HostingTile reviews={reviews} listings={listings} sessions={sessions} /> : null}
     </div>
   )
 }
@@ -269,6 +309,7 @@ export default function Profile() {
   const [searchParams] = useSearchParams()
   const [profile, setProfile] = useState(null)
   const [listings, setListings] = useState([])
+  const [sessions, setSessions] = useState([])
   const [ratings, setRatings] = useState({})
   const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
@@ -283,6 +324,7 @@ export default function Profile() {
   function forgetListing(listingId) {
     removedListingIds.current.add(listingId)
     setListings((current) => current.filter((listing) => listing.id !== listingId))
+    setSessions((current) => current.filter((session) => session.listing_id !== listingId))
     setRatings((current) => {
       if (!(listingId in current)) return current
       const next = { ...current }
@@ -312,6 +354,7 @@ export default function Profile() {
       setError('')
       setProfile(null)
       setListings([])
+      setSessions([])
       setRatings({})
       setReviews([])
 
@@ -345,7 +388,7 @@ export default function Profile() {
         verification_status: account?.verification_status ?? null,
       })
 
-      const [listingsResult, reviewsResult] = await Promise.all([
+      const [listingsResult, reviewsResult, sessionsResult] = await Promise.all([
         supabase
           .from('listings')
           .select('id, title, area, price_per_person, category, photo_urls')
@@ -354,6 +397,7 @@ export default function Profile() {
           .eq('review_status', 'approved')
           .order('created_at', { ascending: false }),
         supabase.rpc('reviews_for_host', { p_host_id: id }),
+        userData.is_host ? fetchHostOpenSessions(supabase, id) : Promise.resolve({ data: [], error: null }),
       ])
 
       if (listingsResult.error) {
@@ -378,6 +422,16 @@ export default function Profile() {
 
       if (!reviewsResult.error) {
         setReviews(await attachReviewerIds(reviewsResult.data ?? []))
+      }
+
+      if (sessionsResult.error) {
+        setSessions([])
+      } else {
+        setSessions(
+          (sessionsResult.data ?? []).filter(
+            (session) => !removedListingIds.current.has(session.listing_id),
+          ),
+        )
       }
 
       setLoading(false)
@@ -422,15 +476,15 @@ export default function Profile() {
     pathname: `/u/${id}`,
     search: previewSearch(searchParams, activeTab),
   }
-  const headerCopy = (
-    <ProfileHeaderCopy
-      givenName={givenName}
-      verified={verified}
-      reviews={reviews}
-      listings={listings}
+  const identity = <ProfileIdentity givenName={givenName} verified={verified} />
+  const tiles = (
+    <ProfileTiles
       about={about}
       isOwn={isOwn}
       isHost={isHost}
+      reviews={reviews}
+      listings={listings}
+      sessions={sessions}
     />
   )
 
@@ -464,7 +518,7 @@ export default function Profile() {
               {({ changePhoto, removePhoto }) => {
                 const photo = hasAvatarPhoto(profile.avatar_url)
                 return (
-                  <>
+                  <div className="profile-header__identity">
                     <OverflowMenu
                       label="Profile photo"
                       align="start"
@@ -488,21 +542,13 @@ export default function Profile() {
                           : []),
                       ]}
                     />
-                    <ProfileHeaderCopy
-                      givenName={givenName}
-                      verified={verified}
-                      reviews={reviews}
-                      listings={listings}
-                      about={about}
-                      isOwn={isOwn}
-                      isHost={isHost}
-                    />
-                  </>
+                    {identity}
+                  </div>
                 )
               }}
             </ProfilePhotoFlow>
           ) : (
-            <>
+            <div className="profile-header__identity">
               <ProfileFace>
                 <ViewableAvatar
                   avatarUrl={profile.avatar_url}
@@ -511,9 +557,10 @@ export default function Profile() {
                   className="detail-host__avatar"
                 />
               </ProfileFace>
-              {headerCopy}
-            </>
+              {identity}
+            </div>
           )}
+          {tiles}
         </div>
       </header>
 
