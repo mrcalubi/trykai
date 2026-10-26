@@ -897,7 +897,6 @@ a {
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
     cursor: default;
-    transition: transform 600ms cubic-bezier(0.34, 1.45, 0.64, 1);
   }
 
   .home-hero__badge-inner {
@@ -921,12 +920,12 @@ a {
     pointer-events: none;
   }
 
-  .home-hero__badge--1 { width: 26%; top: 0; left: 2%; }
-  .home-hero__badge--2 { width: 19%; top: 8%; right: -2%; }
+  .home-hero__badge--1 { width: 26%; top: -1%; left: 1%; }
+  .home-hero__badge--2 { width: 17%; top: 6%; right: 1%; }
   .home-hero__badge--2 .home-hero__badge-inner { animation-delay: -1.5s; }
-  .home-hero__badge--3 { width: 22%; bottom: 4%; left: -3%; }
+  .home-hero__badge--3 { width: 24%; bottom: 0; left: 0; }
   .home-hero__badge--3 .home-hero__badge-inner { animation-delay: -3s; }
-  .home-hero__badge--4 { width: 17%; bottom: 0; right: 10%; }
+  .home-hero__badge--4 { width: 16%; bottom: 2%; right: 9%; }
   .home-hero__badge--4 .home-hero__badge-inner { animation-delay: -4.5s; }
 }
 

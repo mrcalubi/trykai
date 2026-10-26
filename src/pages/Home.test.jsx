@@ -502,9 +502,9 @@ describe('Home hero', () => {
       /@media \(min-width: 1280px\) \{\s*\.home-hero__art \{\s*width:\s*min\(100%, 320px\)/,
     )
     expect(css).toMatch(/\.home-hero__badge--1 \{[^}]*width:\s*26%/)
-    expect(css).toMatch(/\.home-hero__badge--2 \{[^}]*width:\s*19%/)
-    expect(css).toMatch(/\.home-hero__badge--3 \{[^}]*width:\s*22%/)
-    expect(css).toMatch(/\.home-hero__badge--4 \{[^}]*width:\s*17%/)
+    expect(css).toMatch(/\.home-hero__badge--2 \{[^}]*width:\s*17%/)
+    expect(css).toMatch(/\.home-hero__badge--3 \{[^}]*width:\s*24%/)
+    expect(css).toMatch(/\.home-hero__badge--4 \{[^}]*width:\s*16%/)
     expect(css).toMatch(
       /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.home-hero__badge,/,
     )
