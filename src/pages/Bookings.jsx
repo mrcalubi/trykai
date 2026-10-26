@@ -33,7 +33,7 @@ function getStripe() {
   return stripePromise
 }
 
-export default function Bookings({ embedded = false }) {
+export default function Bookings({ embedded = false, hostCta = null }) {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const userId = useAuthedUserId()
@@ -410,7 +410,15 @@ export default function Bookings({ embedded = false }) {
         <h2 className="dashboard-section__title">My Bookings</h2>
 
         {visibleBookings.length === 0 ? (
-          <p className="empty-state">No bookings yet.</p>
+          <div className="empty-state">
+            <p>No bookings yet.</p>
+            {hostCta ? (
+              <>
+                <p>Share a skill on TryKai.</p>
+                <Link to={hostCta.to}>{hostCta.label}</Link>
+              </>
+            ) : null}
+          </div>
         ) : (
           <div className="dashboard-list">
             {visibleBookings.map((booking) => {

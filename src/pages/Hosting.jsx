@@ -46,6 +46,12 @@ import {
   PAYOUT_STILL_CHECKING_COPY,
 } from '../lib/payoutReturn'
 import { listingReviewBadge } from '../lib/listingReview'
+import ListingDeleteDialog from '../components/ListingDeleteDialog'
+import {
+  HOST_SESSIONS_SELECT,
+  listingDeleteErrorMessage,
+  listingUpcomingStats,
+} from '../lib/listingDelete'
 
 function activeBookingsOn(session) {
   // Pending rows are unpaid checkouts, not guests the host has to refund.
@@ -56,84 +62,8 @@ function firstRow(data) {
   return firstAccountRow(data)
 }
 
-function listingUpcomingStats(listingId, hostSessions) {
-  const sessions = hostSessions.filter((session) => session.listing_id === listingId)
-  const bookings = sessions.flatMap((session) => activeBookingsOn(session))
-  return { sessionCount: sessions.length, bookingCount: bookings.length }
-}
-
-function sessionLabel(count) {
-  return count === 1 ? '1 upcoming session' : `${count} upcoming sessions`
-}
-
 function emptySessionLabel(count) {
   return count === 1 ? '1 open session' : `${count} open sessions`
-}
-
-function bookingLabel(count) {
-  return count === 1 ? '1 upcoming booking' : `${count} upcoming bookings`
-}
-
-function ListingDeleteDialog({
-  listing,
-  sessionCount,
-  bookingCount,
-  loading,
-  onClose,
-  onConfirm,
-}) {
-  const blocked = bookingCount > 0
-  const title = listing.title
-
-  useEffect(() => {
-    function onKeyDown(event) {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
-
-  return (
-    <div
-      className="confirm-dialog-backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose()
-      }}
-    >
-      <div
-        className="confirm-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="listing-delete-title"
-      >
-        <p id="listing-delete-title" className="cancel-confirm__warning">
-          {blocked
-            ? `'${title}' has ${bookingLabel(bookingCount)}. Cancel those sessions first. Guests are refunded in full.`
-            : `Delete '${title}'? This can't be undone.${
-                sessionCount > 0
-                  ? ` Its ${sessionLabel(sessionCount)} will be removed too.`
-                  : ''
-              }`}
-        </p>
-        <div className="confirm-dialog__actions">
-          {blocked ? (
-            <Button variant="secondary" onClick={onClose}>
-              OK
-            </Button>
-          ) : (
-            <>
-              <Button variant="destructive" loading={loading} loadingLabel="Deleting" onClick={onConfirm}>
-                Confirm delete
-              </Button>
-              <Button variant="secondary" onClick={onClose}>
-                Keep listing
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 export default function Hosting({ embedded = false, onListingDeleted }) {
@@ -241,18 +171,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
     if (listingIds.length > 0) {
       const { data: sessionsData, error: sessionsError } = await supabase
         .from('sessions')
-        .select(
-          `
-          id,
-          starts_at,
-          duration_mins,
-          listing_id,
-          status,
-          held_by_session_id,
-          listings (title),
-          bookings (id, status, guests_count, total_amount, platform_fee, host_payout_amount)
-        `
-        )
+        .select(HOST_SESSIONS_SELECT)
         .in('listing_id', listingIds)
         .neq('status', 'cancelled')
         .gte('starts_at', monthStartIso())
@@ -615,7 +534,8 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
     setDeleteLoading(false)
 
     if (rpcError) {
-      setDeleteError(rpcError.message)
+      console.error('Listing delete failed', rpcError)
+      setDeleteError(listingDeleteErrorMessage(rpcError))
       return
     }
 
@@ -783,7 +703,6 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
       {deleteSessionError && (
         <p className="error-message error-message--spaced">{deleteSessionError}</p>
       )}
-      {deleteError && <p className="error-message error-message--spaced">{deleteError}</p>}
       {payoutSetupError && (
         <p className="error-message error-message--spaced">{payoutSetupError}</p>
       )}
@@ -1115,6 +1034,7 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
           sessionCount={confirmStats.sessionCount}
           bookingCount={confirmStats.bookingCount}
           loading={deleteLoading}
+          error={deleteError}
           onClose={() => setConfirmDeleteListingId(null)}
           onConfirm={() => handleDeleteListing(confirmListing.id)}
         />

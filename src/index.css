@@ -3429,6 +3429,34 @@ body.lightbox-open {
   outline-offset: 2px;
 }
 
+.profile-header__public {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.profile-preview-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.profile-preview-bar a {
+  font-weight: 500;
+  color: var(--primary);
+}
+
 .profile-tabs {
   display: flex;
   gap: 4px;
@@ -6346,7 +6374,8 @@ body.lightbox-open {
   text-align: right;
 }
 
-.settings-logout {
+.settings-logout,
+.edit-listing-delete {
   margin-top: 32px;
   padding-top: 24px;
   border-top: 1px solid var(--border);

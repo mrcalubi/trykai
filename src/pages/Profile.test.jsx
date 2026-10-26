@@ -453,8 +453,12 @@ describe('Profile own tabs', () => {
       'page'
     )
     expect(screen.getByRole('link', { name: 'Hosting' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Listings' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Listings' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Reviews' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'See your public profile' })).toHaveAttribute(
+      'href',
+      `/u/${HOST_ID}?tab=bookings&view=public`,
+    )
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
     expect(screen.getByRole('link', { name: 'Add a short bio' })).toHaveAttribute(
       'href',
@@ -498,7 +502,7 @@ describe('Profile own tabs', () => {
     )
   })
 
-  it('drops a listing from the Listings tab after it is deleted on Hosting', async () => {
+  it('drops a deleted listing from the public preview', async () => {
     givenListings([
       makeListing({
         id: 'listing-9',
@@ -514,11 +518,8 @@ describe('Profile own tabs', () => {
       if (previous) return previous(name, args)
       return { data: null, error: null }
     })
-    const { user } = renderPage({ search: '?tab=listings' })
+    const { user } = renderPage({ search: '?tab=hosting' })
 
-    expect(await screen.findByRole('heading', { name: 'fr', level: 3 })).toBeInTheDocument()
-
-    await user.click(screen.getByRole('link', { name: 'Hosting' }))
     const listingsSection = (
       await screen.findByRole('heading', { name: 'Your listings' })
     ).closest('section')
@@ -529,9 +530,10 @@ describe('Profile own tabs', () => {
 
     await waitFor(() => expect(screen.queryByText('fr')).not.toBeInTheDocument())
 
-    await user.click(screen.getByRole('link', { name: 'Listings' }))
+    await user.click(screen.getByRole('link', { name: 'See your public profile' }))
 
-    expect(await screen.findByText('No listings yet.')).toBeInTheDocument()
+    expect(await screen.findByText('This is how guests see your profile')).toBeInTheDocument()
+    expect(screen.getByText('No listings yet.')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'fr', level: 3 })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /fr/ })).not.toBeInTheDocument()
   })
@@ -560,12 +562,12 @@ describe('Profile own tabs', () => {
     const user = userEvent.setup({ delay: null })
     render(<RouterProvider router={router} />)
 
-    await screen.findByRole('link', { name: 'Listings' })
-    await user.click(screen.getByRole('link', { name: 'Listings' }))
+    await screen.findByRole('link', { name: 'Reviews' })
+    await user.click(screen.getByRole('link', { name: 'Reviews' }))
 
     expect(router.state.location.pathname).toBe(`/u/${HOST_ID}`)
-    expect(router.state.location.search).toBe('?tab=listings')
-    expect(screen.getByRole('link', { name: 'Listings' })).toHaveAttribute('aria-current', 'page')
+    expect(router.state.location.search).toBe('?tab=reviews')
+    expect(screen.getByRole('link', { name: 'Reviews' })).toHaveAttribute('aria-current', 'page')
 
     await router.navigate(-1)
     expect(router.state.location.pathname).toBe('/')
@@ -575,10 +577,10 @@ describe('Profile own tabs', () => {
   it('keeps other query keys when switching tabs', async () => {
     renderPage({ search: '?booking=booking-1&tab=bookings' })
 
-    await screen.findByRole('link', { name: 'Listings' })
-    expect(screen.getByRole('link', { name: 'Listings' })).toHaveAttribute(
+    await screen.findByRole('link', { name: 'Reviews' })
+    expect(screen.getByRole('link', { name: 'Reviews' })).toHaveAttribute(
       'href',
-      `/u/${HOST_ID}?booking=booking-1&tab=listings`
+      `/u/${HOST_ID}?booking=booking-1&tab=reviews`
     )
   })
 
@@ -592,7 +594,18 @@ describe('Profile own tabs', () => {
     )
   })
 
-  it('hides Hosting and prompts Host a session on a verified non-host Listings tab', async () => {
+  it('treats ?tab=listings as bookings', async () => {
+    renderPage({ search: '?tab=listings' })
+
+    expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Bookings' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(screen.queryByRole('link', { name: 'Listings' })).not.toBeInTheDocument()
+  })
+
+  it('hides Hosting and puts the host link on a non-host Bookings empty state', async () => {
     givenProfile({
       id: HOST_ID,
       display_name: 'Mei',
@@ -601,18 +614,16 @@ describe('Profile own tabs', () => {
       is_host: false,
     })
     givenHostReviews([])
-    const { user } = renderPage({ search: '?tab=listings' })
+    renderPage()
 
     await screen.findByRole('navigation', { name: 'Profile' })
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
+    expect(await screen.findByText('No bookings yet.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Host a session' })).toHaveAttribute(
       'href',
       '/create-listing'
     )
     expect(screen.queryByText('No listings yet.')).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('link', { name: 'Bookings' }))
-    expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
   })
 
   it('treats ?tab=hosting as bookings when the owner is not a host', async () => {
@@ -675,6 +686,67 @@ describe('Profile own tabs', () => {
       expect(document.querySelector('.detail-host__avatar')).toHaveTextContent('M'),
     )
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  })
+})
+
+describe('Profile public preview', () => {
+  beforeEach(() => {
+    givenSignedIn(HOST_ID)
+  })
+
+  it('carries the current tab into public preview and back', async () => {
+    const { user } = renderPage({ search: '?tab=hosting' })
+
+    expect(await screen.findByRole('link', { name: 'See your public profile' })).toHaveAttribute(
+      'href',
+      `/u/${HOST_ID}?tab=hosting&view=public`,
+    )
+
+    await user.click(screen.getByRole('link', { name: 'See your public profile' }))
+
+    expect(await screen.findByText('This is how guests see your profile')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to your profile' })).toHaveAttribute(
+      'href',
+      `/u/${HOST_ID}?tab=hosting`,
+    )
+
+    await user.click(screen.getByRole('link', { name: 'Back to your profile' }))
+
+    expect(await screen.findByRole('link', { name: 'Hosting' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
+  it('shows the public layout plus the bar, and no owner controls', async () => {
+    givenListings([
+      makeListing({
+        id: 'listing-9',
+        title: 'Latte art',
+        category: 'Food',
+        area: 'Bedok',
+        price_per_person: 3500,
+      }),
+    ])
+    const { user } = renderPage({ search: '?view=public' })
+
+    expect(await screen.findByText('This is how guests see your profile')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to your profile' })).toHaveAttribute(
+      'href',
+      `/u/${HOST_ID}`,
+    )
+    expect(screen.getByRole('heading', { name: 'Listings' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Latte art', level: 3 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Reviews' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Profile' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'See your public profile' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Profile photo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: 'Back to your profile' }))
+    expect(await screen.findByRole('navigation', { name: 'Profile' })).toBeInTheDocument()
   })
 })
 

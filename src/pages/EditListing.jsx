@@ -29,6 +29,14 @@ import { LISTING_CATEGORIES } from '../lib/listingCategories'
 import { notifyListingSubmitted } from '../lib/listingReview'
 import { listingEditorDraft } from '../lib/unsavedDraft'
 import { useUnsavedChangesGuard } from '../lib/useUnsavedChangesGuard'
+import ListingDeleteDialog from '../components/ListingDeleteDialog'
+import {
+  HOST_SESSIONS_SELECT,
+  listingDeleteErrorMessage,
+  listingUpcomingStats,
+  upcomingSessionsFrom,
+} from '../lib/listingDelete'
+import { monthStartIso } from '../lib/hostingDashboard'
 
 const MAX_PHOTOS = 5
 
@@ -80,6 +88,13 @@ export default function EditListing() {
   const [photoError, setPhotoError] = useState('')
   const [loading, setLoading] = useState(false)
   const [savedDraft, setSavedDraft] = useState(null)
+  const [listingTitle, setListingTitle] = useState('')
+  const [upcomingSessions, setUpcomingSessions] = useState([])
+  const [sessionsFailed, setSessionsFailed] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [leaving, setLeaving] = useState(false)
   const priceCents = parsePriceInputCents(price)
   const guests = parseInt(maxGuests, 10)
   const guestCount = Number.isInteger(guests) ? guests : 1
@@ -110,9 +125,16 @@ export default function EditListing() {
             .single()
         )
       }
-      const [founding, addressResult] = await Promise.all([
+      const [founding, addressResult, sessionsResult] = await Promise.all([
         supabase.rpc('my_is_founding_host'),
         supabase.rpc('listing_address', { listing_id: id }),
+        supabase
+          .from('sessions')
+          .select(HOST_SESSIONS_SELECT)
+          .eq('listing_id', id)
+          .neq('status', 'cancelled')
+          .gte('starts_at', monthStartIso())
+          .order('starts_at', { ascending: true }),
       ])
       const { data, error: fetchError } = listingResult
 
@@ -129,6 +151,14 @@ export default function EditListing() {
       }
 
       setIsFoundingHost(foundingHostFromRpc(founding.data, founding.error))
+      setListingTitle(data.title)
+      if (sessionsResult.error) {
+        setUpcomingSessions([])
+        setSessionsFailed(true)
+      } else {
+        setUpcomingSessions(upcomingSessionsFrom(sessionsResult.data))
+        setSessionsFailed(false)
+      }
 
       const nextTitle = data.title
       const nextDescription = data.description
@@ -298,6 +328,26 @@ export default function EditListing() {
     await saveListing()
   }
 
+  async function handleDeleteListing() {
+    setDeleteError('')
+    setDeleteLoading(true)
+    setLeaving(true)
+    const { error: rpcError } = await supabase.rpc('delete_listing', {
+      p_listing_id: id,
+    })
+    setDeleteLoading(false)
+
+    if (rpcError) {
+      console.error('Listing delete failed', rpcError)
+      setLeaving(false)
+      setDeleteError(listingDeleteErrorMessage(rpcError))
+      return
+    }
+
+    photosRef.current.forEach(revokePhotoUrls)
+    navigate('/hosting', { replace: true })
+  }
+
   const currentDraft = listingEditorDraft({
     title,
     description,
@@ -312,7 +362,9 @@ export default function EditListing() {
     whatToBring,
     photos,
   })
-  const isDirty = !fetching && !loading && savedDraft != null && currentDraft !== savedDraft
+  const isDirty =
+    !fetching && !loading && !leaving && savedDraft != null && currentDraft !== savedDraft
+  const deleteStats = listingUpcomingStats(id, upcomingSessions)
   const unsavedGuard = useUnsavedChangesGuard(isDirty)
 
   if (fetching) {
@@ -480,7 +532,33 @@ export default function EditListing() {
             Save changes
           </Button>
         </form>
+
+        <div className="edit-listing-delete">
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => {
+              setDeleteError('')
+              setDeleteOpen(true)
+            }}
+          >
+            Delete listing
+          </Button>
+        </div>
       </div>
+
+      {deleteOpen ? (
+        <ListingDeleteDialog
+          listing={{ title: listingTitle || title }}
+          sessionCount={deleteStats.sessionCount}
+          bookingCount={deleteStats.bookingCount}
+          loading={deleteLoading}
+          error={deleteError}
+          unavailable={sessionsFailed}
+          onClose={() => setDeleteOpen(false)}
+          onConfirm={handleDeleteListing}
+        />
+      ) : null}
 
       {photoSkipOpen ? (
         <PhotoSkipDialog

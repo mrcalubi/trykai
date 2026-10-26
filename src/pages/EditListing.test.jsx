@@ -12,6 +12,11 @@ import {
   LISTING_SAVE_ERROR,
   PHOTO_UPLOAD_ERROR,
 } from '../lib/listingFieldHints'
+import {
+  LISTING_DELETE_ACTIVE_BOOKINGS,
+  LISTING_DELETE_FAILED,
+  LISTING_DELETE_SESSIONS_UNAVAILABLE,
+} from '../lib/listingDelete'
 
 vi.mock('../lib/supabase')
 
@@ -711,5 +716,116 @@ describe('EditListing photos', () => {
 
     expect(await screen.findByText(PHOTO_UPLOAD_ERROR)).toBeInTheDocument()
     expect(supabase.__calls('listings', 'update')).toHaveLength(0)
+  })
+})
+
+describe('EditListing delete', () => {
+  function givenDeleteListing(result = { data: 'listing-1', error: null }) {
+    const previous = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation(async (fn, args) => {
+      if (fn === 'delete_listing') return typeof result === 'function' ? result(args) : result
+      if (previous) return previous(fn, args)
+      return { data: null, error: null }
+    })
+  }
+
+  const hostingRoute = <Route path="/hosting" element={<h1>Hosting</h1>} />
+
+  it('deletes through delete_listing and goes to Hosting', async () => {
+    givenDeleteListing()
+    const { user, currentPath } = await renderLoaded({ extraRoutes: hostingRoute })
+
+    await user.click(screen.getByRole('button', { name: 'Delete listing' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent("Delete 'Latte art'? This can't be undone.")
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    await waitFor(() =>
+      expect(supabase.rpc).toHaveBeenCalledWith('delete_listing', { p_listing_id: 'listing-1' }),
+    )
+    await waitFor(() => expect(currentPath()).toBe('/hosting'))
+    expect(screen.queryByRole('dialog', { name: 'Discard your changes?' })).not.toBeInTheDocument()
+  })
+
+  it('blocks delete when an upcoming session has a booking', async () => {
+    supabase.__on('sessions', 'select', {
+      data: [
+        {
+          id: 's-booked',
+          listing_id: 'listing-1',
+          starts_at: '2099-06-10T02:00:00.000Z',
+          bookings: [{ id: 'b1', status: 'confirmed', guests_count: 1 }],
+        },
+      ],
+      error: null,
+    })
+    const { user } = await renderLoaded()
+
+    await user.click(screen.getByRole('button', { name: 'Delete listing' }))
+
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      "'Latte art' has 1 upcoming booking. Cancel those sessions first. Guests are refunded in full.",
+    )
+    expect(screen.queryByRole('button', { name: 'Confirm delete' })).not.toBeInTheDocument()
+    expect(supabase.rpc.mock.calls.some(([name]) => name === 'delete_listing')).toBe(false)
+  })
+
+  it('does not ask about unsaved changes after a delete with dirty edits', async () => {
+    givenDeleteListing()
+    const { user, currentPath } = await renderLoaded({ extraRoutes: hostingRoute })
+
+    await user.clear(screen.getByLabelText('Title'))
+    await user.type(screen.getByLabelText('Title'), 'New title')
+    await user.click(screen.getByRole('button', { name: 'Delete listing' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    await waitFor(() => expect(currentPath()).toBe('/hosting'))
+    expect(screen.queryByRole('dialog', { name: 'Discard your changes?' })).not.toBeInTheDocument()
+  })
+
+  it('maps an active-bookings RPC error to a cancel-those-sessions line', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    givenDeleteListing({ data: null, error: { message: 'listing has active bookings' } })
+    const { user, currentPath } = await renderLoaded()
+
+    await user.click(screen.getByRole('button', { name: 'Delete listing' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(LISTING_DELETE_ACTIVE_BOOKINGS)
+    expect(log).toHaveBeenCalledWith(
+      'Listing delete failed',
+      expect.objectContaining({ message: 'listing has active bookings' }),
+    )
+    expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
+    expect(currentPath()).toBe('/edit-listing/listing-1')
+    log.mockRestore()
+  })
+
+  it('keeps the form and shows a retry line when delete fails', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    givenDeleteListing({ data: null, error: { message: 'not your listing' } })
+    const { user, currentPath } = await renderLoaded()
+
+    await user.click(screen.getByRole('button', { name: 'Delete listing' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(LISTING_DELETE_FAILED)
+    expect(log).toHaveBeenCalledWith(
+      'Listing delete failed',
+      expect.objectContaining({ message: 'not your listing' }),
+    )
+    expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
+    expect(currentPath()).toBe('/edit-listing/listing-1')
+    log.mockRestore()
+  })
+
+  it('hides Confirm when the sessions query fails', async () => {
+    supabase.__on('sessions', 'select', { data: null, error: { message: 'permission denied' } })
+    const { user } = await renderLoaded()
+
+    await user.click(screen.getByRole('button', { name: 'Delete listing' }))
+
+    expect(screen.getByRole('dialog')).toHaveTextContent(LISTING_DELETE_SESSIONS_UNAVAILABLE)
+    expect(screen.queryByRole('button', { name: 'Confirm delete' })).not.toBeInTheDocument()
+    expect(supabase.rpc.mock.calls.some(([name]) => name === 'delete_listing')).toBe(false)
   })
 })
