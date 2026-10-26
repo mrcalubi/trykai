@@ -10,6 +10,8 @@ import Button from '../components/ui/Button'
 import PageLoader from '../components/PageLoader'
 import WaitingState from '../components/WaitingState'
 import { functionReasonOrDefault } from '../lib/edgeFunctionError'
+import { compressImage } from '../lib/compressImage'
+import { HEIC_READ_ERROR, IMAGE_ACCEPT, isHeicFile, isHeicReadError } from '../lib/heicImage'
 
 /** `my_verification` returns a table, so PostgREST hands back an array. */
 function firstRow(data) {
@@ -93,11 +95,23 @@ export default function VerifyIdentity() {
 
     setLoading(true)
 
+    let readyId
+    let readySelfie
+    try {
+      readyId = await compressImage(idPhoto)
+      readySelfie = await compressImage(selfie)
+      if (isHeicFile(readyId) || isHeicFile(readySelfie)) throw new Error(HEIC_READ_ERROR)
+    } catch (error) {
+      setLoading(false)
+      setError(isHeicReadError(error) ? HEIC_READ_ERROR : error.message)
+      return
+    }
+
     const paths = verificationDocumentPaths(userId)
 
     const { error: idUploadError } = await supabase.storage
       .from('verification-docs')
-      .upload(paths.idPhoto, idPhoto, { upsert: true })
+      .upload(paths.idPhoto, readyId, { upsert: true })
 
     if (idUploadError) {
       setLoading(false)
@@ -107,7 +121,7 @@ export default function VerifyIdentity() {
 
     const { error: selfieUploadError } = await supabase.storage
       .from('verification-docs')
-      .upload(paths.selfie, selfie, { upsert: true })
+      .upload(paths.selfie, readySelfie, { upsert: true })
 
     if (selfieUploadError) {
       setLoading(false)
@@ -182,7 +196,7 @@ export default function VerifyIdentity() {
         Passport or NRIC photo
         <input
           type="file"
-          accept="image/*"
+          accept={IMAGE_ACCEPT}
           onChange={(e) => setIdPhoto(e.target.files?.[0] || null)}
           className="input input--file"
         />
@@ -196,7 +210,7 @@ export default function VerifyIdentity() {
         Selfie
         <input
           type="file"
-          accept="image/*"
+          accept={IMAGE_ACCEPT}
           onChange={(e) => setSelfie(e.target.files?.[0] || null)}
           className="input input--file"
         />

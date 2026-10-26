@@ -31,6 +31,7 @@ import {
   revokeIfBlobUrl,
   revokePhotoUrls,
 } from '../lib/coverCrop'
+import { HEIC_READ_ERROR, IMAGE_ACCEPT, isHeicFile, isHeicReadError } from '../lib/heicImage'
 import { filesToPhotos, movePhoto, snapshotImageFiles } from '../lib/listingPhotos'
 
 const MAX_PHOTOS = 5
@@ -221,13 +222,20 @@ export default function ListingPhotosEditor({
     setDropHint(null)
     setAdding(true)
     try {
-      const added = await filesToPhotos(files, remaining)
-      onChange([...photos, ...added.map(rememberOriginal)])
+      const { photos: added, error } = await filesToPhotos(files, remaining)
+      if (error) setDropHint(error.message === HEIC_READ_ERROR ? HEIC_READ_ERROR : error.message)
+      if (added.length) onChange([...photos, ...added.map(rememberOriginal)])
     } catch (error) {
+      if (isHeicReadError(error)) {
+        setDropHint(HEIC_READ_ERROR)
+        return
+      }
       console.error('ListingPhotosEditor: could not add photos', error)
+      const safe = files.filter((file) => !isHeicFile(file)).slice(0, remaining)
+      if (!safe.length) return
       onChange([
         ...photos,
-        ...files.slice(0, remaining).map((file) =>
+        ...safe.map((file) =>
           rememberOriginal({
             id: `${file.name}-${file.lastModified}`,
             file,
@@ -361,7 +369,7 @@ export default function ListingPhotosEditor({
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept={IMAGE_ACCEPT}
           multiple
           aria-label="Photos"
           onChange={handleFiles}

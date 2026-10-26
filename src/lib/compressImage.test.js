@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { compressImage } from './compressImage'
+import { HEIC_READ_ERROR, heicLoader } from './heicImage'
 
 function imageFile(name = 'avatar.png') {
   return new File(['binary'], name, { type: 'image/png' })
@@ -32,6 +33,9 @@ function stubCanvas({ blob = new Blob(['jpg'], { type: 'image/jpeg' }), ctx = {}
     drawImage: vi.fn(),
     ...ctx,
   })
+  if (typeof HTMLCanvasElement.prototype.toBlob !== 'function') {
+    HTMLCanvasElement.prototype.toBlob = function toBlob() {}
+  }
   vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((done) => done(blob))
 }
 
@@ -132,5 +136,83 @@ describe('compressImage', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     await expect(compressImage(file)).resolves.toBe(file)
     expect(error).toHaveBeenCalled()
+  })
+
+  it('does not import the HEIC converter for a JPEG', async () => {
+    const file = new File(['binary'], 'latte.jpg', { type: 'image/jpeg' })
+    const restore = stubImage({ width: 400, height: 300 })
+    stubCanvas()
+    const load = vi.spyOn(heicLoader, 'importConverter')
+
+    await compressImage(file)
+
+    expect(load).not.toHaveBeenCalled()
+    restore()
+  })
+
+  it('converts HEIC to JPEG before resize', async () => {
+    const heic = new File(['heic'], 'shot.heic', { type: 'image/heic' })
+    const converted = new File(['jpeg-bytes'], 'shot.jpg', { type: 'image/jpeg' })
+    vi.spyOn(heicLoader, 'importConverter').mockResolvedValue(async () => converted)
+    const close = vi.fn()
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => ({
+        width: 4032,
+        height: 3024,
+        close,
+      })),
+    )
+    stubCanvas()
+
+    const next = await compressImage(heic)
+
+    expect(heicLoader.importConverter).toHaveBeenCalledOnce()
+    expect(createImageBitmap).toHaveBeenCalledWith(expect.objectContaining({ type: 'image/jpeg', name: 'shot.jpg' }))
+    expect(next.type).toBe('image/jpeg')
+    expect(next.name).toBe('shot.jpg')
+    expect(HTMLCanvasElement.prototype.toBlob.mock.instances[0].width).toBe(1600)
+  })
+
+  it('treats a typeless .heic file as HEIC', async () => {
+    const heic = new File(['heic'], 'IMG_001.HEIC', { type: '' })
+    vi.spyOn(heicLoader, 'importConverter').mockResolvedValue(async () => new Blob(['jpeg'], { type: 'image/jpeg' }))
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => ({
+        width: 800,
+        height: 600,
+        close: vi.fn(),
+      })),
+    )
+    stubCanvas()
+
+    const next = await compressImage(heic)
+
+    expect(heicLoader.importConverter).toHaveBeenCalledOnce()
+    expect(next.type).toBe('image/jpeg')
+    expect(next.name).toBe('IMG_001.jpg')
+  })
+
+  it('throws and does not return the HEIC when conversion fails', async () => {
+    const heic = new File(['heic'], 'shot.heic', { type: 'image/heic' })
+    vi.spyOn(heicLoader, 'importConverter').mockRejectedValue(new Error('wasm'))
+
+    await expect(compressImage(heic)).rejects.toThrow(HEIC_READ_ERROR)
+  })
+
+  it('does not fall back to the raw HEIC when resize fails after conversion', async () => {
+    const heic = new File(['heic'], 'shot.heic', { type: 'image/heic' })
+    vi.spyOn(heicLoader, 'importConverter').mockResolvedValue(async () => new Blob(['jpeg'], { type: 'image/jpeg' }))
+    const restore = stubImage({ fail: true })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const next = await compressImage(heic)
+
+    expect(next).not.toBe(heic)
+    expect(next.type).toBe('image/jpeg')
+    expect(next.name).toBe('shot.jpg')
+    expect(error).toHaveBeenCalled()
+    restore()
   })
 })

@@ -8,6 +8,7 @@ import PageLoader from '../components/PageLoader'
 import Avatar from '../components/ui/Avatar'
 import { firstAccountRow } from '../lib/myAccount'
 import { compressImage } from '../lib/compressImage'
+import { HEIC_READ_ERROR, IMAGE_ACCEPT, isHeicFile, isHeicReadError, isImageFile } from '../lib/heicImage'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 
 export default function Settings() {
@@ -86,9 +87,7 @@ export default function Settings() {
   }
 
   function handleAvatarChange(event) {
-    const file = Array.from(event.target.files ?? []).find((candidate) =>
-      candidate.type.startsWith('image/')
-    )
+    const file = Array.from(event.target.files ?? []).find(isImageFile)
     event.target.value = ''
     if (!file) return
 
@@ -102,6 +101,7 @@ export default function Settings() {
 
   async function uploadAvatar() {
     const file = await compressImage(avatarFile)
+    if (isHeicFile(file)) throw new Error(HEIC_READ_ERROR)
     const ext = file.name.split('.').pop() || 'jpg'
     const path = `${userId}/avatar-${crypto.randomUUID()}.${ext}`
     const { error: uploadError } = await supabase.storage
@@ -147,7 +147,7 @@ export default function Settings() {
         console.error('Avatar upload failed', uploadError)
         setSaving(false)
         setSaveStatusKind('error')
-        setSaveStatus(uploadError.message)
+        setSaveStatus(isHeicReadError(uploadError) ? HEIC_READ_ERROR : uploadError.message)
         return
       }
     }
@@ -227,7 +227,7 @@ export default function Settings() {
               id="settings-avatar"
               label="Profile photo"
               type="file"
-              accept="image/*"
+              accept={IMAGE_ACCEPT}
               onChange={handleAvatarChange}
             />
 

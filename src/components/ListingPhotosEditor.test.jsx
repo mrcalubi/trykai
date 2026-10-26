@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { useEffect } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import ListingPhotosEditor from './ListingPhotosEditor'
+import { compressImage } from '../lib/compressImage'
+import { HEIC_READ_ERROR, IMAGE_ACCEPT } from '../lib/heicImage'
 import { filesToPhotos } from '../lib/listingPhotos'
 
 vi.mock('react-easy-crop', () => ({
@@ -445,6 +447,24 @@ describe('ListingPhotosEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
     expect(screen.getByRole('menuitem', { name: 'Crop' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Undo crop' })).not.toBeInTheDocument()
+  })
+
+  it('offers HEIC files in the photo picker', () => {
+    render(<ListingPhotosEditor photos={[]} onChange={vi.fn()} />)
+    expect(screen.getByLabelText('Photos')).toHaveAttribute('accept', IMAGE_ACCEPT)
+  })
+
+  it('shows a read error and adds nothing when HEIC conversion fails', async () => {
+    const onChange = vi.fn()
+    compressImage.mockRejectedValueOnce(new Error(HEIC_READ_ERROR))
+    render(<ListingPhotosEditor photos={[]} onChange={onChange} />)
+
+    fireEvent.change(screen.getByLabelText('Photos'), {
+      target: { files: [new File(['h'], 'shot.heic', { type: 'image/heic' })] },
+    })
+
+    expect(await screen.findByRole('status')).toHaveTextContent(HEIC_READ_ERROR)
+    expect(onChange).not.toHaveBeenCalled()
   })
 
 })
