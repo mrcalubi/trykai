@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import HamburgerMenu from './HamburgerMenu'
-import { getInitials } from './getInitials'
+import Avatar from './Avatar'
 
 const SCROLL_THRESHOLD = 48
 
@@ -33,9 +33,8 @@ function CloseIcon() {
   )
 }
 
-/** Logged-in account control: photo if avatarUrl, otherwise initials from name. */
+/** Logged-in account control: photo if avatarUrl, otherwise the display-name initial. */
 export function TopNavAccount({ avatarUrl, name, className = '' }) {
-  const initials = getInitials(name)
   const classes = [
     'ui-topnav__account',
     avatarUrl ? 'ui-topnav__account--photo' : 'ui-topnav__account--initials',
@@ -46,19 +45,12 @@ export function TopNavAccount({ avatarUrl, name, className = '' }) {
 
   return (
     <span className={classes}>
-      {avatarUrl ? (
-        <img
-          src={avatarUrl}
-          alt=""
-          width="36"
-          height="36"
-          className="ui-topnav__avatar-img"
-        />
-      ) : (
-        <span className="ui-topnav__avatar-initials" aria-hidden="true">
-          {initials}
-        </span>
-      )}
+      <Avatar
+        avatarUrl={avatarUrl}
+        displayName={name}
+        size={36}
+        className={avatarUrl ? 'ui-topnav__avatar-img' : ''}
+      />
     </span>
   )
 }

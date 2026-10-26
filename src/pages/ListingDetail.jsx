@@ -40,6 +40,7 @@ import { listingReportSubject, reportMailto } from '../lib/reportMailto'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import { SHARE_NOTES, shareOrCopy } from '../lib/share'
 import { BackRowActions } from '../components/BackButton'
+import Avatar from '../components/ui/Avatar'
 import Icon from '../components/ui/Icon'
 import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
@@ -73,10 +74,12 @@ function previewHostBio(bio) {
 
 function HostAvatar({ host, to }) {
   const name = publicName(host) || 'Anonymous'
-  const avatar = host?.avatar_url ? (
-    <img src={host.avatar_url} alt="" className="detail-host__avatar" />
-  ) : (
-    <div className="detail-host__avatar-placeholder">{name[0]?.toUpperCase() || '?'}</div>
+  const avatar = (
+    <Avatar
+      avatarUrl={host?.avatar_url}
+      displayName={publicName(host)}
+      className="detail-host__avatar"
+    />
   )
   if (!to) return avatar
   return (
