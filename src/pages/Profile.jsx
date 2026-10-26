@@ -295,6 +295,7 @@ export default function Profile() {
               return (
                 <OverflowMenu
                   label="Profile photo"
+                  align="start"
                   className="ui-overflow--avatar"
                   icon={
                     <Avatar

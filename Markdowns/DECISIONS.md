@@ -633,6 +633,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-26 — Profile photos can be changed, cropped, removed, and viewed.** Settings no longer waits for form Save: Change photo picks through `compressImage` (so HEIC is a JPEG before crop), then the shared listing crop dialog at 1:1 with a circular mask, then upload and `avatar_url`. Remove asks "Remove your profile photo?" and writes null; old files in `listing-photos` stay. Own profile: tap the avatar for View / Change / Remove (OverflowMenu). Any profile and the listing Hosted by avatar open a larger viewer when there is a photo; initials do not. The header updates in place. A successful photo save/remove or Settings profile Save fires `trykai:account-updated`; SiteNav re-reads `my_account()` so the top-nav face updates without a reload.
 
+**2026-10-26 — OverflowMenu can open to the start so a left-side avatar stays on screen.** The menu was always `right: 0`, so View / Change / Remove on the profile photo grew left and clipped on phones. `align="start"` pins that menu to the left of the trigger. Every menu also caps at `calc(100vw - 32px)` and wraps item text.
+
 ---
 
 # Analysed but not decided

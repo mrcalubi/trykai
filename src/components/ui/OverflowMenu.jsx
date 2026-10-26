@@ -6,6 +6,7 @@ export default function OverflowMenu({
   items,
   className = '',
   icon = '⋯',
+  align = 'end',
 }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
@@ -75,6 +76,8 @@ export default function OverflowMenu({
 
   if (!hasItems) return null
 
+  const menuAlign = align === 'start' ? 'start' : 'end'
+
   return (
     <div className={['ui-overflow', className].filter(Boolean).join(' ')} ref={rootRef}>
       <button
@@ -99,7 +102,7 @@ export default function OverflowMenu({
         <ul
           id={menuId}
           role="menu"
-          className="ui-overflow__menu"
+          className={['ui-overflow__menu', `ui-overflow__menu--${menuAlign}`].join(' ')}
           onKeyDown={handleMenuKeyDown}
         >
           {items.map((item, index) => {

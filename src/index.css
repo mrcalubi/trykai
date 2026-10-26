@@ -5081,6 +5081,7 @@ body.lightbox-open {
   right: 0;
   z-index: 20;
   width: max-content;
+  max-width: calc(100vw - 32px);
   margin: 0;
   padding: 6px;
   list-style: none;
@@ -5091,10 +5092,16 @@ body.lightbox-open {
   box-shadow: var(--shadow-md);
 }
 
+.ui-overflow__menu--start {
+  left: 0;
+  right: auto;
+}
+
 .ui-overflow__item {
   display: flex;
   align-items: center;
   width: 100%;
+  min-width: 0;
   min-height: 44px;
   padding: 10px 14px;
   font-family: var(--sans);
@@ -5104,6 +5111,7 @@ body.lightbox-open {
   color: var(--navy);
   text-align: left;
   text-decoration: none;
+  white-space: normal;
   background-color: var(--bg-elevated);
   border: none;
   border-radius: var(--radius-sm);
