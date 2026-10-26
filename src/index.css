@@ -730,6 +730,10 @@ a {
 }
 
 /* Home hero (DESIGN.md section 9) */
+.home-stage--listed {
+  margin-bottom: 24px;
+}
+
 .home-hero {
   display: grid;
   gap: 20px;
@@ -830,27 +834,48 @@ a {
 }
 
 @media (min-width: 1024px) {
-  .home-hero {
+  .home-stage {
+    display: grid;
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-    gap: 24px;
+    grid-template-rows: auto auto;
+    column-gap: 24px;
+    align-items: start;
+  }
+
+  .home-hero {
+    display: contents;
+  }
+
+  .home-hero__copy {
+    grid-column: 1;
+    grid-row: 1;
     padding: 24px 0 28px;
+  }
+
+  .home-stage .category-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .home-hero__art {
     position: relative;
     display: block;
-    width: 100%;
-    max-width: 260px;
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: center;
+    width: min(100%, 260px);
+    max-height: 100%;
     aspect-ratio: 1;
-    /* Badges sit at left: -5% / right: -4% / bottom: -3%. A slice of the
-       1fr column on each side keeps them off the page edge, the trust
-       pills, and the category row. */
+    /* Badges sit just outside the ring. A slice of the 1fr column keeps
+       them off the page edge, the trust pills, and the category divider. */
     margin-inline: 16px;
-    margin-block-end: 12px;
     background:
       radial-gradient(circle at 50% 50%, var(--surface) 0 40%, transparent 40.3%),
       var(--sand);
     border-radius: 50%;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .home-hero__mascot {
@@ -859,27 +884,55 @@ a {
     width: 62%;
     height: 62%;
     object-fit: contain;
+    pointer-events: none;
   }
 
   .home-hero__badge {
     position: absolute;
+    z-index: 1;
     width: 24%;
-    height: auto;
+    aspect-ratio: 1;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    cursor: default;
+    transition: transform 600ms cubic-bezier(0.34, 1.45, 0.64, 1);
+  }
+
+  .home-hero__badge-inner {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    padding: 4px;
     background: var(--surface);
     border-radius: 50%;
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 2px 4px rgba(22, 38, 75, 0.06), 0 4px 10px rgba(22, 38, 75, 0.07);
     animation: hero-float 6s ease-in-out infinite;
   }
 
-  .home-hero__badge--1 { top: 0; left: 4%; }
-  .home-hero__badge--2 { top: 8%; right: -4%; animation-delay: -1.5s; }
-  .home-hero__badge--3 { bottom: 4%; left: -5%; animation-delay: -3s; }
-  .home-hero__badge--4 { bottom: -3%; right: 10%; animation-delay: -4.5s; }
+  .home-hero__badge-inner img {
+    display: block;
+    width: 170%;
+    height: 170%;
+    max-width: none;
+    margin: -35%;
+    pointer-events: none;
+  }
+
+  .home-hero__badge--1 { width: 26%; top: 0; left: 2%; }
+  .home-hero__badge--2 { width: 19%; top: 8%; right: -2%; }
+  .home-hero__badge--2 .home-hero__badge-inner { animation-delay: -1.5s; }
+  .home-hero__badge--3 { width: 22%; bottom: 4%; left: -3%; }
+  .home-hero__badge--3 .home-hero__badge-inner { animation-delay: -3s; }
+  .home-hero__badge--4 { width: 17%; bottom: 0; right: 10%; }
+  .home-hero__badge--4 .home-hero__badge-inner { animation-delay: -4.5s; }
 }
 
 @media (min-width: 1280px) {
   .home-hero__art {
-    max-width: 320px;
+    width: min(100%, 320px);
   }
 }
 
@@ -903,6 +956,7 @@ a {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  margin-top: -10px;
   margin-bottom: 24px;
 }
 
@@ -2785,6 +2839,7 @@ input[type='password']::-webkit-password-reveal-button {
 @media (prefers-reduced-motion: reduce) {
   .ui-card__image,
   .home-hero__badge,
+  .home-hero__badge-inner,
   .skeleton {
     transition: none;
     animation: none;

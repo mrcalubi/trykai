@@ -484,27 +484,48 @@ describe('Home hero', () => {
   it('keeps the desktop hero short enough for the first cards', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
     expect(css).toMatch(
-      /@media \(min-width: 1024px\) \{\s*\.home-hero \{\s*grid-template-columns:[^}]*padding:\s*24px 0 28px/,
+      /@media \(min-width: 1024px\) \{[\s\S]*?\.home-hero__copy \{[\s\S]*?padding:\s*24px 0 28px/,
     )
-    expect(css).toMatch(/\.home-hero__art \{[^}]*max-width:\s*260px/)
+    expect(css).toMatch(/\.home-hero__art \{[^}]*width:\s*min\(100%, 260px\)/)
   })
 
-  it('centres the mascot in its column and lets it grow from 1280px', () => {
+  it('centres the mascot between the nav and the category divider', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
     expect(css).toMatch(/\.home-hero__art \{\s*display:\s*none/)
     expect(css).toMatch(
       /@media \(min-width: 768px\) \{\s*\.home-hero__art \{\s*justify-self:\s*center/,
     )
-    expect(css).not.toMatch(/\.home-hero__art \{[^}]*justify-self:\s*end/)
+    expect(css).toMatch(/\.home-hero \{\s*display:\s*contents/)
+    expect(css).toMatch(/\.home-hero__art \{[^}]*grid-row:\s*1 \/ 3/)
+    expect(css).toMatch(/\.home-hero__art \{[^}]*align-self:\s*center/)
     expect(css).toMatch(
-      /@media \(min-width: 1280px\) \{\s*\.home-hero__art \{\s*max-width:\s*320px/,
+      /@media \(min-width: 1280px\) \{\s*\.home-hero__art \{\s*width:\s*min\(100%, 320px\)/,
     )
-    expect(css).toMatch(/\.home-hero__badge--2 \{[^}]*right:\s*-4%/)
-    expect(css).toMatch(/\.home-hero__badge--3 \{[^}]*left:\s*-5%/)
-    expect(css).toMatch(/\.home-hero__badge--4 \{[^}]*bottom:\s*-3%/)
+    expect(css).toMatch(/\.home-hero__badge--1 \{[^}]*width:\s*26%/)
+    expect(css).toMatch(/\.home-hero__badge--2 \{[^}]*width:\s*19%/)
+    expect(css).toMatch(/\.home-hero__badge--3 \{[^}]*width:\s*22%/)
+    expect(css).toMatch(/\.home-hero__badge--4 \{[^}]*width:\s*17%/)
     expect(css).toMatch(
       /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.home-hero__badge,/,
     )
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.home-hero__badge-inner,/,
+    )
+  })
+
+  it('wraps each floating badge so a poke can move the outer element', async () => {
+    givenListings([LATTE])
+    renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+
+    const art = document.querySelector('.home-hero__art')
+    expect(art).toHaveAttribute('aria-hidden', 'true')
+    const badges = art.querySelectorAll('.home-hero__badge')
+    expect(badges).toHaveLength(4)
+    badges.forEach((badge) => {
+      expect(badge.querySelector('.home-hero__badge-inner img')).not.toBeNull()
+      expect(badge).not.toHaveAttribute('tabindex')
+    })
   })
 })
 
