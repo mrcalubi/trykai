@@ -643,6 +643,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-26 — Profile photo required to host is deferred.** Trust layer used to say non-negotiable. Not enforced today; hosts can publish and remove their photo. Enforce later at publish and block Remove while a listing is live.
 
+**2026-10-26 — Desktop hero art sits in the middle of its column, not the far right.** The two-column hero (`1.25fr` copy, `1fr` art) pinned the mascot with `justify-self: end` (max 260px), so wide screens left a large empty gap and the headline looked cramped. From 768px the art is `justify-self: center` in that column so the leftover space is shared; the nav logo and headline stay put. From 1280px the art can grow to 320px (badges stay in % so they scale). Negative badge offsets keep a 16px inline / 12px bottom margin so they do not scroll the page or sit on the trust pills or category row. Phone (art hidden below 768px, shown from 1024px) and `prefers-reduced-motion` on the badges are unchanged.
+
 **2026-10-26 — Avatar centres its own initial.** The shared face was a bare span when there was no photo. Settings passed no class, so the letter sat in the top-left and the circle clipped it; the profile header only looked right because `.detail-host__avatar` flex-centred the span. `Avatar` now always adds `ui-avatar` (circle, flex centre; initials navy on cream, letter about 40% of `size`). Callers keep only size and border.
 
 ---
