@@ -7,17 +7,27 @@ describe('Avatar', () => {
     const { container } = render(
       <Avatar avatarUrl="https://cdn.test/face.jpg" displayName="Mei Ling" />,
     )
-    expect(container.querySelector('img')).toHaveAttribute('src', 'https://cdn.test/face.jpg')
+    const photo = container.querySelector('img')
+    expect(photo).toHaveAttribute('src', 'https://cdn.test/face.jpg')
+    expect(photo).toHaveClass('ui-avatar')
     expect(screen.queryByText('M')).not.toBeInTheDocument()
   })
 
   it('shows the first letter of display_name when there is no photo', () => {
     render(<Avatar displayName="Latte Queen" className="face" size={36} />)
     const face = screen.getByText('L')
-    expect(face).toHaveClass('face')
+    expect(face).toHaveClass('ui-avatar', 'face')
     expect(face).toHaveStyle({ width: '36px', height: '36px' })
     expect(screen.queryByText('LQ')).not.toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  })
+
+  it('centres the initial in ui-avatar and sizes the letter from size', () => {
+    render(<Avatar displayName="Mei" size={72} />)
+    const face = screen.getByText('M')
+    expect(face.tagName).toBe('SPAN')
+    expect(face).toHaveClass('ui-avatar')
+    expect(parseFloat(face.style.fontSize)).toBeCloseTo(29, 0)
   })
 
   it('uppercases a single-word display name', () => {
