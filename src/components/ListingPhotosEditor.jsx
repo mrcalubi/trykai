@@ -16,8 +16,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import Cropper from 'react-easy-crop'
 import Button from './ui/Button'
+import PhotoCropDialog from './PhotoCropDialog'
 import Icon from './ui/Icon'
 import { compressImage } from '../lib/compressImage'
 import {
@@ -442,42 +442,26 @@ export default function ListingPhotosEditor({
       ) : null}
 
       {croppingPhoto ? (
-        <div className="confirm-dialog-backdrop">
-          <div
-            className="confirm-dialog confirm-dialog--wide"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="photo-crop-title"
-          >
-            <p id="photo-crop-title" className="confirm-dialog__copy">
-              {photos[0]?.id === croppingPhoto.id ? 'Crop the cover' : 'Crop this photo'}
-            </p>
-            <div className="cover-crop">
-              <Cropper
-                image={cropSourceUrl(croppingPhoto)}
-                crop={crop}
-                zoom={zoom}
-                aspect={LISTING_COVER_ASPECT}
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onCropComplete={(_, area) => setCroppedArea(area)}
-              />
-            </div>
-            <div className="confirm-dialog__actions">
-              <Button variant="primary" onClick={applyCrop} disabled={!croppedArea}>
-                Use this crop
+        <PhotoCropDialog
+          title={photos[0]?.id === croppingPhoto.id ? 'Crop the cover' : 'Crop this photo'}
+          image={cropSourceUrl(croppingPhoto)}
+          aspect={LISTING_COVER_ASPECT}
+          crop={crop}
+          zoom={zoom}
+          onCropChange={setCrop}
+          onZoomChange={setZoom}
+          onCropComplete={(_, area) => setCroppedArea(area)}
+          onApply={applyCrop}
+          applyDisabled={!croppedArea}
+          onCancel={() => setCropping(null)}
+          extraActions={
+            photoIsCropped(croppingPhoto) ? (
+              <Button variant="secondary" onClick={resetCrop}>
+                Reset to original
               </Button>
-              {photoIsCropped(croppingPhoto) ? (
-                <Button variant="secondary" onClick={resetCrop}>
-                  Reset to original
-                </Button>
-              ) : null}
-              <Button variant="secondary" onClick={() => setCropping(null)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
+            ) : null
+          }
+        />
       ) : null}
     </div>
   )

@@ -58,7 +58,7 @@ describe('PhotoLightbox', () => {
       <PhotoLightbox photos={['https://cdn.test/a.jpg']} title="Latte art" onClose={vi.fn()} />
     )
 
-    expect(screen.getByText('1 / 1')).toBeInTheDocument()
+    expect(screen.queryByText('1 / 1')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Next photo' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Previous photo' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()

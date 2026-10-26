@@ -444,7 +444,7 @@ describe('Profile own tabs', () => {
   })
 
   it('shows private tabs and a settings gear on your own profile', async () => {
-    renderPage()
+    const { user } = renderPage()
 
     expect(await screen.findByRole('navigation', { name: 'Profile' })).toBeInTheDocument()
     expect(supabase.rpc).toHaveBeenCalledWith('my_account')
@@ -464,6 +464,11 @@ describe('Profile own tabs', () => {
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '⚑ Report' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+    const photo = screen.getByRole('button', { name: 'Profile photo' })
+    await user.click(photo)
+    expect(screen.getByRole('menuitem', { name: 'Change photo' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'View photo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Remove photo' })).not.toBeInTheDocument()
   })
 
   it('scrolls the tab bar horizontally without showing a scrollbar in any browser', () => {
@@ -639,6 +644,37 @@ describe('Profile own tabs', () => {
     expect(screen.getByText('I pull rosettas.')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Add a short bio' })).not.toBeInTheDocument()
   })
+
+  it('lets you view, change and remove your photo, and updates the header', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      avatar_url: 'https://cdn.test/mei.jpg',
+      is_id_verified: true,
+      is_host: true,
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Profile photo' }))
+    expect(screen.getByRole('menuitem', { name: 'View photo' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Change photo' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Remove photo' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('menuitem', { name: 'View photo' }))
+    expect(screen.getByRole('dialog', { name: "Mei's photo" })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+
+    await user.click(screen.getByRole('button', { name: 'Profile photo' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Remove photo' }))
+    const confirm = screen.getByRole('dialog')
+    expect(confirm).toHaveTextContent('Remove your profile photo?')
+    await user.click(within(confirm).getByRole('button', { name: 'Remove photo' }))
+
+    await waitFor(() =>
+      expect(document.querySelector('.detail-host__avatar')).toHaveTextContent('M'),
+    )
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  })
 })
 
 describe('Profile of another user', () => {
@@ -654,5 +690,21 @@ describe('Profile of another user', () => {
     expect(screen.getByRole('heading', { name: 'Listings' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Reviews' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'My Bookings' })).not.toBeInTheDocument()
+  })
+
+  it("opens a photo viewer from another person's avatar", async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      avatar_url: 'https://cdn.test/mei.jpg',
+      is_id_verified: true,
+      is_host: true,
+    })
+    givenSignedIn(OTHER_ID)
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: "View Mei's photo" }))
+    expect(screen.getByRole('dialog', { name: "Mei's photo" })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Profile photo' })).not.toBeInTheDocument()
   })
 })
