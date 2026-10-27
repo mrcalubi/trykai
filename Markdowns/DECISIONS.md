@@ -667,6 +667,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-26 — Avatar `fill` sits inside bordered wrappers so initials stay centred.** Card host is 36px including a 2.5px cream ring; TopNav account is 36px including a 1px border. Passing `size={36}` overflowed the content box and the ring clipped the face down-right. `fill` is width/height 100% and letter size from `--avatar-font` on the wrapper (about 40% of the inner hole). Profile header does the same: the white ring lives on `.profile-header__face`, and the avatar fills it (menu trigger and `ViewableAvatar`). Listing Hosted by, booking detail, review cards, and Settings keep a fixed `size` or class size — those wrappers have no inset ring.
 
+**2026-10-27 — Desktop hero art sits in a 40/32 padded stage, badges on an uneven clock orbit.** From 1024px the art stays `align-self: center` but its square is inset 40px under the nav and 32px above the category divider (`margin: 40px 16px 32px`, `height: min(260px, calc(100% - 72px))`, 320px from 1280px when the row is tall enough). Copy padding stays `24px 0 28px`. The four 24% badges keep their rims and poke; each centre sits on the ring (r 45% of the art) at 300° food, 35° music, 140° fitness, 235° arts (12 o'clock = 0°, clockwise). Food's left is slightly negative so the disc sits on the ring; it stays inside the padded stage via the 16px inline margin. Phone layout and `prefers-reduced-motion` are unchanged.
+
 ---
 
 # Analysed but not decided
