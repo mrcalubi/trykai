@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useSearchParams, Link, Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
@@ -66,7 +66,7 @@ function emptySessionLabel(count) {
   return count === 1 ? '1 open session' : `${count} open sessions`
 }
 
-export default function Hosting({ embedded = false, onListingDeleted }) {
+export default function Hosting({ embedded = false, onListingDeleted, onSessionsChange }) {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const userId = useAuthedUserId()
@@ -114,6 +114,13 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
   const [payoutPendingCopy, setPayoutPendingCopy] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
+
+  // The profile's calendar mirrors this tab's sessions. Keep the callback in
+  // a ref so a new function each render does not reload the page.
+  const onSessionsChangeRef = useRef(onSessionsChange)
+  useEffect(() => {
+    onSessionsChangeRef.current = onSessionsChange
+  }, [onSessionsChange])
 
   const loadData = useCallback(async () => {
     const listingColumns =
@@ -186,10 +193,12 @@ export default function Hosting({ embedded = false, onListingDeleted }) {
         const rows = sessionsData ?? []
         setHostSessions(rows.filter((session) => new Date(session.starts_at).getTime() > now))
         setMonthSessions(monthSessionsToCount(rows, now))
+        onSessionsChangeRef.current?.(rows)
       }
     } else {
       setHostSessions([])
       setMonthSessions([])
+      onSessionsChangeRef.current?.([])
     }
 
     setLoading(false)

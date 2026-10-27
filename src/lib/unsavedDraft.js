@@ -1,5 +1,23 @@
-export function settingsDraft({ fullName, displayName, bio }) {
-  return JSON.stringify({ fullName, displayName, bio })
+export function settingsDraft({
+  fullName,
+  displayName,
+  bio,
+  bannerPreset = null,
+  bannerUrl = '',
+  instagram = '',
+  tiktok = '',
+  featuredReviewId = null,
+}) {
+  return JSON.stringify({
+    fullName,
+    displayName,
+    bio,
+    bannerPreset,
+    bannerUrl,
+    instagram,
+    tiktok,
+    featuredReviewId,
+  })
 }
 
 function photoFingerprint(photo) {
