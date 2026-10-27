@@ -860,7 +860,7 @@ a {
   .home-hero__copy {
     grid-column: 1;
     grid-row: 1;
-    padding: 24px 0 28px;
+    padding: 56px 0 48px;
   }
 
   .home-stage .category-bar {
@@ -874,13 +874,13 @@ a {
     grid-column: 2;
     grid-row: 1 / 3;
     align-self: center;
-    /* Square, centred in a 40px-under-nav / 32px-above-divider stage.
+    /* Square, centred in a 56px-under-nav / 48px-above-divider stage.
        Shrinks when that inset would not fit; 260px when there is room. */
-    height: min(260px, calc(100% - 72px));
+    height: min(260px, calc(100% - 104px));
     width: auto;
     max-width: min(100%, 260px);
     aspect-ratio: 1;
-    margin: 40px 16px 32px;
+    margin: 56px 16px 48px;
     background:
       radial-gradient(circle at 50% 50%, var(--surface) 0 40%, transparent 40.3%),
       var(--sand);
@@ -949,11 +949,11 @@ a {
     --badge-img-scale: 172%;
   }
   .home-hero__badge--2 .home-hero__badge-inner { animation-delay: -1.5s; }
-  /* arts: 235° (8 o'clock), r 45% */
+  /* arts: 235° (8 o'clock), r 47% (nudged out from 45%) */
   .home-hero__badge--3 {
     width: 24%;
-    top: 63.81%;
-    left: 1.14%;
+    top: 64.96%;
+    left: -0.5%;
     --badge-img-scale: 170%;
   }
   .home-hero__badge--3 .home-hero__badge-inner { animation-delay: -3s; }
@@ -969,7 +969,7 @@ a {
 
 @media (min-width: 1280px) {
   .home-hero__art {
-    height: min(320px, calc(100% - 72px));
+    height: min(320px, calc(100% - 104px));
     max-width: min(100%, 320px);
   }
 }
