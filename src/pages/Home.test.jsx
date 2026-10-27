@@ -486,7 +486,8 @@ describe('Home hero', () => {
     expect(css).toMatch(
       /@media \(min-width: 1024px\) \{[\s\S]*?\.home-hero__copy \{[\s\S]*?padding:\s*24px 0 28px/,
     )
-    expect(css).toMatch(/\.home-hero__art \{[^}]*width:\s*min\(100%, 260px\)/)
+    expect(css).toMatch(/\.home-hero__art \{[^}]*max-width:\s*min\(100%, 260px\)/)
+    expect(css).toMatch(/\.home-hero__art \{[^}]*height:\s*min\(260px, calc\(100% - 72px\)\)/)
   })
 
   it('centres the mascot between the nav and the category divider', () => {
@@ -498,17 +499,22 @@ describe('Home hero', () => {
     expect(css).toMatch(/\.home-hero \{\s*display:\s*contents/)
     expect(css).toMatch(/\.home-hero__art \{[^}]*grid-row:\s*1 \/ 3/)
     expect(css).toMatch(/\.home-hero__art \{[^}]*align-self:\s*center/)
+    expect(css).toMatch(/\.home-hero__art \{[^}]*margin:\s*40px 16px 32px/)
     expect(css).toMatch(
-      /@media \(min-width: 1280px\) \{\s*\.home-hero__art \{\s*width:\s*min\(100%, 320px\)/,
+      /@media \(min-width: 1280px\) \{\s*\.home-hero__art \{[\s\S]*?height:\s*min\(320px, calc\(100% - 72px\)\)/,
     )
     expect(css).toMatch(/\.home-hero__badge--1 \{[^}]*width:\s*24%/)
     expect(css).toMatch(/\.home-hero__badge--2 \{[^}]*width:\s*24%/)
     expect(css).toMatch(/\.home-hero__badge--3 \{[^}]*width:\s*24%/)
     expect(css).toMatch(/\.home-hero__badge--4 \{[^}]*width:\s*24%/)
-    expect(css).toMatch(/\.home-hero__badge--1 \{[^}]*top:\s*6%/)
-    expect(css).toMatch(/\.home-hero__badge--2 \{[^}]*top:\s*-4%/)
-    expect(css).toMatch(/\.home-hero__badge--3 \{[^}]*bottom:\s*6%/)
-    expect(css).toMatch(/\.home-hero__badge--4 \{[^}]*bottom:\s*-4%/)
+    expect(css).toMatch(/\.home-hero__badge--1 \{[^}]*top:\s*15\.5%/)
+    expect(css).toMatch(/\.home-hero__badge--1 \{[^}]*left:\s*-0\.97%/)
+    expect(css).toMatch(/\.home-hero__badge--2 \{[^}]*top:\s*1\.14%/)
+    expect(css).toMatch(/\.home-hero__badge--2 \{[^}]*left:\s*63\.81%/)
+    expect(css).toMatch(/\.home-hero__badge--3 \{[^}]*top:\s*63\.81%/)
+    expect(css).toMatch(/\.home-hero__badge--3 \{[^}]*left:\s*1\.14%/)
+    expect(css).toMatch(/\.home-hero__badge--4 \{[^}]*top:\s*72\.47%/)
+    expect(css).toMatch(/\.home-hero__badge--4 \{[^}]*left:\s*66\.93%/)
     expect(css).toMatch(/\.home-hero__badge--1 \{[^}]*--badge-img-scale:\s*190%/)
     expect(css).toMatch(/\.home-hero__badge--2 \{[^}]*--badge-img-scale:\s*172%/)
     expect(css).toMatch(/\.home-hero__badge--3 \{[^}]*--badge-img-scale:\s*170%/)
