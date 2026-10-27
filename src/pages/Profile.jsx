@@ -332,8 +332,10 @@ function ReviewsHeading({ reviews, level = 'h2' }) {
       {reviewCount > 0 && average != null ? (
         <>
           {' '}
-          <span className="profile-section__rating">★ {average.toFixed(1)}</span>
-          <span className="profile-section__count"> · {reviewCount}</span>
+          <span className="profile-section__rating">{average.toFixed(1)} ★</span>{' '}
+          <span className="profile-section__count">
+            {reviewCount} {reviewCount === 1 ? 'review' : 'reviews'}
+          </span>
         </>
       ) : null}
     </Tag>
@@ -379,6 +381,10 @@ function HostCalendar({ sessions, listings, nowMs }) {
 export default function Profile() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
+  // Only the profile and the public preview flag decide what to load. Tab
+  // switches (and Bookings/Hosting query keys) must not reload the card.
+  const viewParam = searchParams.get('view')
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set())
   const [profile, setProfile] = useState(null)
   const [listings, setListings] = useState([])
   const [sessions, setSessions] = useState([])
@@ -470,7 +476,7 @@ export default function Profile() {
         verification_status: account?.verification_status ?? null,
       })
 
-      const viewingOwn = isOwner && searchParams.get('view') !== 'public'
+      const viewingOwn = isOwner && viewParam !== 'public'
       const now = Date.now()
 
       const [listingsResult, reviewsResult, heldResult, foundingResult, statsResult] =
@@ -554,7 +560,7 @@ export default function Profile() {
     }
 
     fetchProfile()
-  }, [id, searchParams])
+  }, [id, viewParam])
 
   if (loading || !viewerReady) {
     return <PageLoader />
@@ -583,6 +589,9 @@ export default function Profile() {
   const allowedTabs = isHost ? OWN_TABS : OWN_TABS.filter((tab) => tab !== 'hosting')
   const requestedTab = searchParams.get('tab')
   const activeTab = allowedTabs.includes(requestedTab) ? requestedTab : 'bookings'
+  if (isOwn && !visitedTabs.has(activeTab)) {
+    setVisitedTabs((current) => new Set(current).add(activeTab))
+  }
   const tabs = [
     { id: 'bookings', label: 'Bookings' },
     ...(isHost ? [{ id: 'hosting', label: 'Hosting' }] : []),
@@ -832,16 +841,17 @@ export default function Profile() {
             ))}
           </nav>
 
-          {activeTab === 'bookings' ? (
-            <div className="profile-tab-panel">
+          {/* Tabs stay mounted once opened, so switching back is instant. */}
+          {visitedTabs.has('bookings') ? (
+            <div className="profile-tab-panel" hidden={activeTab !== 'bookings'}>
               <AuthedUserContext.Provider value={viewerId}>
                 <Bookings embedded hostCta={null} withCalendar />
               </AuthedUserContext.Provider>
             </div>
           ) : null}
 
-          {activeTab === 'hosting' ? (
-            <div className="profile-tab-panel profile-tab-layout">
+          {isHost && visitedTabs.has('hosting') ? (
+            <div className="profile-tab-panel profile-tab-layout" hidden={activeTab !== 'hosting'}>
               <aside className="profile-tab-layout__aside">
                 <HostCalendar sessions={sessions} listings={listings} nowMs={nowMs} />
               </aside>
@@ -857,8 +867,12 @@ export default function Profile() {
             </div>
           ) : null}
 
-          {activeTab === 'reviews' ? (
-            <section className="profile-section profile-tab-panel" aria-label="Reviews">
+          {visitedTabs.has('reviews') ? (
+            <section
+              className="profile-section profile-tab-panel"
+              aria-label="Reviews"
+              hidden={activeTab !== 'reviews'}
+            >
               <ReviewsHeading reviews={hostReviews} />
               <ReviewsList reviews={hostReviews} viewerId={viewerId} />
             </section>

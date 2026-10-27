@@ -685,4 +685,15 @@ describe('Edit profile v2 fields', () => {
 
     expect(screen.getByRole('dialog', { name: 'Discard your changes?' })).toBeInTheDocument()
   })
+
+  it('pins a full-width save bar and lets long reviews wrap inside their card', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    const bar = css.match(/\.edit-profile__bar \{[\s\S]*?\n\}/)?.[0] ?? ''
+    expect(bar).toMatch(/position:\s*fixed/)
+    expect(bar).toMatch(/left:\s*0/)
+    expect(bar).toMatch(/right:\s*0/)
+    expect(bar).toMatch(/safe-area-inset-bottom/)
+    expect(css).toMatch(/body:has\(\.edit-profile__bar\) \.site-footer \{[\s\S]*?margin-bottom/)
+    expect(css).toMatch(/\.featured-choices \{[\s\S]*?min-inline-size:\s*0/)
+  })
 })
