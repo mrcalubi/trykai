@@ -74,6 +74,7 @@ export default function SessionCalendar({
             'session-calendar__dot',
             mark === 'booked' && 'session-calendar__dot--booked',
             mark === 'open' && 'session-calendar__dot--open',
+            mark === 'past' && 'session-calendar__dot--past',
           ]
             .filter(Boolean)
             .join(' ')

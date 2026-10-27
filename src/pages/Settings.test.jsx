@@ -76,7 +76,7 @@ async function renderSettings({ withNav = false, extraRoutes = null, route = '/s
     </RequireAuth>,
     { route, path: '/settings', extraRoutes },
   )
-  await screen.findByRole('heading', { name: 'Settings', level: 1 })
+  await screen.findByRole('heading', { name: 'Edit profile', level: 1 })
   return utils
 }
 
@@ -123,7 +123,7 @@ describe('Settings access', () => {
     expect(screen.getByText('Shown on your profile and reviews.')).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toHaveValue('mei@example.com')
     expect(screen.getByRole('heading', { name: 'Profile' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Account' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Private details' })).toBeInTheDocument()
   })
 
   it('reports a load failure', async () => {
@@ -449,7 +449,7 @@ describe('Settings unsaved changes', () => {
     await user.click(screen.getByRole('button', { name: 'Keep editing' }))
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Edit profile', level: 1 })).toBeInTheDocument()
     expect(screen.getByLabelText('Display name')).toHaveValue('Latte Queen')
   })
 
@@ -462,7 +462,7 @@ describe('Settings unsaved changes', () => {
     await user.click(screen.getByRole('button', { name: 'Discard' }))
 
     expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Settings', level: 1 })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Edit profile', level: 1 })).not.toBeInTheDocument()
   })
 
   it('navigates without a dialog when nothing has changed', async () => {
@@ -500,7 +500,7 @@ describe('Settings unsaved changes', () => {
     await user.click(screen.getByRole('button', { name: 'Keep editing' }))
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Edit profile', level: 1 })).toBeInTheDocument()
     expect(screen.getByLabelText('Display name')).toHaveValue('Latte Queen')
     expect(supabase.auth.signOut).not.toHaveBeenCalled()
   })
@@ -529,5 +529,160 @@ describe('Settings unsaved changes', () => {
 
     expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})
+
+describe('Edit profile v2 fields', () => {
+  function givenV2(row = {}) {
+    supabase.__on('users', 'select', {
+      data: {
+        banner_preset: null,
+        banner_url: null,
+        featured_review_id: null,
+        instagram_handle: null,
+        tiktok_handle: null,
+        ...row,
+      },
+      error: null,
+    })
+  }
+
+  function givenHostWithReviews(reviews) {
+    account = { ...account, is_host: true }
+    supabase.rpc.mockImplementation(async (fn) => {
+      if (fn === 'my_account') return { data: [{ ...account }], error: null }
+      if (fn === 'reviews_for_host') return { data: reviews, error: null }
+      return { data: null, error: null }
+    })
+  }
+
+  it('hides banner, socials and featured review until 00041 is applied', async () => {
+    supabase.__on('users', 'select', {
+      data: null,
+      error: { code: '42703', message: 'column users.banner_preset does not exist' },
+    })
+    await renderSettings()
+
+    expect(screen.queryByRole('heading', { name: 'Banner' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Instagram')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Display name')).toHaveValue('Mei')
+  })
+
+  it('saves a banner colour and only the fields that changed', async () => {
+    givenV2({ instagram_handle: 'mei.cooks' })
+    const { user } = await renderSettings()
+
+    await user.click(screen.getByRole('button', { name: 'Mint banner' }))
+    expect(screen.getByRole('button', { name: 'Mint banner' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('users', 'update').payload).toEqual({
+      full_name: 'Mei Ling',
+      display_name: 'Mei',
+      bio: null,
+      banner_preset: 'mint',
+    })
+  })
+
+  it('cleans pasted links and @ off social handles before saving', async () => {
+    givenV2()
+    const { user } = await renderSettings()
+
+    await user.type(screen.getByLabelText('Instagram'), 'https://www.instagram.com/mei.cooks/')
+    await user.type(screen.getByLabelText('TikTok'), '@meicooks')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
+    const { payload } = supabase.__lastCall('users', 'update')
+    expect(payload.instagram_handle).toBe('mei.cooks')
+    expect(payload.tiktok_handle).toBe('meicooks')
+    expect(screen.getByLabelText('Instagram')).toHaveValue('mei.cooks')
+  })
+
+  it('blocks a handle with spaces and says why', async () => {
+    givenV2()
+    const { user } = await renderSettings()
+
+    await user.type(screen.getByLabelText('Instagram'), 'mei cooks')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(
+      await screen.findByText('Use letters, numbers, full stops or underscores (30 at most).'),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('Instagram')).toHaveAttribute('aria-invalid', 'true')
+    expect(supabase.__calls('users', 'update')).toHaveLength(0)
+  })
+
+  it('clears a handle to null', async () => {
+    givenV2({ tiktok_handle: 'meicooks' })
+    const { user } = await renderSettings()
+
+    await user.clear(screen.getByLabelText('TikTok'))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('users', 'update').payload.tiktok_handle).toBeNull()
+  })
+
+  it('lets a host feature one review or go back to TryKai picking', async () => {
+    givenV2()
+    givenHostWithReviews([
+      { id: 'r1', rating: 5, comment: 'Brilliant', created_at: '2026-10-01T00:00:00Z', listing_title: 'Latte art', users: { full_name: 'Sam' } },
+      { id: 'r2', rating: 4, comment: 'Lovely', created_at: '2026-10-05T00:00:00Z', listing_title: 'Latte art', users: { full_name: 'Jo' } },
+    ])
+    const { user } = await renderSettings()
+
+    const pick = screen.getByRole('radio', { name: /Let TryKai pick/ })
+    expect(pick).toBeChecked()
+    await user.click(screen.getByRole('radio', { name: /Lovely/ }))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('users', 'update').payload.featured_review_id).toBe('r2')
+    expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_host', { p_host_id: USER_ID })
+  })
+
+  it('does not show the featured review choice to a guest', async () => {
+    givenV2()
+    await renderSettings()
+    expect(screen.queryByRole('heading', { name: 'Featured review' })).not.toBeInTheDocument()
+  })
+
+  it('uploads a cropped banner into the user folder and saves its URL with the form', async () => {
+    givenV2({ banner_preset: 'coral' })
+    const { user } = await renderSettings()
+
+    fireEvent.change(screen.getByLabelText('Banner photo'), {
+      target: { files: [imageFile('wide.png')] },
+    })
+    expect(await screen.findByText('Crop your banner')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Use this crop' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Use this crop' }))
+
+    await waitFor(() => expect(supabase.__bucket('listing-photos').upload).toHaveBeenCalledOnce())
+    const uploadedPath = supabase.__bucket('listing-photos').upload.mock.calls[0][0]
+    expect(uploadedPath).toMatch(new RegExp(`^${USER_ID}/banner-.+\\.jpg$`))
+    expect(supabase.__calls('users', 'update')).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Your banner photo' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('users', 'update').payload.banner_url).toBe(
+      `https://cdn.test/listing-photos/${uploadedPath}`,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Use a colour instead' }))
+    expect(screen.getByRole('button', { name: 'Coral banner' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('asks before leaving when only the banner changed', async () => {
+    givenV2()
+    const { user } = await renderSettings({ withNav: true, extraRoutes: <Route path="/" element={<h1>Home</h1>} /> })
+
+    await user.click(screen.getByRole('button', { name: 'Navy banner' }))
+    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+
+    expect(screen.getByRole('dialog', { name: 'Discard your changes?' })).toBeInTheDocument()
   })
 })
