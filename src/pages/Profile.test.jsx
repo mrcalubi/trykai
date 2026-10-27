@@ -305,7 +305,7 @@ describe('Profile public content', () => {
     ])
     renderPage()
 
-    await screen.findByRole('heading', { name: /^Reviews\s*★ 4\.5\s*· 2$/ })
+    await screen.findByRole('heading', { name: /^Reviews\s*4\.5 ★\s*2 reviews$/ })
     const stats = screen.getByTestId('profile-stats')
     expect(stats).toHaveTextContent('4.5 ★')
     expect(stats).toHaveTextContent('2 reviews')
@@ -651,6 +651,27 @@ describe('Profile own tabs', () => {
     await router.navigate(-1)
     expect(router.state.location.pathname).toBe('/')
     expect(router.state.location.search).toBe('')
+  })
+
+  it('switches tabs without reloading the profile and keeps opened tabs mounted', async () => {
+    givenBookings([makeBooking({ id: 'booking-1' })])
+    const { user } = renderPage()
+
+    await screen.findByRole('heading', { name: 'My Bookings' })
+    const profileReads = supabase.__calls('users', 'select').length
+    const bookingReads = supabase.__calls('bookings', 'select').length
+
+    await user.click(screen.getByRole('link', { name: 'Reviews' }))
+    expect(await screen.findByRole('region', { name: 'Reviews' })).toBeVisible()
+    expect(screen.queryByRole('heading', { name: 'My Bookings' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: 'Bookings' }))
+    expect(screen.getByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
+    expect(supabase.__calls('users', 'select')).toHaveLength(profileReads)
+    expect(supabase.__calls('bookings', 'select')).toHaveLength(bookingReads)
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    expect(css).toMatch(/\.profile-tab-panel\[hidden\] \{\s*display:\s*none/)
   })
 
   it('keeps other query keys when switching tabs', async () => {
