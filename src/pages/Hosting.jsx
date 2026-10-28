@@ -249,13 +249,14 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
       onSessionsChangeRef.current?.([])
     }
 
-    await notifyWaitingGuests({
+    setLoading(false)
+    // Emails can take a few seconds; never hold the Hosting page for them.
+    void notifyWaitingGuests({
       payoutsOn: Boolean(account?.stripe_payouts_enabled),
       listings: loadedListings,
       interest,
       sessions: upcoming,
     })
-    setLoading(false)
   }, [userId, notifyWaitingGuests])
 
   useEffect(() => {
