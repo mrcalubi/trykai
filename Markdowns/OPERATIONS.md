@@ -552,7 +552,7 @@ If the button says Singpass isn't available, the function logs name the missing 
 2. New keys from `/admin/singpass-keys` on trykai.sg (never reuse staging keys).
 3. Portal set to **Production**: same app settings with redirect URI `https://trykai.sg/verify-identity/singpass`. Upload the user journey document and submit for approval (up to 2 weeks).
 4. Production secrets: the same five, with `SINGPASS_ISSUER` = `https://id.singpass.gov.sg/fapi` and the production App ID and keys. Issuer and redirect were checked against the expected production values by SHA-256 digest, never pasted.
-5. `VITE_SINGPASS_ENABLED` = `true` as a **Production**-scoped Vercel variable (the Preview one is branch-scoped, so production needed its own), then redeploy. The Go-Live notice was submitted. Caleb tested on trykai.sg up to "Check your details" and Cancel.
+5. `VITE_SINGPASS_ENABLED` = `true` as a **Production**-scoped Vercel variable (the Preview one is branch-scoped, so production needed its own), then redeploy. The Go-Live notice was submitted, and Singpass confirmed on 28 October that it was reviewed with no further action needed. Caleb tested on trykai.sg up to "Check your details" and Cancel.
 
 The approved journey must not change. Any change goes back to Singpass first.
 
