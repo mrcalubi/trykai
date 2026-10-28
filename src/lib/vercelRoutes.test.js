@@ -75,8 +75,9 @@ describe('robots.txt', () => {
   const disallowed = [...robots.matchAll(/^Disallow: (\S+)$/gm)].map(([, path]) => path)
   const blocked = (path) => disallowed.some((prefix) => path.startsWith(prefix))
 
-  it('points crawlers at the production sitemap', () => {
-    expect(robots).toMatch(/^Sitemap: https:\/\/trykai\.sg\/sitemap\.xml$/m)
+  it('points crawlers at the production sitemap on www, with no redirect', () => {
+    // trykai.sg answers with a 308 to www.trykai.sg.
+    expect(robots).toMatch(/^Sitemap: https:\/\/www\.trykai\.sg\/sitemap\.xml$/m)
     expect(robots).toMatch(/^User-agent: \*$/m)
   })
 

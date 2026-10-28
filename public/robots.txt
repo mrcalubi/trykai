@@ -19,4 +19,4 @@ Disallow: /settings
 Disallow: /style-guide
 Disallow: /verify-identity
 
-Sitemap: https://trykai.sg/sitemap.xml
+Sitemap: https://www.trykai.sg/sitemap.xml
