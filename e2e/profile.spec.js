@@ -64,4 +64,32 @@ test.describe('public profile v2', () => {
     )
     expect(overflow).toBeLessThanOrEqual(0)
   })
+
+  test('closes the profile photo viewer from its Close button', async ({ page }) => {
+    const photo =
+      'data:image/svg+xml;utf8,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000"><rect width="800" height="1000" fill="#d97756"/></svg>',
+      )
+    await stubAllExternalCalls(page, {
+      users: [{ ...HOST, avatar_url: photo }],
+      listings: [LATTE_ART],
+      sessions: [],
+      reviews: [],
+      'rpc/reviews_for_host': [],
+      'rpc/host_sessions_held': [0],
+      'rpc/host_is_founding': [false],
+      'rpc/listing_ratings': [],
+    })
+
+    await page.goto('/u/host-1')
+    await page.getByRole('button', { name: "View Mei's photo" }).click()
+
+    // The viewer used to open inside the profile header, where the top nav
+    // painted over Close. Playwright refuses to click a covered button.
+    const viewer = page.getByRole('dialog', { name: "Mei's photo" })
+    await expect(viewer).toBeVisible()
+    await viewer.getByRole('button', { name: 'Close' }).click()
+    await expect(viewer).toHaveCount(0)
+  })
 })

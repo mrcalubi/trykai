@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 const FOCUSABLE = 'button:not([disabled])'
 
@@ -96,12 +97,18 @@ export default function PhotoLightbox({ photos, title, label, startIndex = 0, on
   }
 
   function handleBackdropClick(event) {
+    // React still bubbles clicks through the portal to whatever opened the
+    // viewer, such as a profile card; keep them here.
+    event.stopPropagation()
     if (event.target === event.currentTarget) {
       onClose()
     }
   }
 
-  return (
+  // On document.body, not where it is opened: inside the profile header it
+  // inherited line-height: 0 from the avatar ring and sat in the header's
+  // stacking context, so the top nav covered Close and the photo slid sideways.
+  return createPortal(
     <div
       ref={dialogRef}
       className="lightbox"
@@ -154,6 +161,7 @@ export default function PhotoLightbox({ photos, title, label, startIndex = 0, on
           ›
         </button>
       )}
-    </div>
+    </div>,
+    document.body,
   )
 }
