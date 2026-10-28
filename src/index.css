@@ -5166,7 +5166,10 @@ body.lightbox-open {
   border-color: var(--primary);
 }
 
+/* :enabled outranks a lone class, so list it here too. Without it a picked
+   day is navy text on a navy tile until you hover it. */
 .session-calendar__day--selected,
+.session-calendar__day--selected:enabled,
 .session-calendar__day--selected:hover {
   color: var(--cream);
   background: var(--primary);
