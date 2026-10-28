@@ -175,4 +175,36 @@ describe('PhotoLightbox', () => {
     const { container } = render(<PhotoLightbox photos={[]} title="Latte art" onClose={vi.fn()} />)
     expect(container).toBeEmptyDOMElement()
   })
+
+  it('mounts on the page body, clear of the header that opened it', () => {
+    // Inside the profile header it inherited line-height: 0 and the header's
+    // stacking context, so the top nav hid Close.
+    const { container } = render(
+      <div className="profile-header__face">
+        <PhotoLightbox photos={[PHOTOS[0]]} title="Mei's photo" onClose={vi.fn()} />
+      </div>
+    )
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.parentElement).toBe(document.body)
+    expect(container.querySelector('.lightbox')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
+  })
+
+  it('keeps its clicks from reaching whatever opened it', async () => {
+    const user = userEvent.setup()
+    const onOuterClick = vi.fn()
+    const onClose = vi.fn()
+    render(
+      <div onClick={onOuterClick}>
+        <PhotoLightbox photos={[PHOTOS[0]]} title="Mei's photo" onClose={onClose} />
+      </div>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await user.click(screen.getByRole('dialog'))
+
+    expect(onClose).toHaveBeenCalledTimes(2)
+    expect(onOuterClick).not.toHaveBeenCalled()
+  })
 })
