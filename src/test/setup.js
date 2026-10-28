@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
+import { clearBrowseCache } from '../lib/browseCache'
 
 // jsdom does not implement the object URL APIs that the photo pickers rely on.
 if (!window.URL.createObjectURL) {
@@ -10,10 +11,11 @@ if (!window.URL.revokeObjectURL) {
   window.URL.revokeObjectURL = vi.fn()
 }
 
-// ScrollToTop calls window.scrollTo; jsdom only logs "Not implemented".
+// ScrollRestoration calls window.scrollTo; jsdom only logs "Not implemented".
 window.scrollTo = () => {}
 
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
+  clearBrowseCache()
 })
