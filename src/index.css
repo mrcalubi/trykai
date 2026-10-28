@@ -5610,6 +5610,11 @@ body.lightbox-open {
   .page--with-checkout-bar {
     padding-bottom: 120px;
   }
+
+  /* The fixed pay bar would otherwise cover the bottom of the site footer. */
+  body:has(.checkout-pay-bar) .site-footer {
+    margin-bottom: calc(69px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 .checkout-promises {
@@ -7320,6 +7325,32 @@ body.lightbox-open {
   font-size: 14px;
   line-height: 1.55;
   color: #B9C0CF;
+}
+
+.site-footer__socials {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.site-footer__social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--cream);
+  text-decoration: none;
+  border-radius: 50%;
+}
+
+.site-footer__social:hover,
+.site-footer__social:focus-visible {
+  box-shadow: 0 0 0 1.5px var(--cream);
+}
+
+.site-footer__social:focus-visible {
+  outline: none;
 }
 
 .site-footer__column {

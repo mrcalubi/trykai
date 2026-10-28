@@ -549,6 +549,8 @@ describe('booking confirmation emails', () => {
     expect(html).toContain('UEN 53526159D')
     expect(html).toContain('https://trykai.sg/terms')
     expect(html).toContain('https://trykai.sg/privacy')
+    expect(html).toContain('href="https://www.instagram.com/trykaisg/"')
+    expect(html).toContain('href="https://www.tiktok.com/@trykaisg"')
     expect(html).not.toContain('/dashboard')
   })
 
