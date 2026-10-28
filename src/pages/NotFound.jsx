@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
+import { useNoIndex } from '../lib/pageTitle'
 
 export default function NotFound() {
+  useNoIndex()
   return (
     <div className="page page--narrow page--centered">
       <h1>Page not found</h1>

@@ -156,11 +156,11 @@ describe('api/listing-preview', () => {
     expect(res.body).toContain('<h1>Latte art for beginners</h1>')
   })
 
-  it('serves the default preview when the listing is hidden or missing', async () => {
+  it('serves the default page with a 404 when the listing is hidden or missing', async () => {
     vi.stubGlobal('fetch', routeFetch({ listings: () => Response.json([]) }))
     const res = mockRes()
     await handler(req(), res)
-    expect(res.statusCode).toBe(200)
+    expect(res.statusCode).toBe(404)
     expect(res.body).toBe(indexHtml)
   })
 
@@ -169,6 +169,7 @@ describe('api/listing-preview', () => {
     vi.stubGlobal('fetch', fetchMock)
     const res = mockRes()
     await handler(req('abc,select=*'), res)
+    expect(res.statusCode).toBe(404)
     expect(res.body).toBe(indexHtml)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -177,11 +178,14 @@ describe('api/listing-preview', () => {
     vi.stubGlobal('fetch', routeFetch({ listings: () => new Response('nope', { status: 500 }) }))
     const res = mockRes()
     await handler(req(), res)
+    // Not known to be missing, so not a 404 that would drop it from search.
+    expect(res.statusCode).toBe(200)
     expect(res.body).toBe(indexHtml)
 
     vi.stubGlobal('fetch', routeFetch({ listings: () => Promise.reject(new Error('timeout')) }))
     const res2 = mockRes()
     await handler(req(), res2)
+    expect(res2.statusCode).toBe(200)
     expect(res2.body).toBe(indexHtml)
   })
 
@@ -216,13 +220,14 @@ describe('api/listing-preview', () => {
 
 describe('vercel.json', () => {
   const config = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../vercel.json'), 'utf8'))
-  const [preview, catchAll] = config.rewrites
+  const [preview] = config.rewrites
   const pattern = new RegExp(`^${preview.has[0].value}$`)
 
-  it('routes listing pages to the preview function before the SPA catch-all', () => {
+  it('routes crawlers on listing pages to the preview function before the app routes', () => {
     expect(preview.source).toBe('/listings/:id')
     expect(preview.destination).toBe('/api/listing-preview?id=:id')
-    expect(catchAll).toEqual({ source: '/(.*)', destination: '/index.html' })
+    const appRule = config.rewrites.findIndex((rule) => rule.destination === '/index.html')
+    expect(appRule).toBeGreaterThan(0)
   })
 
   it.each([

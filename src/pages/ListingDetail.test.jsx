@@ -154,6 +154,7 @@ describe('ListingDetail content', () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Latte art', level: 1 })).toBeInTheDocument()
+    expect(document.title).toBe('Latte art · TryKai')
     expect(screen.getByText('Food')).toBeInTheDocument()
     expect(screen.getByText('Tiong Bahru')).toBeInTheDocument()
     expect(screen.getByText('Pull your first rosetta in ninety minutes.')).toBeInTheDocument()

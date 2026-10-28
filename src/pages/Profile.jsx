@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { AuthedUserContext } from '../lib/authedUser'
 import { publicName } from '../lib/publicName'
+import { usePageTitle } from '../lib/pageTitle'
 import BioPreview from '../components/BioPreview'
 import ReviewCard from '../components/ReviewCard'
 import Avatar from '../components/ui/Avatar'
@@ -408,6 +409,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [viewerId, setViewerId] = useState(null)
+  usePageTitle(publicName(profile))
   const [viewerReady, setViewerReady] = useState(false)
   const [viewingPhoto, setViewingPhoto] = useState(false)
   const [shareNote, setShareNote] = useState('')
