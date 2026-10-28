@@ -41,7 +41,7 @@ const FALLBACK_HTML = `<!doctype html>
     <!-- link-preview:end -->
     <title>TryKai</title>
   </head>
-  <body><div id="root"></div><a href="https://trykai.sg">TryKai</a></body>
+  <body><div id="root"></div><a href="https://www.trykai.sg">TryKai</a></body>
 </html>
 `
 
