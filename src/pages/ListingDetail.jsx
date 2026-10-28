@@ -582,6 +582,7 @@ export default function ListingDetail() {
   const paynowPrice = paynowPriceCents(listing.price_per_person, guestsCount, groupPricing)
   const canTakePayments = hostCanTakePayments()
   const isOwnListing = viewerIsHost()
+  const publicSessionRange = isOwnListing || canTakePayments ? sessionRange : null
 
   const monthCacheKey = visibleMonth ? `${id}:${visibleMonth}` : null
   const monthSessions = monthCacheKey ? sessionsByMonth[monthCacheKey] : undefined
@@ -607,7 +608,7 @@ export default function ListingDetail() {
     reviews.length > 0
       ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
       : null
-  const showBookBar = Boolean(sessionRange) && !checkoutSessionId && !isOwnListing
+  const showBookBar = Boolean(publicSessionRange) && !checkoutSessionId && !isOwnListing
   const nextHint = checkoutSession
     ? nextGroupTierHint(
         guestsCount,
@@ -860,13 +861,10 @@ export default function ListingDetail() {
                   </p>
                 ) : null}
                 <p className="price-breakdown__row price-breakdown__row--total">
-                  <span>Total</span>
+                  <span>Total (all in)</span>
                   <span className="price-breakdown__amount price-breakdown__total">
                     <FormattedPrice cents={checkoutPrice} />
                   </span>
-                </p>
-                <p className="price-breakdown__note">
-                  Booking fee included. Nothing extra to pay at the door.
                 </p>
               </div>
 
@@ -1104,7 +1102,7 @@ export default function ListingDetail() {
               <FormattedPrice cents={checkoutPrice} />
               {!checkoutSessionId && <span className="detail-booking-card__unit"> / person</span>}
             </p>
-            {!checkoutSessionId && sessionRange && (
+            {!checkoutSessionId && publicSessionRange && (
               <p className="detail-booking-card__note">Pick a date, then a time</p>
             )}
 
@@ -1114,26 +1112,26 @@ export default function ListingDetail() {
 
             {checkoutSessionId && renderCheckout()}
 
-            {!sessionRange && isOwnListing && (
+            {!publicSessionRange && isOwnListing && (
               <p className="empty-state">No upcoming sessions yet. Add dates from your Hosting tab.</p>
             )}
-            {!sessionRange && !isOwnListing && (
+            {!publicSessionRange && !isOwnListing && (
               <KeenPanel listingId={id} hostName={hostName} viewerId={viewerId} />
             )}
 
-            {sessionRange && !checkoutSessionId && (
+            {publicSessionRange && !checkoutSessionId && (
               <>
                 <div className="detail-calendar">
                   <SessionCalendar
                     monthKey={visibleMonth}
                     countsByDay={countsByDay}
                     selectedDateKey={activeDateKey}
-                    todayKey={sessionRange.todayKey}
+                    todayKey={publicSessionRange.todayKey}
                     onSelectDate={setSelectedDateKey}
                     onPrevMonth={() => showMonth(shiftMonth(visibleMonth, -1))}
                     onNextMonth={() => showMonth(shiftMonth(visibleMonth, 1))}
-                    canGoPrev={visibleMonth > sessionRange.firstMonth}
-                    canGoNext={visibleMonth < sessionRange.lastMonth}
+                    canGoPrev={visibleMonth > publicSessionRange.firstMonth}
+                    canGoNext={visibleMonth < publicSessionRange.lastMonth}
                     loading={!monthSessions}
                   />
                 </div>
@@ -1147,9 +1145,10 @@ export default function ListingDetail() {
               </p>
             )}
 
-            {!isOwnListing && !canTakePayments && sessionRange && (
+            {isOwnListing && sessionRange && !canTakePayments && (
               <p className="hint detail-booking-card__hint">
-                This host is still setting up payouts. Booking will open once that is complete.
+                Guests can&apos;t book until your payouts are set up.{' '}
+                <Link to={`/u/${listing.host_id}?tab=hosting`}>Set up payouts</Link>
               </p>
             )}
 

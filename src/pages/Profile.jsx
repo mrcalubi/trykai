@@ -58,7 +58,7 @@ import Bookings from './Bookings'
 import Hosting from './Hosting'
 
 const OWN_TABS = ['bookings', 'hosting', 'reviews']
-const BASE_COLUMNS = 'id, display_name, bio, avatar_url, is_host'
+const BASE_COLUMNS = 'id, display_name, bio, avatar_url, is_host, stripe_payouts_enabled'
 const PROFILE_COLUMNS = `${BASE_COLUMNS}, is_id_verified`
 const PROFILE_V2_COLUMNS = `${PROFILE_COLUMNS}, banner_preset, banner_url, featured_review_id, instagram_handle, tiktok_handle`
 const PROFILE_COLUMNS_WITHOUT_BADGE = BASE_COLUMNS
@@ -542,7 +542,12 @@ export default function Profile() {
         )
       }
 
-      if (!viewingOwn && userData.is_host && listingIds.length > 0) {
+      if (
+        !viewingOwn &&
+        userData.is_host &&
+        userData.stripe_payouts_enabled === true &&
+        listingIds.length > 0
+      ) {
         const until = new Date(now + COMING_UP_DAYS * 24 * 60 * 60 * 1000).toISOString()
         const openResult = await supabase
           .from('sessions')
@@ -611,7 +616,10 @@ export default function Profile() {
     .filter((session) => new Date(session.starts_at).getTime() > nowMs)
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
   const nextSession = upcomingOwn[0] ?? null
-  const comingUp = isOwn ? [] : comingUpSessions(openSessions, { now: nowMs, days: COMING_UP_DAYS })
+  const comingUp =
+    isOwn || profile.stripe_payouts_enabled !== true
+      ? []
+      : comingUpSessions(openSessions, { now: nowMs, days: COMING_UP_DAYS })
   const medals = isHost
     ? hostMedals({ sessionsHeld, reviews: hostReviews })
     : guestMedals(stats ?? {})

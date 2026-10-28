@@ -5571,11 +5571,6 @@ body.lightbox-open {
   border-top: 0;
 }
 
-.price-breakdown__note {
-  font-size: 12px;
-  color: var(--muted);
-}
-
 .checkout-pay-bar {
   display: flex;
   flex-direction: column;

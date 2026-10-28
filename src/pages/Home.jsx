@@ -8,7 +8,7 @@ import { categoryIconName } from '../components/ui/categoryIcon'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { browseFlag, keenCountsById } from '../lib/keen'
 import { formatGuestFacingPrice } from '../lib/pricing'
-import { sortListingsForBrowse } from '../lib/listingSort'
+import { listingsForGuestBrowse, sortListingsForBrowse } from '../lib/listingSort'
 import { filterNarrows, locationLabel, showLocationFilter, showNewFlags, visibleCategories } from '../lib/browseUi'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
 import { REGIONS, regionForPlanningArea } from '../lib/planningAreas'
@@ -111,7 +111,8 @@ export default function Home() {
           created_at,
           users!host_id (
             display_name,
-            avatar_url
+            avatar_url,
+            stripe_payouts_enabled
           ),
           sessions (
             starts_at,
@@ -136,7 +137,7 @@ export default function Home() {
         return
       }
 
-      const rows = sortListingsForBrowse(data ?? [])
+      const rows = sortListingsForBrowse(listingsForGuestBrowse(data ?? []))
       const listingIds = rows.map((listing) => listing.id)
       const noDateIds = rows.filter((listing) => !nextSessionLabel(listing)).map((listing) => listing.id)
       let ratingRows = []
