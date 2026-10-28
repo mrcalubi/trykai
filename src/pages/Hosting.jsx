@@ -119,13 +119,50 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   // a ref so a new function each render does not reload the page.
   const onSessionsChangeRef = useRef(onSessionsChange)
   const hostSessionsRef = useRef([])
-  const payoutsEnabledRef = useRef(payoutsEnabled)
+  const listingsRef = useRef([])
+  const interestByListingRef = useRef({})
+  const notifiedListingIdsRef = useRef(new Set())
   useEffect(() => {
     onSessionsChangeRef.current = onSessionsChange
   }, [onSessionsChange])
-  useEffect(() => {
-    payoutsEnabledRef.current = payoutsEnabled
-  }, [payoutsEnabled])
+
+  const notifyWaitingGuests = useCallback(async ({ payoutsOn, listings, interest, sessions }) => {
+    listingsRef.current = listings
+    interestByListingRef.current = interest
+    if (!payoutsOn) return
+
+    const upcomingIds = new Set(listingsWithOpenUpcoming(sessions))
+    const pending = []
+    for (const listing of listings) {
+      const id = listing.id
+      if (!interest[id] || !upcomingIds.has(id) || notifiedListingIdsRef.current.has(id)) continue
+      notifiedListingIdsRef.current.add(id)
+      pending.push(id)
+    }
+    if (pending.length === 0) return
+
+    const {
+      data: { session: authSession },
+    } = await supabase.auth.getSession()
+    for (const listingId of pending) {
+      try {
+        const { error: notifyError } = await supabase.functions.invoke('notify-interested', {
+          body: { listing_id: listingId },
+          headers: { Authorization: `Bearer ${authSession?.access_token}` },
+        })
+        if (notifyError) {
+          console.error('notify-interested after payouts failed', listingId, notifyError)
+        }
+      } catch (notifyError) {
+        console.error('notify-interested after payouts failed', listingId, notifyError)
+      }
+    }
+
+    const { data: refreshed } = await supabase.rpc('host_listing_interest')
+    const next = hostInterestById(refreshed)
+    interestByListingRef.current = next
+    setInterestByListing(next)
+  }, [])
 
   const loadData = useCallback(async () => {
     const listingColumns =
@@ -163,11 +200,11 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
       setListings(listingsResult.data ?? [])
     }
 
-    if (!profileResult.error) {
-      const account = firstAccountRow(profileResult.data)
-      setPayoutsEnabled(Boolean(account?.stripe_payouts_enabled))
-      setIsHost(Boolean(account?.is_host))
-      setVerificationStatus(account?.verification_status ?? null)
+    const account = profileResult.error ? null : firstAccountRow(profileResult.data)
+    if (account) {
+      setPayoutsEnabled(Boolean(account.stripe_payouts_enabled))
+      setIsHost(Boolean(account.is_host))
+      setVerificationStatus(account.verification_status ?? null)
     }
 
     const adminRow = firstRow(adminResult.data)
@@ -175,11 +212,14 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
     setIsAdmin(admin)
     setPendingCount(admin ? Number(adminRow?.pending_count) || 0 : 0)
 
-    const listingIds = listingsResult.data?.map((l) => l.id) ?? []
+    const loadedListings = listingsResult.error ? [] : (listingsResult.data ?? [])
+    const listingIds = loadedListings.map((l) => l.id)
     // 00032. Until it is applied the RPC errors; the page simply shows no banner.
     const { data: interestRows } = await supabase.rpc('host_listing_interest')
-    setInterestByListing(hostInterestById(interestRows))
+    const interest = hostInterestById(interestRows)
+    setInterestByListing(interest)
 
+    let upcoming = []
     if (listingIds.length > 0) {
       const { data: sessionsData, error: sessionsError } = await supabase
         .from('sessions')
@@ -196,7 +236,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
         // session still to come for the listings and Upcoming bookings.
         const now = Date.now()
         const rows = sessionsData ?? []
-        const upcoming = rows.filter((session) => new Date(session.starts_at).getTime() > now)
+        upcoming = rows.filter((session) => new Date(session.starts_at).getTime() > now)
         hostSessionsRef.current = upcoming
         setHostSessions(upcoming)
         setMonthSessions(monthSessionsToCount(rows, now))
@@ -209,8 +249,14 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
       onSessionsChangeRef.current?.([])
     }
 
+    await notifyWaitingGuests({
+      payoutsOn: Boolean(account?.stripe_payouts_enabled),
+      listings: loadedListings,
+      interest,
+      sessions: upcoming,
+    })
     setLoading(false)
-  }, [userId])
+  }, [userId, notifyWaitingGuests])
 
   useEffect(() => {
     let cancelled = false
@@ -260,31 +306,18 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
         return
       }
       if (data?.stripe_payouts_enabled) {
-        const wasOff = !payoutsEnabledRef.current
         setPayoutsEnabled(true)
         setPayoutSetupIncomplete(false)
         setPayoutChecking(false)
         setPayoutPendingCopy('')
         setBookingStatusMessage(PAYOUT_READY_COPY)
         clearConnectParam()
-        if (wasOff) {
-          const {
-            data: { session: authSession },
-          } = await supabase.auth.getSession()
-          for (const listingId of listingsWithOpenUpcoming(hostSessionsRef.current)) {
-            try {
-              const { error: notifyError } = await supabase.functions.invoke('notify-interested', {
-                body: { listing_id: listingId },
-                headers: { Authorization: `Bearer ${authSession?.access_token}` },
-              })
-              if (notifyError) {
-                console.error('notify-interested after payouts failed', listingId, notifyError)
-              }
-            } catch (notifyError) {
-              console.error('notify-interested after payouts failed', listingId, notifyError)
-            }
-          }
-        }
+        await notifyWaitingGuests({
+          payoutsOn: true,
+          listings: listingsRef.current,
+          interest: interestByListingRef.current,
+          sessions: hostSessionsRef.current,
+        })
         return
       }
       if (data?.pending) {
@@ -316,7 +349,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
       cancelled = true
       window.clearTimeout(timeoutId)
     }
-  }, [loading, connectStatus, setSearchParams])
+  }, [loading, connectStatus, setSearchParams, notifyWaitingGuests])
 
   function openSessionForm(listingId) {
     setActiveFormId(listingId)
