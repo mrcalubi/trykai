@@ -53,6 +53,7 @@ function givenData({
   isHost,
   payoutsEnabled = true,
   verificationStatus = 'approved',
+  interest = [],
 } = {}) {
   supabase.__on('listings', 'select', { data: listings, error: null })
   supabase.__on('bookings', 'select', (call) =>
@@ -72,9 +73,22 @@ function givenData({
   }
   const previousRpc = supabase.rpc.getMockImplementation()
   givenRpc(async (name, args) => {
+    if (name === 'host_listing_interest') {
+      return { data: interest, error: null }
+    }
     if (previousRpc) return previousRpc(name, args)
     return { data: null, error: null }
   })
+}
+
+function waitingInterest(listingId, keenCount = 2) {
+  return { listing_id: listingId, keen_count: keenCount, weekday: 0, weekend: keenCount, morning: 0, afternoon: 0, evening: 0 }
+}
+
+function notifiedListingIds() {
+  return supabase.functions.invoke.mock.calls
+    .filter(([name]) => name === 'notify-interested')
+    .map(([, options]) => options.body.listing_id)
 }
 
 let accountRow = {
@@ -1911,12 +1925,80 @@ describe('Dashboard payout setup', () => {
       headers: { Authorization: 'Bearer test-access-token' },
     })
     expect(screen.queryByText(/Payout setup submitted/)).not.toBeInTheDocument()
-    expect(supabase.functions.invoke.mock.calls.some(([name]) => name === 'notify-interested')).toBe(
-      false,
-    )
+    expect(notifiedListingIds()).toEqual([])
   })
 
-  it('emails keen guests once payouts flip on, and ignores a notify failure', async () => {
+  it('emails waiting guests once payouts are on, dates are up, and guests are waiting', async () => {
+    givenData({
+      listings: [makeMyListing(), makeMyListing({ id: 'listing-2', title: 'Pottery' })],
+      hostSessions: [
+        makeHostSession({ listing_id: 'listing-1', status: 'open' }),
+        makeHostSession({ id: 'session-2', listing_id: 'listing-2', status: 'open' }),
+      ],
+      interest: [waitingInterest('listing-1'), waitingInterest('listing-2', 4)],
+    })
+    await renderHosting()
+
+    await waitFor(() => expect(notifiedListingIds()).toEqual(['listing-1', 'listing-2']))
+  })
+
+  it('does not email when nobody is still waiting', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [makeHostSession({ listing_id: 'listing-1', status: 'open' })],
+    })
+    await renderHosting()
+
+    expect(notifiedListingIds()).toEqual([])
+  })
+
+  it('does not email while payouts are off', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      payoutsEnabled: false,
+      hostSessions: [makeHostSession({ listing_id: 'listing-1', status: 'open' })],
+      interest: [waitingInterest('listing-1')],
+    })
+    await renderHosting()
+
+    expect(notifiedListingIds()).toEqual([])
+  })
+
+  it('emails when payouts were already on at load, the webhook-first case', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      payoutsEnabled: true,
+      hostSessions: [makeHostSession({ listing_id: 'listing-1', status: 'open' })],
+      interest: [waitingInterest('listing-1')],
+    })
+    await renderHosting()
+
+    await waitFor(() => expect(notifiedListingIds()).toEqual(['listing-1']))
+  })
+
+  it('does not email the same listing twice on this mount', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      payoutsEnabled: true,
+      hostSessions: [makeHostSession({ listing_id: 'listing-1', status: 'open' })],
+      interest: [waitingInterest('listing-1')],
+    })
+    supabase.functions.invoke.mockResolvedValue({
+      data: { stripe_payouts_enabled: true, url: null },
+      error: null,
+    })
+    renderWithRouter(
+      <RequireAuth>
+        <Hosting />
+      </RequireAuth>,
+      { route: '/hosting?connect=return', path: '/hosting' },
+    )
+
+    expect(await screen.findByText('Payouts are set up. Guests can now book you.')).toBeInTheDocument()
+    await waitFor(() => expect(notifiedListingIds()).toEqual(['listing-1']))
+  })
+
+  it('emails waiting guests once the Connect return enables payouts, and ignores a notify failure', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     givenData({
       listings: [makeMyListing(), makeMyListing({ id: 'listing-2', title: 'Pottery' })],
@@ -1925,6 +2007,7 @@ describe('Dashboard payout setup', () => {
         makeHostSession({ listing_id: 'listing-1', status: 'open' }),
         makeHostSession({ id: 'session-2', listing_id: 'listing-2', status: 'open' }),
       ],
+      interest: [waitingInterest('listing-1'), waitingInterest('listing-2')],
     })
     supabase.functions.invoke.mockImplementation(async (name) => {
       if (name === 'create-account-link') {
@@ -1943,10 +2026,7 @@ describe('Dashboard payout setup', () => {
     )
 
     expect(await screen.findByText('Payouts are set up. Guests can now book you.')).toBeInTheDocument()
-    const notified = supabase.functions.invoke.mock.calls
-      .filter(([name]) => name === 'notify-interested')
-      .map(([, options]) => options.body.listing_id)
-    expect(notified).toEqual(['listing-1', 'listing-2'])
+    expect(notifiedListingIds()).toEqual(['listing-1', 'listing-2'])
     expect(log).toHaveBeenCalled()
     log.mockRestore()
   })
