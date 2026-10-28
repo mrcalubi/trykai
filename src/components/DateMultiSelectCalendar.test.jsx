@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -62,5 +64,18 @@ describe('DateMultiSelectCalendar', () => {
         .getAllByRole('button')
         .filter((button) => button.getAttribute('aria-pressed') === 'true')
     ).toHaveLength(2)
+  })
+})
+
+describe('selected day contrast', () => {
+  it('keeps picked days cream on navy even though the day buttons are enabled', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    const rule = css.match(
+      /\.session-calendar__day--selected,\s*\n\.session-calendar__day--selected:enabled,\s*\n\.session-calendar__day--selected:hover \{[\s\S]*?\n\}/,
+    )?.[0]
+    expect(rule).toBeTruthy()
+    expect(rule).toMatch(/color:\s*var\(--cream\)/)
+    expect(rule).toMatch(/background:\s*var\(--primary\)/)
+    expect(css.indexOf(rule)).toBeGreaterThan(css.indexOf('.session-calendar__day:enabled {'))
   })
 })
