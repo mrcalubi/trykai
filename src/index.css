@@ -4572,12 +4572,17 @@ body.lightbox-open {
 }
 
 /* Hosting tab inside the profile: one column so the calendar fits beside it */
-.profile-tab-layout .hosting__layout--setup {
+/* Inside the profile the calendar takes the right column, so Hosting's own
+   two-column setup grid collapses to one. The selectors outrank the
+   `.hosting__layout--setup .hosting-*` grid-area rules further down; with
+   equal specificity those win, every block lands in the same cell, and the
+   setup checklist sits on top of the listings. */
+.profile-tab-layout .hosting__layout.hosting__layout--setup {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: none;
 }
 
-.profile-tab-layout .hosting__layout--setup > * {
+.profile-tab-layout .hosting__layout.hosting__layout--setup > section {
   grid-area: auto;
 }
 
@@ -5161,7 +5166,10 @@ body.lightbox-open {
   border-color: var(--primary);
 }
 
+/* :enabled outranks a lone class, so list it here too. Without it a picked
+   day is navy text on a navy tile until you hover it. */
 .session-calendar__day--selected,
+.session-calendar__day--selected:enabled,
 .session-calendar__day--selected:hover {
   color: var(--cream);
   background: var(--primary);
