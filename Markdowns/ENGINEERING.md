@@ -467,6 +467,7 @@ src/
 │   ├── listingRatings.js        # Map listing_ratings RPC rows onto Card rating props
 │   ├── planningAreas.js         # 55 URA planning areas, five regions, host hide list
 │   ├── areaSearch.js            # Neighbourhood alias → planning area
+│   ├── browseCache.js           # 5-minute Home grid + filters cache; scroll restoration key
 │   ├── pageLoad.js              # JWT issued-at-future retry + friendly first-load error
 │   ├── unsavedDraft.js          # Settings / Edit listing snapshot for dirty compare
 │   ├── bioPreview.js            # Truncate a bio to N lines / max chars for … more
@@ -512,7 +513,6 @@ src/
 │   └── Privacy.jsx
 ├── components/
 │   ├── SiteNav.jsx              # Live chrome: TopNav from session + my_account(); refetches on trykai:account-updated
-│   ├── ScrollToTop.jsx          # Scroll to top on PUSH/REPLACE path change; skip POP
 │   ├── BackButton.jsx           # Shared header row: circled SVG chevron + optional actions slot
 │   ├── Footer.jsx               # Policy links, UEN, privacy@trykai.sg
 │   ├── RequireAuth.jsx
@@ -686,7 +686,7 @@ supabase/functions/
 | Connect onboarding                                         | `supabase/functions/create-account-link/`                                                           |
 
 
-**Routes in** `App.jsx`**:** `createBrowserRouter` + `createRoutesFromElements`. Chrome (`ScrollToTop`, `SiteNav`, `BackSlotProvider` / `BackButton`, `Footer`) lives on a layout route with `<Outlet />`. Paths: `/`, `/login`, `/forgot-password`, `/reset-password`, `/listings/:id`, `/u/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/bookings/:bookingId` (guest-only booking receipt; anyone else is sent to `/bookings`), `/bookings`, `/hosting`, `/dashboard`, `/settings` (`/create-listing` through `/settings` behind `RequireAuth`; `/dashboard` redirects to `/bookings`, or `/hosting` when `?connect=` is present; `/bookings` and `/hosting` then redirect to `/u/:id` with `?tab=bookings` or `?tab=hosting` and the rest of the query string kept), `/logout` (public; `signOut`, local fallback on failure, then Home), `/verify-identity/singpass` (Singpass return, behind `RequireAuth`), `/admin/listings`, `/admin/verifications` and `/admin/singpass-keys` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/terms`, `/privacy`, `/style-guide`, and a catch-all `*` that renders `NotFound`. `useBlocker` on Settings and Edit listing needs this data router.
+**Routes in** `App.jsx`**:** `createBrowserRouter` + `createRoutesFromElements`. Chrome (`<ScrollRestoration getKey={scrollRestorationKey} />` from `src/lib/browseCache.js`: `/` and `/u/:id` keep scroll across `?category=` / `?tab=` replace, other new pages start at the top, back/forward restores; `SiteNav`, `BackSlotProvider` / `BackButton`, `Footer`) lives on a layout route with `<Outlet />`. Paths: `/`, `/login`, `/forgot-password`, `/reset-password`, `/listings/:id`, `/u/:id`, `/create-listing`, `/verify-identity`, `/edit-listing/:id`, `/bookings/:bookingId` (guest-only booking receipt; anyone else is sent to `/bookings`), `/bookings`, `/hosting`, `/dashboard`, `/settings` (`/create-listing` through `/settings` behind `RequireAuth`; `/dashboard` redirects to `/bookings`, or `/hosting` when `?connect=` is present; `/bookings` and `/hosting` then redirect to `/u/:id` with `?tab=bookings` or `?tab=hosting` and the rest of the query string kept), `/logout` (public; `signOut`, local fallback on failure, then Home), `/verify-identity/singpass` (Singpass return, behind `RequireAuth`), `/admin/listings`, `/admin/verifications` and `/admin/singpass-keys` (behind `RequireAuth` and `RequireAdmin`), `/refund-policy`, `/cancellation-policy`, `/dispute-policy`, `/terms`, `/privacy`, `/style-guide`, and a catch-all `*` that renders `NotFound`. `useBlocker` on Settings and Edit listing needs this data router.
 
 ---
 

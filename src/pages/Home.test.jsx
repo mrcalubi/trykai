@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Home from './Home'
 import { supabase } from '../lib/supabase'
 import { PAGE_LOAD_ERROR } from '../lib/pageLoad'
+import { BROWSE_CACHE_TTL_MS, clearBrowseCache, writeBrowseCache } from '../lib/browseCache'
 import { renderWithRouter } from '../test/render'
 import { makeListing, makeSession } from '../test/fixtures'
 
@@ -73,6 +74,7 @@ function listingTitles() {
 
 beforeEach(() => {
   supabase.__reset()
+  clearBrowseCache()
 })
 
 describe('Home loading and error states', () => {
@@ -127,6 +129,37 @@ describe('Home loading and error states', () => {
         name: "Singapore's not boring. You just haven't found your thing yet.",
       })
     ).toBeInTheDocument()
+  })
+
+  it('renders a fresh cache immediately and replaces it from a quiet refetch', async () => {
+    writeBrowseCache({ listings: [LATTE], ratings: {}, keenCounts: {} })
+    givenListings([LATTE, BOXING])
+    renderWithRouter(<Home />)
+
+    expect(screen.getByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Boxing basics' })).toBeInTheDocument()
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('keeps the cached grid when a quiet refetch fails', async () => {
+    writeBrowseCache({ listings: [LATTE], ratings: {}, keenCounts: {} })
+    supabase.__on('listings', 'select', { data: null, error: { message: 'network down' } })
+    renderWithRouter(<Home />)
+
+    expect(screen.getByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
+    expect(screen.queryByText(PAGE_LOAD_ERROR)).not.toBeInTheDocument()
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('shows the loader when the cache is older than five minutes', () => {
+    writeBrowseCache({ listings: [LATTE], ratings: {}, keenCounts: {} }, Date.now() - BROWSE_CACHE_TTL_MS)
+    givenListings([LATTE])
+    renderWithRouter(<Home />)
+
+    expect(screen.getByText('Loading listings…')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Latte art' })).not.toBeInTheDocument()
   })
 })
 
@@ -468,6 +501,35 @@ describe('Home filters', () => {
     await user.click(screen.getByRole('button', { name: 'Food' }))
     expect(screen.getByText('1 of 2 listings')).toBeInTheDocument()
   })
+
+  it('lets the category query override a cached category', () => {
+    writeBrowseCache({
+      listings: [LATTE, BOXING],
+      ratings: {},
+      keenCounts: {},
+      filters: { category: 'Food' },
+    })
+    givenListings([LATTE, BOXING])
+    renderWithRouter(<Home />, { route: '/?category=Fitness' })
+
+    expect(listingTitles()).toEqual(['Boxing basics'])
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('keeps region and area filters after a remount', async () => {
+    givenListings(withFillers([LATTE, BOXING, POTTERY]))
+    const { user, unmount } = renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+    await openLocation(user)
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
+    expect(listingTitles()).toEqual(['Boxing basics', 'Pottery hour'])
+
+    unmount()
+    renderWithRouter(<Home />)
+
+    expect(listingTitles()).toEqual(['Boxing basics', 'Pottery hour'])
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
 })
 
 describe('Home hero', () => {
@@ -647,6 +709,7 @@ describe('Home New label', () => {
     await screen.findByText('Fresh one')
     expect(screen.queryByText('New')).not.toBeInTheDocument()
     unmount()
+    clearBrowseCache()
 
     givenListings([FRESH, ...WEST_FILLERS.slice(0, 2)])
     renderWithRouter(<Home />)
