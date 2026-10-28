@@ -375,3 +375,24 @@ describe('App routes', () => {
     expect(screen.queryByRole('heading', { name: 'Verification review' })).not.toBeInTheDocument()
   })
 })
+
+describe('App page titles', () => {
+  it('uses the site title on browse', async () => {
+    renderAt('/')
+    await screen.findByRole('heading', { level: 1 })
+    expect(document.title).toBe('TryKai — find your thing in Singapore')
+  })
+
+  it('names static pages from their route', async () => {
+    renderAt('/terms')
+    await screen.findByRole('heading', { name: 'Terms of Service' })
+    expect(document.title).toBe('Terms of Service · TryKai')
+  })
+
+  it('names the not-found page and asks search engines not to index it', async () => {
+    renderAt('/does-not-exist')
+    await screen.findByRole('heading', { name: 'Page not found' })
+    expect(document.title).toBe('Page not found · TryKai')
+    expect(document.head.querySelector('meta[name="robots"]')?.content).toBe('noindex')
+  })
+})

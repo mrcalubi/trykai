@@ -85,7 +85,10 @@ async function fetchListing(config, id) {
   const rows =
     (await restGet(config, `listings?select=${LISTING_COLUMNS}${filters}`)) ??
     (await restGet(config, `listings?select=${BASE_COLUMNS}${filters}`))
-  return Array.isArray(rows) ? (rows[0] ?? null) : null
+  // null: Supabase answered and there is no such live listing.
+  // undefined: Supabase did not answer, so nothing is known.
+  if (!Array.isArray(rows)) return undefined
+  return rows[0] ?? null
 }
 
 async function fetchSessions(config, id) {
@@ -130,7 +133,10 @@ export default async function handler(req, res) {
   }
 
   let body = html
-  const config = isListingId(id) ? supabaseConfig() : null
+  // A malformed id, or a listing Supabase says is not live, is a real 404 so
+  // search engines drop it. A Supabase failure stays 200: it is not known missing.
+  let status = isListingId(id) ? 200 : 404
+  const config = status === 200 ? supabaseConfig() : null
   if (config) {
     try {
       const [listing, sessions, rating] = await Promise.all([
@@ -138,6 +144,7 @@ export default async function handler(req, res) {
         optional(fetchSessions(config, id), []),
         optional(fetchRating(config, id), null),
       ])
+      if (listing === null) status = 404
       const pageUrl = `${origin}/listings/${id}`
       const meta = listing ? listingPreviewMeta(listing, pageUrl) : null
       if (meta) {
@@ -154,5 +161,5 @@ export default async function handler(req, res) {
   // Unfurlers fetch rarely and re-fetch on their own schedule. Five minutes at
   // the edge keeps a burst of shares from hitting Supabase each time.
   res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=300, stale-while-revalidate=3600')
-  res.status(200).send(body)
+  res.status(status).send(body)
 }

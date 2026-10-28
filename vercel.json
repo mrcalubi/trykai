@@ -11,6 +11,20 @@
       ],
       "destination": "/api/listing-preview?id=:id"
     },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    {
+      "source": "/(login|logout|forgot-password|reset-password|create-listing|verify-identity|bookings|hosting|dashboard|settings|refund-policy|cancellation-policy|dispute-policy|terms|privacy|style-guide)",
+      "destination": "/index.html"
+    },
+    { "source": "/(listings|u|edit-listing|bookings)/:id", "destination": "/index.html" },
+    { "source": "/verify-identity/singpass", "destination": "/index.html" },
+    { "source": "/admin/(singpass-keys|listings|verifications)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "missing": [{ "type": "host", "value": "(www\\.)?trykai\\.sg" }],
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    }
   ]
 }

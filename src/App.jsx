@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -6,7 +6,9 @@ import {
   Route,
   RouterProvider,
   ScrollRestoration,
+  useMatches,
 } from 'react-router-dom'
+import { pageTitle } from './lib/pageTitle'
 import SiteNav from './components/SiteNav'
 import BackButton, { BackSlotProvider } from './components/BackButton'
 import Footer from './components/Footer'
@@ -38,7 +40,21 @@ import Privacy from './pages/Privacy'
 import StyleGuide from './pages/StyleGuide'
 import NotFound from './pages/NotFound'
 
+/**
+ * Title for routes that name one in their handle. Listing and profile pages
+ * have none and set their own from data (usePageTitle); this effect runs after
+ * theirs, so it must leave those routes alone.
+ */
+function useRouteTitle() {
+  const matches = useMatches()
+  const title = matches[matches.length - 1]?.handle?.title
+  useEffect(() => {
+    if (typeof title === 'string') document.title = pageTitle(title)
+  }, [title])
+}
+
 function AppLayout() {
+  useRouteTitle()
   return (
     <>
       <ScrollRestoration />
@@ -55,14 +71,14 @@ function AppLayout() {
 function appRoutes() {
   return createRoutesFromElements(
     <Route element={<AppLayout />}>
-      <Route path="/" element={<Home />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/" handle={{ title: '' }} element={<Home />} />
+      <Route path="/login" handle={{ title: 'Log in' }} element={<Login />} />
+      <Route path="/forgot-password" handle={{ title: 'Forgot password' }} element={<ForgotPassword />} />
+      <Route path="/reset-password" handle={{ title: 'Reset password' }} element={<ResetPassword />} />
       <Route path="/listings/:id" element={<ListingDetail />} />
       <Route path="/u/:id" element={<Profile />} />
       <Route
-        path="/create-listing"
+        path="/create-listing" handle={{ title: 'Create a listing' }}
         element={
           <RequireAuth>
             <CreateListing />
@@ -70,7 +86,7 @@ function appRoutes() {
         }
       />
       <Route
-        path="/verify-identity"
+        path="/verify-identity" handle={{ title: 'Verify your identity' }}
         element={
           <RequireAuth>
             <VerifyIdentity />
@@ -78,7 +94,7 @@ function appRoutes() {
         }
       />
       <Route
-        path="/edit-listing/:id"
+        path="/edit-listing/:id" handle={{ title: 'Edit listing' }}
         element={
           <RequireAuth>
             <EditListing />
@@ -86,7 +102,7 @@ function appRoutes() {
         }
       />
       <Route
-        path="/bookings/:bookingId"
+        path="/bookings/:bookingId" handle={{ title: 'Booking' }}
         element={
           <RequireAuth>
             <BookingDetail />
@@ -94,7 +110,7 @@ function appRoutes() {
         }
       />
       <Route
-        path="/bookings"
+        path="/bookings" handle={{ title: 'Bookings' }}
         element={
           <RequireAuth>
             <RedirectToOwnProfile tab="bookings" />
@@ -102,7 +118,7 @@ function appRoutes() {
         }
       />
       <Route
-        path="/hosting"
+        path="/hosting" handle={{ title: 'Hosting' }}
         element={
           <RequireAuth>
             <RedirectToOwnProfile tab="hosting" />
@@ -110,7 +126,7 @@ function appRoutes() {
         }
       />
       <Route
-        path="/dashboard"
+        path="/dashboard" handle={{ title: 'Dashboard' }}
         element={
           <RequireAuth>
             <Dashboard />
@@ -118,16 +134,16 @@ function appRoutes() {
         }
       />
       <Route
-        path="/settings"
+        path="/settings" handle={{ title: 'Edit profile' }}
         element={
           <RequireAuth>
             <Settings />
           </RequireAuth>
         }
       />
-      <Route path="/logout" element={<Logout />} />
+      <Route path="/logout" handle={{ title: 'Log out' }} element={<Logout />} />
       <Route
-        path="/verify-identity/singpass"
+        path="/verify-identity/singpass" handle={{ title: 'Verify with Singpass' }}
         element={
           <RequireAuth>
             <SingpassReturn />
@@ -135,7 +151,7 @@ function appRoutes() {
         }
       />
       <Route
-        path="/admin/singpass-keys"
+        path="/admin/singpass-keys" handle={{ title: 'Singpass keys' }}
         element={
           <RequireAuth>
             <RequireAdmin>
@@ -145,7 +161,7 @@ function appRoutes() {
         }
       />
       <Route
-        path="/admin/listings"
+        path="/admin/listings" handle={{ title: 'Listing review' }}
         element={
           <RequireAuth>
             <RequireAdmin>
@@ -155,7 +171,7 @@ function appRoutes() {
         }
       />
       <Route
-        path="/admin/verifications"
+        path="/admin/verifications" handle={{ title: 'Verification review' }}
         element={
           <RequireAuth>
             <RequireAdmin>
@@ -164,13 +180,13 @@ function appRoutes() {
           </RequireAuth>
         }
       />
-      <Route path="/refund-policy" element={<RefundPolicy />} />
-      <Route path="/cancellation-policy" element={<CancellationPolicy />} />
-      <Route path="/dispute-policy" element={<DisputePolicy />} />
-      <Route path="/terms" element={<Terms />} />
-      <Route path="/privacy" element={<Privacy />} />
-      <Route path="/style-guide" element={<StyleGuide />} />
-      <Route path="*" element={<NotFound />} />
+      <Route path="/refund-policy" handle={{ title: 'Refund Policy' }} element={<RefundPolicy />} />
+      <Route path="/cancellation-policy" handle={{ title: 'Cancellation Policy' }} element={<CancellationPolicy />} />
+      <Route path="/dispute-policy" handle={{ title: 'Dispute Policy' }} element={<DisputePolicy />} />
+      <Route path="/terms" handle={{ title: 'Terms of Service' }} element={<Terms />} />
+      <Route path="/privacy" handle={{ title: 'Privacy Policy' }} element={<Privacy />} />
+      <Route path="/style-guide" handle={{ title: 'Component preview' }} element={<StyleGuide />} />
+      <Route path="*" handle={{ title: 'Page not found' }} element={<NotFound />} />
     </Route>,
   )
 }
