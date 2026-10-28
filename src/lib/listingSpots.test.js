@@ -8,7 +8,9 @@ import {
   firstSpotsResult,
   floorSessionSpots,
   formatListingSpotsMessage,
+  isLowSpots,
   isSessionHasBookingsError,
+  spotsLabel,
 } from './listingSpots'
 
 const migration = readFileSync(
@@ -19,6 +21,22 @@ const checkout = readFileSync(
   resolve(import.meta.dirname, '../../supabase/functions/create-payment-intent/index.ts'),
   'utf8',
 )
+
+describe('spotsLabel', () => {
+  it('says Full, N spot(s) left at 1–4, and N spots from 5', () => {
+    expect(spotsLabel(0)).toBe('Full')
+    expect(spotsLabel(1)).toBe('1 spot left')
+    expect(spotsLabel(4)).toBe('4 spots left')
+    expect(spotsLabel(5)).toBe('5 spots')
+  })
+
+  it('treats 1–4 as low', () => {
+    expect(isLowSpots(0)).toBe(false)
+    expect(isLowSpots(1)).toBe(true)
+    expect(isLowSpots(4)).toBe(true)
+    expect(isLowSpots(5)).toBe(false)
+  })
+})
 
 describe('floorSessionSpots', () => {
   it('uses the listing number when nothing is booked', () => {
