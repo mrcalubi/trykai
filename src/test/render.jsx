@@ -1,6 +1,15 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import {
+  createMemoryRouter,
+  createRoutesFromElements,
+  MemoryRouter,
+  Outlet,
+  Route,
+  RouterProvider,
+  Routes,
+  useLocation,
+} from 'react-router-dom'
 import { vi } from 'vitest'
 
 function LocationProbe({ pinnedPathname }) {
@@ -67,6 +76,56 @@ export function renderWithRouter(
 
   return {
     user,
+    ...utils,
+    currentPath: () => screen.getByTestId('location-probe').dataset.pathname,
+    currentSearch: () => screen.getByTestId('location-probe').dataset.search,
+    currentState: () => JSON.parse(screen.getByTestId('location-probe').dataset.state),
+  }
+}
+
+/**
+ * Same helpers as renderWithRouter, on a data router so useBlocker works.
+ */
+export function renderWithDataRouter(
+  ui,
+  {
+    route = '/',
+    path = '*',
+    extraRoutes = null,
+    outlivesNavigation = false,
+    withFakeTimers = false,
+  } = {},
+) {
+  const user = userEvent.setup({
+    delay: null,
+    ...(withFakeTimers ? { advanceTimers: vi.advanceTimersByTime } : {}),
+  })
+
+  const router = createMemoryRouter(
+    createRoutesFromElements(
+      <Route
+        element={
+          <>
+            <Outlet />
+            <LocationProbe
+              pinnedPathname={path === '*' && !outlivesNavigation ? pathnameOf(route) : null}
+            />
+          </>
+        }
+      >
+        <Route path={path} element={ui} />
+        {extraRoutes}
+        <Route path="*" element={null} />
+      </Route>,
+    ),
+    { initialEntries: [route] },
+  )
+
+  const utils = render(<RouterProvider router={router} />)
+
+  return {
+    user,
+    router,
     ...utils,
     currentPath: () => screen.getByTestId('location-probe').dataset.pathname,
     currentSearch: () => screen.getByTestId('location-probe').dataset.search,

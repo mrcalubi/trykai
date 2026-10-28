@@ -5,6 +5,7 @@ import SiteNav from './SiteNav'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { makeAuthSession } from '../test/fixtures'
+import { ACCOUNT_UPDATED_EVENT, notifyAccountUpdated } from '../lib/myAccount'
 
 vi.mock('../lib/supabase')
 
@@ -57,7 +58,7 @@ describe('SiteNav when signed in', () => {
     renderNav()
 
     const account = await screen.findByRole('link', { name: 'Your profile' })
-    await waitFor(() => expect(account).toHaveTextContent('ML'))
+    await waitFor(() => expect(account).toHaveTextContent('M'))
     expect(account.querySelector('.ui-topnav__account')).toHaveClass('ui-topnav__account--initials')
     expect(screen.queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument()
   })
@@ -74,13 +75,13 @@ describe('SiteNav when signed in', () => {
     expect(account.querySelector('img')).toHaveAttribute('src', 'https://cdn.test/avatar.jpg')
   })
 
-  it('falls back to the email initial when the profile has no name', async () => {
+  it('shows ? when the profile has no display name', async () => {
     signedIn(makeAuthSession({ user: { email: 'kai@example.com', full_name: null } }))
     givenAccount(null)
     renderNav()
 
     const account = await screen.findByRole('link', { name: 'Your profile' })
-    await waitFor(() => expect(account).toHaveTextContent('K'))
+    await waitFor(() => expect(account).toHaveTextContent('?'))
   })
 
   it('loads the signed-in account through my_account', async () => {
@@ -91,6 +92,37 @@ describe('SiteNav when signed in', () => {
     await screen.findByRole('link', { name: 'Your profile' })
     await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('my_account'))
     expect(supabase.__calls('users')).toHaveLength(0)
+  })
+
+  it('refetches the face when the account is updated, and drops the listener on unmount', async () => {
+    signedIn()
+    givenAccount({ display_name: 'Mei', avatar_url: null })
+    const { unmount } = renderNav()
+
+    const account = await screen.findByRole('link', { name: 'Your profile' })
+    await waitFor(() => expect(account).toHaveTextContent('M'))
+
+    givenAccount({ display_name: 'Mei', avatar_url: 'https://cdn.test/new.jpg' })
+    await act(async () => {
+      notifyAccountUpdated()
+    })
+    await waitFor(() =>
+      expect(account.querySelector('img')).toHaveAttribute('src', 'https://cdn.test/new.jpg'),
+    )
+
+    givenAccount({ display_name: 'Latte Queen', avatar_url: null })
+    await act(async () => {
+      notifyAccountUpdated()
+    })
+    await waitFor(() => expect(account).toHaveTextContent('L'))
+    expect(account.querySelector('img')).not.toBeInTheDocument()
+
+    const callsAfter = supabase.rpc.mock.calls.filter(([fn]) => fn === 'my_account').length
+    unmount()
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(ACCOUNT_UPDATED_EVENT))
+    })
+    expect(supabase.rpc.mock.calls.filter(([fn]) => fn === 'my_account')).toHaveLength(callsAfter)
   })
 
   it('takes the avatar to the signed-in user own profile', async () => {
@@ -120,23 +152,23 @@ describe('SiteNav hamburger', () => {
       `/u/${makeAuthSession().user.id}`
     )
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Log out' })).toHaveAttribute('href', '/logout')
     expect(screen.queryByRole('link', { name: 'My bookings' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Hosting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Create listing' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Verification review' })).not.toBeInTheDocument()
   })
 
-  it('signs the user out from the menu and sends them home', async () => {
+  it('sends the hamburger Log out row to /logout without signing out itself', async () => {
     signedIn()
     const { user, currentPath } = renderNav()
 
     await screen.findByRole('link', { name: 'Your profile' })
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
-    await user.click(screen.getByRole('button', { name: 'Log out' }))
+    await user.click(screen.getByRole('link', { name: 'Log out' }))
 
-    expect(supabase.auth.signOut).toHaveBeenCalledOnce()
-    await waitFor(() => expect(currentPath()).toBe('/'))
+    expect(supabase.auth.signOut).not.toHaveBeenCalled()
+    await waitFor(() => expect(currentPath()).toBe('/logout'))
   })
 
   it('labels Host a session once my_verification reports approved', async () => {

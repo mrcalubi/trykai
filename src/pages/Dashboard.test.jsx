@@ -21,6 +21,10 @@ import {
   PAYOUT_READY_COPY,
   PAYOUT_STILL_CHECKING_COPY,
 } from '../lib/payoutReturn'
+import {
+  LISTING_DELETE_ACTIVE_BOOKINGS,
+  LISTING_DELETE_FAILED,
+} from '../lib/listingDelete'
 
 vi.mock('../lib/supabase')
 
@@ -568,7 +572,31 @@ describe('Dashboard listings', () => {
     expect(listingCard('Latte art')).toBeInTheDocument()
   })
 
-  it('reports a failed deletion', async () => {
+  it('maps an active-bookings RPC error to a cancel-those-sessions line', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    givenData({ listings: [makeMyListing()] })
+    givenRpc(async (name) => {
+      if (name === 'delete_listing') {
+        return { data: null, error: { message: 'listing has active bookings' } }
+      }
+      return { data: null, error: null }
+    })
+    const { user } = await renderHosting()
+
+    await openDeleteListing(user)
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(LISTING_DELETE_ACTIVE_BOOKINGS)
+    expect(log).toHaveBeenCalledWith(
+      'Listing delete failed',
+      expect.objectContaining({ message: 'listing has active bookings' }),
+    )
+    expect(listingCard('Latte art')).toBeInTheDocument()
+    log.mockRestore()
+  })
+
+  it('reports a failed deletion as a retry line', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     givenData({ listings: [makeMyListing()] })
     givenRpc(async (name) => {
       if (name === 'delete_listing') {
@@ -581,8 +609,13 @@ describe('Dashboard listings', () => {
     await openDeleteListing(user)
     await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
 
-    expect(await screen.findByText('not your listing')).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent(LISTING_DELETE_FAILED)
+    expect(log).toHaveBeenCalledWith(
+      'Listing delete failed',
+      expect.objectContaining({ message: 'not your listing' }),
+    )
     expect(listingCard('Latte art')).toBeInTheDocument()
+    log.mockRestore()
   })
 })
 
@@ -2127,7 +2160,7 @@ describe('Dashboard reviews', () => {
     await renderBookings()
 
     const reviewButton = screen.getByRole('button', { name: 'Leave a review' })
-    expect(reviewButton).toHaveClass('ui-button', 'ui-button--secondary')
+    expect(reviewButton).toHaveClass('ui-button', 'ui-button--secondary', 'btn--small')
     expect(reviewButton.parentElement).toHaveClass('booking-card__actions')
     expect(reviewButton.parentElement.querySelector('.badge')).toHaveTextContent('confirmed')
   })

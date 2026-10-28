@@ -225,7 +225,7 @@ test.describe('signed-in navigation', () => {
     await page.getByRole('link', { name: 'Your profile' }).click()
     await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}`))
     await expect(page.getByRole('navigation', { name: 'Profile' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Edit profile' })).toBeVisible()
     await expect(page.getByRole('menu')).toHaveCount(0)
   })
 
@@ -276,7 +276,7 @@ test.describe('signed-in navigation', () => {
       `/u/${SIGNED_IN_USER.id}`
     )
     await expect(menu.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-    await expect(menu.getByRole('button', { name: 'Log out' })).toBeVisible()
+    await expect(menu.getByRole('link', { name: 'Log out' })).toHaveAttribute('href', '/logout')
     await expect(menu.getByRole('link', { name: 'My bookings' })).toHaveCount(0)
     await expect(menu.getByRole('link', { name: 'Hosting' })).toHaveCount(0)
   })
@@ -317,8 +317,8 @@ test.describe('signed-in navigation', () => {
 
     await page.getByRole('link', { name: 'Your profile' }).click()
     await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}`))
-    await page.getByRole('navigation', { name: 'Profile' }).getByRole('link', { name: 'Listings' }).click()
-    await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}\\?tab=listings`))
+    await page.getByRole('navigation', { name: 'Profile' }).getByRole('link', { name: 'Reviews' }).click()
+    await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}\\?tab=reviews`))
 
     await page.goBack()
     await expect(page).toHaveURL(/\/$/)

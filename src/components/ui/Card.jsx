@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import Icon from './Icon'
 import { categoryIconName, categoryTint } from './categoryIcon'
-import { getInitials } from './getInitials'
+import Avatar from './Avatar'
 
 function hasRating(rating) {
   return typeof rating === 'number' && !Number.isNaN(rating) && rating > 0
@@ -86,11 +86,12 @@ export default function Card({
   const hostFace =
     isBrowse && host && (host.avatarUrl || hostName) ? (
       <span className="ui-card__host" title={hostName || undefined}>
-        {host.avatarUrl ? (
-          <img src={host.avatarUrl} alt="" className="ui-card__host-img" />
-        ) : (
-          <span aria-hidden="true">{getInitials(hostName)}</span>
-        )}
+        <Avatar
+          avatarUrl={host.avatarUrl}
+          displayName={hostName}
+          fill
+          className={host.avatarUrl ? 'ui-card__host-img' : ''}
+        />
       </span>
     ) : null
 

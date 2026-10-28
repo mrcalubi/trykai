@@ -20,7 +20,7 @@ test.describe('listing detail', () => {
 
     await expect(page.getByText('Your host')).toBeVisible()
     await expect(page.getByRole('link', { name: 'Mei', exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: "Mei's profile", exact: true })).toHaveAttribute(
+    await expect(page.getByRole('link', { name: "View Mei's profile" })).toHaveAttribute(
       'href',
       '/u/host-1'
     )
@@ -136,14 +136,14 @@ test.describe('listing detail', () => {
     await page.goto('/listings/listing-latte')
     await page.getByRole('button', { name: 'Book' }).click()
 
-    await expect(page.getByRole('button', { name: /PayNow/ })).toBeDisabled()
+    await expect(page.getByRole('radio', { name: /PayNow/ })).toBeDisabled()
     await expect(
       page.getByText('PayNow is available for sessions within 80 days. Please pay by card.')
     ).toBeVisible()
     await expect(page.locator('.detail-booking-card__price')).toContainText('$51')
   })
 
-  test('truncates a long host bio with an inline more link', async ({ page }) => {
+  test('expands a long host bio in place', async ({ page }) => {
     await stubAllExternalCalls(page, {
       listings: [
         {
@@ -160,8 +160,25 @@ test.describe('listing detail', () => {
     await page.goto('/listings/listing-latte')
 
     await expect(page.getByText(/I pull rosettas/)).toBeVisible()
-    await expect(page.getByRole('link', { name: '… more' })).toHaveAttribute('href', '/u/host-1')
+    const more = page.getByRole('button', { name: '… more' })
+    await expect(more).toHaveAttribute('aria-expanded', 'false')
+    await expect(page.getByText('And cortados.')).toHaveCount(0)
     await expect(page.getByRole('link', { name: /More about/ })).toHaveCount(0)
+
+    await more.click()
+    await expect(page.getByText('I pull rosettas.')).toBeVisible()
+    await expect(page.getByText('Also pour-overs.')).toBeVisible()
+    await expect(page.getByText('And cortados.')).toBeVisible()
+    const less = page.getByRole('button', { name: 'Less' })
+    await expect(less).toHaveAttribute('aria-expanded', 'true')
+
+    await less.click()
+    await expect(page.getByRole('button', { name: '… more' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    await expect(page.getByRole('button', { name: 'Less' })).toHaveCount(0)
+    await expect(page.getByText('And cortados.')).toHaveCount(0)
   })
 
   test('reveals the guest cancellation policy on request', async ({ page }) => {

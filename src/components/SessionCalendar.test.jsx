@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -109,5 +111,36 @@ describe('SessionCalendar', () => {
     for (const button of screen.getAllByRole('button')) {
       expect(button).toHaveAttribute('type', 'button')
     }
+  })
+
+  it('does not paint a sand tile on days with sessions unless they are selected', () => {
+    renderCalendar({ selectedDateKey: '2026-10-09' })
+
+    const selected = screen.getByRole('button', { name: 'Friday, 9 October, 2 sessions' })
+    const other = screen.getByRole('button', { name: 'Tuesday, 27 October, 1 session' })
+    expect(selected).toHaveClass('session-calendar__day--selected')
+    expect(selected).not.toHaveClass('session-calendar__day--available')
+    expect(other).not.toHaveClass('session-calendar__day--selected')
+    expect(other).not.toHaveClass('session-calendar__day--available')
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    expect(css).toMatch(/\.session-calendar__nav \{[\s\S]*?border-radius:\s*50%/)
+    expect(css).toMatch(/\.session-calendar__nav:disabled \{[\s\S]*?opacity:\s*0\.4/)
+  })
+
+  it('paints a solid booked mark and a hollow open mark', () => {
+    renderCalendar({
+      countsByDay: {},
+      marksByDay: { '2026-10-09': 'booked', '2026-10-27': 'open' },
+    })
+
+    expect(
+      screen.getByRole('button', { name: 'Friday, 9 October, 1 session' }).querySelector('.session-calendar__dot'),
+    ).toHaveClass('session-calendar__dot--booked')
+    expect(
+      screen.getByRole('button', { name: 'Tuesday, 27 October, 1 session' }).querySelector('.session-calendar__dot'),
+    ).toHaveClass('session-calendar__dot--open')
+    expect(document.querySelector('.session-calendar__dot--booked')).not.toHaveClass(
+      'session-calendar__dot--open',
+    )
   })
 })

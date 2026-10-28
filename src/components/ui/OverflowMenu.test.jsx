@@ -104,12 +104,47 @@ describe('OverflowMenu', () => {
     expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
   })
 
+  it('aligns the menu to the start when asked, and keeps end by default', async () => {
+    const items = [{ label: 'Change photo', onSelect: vi.fn() }]
+    const { user } = renderMenu(items)
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    expect(screen.getByRole('menu')).toHaveClass('ui-overflow__menu--end')
+    expect(screen.getByRole('menu')).not.toHaveClass('ui-overflow__menu--start')
+  })
+
+  it('uses the start modifier when align is start', async () => {
+    const user = userEvent.setup({ delay: null })
+    render(
+      <MemoryRouter>
+        <OverflowMenu align="start" items={[{ label: 'Change photo', onSelect: vi.fn() }]} />
+      </MemoryRouter>,
+    )
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    expect(screen.getByRole('menu')).toHaveClass('ui-overflow__menu--start')
+    expect(screen.getByRole('menu')).not.toHaveClass('ui-overflow__menu--end')
+  })
+
   it('sizes the menu to its items and centres each label in the highlight', () => {
     const css = readFileSync(resolve(import.meta.dirname, '../../index.css'), 'utf8')
     expect(css).toMatch(/\.ui-overflow__menu \{[\s\S]*?width:\s*max-content/)
+    expect(css).toMatch(/\.ui-overflow__menu \{[\s\S]*?max-width:\s*calc\(100vw - 32px\)/)
+    expect(css).toMatch(/\.ui-overflow__menu--start \{[\s\S]*?left:\s*0[\s\S]*?right:\s*auto/)
     expect(css).toMatch(
       /\.ui-overflow__item \{[\s\S]*?display:\s*flex[\s\S]*?align-items:\s*center[\s\S]*?padding:\s*10px 14px/
     )
+    expect(css).toMatch(/\.ui-overflow__item \{[\s\S]*?white-space:\s*normal/)
+    expect(css).toMatch(/\.ui-overflow__item:hover,\s*\.ui-overflow__item:focus-visible/)
+    expect(css).not.toMatch(/\.ui-overflow__item:focus \{/)
+  })
+
+  it('focuses the first item on open so keyboard users can move from there', async () => {
+    const { user } = renderMenu([
+      { label: 'View listing', to: '/listings/l-1' },
+      { label: 'Edit', to: '/edit-listing/l-1' },
+    ])
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    expect(screen.getByRole('menuitem', { name: 'View listing' })).toHaveFocus()
   })
 
   it('runs the action and closes after a choice', async () => {

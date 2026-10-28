@@ -238,6 +238,7 @@ In this order after warm-contact launch:
 23. **Review RPC key rename:** `users.full_name` in the review jsonb returns the display name; rename the key to match (see P2.13).
 24. **Orphaned photo cleanup.** Storage objects no listing references.
 25. **Terms additions from the ToGatherSG review:** group booker responsible for their group; guest conduct and the host's right to end participation; detailed assumption of risk; payout offset right; session photos usable for marketing. Plus a **Host Safety and Standards page**: alcohol licence, domestic workers, MCST and neighbours, NParks permits, allergens and halal, pets.
+26. **Profile photo required to host (KIV).** Deferred 26 October (Caleb). Not enforced; hosts can publish and remove their photo. Enforce later at publish and block Remove while a listing is live.
 
 Then: identity and social layer, Date Mode, credit bundles, multi session courses, "this weekend" filter, search, in app notifications, listing performance nudges, listing video, host Pro subscription, payout clawback.
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Card from '../components/ui/Card'
+import HeroBadge from '../components/HeroBadge'
 import Icon from '../components/ui/Icon'
 import { categoryIconName } from '../components/ui/categoryIcon'
 import { ratingsByListingId } from '../lib/listingRatings'
@@ -214,35 +215,59 @@ export default function Home() {
   const isFiltering =
     activeCategory !== 'All' || Boolean(activeQuick) || locationActive
 
+  const showListings = !loading && !error && listings.length > 0
+  const categoryBar = showListings ? (
+    <div className="category-bar filter-pills" role="group" aria-label="Categories">
+      {categories.map((category) => (
+        <button
+          key={category}
+          type="button"
+          onClick={() => chooseCategory(category)}
+          aria-pressed={activeCategory === category}
+          className={`category-tab${activeCategory === category ? ' category-tab--active' : ''}`}
+        >
+          <Icon name={categoryIconName(category)} size={24} strokeWidth={1.6} />
+          <span className="category-tab__label">{category}</span>
+        </button>
+      ))}
+    </div>
+  ) : null
+  const showFilterChrome =
+    showListings &&
+    (availableQuickFilters.length > 0 || showLocation || isFiltering)
+
   return (
     <div className="page page--browse">
-      <section className="home-hero">
-        <div className="home-hero__copy">
-          <p className="eyebrow">Hands-on sessions across Singapore</p>
-          <h1 className="home-hero__title">
-            Singapore&apos;s not boring. You just haven&apos;t found{' '}
-            <span className="home-hero__mark">your thing</span> yet.
-          </h1>
-          <p className="home-hero__subtitle">
-            Solo, with friends, or on a date. Your next hobby awaits.
-          </p>
-          <ul className="trust-list" aria-label="Why book on TryKai">
-            {TRUST_POINTS.map((point) => (
-              <li key={point.label} className="trust-list__item">
-                <Icon name={point.icon} size={18} />
-                {point.label}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="home-hero__art" aria-hidden="true">
-          <img src="/trykai.png" alt="" className="home-hero__mascot" width="400" height="400" />
-          <img src={foodArt} alt="" className="home-hero__badge home-hero__badge--1" loading="lazy" />
-          <img src={musicArt} alt="" className="home-hero__badge home-hero__badge--2" loading="lazy" />
-          <img src={artsArt} alt="" className="home-hero__badge home-hero__badge--3" loading="lazy" />
-          <img src={fitnessArt} alt="" className="home-hero__badge home-hero__badge--4" loading="lazy" />
-        </div>
-      </section>
+      <div className={categoryBar ? 'home-stage home-stage--listed' : 'home-stage'}>
+        <section className="home-hero">
+          <div className="home-hero__copy">
+            <p className="eyebrow">Hands-on sessions across Singapore</p>
+            <h1 className="home-hero__title">
+              Singapore&apos;s not boring. You just haven&apos;t found{' '}
+              <span className="home-hero__mark">your thing</span> yet.
+            </h1>
+            <p className="home-hero__subtitle">
+              Solo, with friends, or on a date. Your next hobby awaits.
+            </p>
+            <ul className="trust-list" aria-label="Why book on TryKai">
+              {TRUST_POINTS.map((point) => (
+                <li key={point.label} className="trust-list__item">
+                  <Icon name={point.icon} size={18} />
+                  {point.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="home-hero__art" aria-hidden="true">
+            <img src="/trykai.png" alt="" className="home-hero__mascot" width="400" height="400" />
+            <HeroBadge src={foodArt} className="home-hero__badge--1" />
+            <HeroBadge src={musicArt} className="home-hero__badge--2" />
+            <HeroBadge src={artsArt} className="home-hero__badge--3" />
+            <HeroBadge src={fitnessArt} className="home-hero__badge--4" />
+          </div>
+        </section>
+        {categoryBar}
+      </div>
 
       <section id="listings" className="home-browse" aria-labelledby="browse-title">
         {/* No visible heading: the hero already says what this is, and the
@@ -269,23 +294,10 @@ export default function Home() {
           </EmptyPanel>
         )}
 
-        {!loading && !error && listings.length > 0 && (
+        {showListings && (
           <>
+            {showFilterChrome ? (
             <div className="filters">
-              <div className="category-bar filter-pills" role="group" aria-label="Categories">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => chooseCategory(category)}
-                    aria-pressed={activeCategory === category}
-                    className={`category-tab${activeCategory === category ? ' category-tab--active' : ''}`}
-                  >
-                    <Icon name={categoryIconName(category)} size={24} strokeWidth={1.6} />
-                    <span className="category-tab__label">{category}</span>
-                  </button>
-                ))}
-              </div>
               {availableQuickFilters.length > 0 || showLocation ? (
                 <div className="filter-strip" role="group" aria-label="Filters">
                   {availableQuickFilters.map((filter) => (
@@ -362,6 +374,7 @@ export default function Home() {
                 </p>
               ) : null}
             </div>
+            ) : null}
 
             {filteredListings.length === 0 ? (
               <EmptyPanel title="No listings match your filters.">

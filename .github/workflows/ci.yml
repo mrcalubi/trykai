@@ -30,6 +30,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -42,6 +43,7 @@ jobs:
   test:
     name: Unit and component tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -68,6 +70,7 @@ jobs:
   build:
     name: Production build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -87,6 +90,7 @@ jobs:
   e2e:
     name: End-to-end tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -108,12 +112,22 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
+      - name: Fail over quickly when apt mirrors stall
+        run: |
+          sudo tee /etc/apt/apt.conf.d/99ci >/dev/null <<'EOF'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "20";
+          Acquire::https::Timeout "20";
+          EOF
+
       - name: Install Chromium
         if: steps.browser-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 6
         run: npx playwright install --with-deps chromium
 
       - name: Install system dependencies for the cached browser
         if: steps.browser-cache.outputs.cache-hit == 'true'
+        timeout-minutes: 6
         run: npx playwright install-deps chromium
 
       - run: npm run test:e2e
@@ -129,6 +143,7 @@ jobs:
   edge-functions:
     name: Edge function checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: denoland/setup-deno@v2

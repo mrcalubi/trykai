@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import TopNav from './TopNav'
-import { getInitials } from './getInitials'
 
 function renderTopNav(props = {}) {
   return render(
@@ -20,15 +19,6 @@ function profileLink() {
 function accountFace() {
   return profileLink().querySelector('.ui-topnav__account')
 }
-
-describe('getInitials', () => {
-  it('uses the first letter of the first and last words', () => {
-    expect(getInitials('Mei Ling')).toBe('ML')
-    expect(getInitials('  Ada  Lovelace  ')).toBe('AL')
-    expect(getInitials('Kai')).toBe('K')
-    expect(getInitials('')).toBe('')
-  })
-})
 
 describe('TopNav', () => {
   it('shows the brand mark, wordmark, menu control, and Log in when logged out', () => {
@@ -52,7 +42,10 @@ describe('TopNav', () => {
     expect(screen.queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument()
     expect(profileLink()).toHaveAttribute('href', '/u/user-77')
     expect(accountFace()).toHaveClass('ui-topnav__account--photo')
-    expect(profileLink().querySelector('img')).toHaveAttribute('src', '/trykai.png')
+    const photo = profileLink().querySelector('img')
+    expect(photo).toHaveAttribute('src', '/trykai.png')
+    expect(photo).toHaveStyle({ width: '100%', height: '100%' })
+    expect(photo.getAttribute('style') ?? '').not.toMatch(/36px/)
     expect(screen.queryByRole('button', { name: 'Account' })).not.toBeInTheDocument()
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
@@ -61,7 +54,10 @@ describe('TopNav', () => {
     renderTopNav({ isLoggedIn: true, userId: 'user-77', name: 'Mei Ling' })
 
     expect(accountFace()).toHaveClass('ui-topnav__account--initials')
-    expect(profileLink()).toHaveTextContent('ML')
+    expect(profileLink()).toHaveTextContent('M')
+    const face = accountFace().querySelector('.ui-avatar')
+    expect(face).toHaveStyle({ width: '100%', height: '100%' })
+    expect(face.getAttribute('style') ?? '').not.toMatch(/36px/)
   })
 
   it('opens and closes the hamburger menu from the icon', async () => {

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { firstAccountRow } from '../lib/myAccount'
+import { ACCOUNT_UPDATED_EVENT, firstAccountRow } from '../lib/myAccount'
 import TopNav from './ui/TopNav'
 
 /**
@@ -11,17 +10,11 @@ import TopNav from './ui/TopNav'
  * TopNav directly with made-up props; this is the only place it reads auth.
  */
 export default function SiteNav() {
-  const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [displayName, setDisplayName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState(null)
-
-  async function handleLogOut() {
-    await supabase.auth.signOut()
-    navigate('/')
-  }
 
   useEffect(() => {
     function applySession(session) {
@@ -49,13 +42,17 @@ export default function SiteNav() {
   }, [])
 
   useEffect(() => {
-    if (!user) return
+    if (!user) return undefined
 
-    supabase.rpc('my_account').then(({ data, error }) => {
-      const row = firstAccountRow(data)
-      setDisplayName(!error && row?.display_name ? row.display_name : '')
-      setAvatarUrl(!error && row?.avatar_url ? row.avatar_url : '')
-    })
+    function loadAccount() {
+      supabase.rpc('my_account').then(({ data, error }) => {
+        const row = firstAccountRow(data)
+        setDisplayName(!error && row?.display_name ? row.display_name : '')
+        setAvatarUrl(!error && row?.avatar_url ? row.avatar_url : '')
+      })
+    }
+
+    loadAccount()
 
     // `is_admin` has no client SELECT grant, so the menu asks the same
     // caller-scoped function RequireAdmin uses. The review function checks
@@ -66,6 +63,9 @@ export default function SiteNav() {
       setIsAdmin(!error && Boolean(row?.is_admin))
       setVerificationStatus(error ? null : row?.verification_status ?? null)
     })
+
+    window.addEventListener(ACCOUNT_UPDATED_EVENT, loadAccount)
+    return () => window.removeEventListener(ACCOUNT_UPDATED_EVENT, loadAccount)
   }, [user])
 
   return (
@@ -75,8 +75,7 @@ export default function SiteNav() {
       verificationStatus={verificationStatus}
       userId={user?.id}
       avatarUrl={avatarUrl || undefined}
-      name={displayName || user?.email || ''}
-      onLogOut={handleLogOut}
+      name={displayName}
     />
   )
 }

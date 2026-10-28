@@ -5,6 +5,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { supabase } from '../lib/supabase'
 import ReviewCard from '../components/ReviewCard'
 import HostRating from '../components/HostRating'
+import BioPreview from '../components/BioPreview'
 import PhotoLightbox from '../components/PhotoLightbox'
 import SessionCalendar from '../components/SessionCalendar'
 import { GuestCancellationNote } from '../components/CancellationPolicy'
@@ -33,6 +34,7 @@ import {
 } from '../lib/pricing'
 import { formatDuration } from '../lib/duration'
 import { edgeFunctionErrorMessage, isPayNowTooFarAheadError } from '../lib/edgeFunctionError'
+import { isLowSpots, spotsLabel } from '../lib/listingSpots'
 import { checkoutCanLeaveForWebhook } from '../lib/paymentReturn'
 import { publicName } from '../lib/publicName'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
@@ -40,7 +42,10 @@ import { listingReportSubject, reportMailto } from '../lib/reportMailto'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import { SHARE_NOTES, shareOrCopy } from '../lib/share'
 import { BackRowActions } from '../components/BackButton'
+import ViewableAvatar from '../components/ViewableAvatar'
+import Button from '../components/ui/Button'
 import Icon from '../components/ui/Icon'
+import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
@@ -54,53 +59,23 @@ function upcomingSessions(listingId, columns) {
     .gt('starts_at', new Date().toISOString())
 }
 
-const HOST_BIO_PREVIEW_LINES = 2
-const HOST_BIO_PREVIEW_CHARS = 160
-
-function previewHostBio(bio) {
-  const text = String(bio).trim()
-  const lines = text.split('\n')
-  let preview = lines.slice(0, HOST_BIO_PREVIEW_LINES).join('\n')
-  let truncated = lines.length > HOST_BIO_PREVIEW_LINES
-  if (preview.length > HOST_BIO_PREVIEW_CHARS) {
-    const cut = preview.slice(0, HOST_BIO_PREVIEW_CHARS)
-    preview = cut.replace(/\s+\S*$/, '').trimEnd() || cut.trimEnd()
-    truncated = true
-  }
-  return { preview, truncated }
-}
-
-function HostAvatar({ host, to }) {
-  const name = publicName(host) || 'Anonymous'
-  const avatar = host?.avatar_url ? (
-    <img src={host.avatar_url} alt="" className="detail-host__avatar" />
-  ) : (
-    <div className="detail-host__avatar-placeholder">{name[0]?.toUpperCase() || '?'}</div>
-  )
-  if (!to) return avatar
+function HostAvatar({ host }) {
   return (
-    <Link to={to} className="detail-host__avatar-link" aria-label={`${name}'s profile`}>
-      {avatar}
-    </Link>
-  )
-}
-
-function HostBioPreview({ bio, to }) {
-  const { preview, truncated } = previewHostBio(bio)
-  return (
-    <p className="detail-host__bio">
-      {preview}
-      {truncated && to ? (
-        <Link to={to} className="detail-host__more">
-          … more
-        </Link>
-      ) : null}
-    </p>
+    <ViewableAvatar
+      avatarUrl={host?.avatar_url}
+      displayName={publicName(host)}
+      name={publicName(host) || 'Anonymous'}
+      className="detail-host__avatar"
+    />
   )
 }
 
 function googleMapsUrl(address) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+}
+
+function defaultCheckoutRail(startsAt, serverBlocked = false) {
+  return serverBlocked || isPayNowTooFarAhead(startsAt) ? 'card' : 'paynow'
 }
 
 function visibleAreaLabel(revealedAddress, area) {
@@ -434,7 +409,7 @@ export default function ListingDetail() {
     const unpaidId = bookingId
     setCheckoutSessionId(null)
     setGuestsCount(1)
-    setCheckoutRail(null)
+    setCheckoutRail(defaultCheckoutRail(findCachedSession(checkoutSessionId)?.starts_at, payNowBlockedByServer))
     setClientSecret(null)
     setBookingId(null)
     setTotalAmount(null)
@@ -485,9 +460,9 @@ export default function ListingDetail() {
     setClientSecret(null)
     setBookingId(null)
     setTotalAmount(null)
-    setCheckoutRail(null)
-    setGuestsCount(1)
     setPayNowBlockedByServer(false)
+    setCheckoutRail(defaultCheckoutRail(findCachedSession(sessionId)?.starts_at))
+    setGuestsCount(1)
     setCheckoutSessionId(sessionId)
   }
 
@@ -498,7 +473,9 @@ export default function ListingDetail() {
       setClientSecret(null)
       setBookingId(null)
       setTotalAmount(null)
-      setCheckoutRail(null)
+      setCheckoutRail(
+        defaultCheckoutRail(findCachedSession(checkoutSessionId)?.starts_at, payNowBlockedByServer),
+      )
       void abandonUnpaidCheckout(unpaidId)
     }
     setGuestsCount(next)
@@ -665,13 +642,10 @@ export default function ListingDetail() {
               </p>
               <p
                 className={`session-card__meta${
-                  session.spots_remaining > 0 && session.spots_remaining <= 2
-                    ? ' session-card__meta--low'
-                    : ''
+                  isLowSpots(session.spots_remaining) ? ' session-card__meta--low' : ''
                 }`}
               >
-                {formatDuration(session.duration_mins)} · {session.spots_remaining} spot
-                {session.spots_remaining !== 1 ? 's' : ''} left
+                {formatDuration(session.duration_mins)} · {spotsLabel(session.spots_remaining)}
               </p>
             </div>
             <div className="session-card__actions">
@@ -750,9 +724,16 @@ export default function ListingDetail() {
                   <div className="guest-stepper__row">
                     <div>
                       <p className="guest-stepper__label">Guests</p>
-                      <p className="guest-stepper__spots">
-                        {checkoutSession.spots_remaining} spot
-                        {checkoutSession.spots_remaining === 1 ? '' : 's'} left in this session
+                      <p
+                        className={`guest-stepper__spots${
+                          isLowSpots(checkoutSession.spots_remaining)
+                            ? ' guest-stepper__spots--low'
+                            : ''
+                        }`}
+                      >
+                        {isLowSpots(checkoutSession.spots_remaining)
+                          ? `${spotsLabel(checkoutSession.spots_remaining)} in this session`
+                          : `${checkoutSession.spots_remaining} spots in this session`}
                       </p>
                     </div>
                     <div className="guest-stepper__controls">
@@ -760,7 +741,7 @@ export default function ListingDetail() {
                         type="button"
                         className="guest-stepper__btn"
                         aria-label="Fewer guests"
-                        disabled={guestsCount <= 1}
+                        disabled={guestsCount <= 1 || bookingLoading}
                         onClick={() => changeGuests(guestsCount - 1)}
                       >
                         −
@@ -773,8 +754,9 @@ export default function ListingDetail() {
                         className="guest-stepper__btn"
                         aria-label="More guests"
                         disabled={
+                          bookingLoading ||
                           guestsCount >=
-                          Math.min(checkoutSession.spots_remaining, MAX_GUESTS_PER_BOOKING)
+                            Math.min(checkoutSession.spots_remaining, MAX_GUESTS_PER_BOOKING)
                         }
                         onClick={() => changeGuests(guestsCount + 1)}
                       >
@@ -797,20 +779,17 @@ export default function ListingDetail() {
                 </div>
               )}
 
-              {bookingLoading ? (
-                <WaitingState
-                  title="Confirm and pay"
-                  message="Getting your payment ready, including PayNow."
-                />
-              ) : (
-              <div className="payment-rails">
-                <p className="checkout__label">Pay with</p>
+              <div className="payment-rails" role="radiogroup" aria-labelledby="pay-with-label">
+                <p className="checkout__label" id="pay-with-label">
+                  Pay with
+                </p>
                 <button
                   type="button"
+                  role="radio"
                   className="payment-rail payment-rail--paynow"
-                  disabled={paynowBlocked}
-                  aria-pressed={!paynowBlocked && checkoutRail === 'paynow'}
-                  onClick={() => startPayment('paynow')}
+                  disabled={paynowBlocked || bookingLoading}
+                  aria-checked={!paynowBlocked && displayRail === 'paynow'}
+                  onClick={() => setCheckoutRail('paynow')}
                 >
                   <span className="payment-rail__radio" aria-hidden="true" />
                   <span className="payment-rail__copy">
@@ -818,7 +797,6 @@ export default function ListingDetail() {
                       <span className="payment-rail__name">PayNow</span>
                       {paynowBlocked ? null : <span className="paynow-badge">Save 5%</span>}
                     </span>
-                    <span className="payment-rail__hint">Scan the QR in your banking app</span>
                   </span>
                   <span className="payment-rail__amounts">
                     {paynowBlocked ? (
@@ -842,9 +820,11 @@ export default function ListingDetail() {
                 ) : null}
                 <button
                   type="button"
+                  role="radio"
                   className="payment-rail"
-                  aria-pressed={paynowBlocked || checkoutRail === 'card'}
-                  onClick={() => startPayment('card')}
+                  disabled={bookingLoading}
+                  aria-checked={paynowBlocked || displayRail === 'card'}
+                  onClick={() => setCheckoutRail('card')}
                 >
                   <span className="payment-rail__radio" aria-hidden="true" />
                   <span className="payment-rail__copy">
@@ -859,17 +839,18 @@ export default function ListingDetail() {
                   </span>
                 </button>
               </div>
-              )}
 
               <div className="price-breakdown">
-                <p className="price-breakdown__row">
-                  <span>
-                    {guestsCount} guest{guestsCount === 1 ? '' : 's'}, all in
-                  </span>
-                  <span className="price-breakdown__amount">
-                    <FormattedPrice cents={cardPrice} />
-                  </span>
-                </p>
+                {cardPrice !== checkoutPrice ? (
+                  <p className="price-breakdown__row">
+                    <span>
+                      {guestsCount} guest{guestsCount === 1 ? '' : 's'}, all in
+                    </span>
+                    <span className="price-breakdown__amount">
+                      <FormattedPrice cents={cardPrice} />
+                    </span>
+                  </p>
+                ) : null}
                 {showPaynowSaving ? (
                   <p className="price-breakdown__row price-breakdown__row--saving">
                     <span>PayNow saving</span>
@@ -889,17 +870,29 @@ export default function ListingDetail() {
                 </p>
               </div>
 
+              <div className="checkout-pay-bar">
+                <Button
+                  className="checkout-pay"
+                  loading={bookingLoading}
+                  loadingLabel="Getting your payment ready"
+                  onClick={() => startPayment(displayRail)}
+                >
+                  <span className="checkout-pay__label">Continue to payment</span>
+                  <FormattedPrice cents={checkoutPrice} />
+                </Button>
+              </div>
+
               <div className="checkout-promises">
                 <p className="checkout-promises__item">
-                  <Icon name="shield" size={18} />
+                  <Icon name="shield" size={14} />
                   Your host passed an ID check before listing on TryKai.
                 </p>
                 <p className="checkout-promises__item">
-                  <Icon name="pin" size={18} />
+                  <Icon name="pin" size={14} />
                   The exact address is shared once your booking is confirmed.
                 </p>
                 <p className="checkout-promises__item">
-                  <Icon name="wallet" size={18} />
+                  <Icon name="wallet" size={14} />
                   Full refund if you cancel 48 or more hours before the session.
                 </p>
               </div>
@@ -927,7 +920,7 @@ export default function ListingDetail() {
 
   return (
     <div
-      className={`page page--detail page--listing${showBookBar ? ' page--with-book-bar' : ''}`}
+      className={`page page--detail page--listing${showBookBar ? ' page--with-book-bar' : ''}${checkoutSessionId ? ' page--with-checkout-bar' : ''}`}
     >
       <BackRowActions>
         <button type="button" className="share-button" aria-label="Share" onClick={shareListing}>
@@ -1045,7 +1038,7 @@ export default function ListingDetail() {
 
           <div className="detail-host">
             <div className="detail-host__top">
-              <HostAvatar host={host} to={hostProfile} />
+              <HostAvatar host={host} />
               <div className="detail-host__copy">
                 <p className="detail-host__label">Your host</p>
                 <p className="detail-host__name">
@@ -1057,17 +1050,12 @@ export default function ListingDetail() {
                     hostName
                   )}
                 </p>
-                {hostVerified ? (
-                  <p className="verified-badge">
-                    <Icon name="shield" size={15} />
-                    ID verified
-                  </p>
-                ) : null}
+                {hostVerified ? <VerifiedBadge /> : null}
                 <HostRating reviews={hostReviews} />
               </div>
             </div>
             {typeof host?.bio === 'string' && host.bio.trim() ? (
-              <HostBioPreview bio={host.bio} to={hostProfile} />
+              <BioPreview bio={host.bio} />
             ) : null}
             {hostProfile ? (
               <Link to={hostProfile} className="detail-host__profile">

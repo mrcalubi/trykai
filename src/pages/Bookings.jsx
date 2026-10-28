@@ -18,7 +18,10 @@ import {
   paymentWasDeclined,
 } from '../lib/paymentReturn'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
-import { formatSessionDateTime } from '../lib/sessionDate'
+import { formatSessionDateTime, formatSessionTime } from '../lib/sessionDate'
+import { guestCalendarMarks, splitGuestBookings } from '../lib/profileV2'
+import { DateChip, TabCalendar } from '../components/profile/ProfileSections'
+import { singaporeDateKey } from '../lib/sessionCalendar'
 
 const POLL_ATTEMPTS = 20
 const POLL_INTERVAL_MS = 2000
@@ -33,7 +36,7 @@ function getStripe() {
   return stripePromise
 }
 
-export default function Bookings({ embedded = false }) {
+export default function Bookings({ embedded = false, hostCta = null, withCalendar = false }) {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const userId = useAuthedUserId()
@@ -62,6 +65,7 @@ export default function Bookings({ embedded = false }) {
   const [cancelLoading, setCancelLoading] = useState(false)
   const [cancelError, setCancelError] = useState('')
   const [bookingAddresses, setBookingAddresses] = useState({})
+  const [nowMs] = useState(() => Date.now())
 
   const loadData = useCallback(async () => {
     const [bookingsResult, reviewsResult] = await Promise.all([
@@ -376,6 +380,138 @@ export default function Bookings({ embedded = false }) {
     await loadData()
   }
 
+  function chipTone(booking) {
+    if (booking.status === 'cancelled') return 'muted'
+    const startsAt = booking.sessions?.starts_at
+    return startsAt && new Date(startsAt).getTime() > nowMs ? 'green' : 'muted'
+  }
+
+  function renderBookingCard(booking, { chip = false } = {}) {
+    const actions = actionsFor(booking)
+    return (
+      <div key={booking.id} className={chip ? 'dashboard-card booking-row' : 'dashboard-card'}>
+        {chip ? <DateChip iso={booking.sessions?.starts_at} tone={chipTone(booking)} /> : null}
+        <div className="booking-row__body">
+          <p className="dashboard-card__title">
+            <Link to={`/bookings/${booking.id}`}>
+              {booking.sessions?.listings?.title || 'Unknown listing'}
+            </Link>
+          </p>
+          <p className="dashboard-card__meta">
+            {booking.sessions?.starts_at
+              ? formatSessionDateTime(booking.sessions.starts_at)
+              : 'Date TBC'}
+            {' · '}
+            {booking.guests_count === 1
+              ? '1 guest'
+              : `${booking.guests_count} guests`}
+            {bookingAddresses[booking.id] && (
+              <>
+                {' · '}
+                {bookingAddresses[booking.id]}
+              </>
+            )}
+          </p>
+          <div className="booking-card__actions">
+            <span className={`badge badge--${booking.status}`}>
+              {booking.status}
+            </span>
+            {actions.review && activeReviewBookingId !== booking.id && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="btn--small"
+                onClick={() => openReviewForm(booking.id)}
+              >
+                Leave a review
+              </Button>
+            )}
+            {actions.cancel && confirmCancelBookingId !== booking.id && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCancelError('')
+                  setConfirmCancelBookingId(booking.id)
+                }}
+                className="btn btn--ghost btn--small btn--danger-quiet"
+              >
+                Cancel booking
+              </button>
+            )}
+            {reviewedBookingIds.has(booking.id) && (
+              <span className="hint">Review submitted</span>
+            )}
+          </div>
+
+          {confirmCancelBookingId === booking.id && (
+            <div className="cancel-confirm">
+              <p className="cancel-confirm__note">
+                {guestCancellationNote(booking)}
+              </p>
+              <div className="button-row">
+                <Button
+                  variant="destructive"
+                  loading={cancelLoading}
+                  loadingLabel="Cancelling"
+                  onClick={() => handleGuestCancelBooking(booking)}
+                >
+                  Confirm cancellation
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmCancelBookingId(null)}
+                  className="btn btn--ghost"
+                >
+                  Keep booking
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeReviewBookingId === booking.id && (
+            <form
+              onSubmit={(e) => handleSubmitReview(e, booking)}
+              className="dashboard-card__form form"
+            >
+              <label className="label">
+                Rating
+                <StarPicker value={reviewRating} onChange={setReviewRating} />
+              </label>
+              <label className="label">
+                Comment
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="Share your experience…"
+                  rows={3}
+                  className="input input--textarea"
+                />
+              </label>
+              {reviewError && <p className="error-message">{reviewError}</p>}
+              <div className="button-row">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  loading={reviewLoading}
+                  loadingLabel="Submitting"
+                >
+                  Submit review
+                </Button>
+                <button
+                  type="button"
+                  onClick={closeReviewForm}
+                  className="btn btn--ghost"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return <PageLoader />
   }
@@ -406,137 +542,99 @@ export default function Bookings({ embedded = false }) {
       {error && <p className="error-message error-message--spaced">{error}</p>}
       {cancelError && <p className="error-message error-message--spaced">{cancelError}</p>}
 
-      <section className="dashboard-section">
-        <h2 className="dashboard-section__title">My Bookings</h2>
+      <div className={withCalendar ? 'profile-tab-layout' : undefined}>
+        {withCalendar ? (
+          <aside className="profile-tab-layout__aside">
+            <GuestCalendar bookings={visibleBookings} nowMs={nowMs} />
+          </aside>
+        ) : null}
+        <section
+          className={
+            withCalendar ? 'dashboard-section profile-tab-layout__main' : 'dashboard-section'
+          }
+        >
+          <h2 className={withCalendar ? 'visually-hidden' : 'dashboard-section__title'}>My Bookings</h2>
 
-        {visibleBookings.length === 0 ? (
-          <p className="empty-state">No bookings yet.</p>
-        ) : (
-          <div className="dashboard-list">
-            {visibleBookings.map((booking) => {
-              const actions = actionsFor(booking)
-              return (
-              <div key={booking.id} className="dashboard-card">
-                <p className="dashboard-card__title">
-                  <Link to={`/bookings/${booking.id}`}>
-                    {booking.sessions?.listings?.title || 'Unknown listing'}
-                  </Link>
-                </p>
-                <p className="dashboard-card__meta">
-                  {booking.sessions?.starts_at
-                    ? formatSessionDateTime(booking.sessions.starts_at)
-                    : 'Date TBC'}
-                  {' · '}
-                  {booking.guests_count === 1
-                    ? '1 guest'
-                    : `${booking.guests_count} guests`}
-                  {bookingAddresses[booking.id] && (
-                    <>
-                      {' · '}
-                      {bookingAddresses[booking.id]}
-                    </>
-                  )}
-                </p>
-                <div className="booking-card__actions">
-                  <span className={`badge badge--${booking.status}`}>
-                    {booking.status}
-                  </span>
-                  {actions.review && activeReviewBookingId !== booking.id && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => openReviewForm(booking.id)}
-                    >
-                      Leave a review
-                    </Button>
-                  )}
-                  {actions.cancel && confirmCancelBookingId !== booking.id && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCancelError('')
-                        setConfirmCancelBookingId(booking.id)
-                      }}
-                      className="btn btn--ghost btn--small btn--danger-quiet"
-                    >
-                      Cancel booking
-                    </button>
-                  )}
-                  {reviewedBookingIds.has(booking.id) && (
-                    <span className="hint">Review submitted</span>
-                  )}
-                </div>
-
-                {confirmCancelBookingId === booking.id && (
-                  <div className="cancel-confirm">
-                    <p className="cancel-confirm__note">
-                      {guestCancellationNote(booking)}
-                    </p>
-                    <div className="button-row">
-                      <Button
-                        variant="destructive"
-                        loading={cancelLoading}
-                        loadingLabel="Cancelling"
-                        onClick={() => handleGuestCancelBooking(booking)}
-                      >
-                        Confirm cancellation
-                      </Button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmCancelBookingId(null)}
-                        className="btn btn--ghost"
-                      >
-                        Keep booking
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {activeReviewBookingId === booking.id && (
-                  <form
-                    onSubmit={(e) => handleSubmitReview(e, booking)}
-                    className="dashboard-card__form form"
-                  >
-                    <label className="label">
-                      Rating
-                      <StarPicker value={reviewRating} onChange={setReviewRating} />
-                    </label>
-                    <label className="label">
-                      Comment
-                      <textarea
-                        value={reviewComment}
-                        onChange={(e) => setReviewComment(e.target.value)}
-                        placeholder="Share your experience…"
-                        rows={3}
-                        className="input input--textarea"
-                      />
-                    </label>
-                    {reviewError && <p className="error-message">{reviewError}</p>}
-                    <div className="button-row">
-                      <Button
-                        type="submit"
-                        variant="primary"
-                        loading={reviewLoading}
-                        loadingLabel="Submitting"
-                      >
-                        Submit review
-                      </Button>
-                      <button
-                        type="button"
-                        onClick={closeReviewForm}
-                        className="btn btn--ghost"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
-              )
-            })}
-          </div>
-        )}
-      </section>
+          {visibleBookings.length === 0 ? (
+            <div className="empty-state">
+              <p>No bookings yet.</p>
+              {hostCta ? (
+                <>
+                  <p>Share a skill on TryKai.</p>
+                  <Link to={hostCta.to}>{hostCta.label}</Link>
+                </>
+              ) : null}
+            </div>
+          ) : withCalendar ? (
+            <BookingColumns
+              groups={splitGuestBookings(visibleBookings, nowMs)}
+              renderCard={(booking) => renderBookingCard(booking, { chip: true })}
+            />
+          ) : (
+            <div className="listings-grid listings-grid--bookings">
+              {visibleBookings.map((booking) => renderBookingCard(booking))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
+  )
+}
+
+function BookingColumns({ groups, renderCard }) {
+  return (
+    <>
+      <h3 className="booking-group__title">Upcoming</h3>
+      {groups.upcoming.length ? (
+        <div className="booking-group">{groups.upcoming.map(renderCard)}</div>
+      ) : (
+        <p className="booking-group__empty">
+          Nothing booked yet. <Link to="/">Find something to try</Link>
+        </p>
+      )}
+      {groups.past.length ? (
+        <>
+          <h3 className="booking-group__title">Past</h3>
+          <div className="booking-group">{groups.past.map(renderCard)}</div>
+        </>
+      ) : null}
+    </>
+  )
+}
+
+function GuestCalendar({ bookings, nowMs }) {
+  const marks = guestCalendarMarks(bookings, nowMs)
+  const upcoming = bookings.filter(
+    (booking) =>
+      booking.status === 'confirmed' &&
+      booking.sessions?.starts_at &&
+      new Date(booking.sessions.starts_at).getTime() > nowMs,
+  ).length
+
+  return (
+    <TabCalendar
+      label="Your bookings calendar"
+      marks={marks}
+      summary={upcoming ? `${upcoming} upcoming` : 'Nothing coming up'}
+      legend="guest"
+      nowMs={nowMs}
+      renderDay={(dateKey) =>
+        bookings
+          .filter(
+            (booking) =>
+              booking.status === 'confirmed' &&
+              booking.sessions?.starts_at &&
+              singaporeDateKey(booking.sessions.starts_at) === dateKey,
+          )
+          .map((booking) => (
+            <li key={booking.id}>
+              <Link to={`/bookings/${booking.id}`}>
+                {formatSessionTime(booking.sessions.starts_at)} ·{' '}
+                {booking.sessions?.listings?.title || 'Session'}
+              </Link>
+            </li>
+          ))
+      }
+    />
   )
 }

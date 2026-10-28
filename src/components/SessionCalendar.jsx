@@ -10,6 +10,7 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 export default function SessionCalendar({
   monthKey,
   countsByDay,
+  marksByDay,
   selectedDateKey,
   todayKey,
   onSelectDate,
@@ -59,13 +60,21 @@ export default function SessionCalendar({
             return <span key={`blank-${index}`} className="session-calendar__blank" />
           }
 
-          const count = countsByDay[cell.dateKey] ?? 0
+          const mark = marksByDay?.[cell.dateKey]
+          const count = mark ? 1 : (countsByDay?.[cell.dateKey] ?? 0)
           const isSelected = cell.dateKey === selectedDateKey
           const classes = [
             'session-calendar__day',
-            count > 0 && 'session-calendar__day--available',
             isSelected && 'session-calendar__day--selected',
             cell.dateKey === todayKey && 'session-calendar__day--today',
+          ]
+            .filter(Boolean)
+            .join(' ')
+          const dotClass = [
+            'session-calendar__dot',
+            mark === 'booked' && 'session-calendar__dot--booked',
+            mark === 'open' && 'session-calendar__dot--open',
+            mark === 'past' && 'session-calendar__dot--past',
           ]
             .filter(Boolean)
             .join(' ')
@@ -81,7 +90,7 @@ export default function SessionCalendar({
               onClick={() => onSelectDate(cell.dateKey)}
             >
               <span className="session-calendar__day-number">{cell.day}</span>
-              {count > 0 && <span className="session-calendar__dot" aria-hidden="true" />}
+              {count > 0 ? <span className={dotClass} aria-hidden="true" /> : null}
             </button>
           )
         })}
