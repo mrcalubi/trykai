@@ -3,7 +3,6 @@ import {
   BROWSE_CACHE_TTL_MS,
   clearBrowseCache,
   readBrowseCache,
-  scrollRestorationKey,
   writeBrowseCache,
   writeBrowseFilters,
 } from './browseCache'
@@ -46,19 +45,5 @@ describe('browseCache', () => {
       area: '',
       quick: 'budget',
     })
-  })
-})
-
-describe('scrollRestorationKey', () => {
-  it('keys Home and a public profile by pathname so query replace keeps scroll', () => {
-    expect(scrollRestorationKey({ pathname: '/', search: '?category=Food', key: 'abc' })).toBe('/')
-    expect(scrollRestorationKey({ pathname: '/u/host-1', search: '?tab=hosting', key: 'def' })).toBe(
-      '/u/host-1',
-    )
-  })
-
-  it('keys every other page by location so a new visit starts at the top', () => {
-    expect(scrollRestorationKey({ pathname: '/listings/listing-1', key: 'xyz' })).toBe('xyz')
-    expect(scrollRestorationKey({ pathname: '/refund-policy', key: 'pol' })).toBe('pol')
   })
 })

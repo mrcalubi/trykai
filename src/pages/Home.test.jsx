@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { screen, within } from '@testing-library/react'
+import { Link, Route } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Home from './Home'
 import { supabase } from '../lib/supabase'
 import { PAGE_LOAD_ERROR } from '../lib/pageLoad'
 import { BROWSE_CACHE_TTL_MS, clearBrowseCache, writeBrowseCache } from '../lib/browseCache'
-import { renderWithRouter } from '../test/render'
+import { renderWithDataRouter, renderWithRouter } from '../test/render'
 import { makeListing, makeSession } from '../test/fixtures'
 
 vi.mock('../lib/supabase')
@@ -516,7 +517,7 @@ describe('Home filters', () => {
     expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
   })
 
-  it('keeps region and area filters after a remount', async () => {
+  it('restores region and area filters on a POP remount', async () => {
     givenListings(withFillers([LATTE, BOXING, POTTERY]))
     const { user, unmount } = renderWithRouter(<Home />)
     await screen.findByText('Latte art')
@@ -529,6 +530,48 @@ describe('Home filters', () => {
 
     expect(listingTitles()).toEqual(['Boxing basics', 'Pottery hour'])
     expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('starts with All and the cached grid when a PUSH lands on Home from another page', async () => {
+    writeBrowseCache({
+      listings: withFillers([LATTE, BOXING, POTTERY]),
+      ratings: {},
+      keenCounts: {},
+      filters: { category: 'Arts', region: 'East', area: 'Bedok', quick: null },
+    })
+    givenListings(withFillers([LATTE, BOXING, POTTERY]))
+    const { user } = renderWithDataRouter(<Home />, {
+      path: '/',
+      route: '/listings/listing-1',
+      extraRoutes: (
+        <Route path="/listings/:id" element={<Link to="/">Browse sessions</Link>} />
+      ),
+    })
+
+    await user.click(screen.getByRole('link', { name: 'Browse sessions' }))
+    expect(await screen.findByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /Anywhere/ })).toBeInTheDocument()
+  })
+
+  it('resets filters when a PUSH to / happens while Home is already filtered', async () => {
+    givenListings([LATTE, BOXING])
+    const { user } = renderWithDataRouter(
+      <>
+        <Link to="/">TryKai home</Link>
+        <Home />
+      </>,
+      { route: '/?category=Food' },
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Boxing basics' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Food' })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByRole('heading', { name: 'Boxing basics' })).toBeInTheDocument()
   })
 })
 

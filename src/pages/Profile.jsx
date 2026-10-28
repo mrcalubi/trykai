@@ -121,9 +121,15 @@ function sessionsHeldCount(data) {
   return Number(data) || 0
 }
 
-function ProfileIconLink({ to, label, icon }) {
+function ProfileIconLink({ to, label, icon, replace = false, preventScrollReset = false }) {
   return (
-    <Link to={to} className="profile-header__icon-btn" aria-label={label}>
+    <Link
+      to={to}
+      replace={replace}
+      preventScrollReset={preventScrollReset}
+      className="profile-header__icon-btn"
+      aria-label={label}
+    >
       <span className="profile-header__icon-face">
         <Icon name={icon} size={18} strokeWidth={2} />
       </span>
@@ -152,7 +158,12 @@ function ProfileTools({ isOwn, isOwner, givenName, profile, previewTo }) {
     return (
       <div className="profile-header__tools">
         <ProfileIconLink to="/settings" label="Edit profile" icon="pencil" />
-        <ProfileIconLink to={previewTo} label="See how guests see you" icon="eye" />
+        <ProfileIconLink
+          to={previewTo}
+          label="See how guests see you"
+          icon="eye"
+          preventScrollReset
+        />
       </div>
     )
   }
@@ -693,7 +704,10 @@ export default function Profile() {
       {publicPreview ? (
         <div className="profile-preview-bar" role="status">
           <span>This is how guests see your profile</span>
-          <Link to={{ pathname: `/u/${id}`, search: ownerSearch(searchParams) }}>
+          <Link
+            to={{ pathname: `/u/${id}`, search: ownerSearch(searchParams) }}
+            preventScrollReset
+          >
             Back to your profile
           </Link>
         </div>
@@ -836,6 +850,7 @@ export default function Profile() {
               <Link
                 key={tab.id}
                 replace
+                preventScrollReset
                 to={{ pathname: `/u/${id}`, search: tabSearch(searchParams, tab.id) }}
                 className={
                   activeTab === tab.id

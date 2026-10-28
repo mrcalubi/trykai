@@ -285,7 +285,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
           next.delete('connect')
           return next
         },
-        { replace: true },
+        { replace: true, preventScrollReset: true },
       )
     }
 

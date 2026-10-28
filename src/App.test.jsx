@@ -156,15 +156,70 @@ describe('App routes', () => {
       renderAt('/')
       await screen.findByText('Latte art')
       scrollTo.mockClear()
-      Object.defineProperty(window, 'scrollY', { configurable: true, value: 240 })
 
       await user.click(screen.getByRole('button', { name: 'Food' }))
       expect(screen.getByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
       expect(screen.queryByText('Boxing basics')).not.toBeInTheDocument()
-      expect(scrollTo).toHaveBeenCalledWith(0, 240)
       expect(scrollTo).not.toHaveBeenCalledWith(0, 0)
     } finally {
-      delete window.scrollY
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('restores cached filters on back to Home', async () => {
+    const listing = makeListing({ id: 'l-1', title: 'Latte art', category: 'Food' })
+    writeBrowseCache({
+      listings: [listing, makeListing({ id: 'l-2', title: 'Boxing basics', category: 'Fitness' })],
+      ratings: {},
+      keenCounts: {},
+      filters: { category: 'Food', region: 'All', area: '', quick: null },
+    })
+    supabase.__on('listings', 'select', (record) =>
+      record.single
+        ? { data: { id: 'l-1', title: 'Latte art', host_id: 'host-1', photo_urls: [] }, error: null }
+        : { data: [listing], error: null },
+    )
+    const user = userEvent.setup()
+    renderAt('/')
+
+    expect(screen.getByRole('button', { name: 'Food' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('link', { name: /Latte art/ }))
+    expect(await screen.findByRole('heading', { name: 'Latte art', level: 1 })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(await screen.findByRole('button', { name: 'Food' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('opens a fresh All browse page at the top from the logo', async () => {
+    const listing = makeListing({ id: 'l-1', title: 'Latte art', category: 'Food' })
+    writeBrowseCache({
+      listings: [listing, makeListing({ id: 'l-2', title: 'Boxing basics', category: 'Fitness' })],
+      ratings: {},
+      keenCounts: {},
+      filters: { category: 'Food', region: 'All', area: '', quick: null },
+    })
+    supabase.__on('listings', 'select', (record) =>
+      record.single
+        ? { data: { id: 'l-1', title: 'Latte art', host_id: 'host-1', photo_urls: [] }, error: null }
+        : { data: [listing], error: null },
+    )
+    const user = userEvent.setup()
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    try {
+      renderAt('/')
+      expect(screen.getByRole('button', { name: 'Food' })).toHaveAttribute('aria-pressed', 'true')
+      await user.click(await screen.findByRole('link', { name: /Latte art/ }))
+      expect(await screen.findByRole('heading', { name: 'Latte art', level: 1 })).toBeInTheDocument()
+      scrollTo.mockClear()
+
+      await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+      expect(await screen.findByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('heading', { name: 'Latte art', level: 3 })).toBeInTheDocument()
+      expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+      expect(scrollTo).toHaveBeenCalledWith(0, 0)
+    } finally {
       vi.unstubAllGlobals()
     }
   })

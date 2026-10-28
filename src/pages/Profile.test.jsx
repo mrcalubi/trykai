@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { render, screen, waitFor, within } from '@testing-library/react'
-import { createMemoryRouter, RouterProvider } from 'react-router-dom'
+import { createMemoryRouter, Outlet, RouterProvider, ScrollRestoration } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Profile from './Profile'
@@ -652,6 +652,38 @@ describe('Profile own tabs', () => {
     await router.navigate(-1)
     expect(router.state.location.pathname).toBe('/')
     expect(router.state.location.search).toBe('')
+  })
+
+  it('does not scroll to the top when switching profile tabs', async () => {
+    givenSignedIn()
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    const router = createMemoryRouter(
+      [
+        {
+          element: (
+            <>
+              <ScrollRestoration />
+              <Outlet />
+            </>
+          ),
+          children: [{ path: '/u/:id', element: <Profile /> }],
+        },
+      ],
+      { initialEntries: [`/u/${HOST_ID}?tab=bookings`] },
+    )
+    const user = userEvent.setup({ delay: null })
+    try {
+      render(<RouterProvider router={router} />)
+      await screen.findByRole('link', { name: 'Reviews' })
+      scrollTo.mockClear()
+
+      await user.click(screen.getByRole('link', { name: 'Reviews' }))
+      expect(screen.getByRole('link', { name: 'Reviews' })).toHaveAttribute('aria-current', 'page')
+      expect(scrollTo).not.toHaveBeenCalledWith(0, 0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('switches tabs without reloading the profile and keeps opened tabs mounted', async () => {
