@@ -35,6 +35,16 @@ export const EMAIL_COLORS = {
  */
 export const EMAIL_LOGO_URL = `${DEFAULT_SITE_URL}/trykai.png`
 
+/**
+ * Official TryKai accounts. Clean URLs, no tracking params.
+ * Duplicated in src/lib/socials.js because Edge Functions cannot import src/.
+ * socials.test.js keeps the two copies in lockstep.
+ */
+export const TRYKAI_SOCIALS = {
+  instagram: 'https://www.instagram.com/trykaisg/',
+  tiktok: 'https://www.tiktok.com/@trykaisg',
+} as const
+
 const FONT_STACK = "Manrope,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
 const DISPLAY_STACK = "'Bricolage Grotesque',Manrope,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
 const LINK_STYLE = `color:${EMAIL_COLORS.navy};font-weight:600;`
@@ -1379,6 +1389,9 @@ function wrapEmail(body: string, siteUrl: string, preheader?: string): string {
           </tr>
           <tr>
             <td style="padding:20px 8px 0;font-size:13px;line-height:1.6;color:${c.muted};">
+              <a href="${TRYKAI_SOCIALS.instagram}" style="${QUIET_LINK_STYLE}">Instagram</a>
+              &nbsp;·&nbsp;
+              <a href="${TRYKAI_SOCIALS.tiktok}" style="${QUIET_LINK_STYLE}">TikTok</a><br>
               TryKai<br>
               UEN 53526159D<br>
               <a href="${base}/terms" style="${QUIET_LINK_STYLE}">Terms</a>

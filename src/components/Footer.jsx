@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import { TRYKAI_SOCIALS } from '../lib/socials'
+import { SocialGlyph } from './profile/ProfileBits'
 
 const COLUMNS = [
   {
@@ -42,6 +44,26 @@ export default function Footer() {
             Learn something real from your neighbours. Hands-on sessions with ID-verified hosts,
             all over Singapore.
           </p>
+          <div className="site-footer__socials">
+            <a
+              className="site-footer__social"
+              href={TRYKAI_SOCIALS.instagram}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="TryKai on Instagram"
+            >
+              <SocialGlyph kind="instagram" size={18} />
+            </a>
+            <a
+              className="site-footer__social"
+              href={TRYKAI_SOCIALS.tiktok}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="TryKai on TikTok"
+            >
+              <SocialGlyph kind="tiktok" size={18} />
+            </a>
+          </div>
         </div>
         {COLUMNS.map((column) => (
           <nav key={column.title} className="site-footer__column" aria-label={column.title}>

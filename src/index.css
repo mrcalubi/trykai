@@ -7278,6 +7278,32 @@ body.lightbox-open {
   color: #B9C0CF;
 }
 
+.site-footer__socials {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.site-footer__social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--cream);
+  text-decoration: none;
+  border-radius: 50%;
+}
+
+.site-footer__social:hover,
+.site-footer__social:focus-visible {
+  box-shadow: 0 0 0 1.5px var(--cream);
+}
+
+.site-footer__social:focus-visible {
+  outline: none;
+}
+
 .site-footer__column {
   display: flex;
   flex-direction: column;
