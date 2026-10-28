@@ -232,4 +232,48 @@ test.describe('browsing listings', () => {
     await expect(page).toHaveURL(/\/listings\/listing-latte$/)
     await expect(page.getByRole('heading', { level: 1, name: 'Learn latte art with me' })).toBeVisible()
   })
+
+  test('going back from a listing keeps the card you opened on screen', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile-chrome', 'phone viewport only')
+    await stubAllExternalCalls(page, {
+      listings: [LATTE_ART, BOXING, ...WEST_FILLERS],
+      sessions: [],
+      reviews: [],
+    })
+    await page.goto('/')
+
+    const card = page.getByRole('link', { name: /West filler 5/ })
+    await card.scrollIntoViewIfNeeded()
+    await expect(card).toBeInViewport()
+    await card.click()
+    await expect(page).toHaveURL(/\/listings\/west-5$/)
+
+    await page.goBack()
+    await expect(page).toHaveURL(/\/(?:\?.*)?$/)
+    await expect(card).toBeInViewport()
+  })
+
+  test('the logo opens a fresh unfiltered browse page at the top', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile-chrome', 'phone viewport only')
+    await stubAllExternalCalls(page, {
+      listings: [LATTE_ART, BOXING, ...WEST_FILLERS],
+      sessions: [],
+      reviews: [],
+    })
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Food', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Food', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await page.evaluate(() => window.scrollTo(0, 400))
+
+    await page.getByRole('link', { name: /Learn latte art with me/ }).click()
+    await expect(page).toHaveURL(/\/listings\/listing-latte$/)
+
+    await page.getByRole('link', { name: 'TryKai home' }).click()
+    await expect(page).toHaveURL('/')
+    await expect(page.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+    expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  })
 })

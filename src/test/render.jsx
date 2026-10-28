@@ -8,6 +8,7 @@ import {
   Route,
   RouterProvider,
   Routes,
+  ScrollRestoration,
   useLocation,
 } from 'react-router-dom'
 import { vi } from 'vitest'
@@ -94,6 +95,7 @@ export function renderWithDataRouter(
     extraRoutes = null,
     outlivesNavigation = false,
     withFakeTimers = false,
+    withScrollRestoration = false,
   } = {},
 ) {
   const user = userEvent.setup({
@@ -106,6 +108,7 @@ export function renderWithDataRouter(
       <Route
         element={
           <>
+            {withScrollRestoration ? <ScrollRestoration /> : null}
             <Outlet />
             <LocationProbe
               pinnedPathname={path === '*' && !outlivesNavigation ? pathnameOf(route) : null}

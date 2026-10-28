@@ -5,10 +5,10 @@ import {
   Outlet,
   Route,
   RouterProvider,
+  ScrollRestoration,
 } from 'react-router-dom'
 import SiteNav from './components/SiteNav'
 import BackButton, { BackSlotProvider } from './components/BackButton'
-import ScrollToTop from './components/ScrollToTop'
 import Footer from './components/Footer'
 import RequireAuth from './components/RequireAuth'
 import RequireAdmin from './components/RequireAdmin'
@@ -41,7 +41,7 @@ import NotFound from './pages/NotFound'
 function AppLayout() {
   return (
     <>
-      <ScrollToTop />
+      <ScrollRestoration />
       <SiteNav />
       <BackSlotProvider>
         <BackButton />

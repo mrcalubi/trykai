@@ -42,6 +42,7 @@ import {
   dateOpenedGuestSubject,
   EMAIL_COLORS,
   EMAIL_LOGO_URL,
+  EMAIL_SOCIAL_ICON_URLS,
   refundDeadlineLines,
   refundMethodNoun,
   refundTimingCopy,
@@ -123,7 +124,10 @@ function hasDetail(html: string, label: string, value: string): boolean {
 
 /** Receipt rows as [label, amount] pairs. */
 function receiptCells(html: string): string[][] {
-  const block = html.slice(html.indexOf('>Receipt<'))
+  const from = html.indexOf('>Receipt<')
+  const rest = html.slice(from)
+  const tableEnd = rest.indexOf('</table>')
+  const block = tableEnd === -1 ? rest : rest.slice(0, tableEnd)
   return [...block.matchAll(/<tr>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<\/tr>/g)].map(
     (m) => [m[1].trim(), m[2].replace(/<[^>]+>/g, '').trim()],
   )
@@ -551,6 +555,10 @@ describe('booking confirmation emails', () => {
     expect(html).toContain('https://trykai.sg/privacy')
     expect(html).toContain('href="https://www.instagram.com/trykaisg/"')
     expect(html).toContain('href="https://www.tiktok.com/@trykaisg"')
+    expect(html).toContain(`src="${EMAIL_SOCIAL_ICON_URLS.instagram}"`)
+    expect(html).toContain(`src="${EMAIL_SOCIAL_ICON_URLS.tiktok}"`)
+    expect(html).toMatch(/<img[^>]*alt="Instagram"[^>]*width="24"[^>]*height="24"/)
+    expect(html).toMatch(/<img[^>]*alt="TikTok"[^>]*width="24"[^>]*height="24"/)
     expect(html).not.toContain('/dashboard')
   })
 
@@ -1284,6 +1292,10 @@ describe('branded receipt', () => {
     const html = guestReceipt({ siteUrl: 'https://trykai.vercel.app' })
     expect(html).toContain(`src="${EMAIL_LOGO_URL}"`)
     expect(EMAIL_LOGO_URL).toBe('https://trykai.sg/trykai.png')
+    expect(EMAIL_SOCIAL_ICON_URLS.instagram).toBe('https://trykai.sg/email/instagram.png')
+    expect(EMAIL_SOCIAL_ICON_URLS.tiktok).toBe('https://trykai.sg/email/tiktok.png')
+    expect(html).toContain(`src="${EMAIL_SOCIAL_ICON_URLS.instagram}"`)
+    expect(html).toContain(`src="${EMAIL_SOCIAL_ICON_URLS.tiktok}"`)
     expect(html).toContain(`TryKai<span style="color:${EMAIL_COLORS.coral};">.</span>`)
     expect(html).toContain(`background:${EMAIL_COLORS.cream}`)
     expect(html).toContain('<meta name="color-scheme" content="light">')

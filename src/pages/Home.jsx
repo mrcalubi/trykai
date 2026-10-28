@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigationType, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { readBrowseCache, writeBrowseCache } from '../lib/browseCache'
 import Card from '../components/ui/Card'
 import HeroBadge from '../components/HeroBadge'
 import Icon from '../components/ui/Icon'
@@ -8,7 +9,7 @@ import { categoryIconName } from '../components/ui/categoryIcon'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { browseFlag, keenCountsById } from '../lib/keen'
 import { formatGuestFacingPrice } from '../lib/pricing'
-import { sortListingsForBrowse } from '../lib/listingSort'
+import { listingsForGuestBrowse, sortListingsForBrowse } from '../lib/listingSort'
 import { filterNarrows, locationLabel, showLocationFilter, showNewFlags, visibleCategories } from '../lib/browseUi'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
 import { REGIONS, regionForPlanningArea } from '../lib/planningAreas'
@@ -82,18 +83,45 @@ function EmptyPanel({ title, icon = 'search', children }) {
   )
 }
 
+function filtersForHome(searchParams, navigationType) {
+  const urlCategory = searchParams.get('category')
+  if (navigationType === 'POP') {
+    const cached = readBrowseCache()
+    return {
+      category: urlCategory || cached?.filters.category || 'All',
+      region: cached?.filters.region || 'All',
+      area: cached?.filters.area || '',
+      quick: cached?.filters.quick ?? null,
+    }
+  }
+  return {
+    category: urlCategory || 'All',
+    region: 'All',
+    area: '',
+    quick: null,
+  }
+}
+
 export default function Home() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [listings, setListings] = useState([])
-  const [ratings, setRatings] = useState({})
-  const [keenCounts, setKeenCounts] = useState({})
-  const [loading, setLoading] = useState(true)
+  const navigationType = useNavigationType()
+  const [listings, setListings] = useState(() => readBrowseCache()?.listings ?? [])
+  const [ratings, setRatings] = useState(() => readBrowseCache()?.ratings ?? {})
+  const [keenCounts, setKeenCounts] = useState(() => readBrowseCache()?.keenCounts ?? {})
+  const [loading, setLoading] = useState(() => !readBrowseCache())
   const [error, setError] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || 'All')
-  const [regionFilter, setRegionFilter] = useState('All')
-  const [areaFilter, setAreaFilter] = useState('')
-  const [quickFilter, setQuickFilter] = useState(null)
+  const [regionFilter, setRegionFilter] = useState(
+    () => filtersForHome(searchParams, navigationType).region,
+  )
+  const [areaFilter, setAreaFilter] = useState(
+    () => filtersForHome(searchParams, navigationType).area,
+  )
+  const [quickFilter, setQuickFilter] = useState(
+    () => filtersForHome(searchParams, navigationType).quick,
+  )
   const [locationOpen, setLocationOpen] = useState(false)
+  const skipEmptyWrite = useRef(!readBrowseCache())
+  const categoryFilter = filtersForHome(searchParams, navigationType).category
 
   useEffect(() => {
     async function fetchListings() {
@@ -111,7 +139,8 @@ export default function Home() {
           created_at,
           users!host_id (
             display_name,
-            avatar_url
+            avatar_url,
+            stripe_payouts_enabled
           ),
           sessions (
             starts_at,
@@ -128,15 +157,17 @@ export default function Home() {
       )
 
       if (fetchError) {
-        setError(PAGE_LOAD_ERROR)
-        setListings([])
-        setRatings({})
-        setKeenCounts({})
+        if (!readBrowseCache()) {
+          setError(PAGE_LOAD_ERROR)
+          setListings([])
+          setRatings({})
+          setKeenCounts({})
+        }
         setLoading(false)
         return
       }
 
-      const rows = sortListingsForBrowse(data ?? [])
+      const rows = sortListingsForBrowse(listingsForGuestBrowse(data ?? []))
       const listingIds = rows.map((listing) => listing.id)
       const noDateIds = rows.filter((listing) => !nextSessionLabel(listing)).map((listing) => listing.id)
       let ratingRows = []
@@ -159,6 +190,47 @@ export default function Home() {
     }
 
     fetchListings()
+  }, [])
+
+  useEffect(() => {
+    if (loading) return
+    if (!listings.length && skipEmptyWrite.current) return
+    skipEmptyWrite.current = false
+    writeBrowseCache({
+      listings,
+      ratings,
+      keenCounts,
+      filters: {
+        category: categoryFilter,
+        region: regionFilter,
+        area: areaFilter,
+        quick: quickFilter,
+      },
+    })
+  }, [listings, ratings, keenCounts, categoryFilter, regionFilter, areaFilter, quickFilter, loading])
+
+  useEffect(() => {
+    function handleClick(event) {
+      if (event.defaultPrevented || event.button !== 0) return
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      const anchor = event.target.closest?.('a[href]')
+      if (!anchor || (anchor.target && anchor.target !== '_self')) return
+      let url
+      try {
+        url = new URL(anchor.getAttribute('href'), window.location.href)
+      } catch {
+        return
+      }
+      if (url.origin !== window.location.origin || url.pathname !== '/') return
+      if (url.searchParams.get('category')) return
+      setRegionFilter('All')
+      setAreaFilter('')
+      setQuickFilter(null)
+      setLocationOpen(false)
+      window.scrollTo(0, 0)
+    }
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
   }, [])
 
   const categories = useMemo(
@@ -193,11 +265,10 @@ export default function Home() {
   }, [listings, activeCategory, regionFilter, areaFilter, activeQuick])
 
   function chooseCategory(category) {
-    setCategoryFilter(category)
     const params = new URLSearchParams(searchParams)
     if (category === 'All') params.delete('category')
     else params.set('category', category)
-    setSearchParams(params, { replace: true })
+    setSearchParams(params, { replace: true, preventScrollReset: true })
   }
 
   function clearFilters() {

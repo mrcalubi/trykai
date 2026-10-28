@@ -45,7 +45,7 @@ export default function SingpassReturn() {
       navigate('/verify-identity', { replace: true })
       return
     }
-    navigate(location.pathname, { replace: true })
+    navigate(location.pathname, { replace: true, preventScrollReset: true })
 
     async function exchange() {
       const { data, error } = await callSingpass({ query })

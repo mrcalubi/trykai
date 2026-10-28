@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { screen, within } from '@testing-library/react'
+import { Link, Route } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Home from './Home'
 import { supabase } from '../lib/supabase'
 import { PAGE_LOAD_ERROR } from '../lib/pageLoad'
-import { renderWithRouter } from '../test/render'
+import { BROWSE_CACHE_TTL_MS, clearBrowseCache, writeBrowseCache } from '../lib/browseCache'
+import { renderWithDataRouter, renderWithRouter } from '../test/render'
 import { makeListing, makeSession } from '../test/fixtures'
 
 vi.mock('../lib/supabase')
@@ -73,6 +75,7 @@ function listingTitles() {
 
 beforeEach(() => {
   supabase.__reset()
+  clearBrowseCache()
 })
 
 describe('Home loading and error states', () => {
@@ -127,6 +130,37 @@ describe('Home loading and error states', () => {
         name: "Singapore's not boring. You just haven't found your thing yet.",
       })
     ).toBeInTheDocument()
+  })
+
+  it('renders a fresh cache immediately and replaces it from a quiet refetch', async () => {
+    writeBrowseCache({ listings: [LATTE], ratings: {}, keenCounts: {} })
+    givenListings([LATTE, BOXING])
+    renderWithRouter(<Home />)
+
+    expect(screen.getByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Boxing basics' })).toBeInTheDocument()
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('keeps the cached grid when a quiet refetch fails', async () => {
+    writeBrowseCache({ listings: [LATTE], ratings: {}, keenCounts: {} })
+    supabase.__on('listings', 'select', { data: null, error: { message: 'network down' } })
+    renderWithRouter(<Home />)
+
+    expect(screen.getByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
+    expect(screen.queryByText(PAGE_LOAD_ERROR)).not.toBeInTheDocument()
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('shows the loader when the cache is older than five minutes', () => {
+    writeBrowseCache({ listings: [LATTE], ratings: {}, keenCounts: {} }, Date.now() - BROWSE_CACHE_TTL_MS)
+    givenListings([LATTE])
+    renderWithRouter(<Home />)
+
+    expect(screen.getByText('Loading listings…')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Latte art' })).not.toBeInTheDocument()
   })
 })
 
@@ -468,6 +502,77 @@ describe('Home filters', () => {
     await user.click(screen.getByRole('button', { name: 'Food' }))
     expect(screen.getByText('1 of 2 listings')).toBeInTheDocument()
   })
+
+  it('lets the category query override a cached category', () => {
+    writeBrowseCache({
+      listings: [LATTE, BOXING],
+      ratings: {},
+      keenCounts: {},
+      filters: { category: 'Food' },
+    })
+    givenListings([LATTE, BOXING])
+    renderWithRouter(<Home />, { route: '/?category=Fitness' })
+
+    expect(listingTitles()).toEqual(['Boxing basics'])
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('restores region and area filters on a POP remount', async () => {
+    givenListings(withFillers([LATTE, BOXING, POTTERY]))
+    const { user, unmount } = renderWithRouter(<Home />)
+    await screen.findByText('Latte art')
+    await openLocation(user)
+    await user.selectOptions(screen.getByLabelText('Filter by region'), 'East')
+    expect(listingTitles()).toEqual(['Boxing basics', 'Pottery hour'])
+
+    unmount()
+    renderWithRouter(<Home />)
+
+    expect(listingTitles()).toEqual(['Boxing basics', 'Pottery hour'])
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('starts with All and the cached grid when a PUSH lands on Home from another page', async () => {
+    writeBrowseCache({
+      listings: withFillers([LATTE, BOXING, POTTERY]),
+      ratings: {},
+      keenCounts: {},
+      filters: { category: 'Arts', region: 'East', area: 'Bedok', quick: null },
+    })
+    givenListings(withFillers([LATTE, BOXING, POTTERY]))
+    const { user } = renderWithDataRouter(<Home />, {
+      path: '/',
+      route: '/listings/listing-1',
+      extraRoutes: (
+        <Route path="/listings/:id" element={<Link to="/">Browse sessions</Link>} />
+      ),
+    })
+
+    await user.click(screen.getByRole('link', { name: 'Browse sessions' }))
+    expect(await screen.findByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /Anywhere/ })).toBeInTheDocument()
+  })
+
+  it('resets filters when a PUSH to / happens while Home is already filtered', async () => {
+    givenListings([LATTE, BOXING])
+    const { user } = renderWithDataRouter(
+      <>
+        <Link to="/">TryKai home</Link>
+        <Home />
+      </>,
+      { route: '/?category=Food' },
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Boxing basics' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Food' })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByRole('heading', { name: 'Boxing basics' })).toBeInTheDocument()
+  })
 })
 
 describe('Home hero', () => {
@@ -561,7 +666,9 @@ describe('Home card details', () => {
     const select = supabase.__lastCall('listings', 'select').chain.find(
       (step) => step.method === 'select'
     )?.args[0]
-    expect(select).toMatch(/users!host_id\s*\(\s*display_name,\s*avatar_url\s*\)/)
+    expect(select).toMatch(
+      /users!host_id\s*\(\s*display_name,\s*avatar_url,\s*stripe_payouts_enabled\s*\)/,
+    )
     expect(select).not.toMatch(/email|phone/)
   })
 })
@@ -587,6 +694,30 @@ describe('Home quick filters', () => {
     await screen.findByText('Cheap chess')
 
     expect(screen.queryByRole('button', { name: 'Under $30' })).not.toBeInTheDocument()
+  })
+
+  it('treats a payouts-off listing as having no dates', async () => {
+    const PAYOUTS_OFF = makeListing({
+      id: 'l-pay',
+      title: 'Closed pottery',
+      category: 'Arts',
+      users: { display_name: 'Mei', avatar_url: null, stripe_payouts_enabled: false },
+      sessions: [makeSession({ starts_at: '2099-03-10T01:00:00.000Z' })],
+    })
+    givenListings([PAYOUTS_OFF, BOXING])
+    supabase.rpc.mockImplementation(async (name) =>
+      name === 'listing_keen_counts'
+        ? { data: [{ listing_id: 'l-pay', keen_count: 3 }], error: null }
+        : { data: [], error: null },
+    )
+    renderWithRouter(<Home />)
+
+    const card = await screen.findByRole('link', { name: /Closed pottery/ })
+    expect(card.textContent).not.toContain('Tue, 10 Mar')
+    expect(await screen.findByText('3 keen')).toBeInTheDocument()
+    const keenCall = supabase.rpc.mock.calls.find(([name]) => name === 'listing_keen_counts')
+    expect(keenCall[1].p_listing_ids).toContain('l-pay')
+    expect(screen.queryByRole('button', { name: 'This weekend' })).not.toBeInTheDocument()
   })
 
   it('hides a quick filter nothing would match', async () => {
@@ -621,6 +752,7 @@ describe('Home New label', () => {
     await screen.findByText('Fresh one')
     expect(screen.queryByText('New')).not.toBeInTheDocument()
     unmount()
+    clearBrowseCache()
 
     givenListings([FRESH, ...WEST_FILLERS.slice(0, 2)])
     renderWithRouter(<Home />)

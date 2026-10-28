@@ -12,7 +12,7 @@ import { supabase } from '../lib/supabase'
 import { formatDayLabel } from '../lib/sessionCalendar'
 import { addSingaporeDays, singaporeDateKey } from '../lib/sessionBatch'
 import { formatSessionDateTime } from '../lib/sessionDate'
-import { renderWithRouter } from '../test/render'
+import { renderWithDataRouter, renderWithRouter } from '../test/render'
 import { hoursFromNow, makeAuthSession, makeBooking } from '../test/fixtures'
 import {
   PAYOUT_CHECKING_COPY,
@@ -53,6 +53,7 @@ function givenData({
   isHost,
   payoutsEnabled = true,
   verificationStatus = 'approved',
+  interest = [],
 } = {}) {
   supabase.__on('listings', 'select', { data: listings, error: null })
   supabase.__on('bookings', 'select', (call) =>
@@ -72,9 +73,22 @@ function givenData({
   }
   const previousRpc = supabase.rpc.getMockImplementation()
   givenRpc(async (name, args) => {
+    if (name === 'host_listing_interest') {
+      return { data: interest, error: null }
+    }
     if (previousRpc) return previousRpc(name, args)
     return { data: null, error: null }
   })
+}
+
+function waitingInterest(listingId, keenCount = 2) {
+  return { listing_id: listingId, keen_count: keenCount, weekday: 0, weekend: keenCount, morning: 0, afternoon: 0, evening: 0 }
+}
+
+function notifiedListingIds() {
+  return supabase.functions.invoke.mock.calls
+    .filter(([name]) => name === 'notify-interested')
+    .map(([, options]) => options.body.listing_id)
 }
 
 let accountRow = {
@@ -1911,6 +1925,137 @@ describe('Dashboard payout setup', () => {
       headers: { Authorization: 'Bearer test-access-token' },
     })
     expect(screen.queryByText(/Payout setup submitted/)).not.toBeInTheDocument()
+    expect(notifiedListingIds()).toEqual([])
+  })
+
+  it('does not scroll to the top when the connect param is cleared', async () => {
+    givenData({ listings: [makeMyListing()] })
+    supabase.functions.invoke.mockResolvedValue({
+      data: { stripe_payouts_enabled: true, url: null },
+      error: null,
+    })
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    try {
+      const { currentSearch } = renderWithDataRouter(
+        <RequireAuth>
+          <Hosting />
+        </RequireAuth>,
+        { route: '/hosting?connect=return', path: '/hosting', withScrollRestoration: true },
+      )
+      await screen.findByRole('heading', { name: 'Hosting', level: 1 })
+      scrollTo.mockClear()
+      expect(
+        await screen.findByText('Payouts are set up. Guests can now book you.'),
+      ).toBeInTheDocument()
+      await waitFor(() => expect(currentSearch()).toBe(''))
+      expect(scrollTo).not.toHaveBeenCalledWith(0, 0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('emails waiting guests once payouts are on, dates are up, and guests are waiting', async () => {
+    givenData({
+      listings: [makeMyListing(), makeMyListing({ id: 'listing-2', title: 'Pottery' })],
+      hostSessions: [
+        makeHostSession({ listing_id: 'listing-1', status: 'open' }),
+        makeHostSession({ id: 'session-2', listing_id: 'listing-2', status: 'open' }),
+      ],
+      interest: [waitingInterest('listing-1'), waitingInterest('listing-2', 4)],
+    })
+    await renderHosting()
+
+    await waitFor(() => expect(notifiedListingIds()).toEqual(['listing-1', 'listing-2']))
+  })
+
+  it('does not email when nobody is still waiting', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [makeHostSession({ listing_id: 'listing-1', status: 'open' })],
+    })
+    await renderHosting()
+
+    expect(notifiedListingIds()).toEqual([])
+  })
+
+  it('does not email while payouts are off', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      payoutsEnabled: false,
+      hostSessions: [makeHostSession({ listing_id: 'listing-1', status: 'open' })],
+      interest: [waitingInterest('listing-1')],
+    })
+    await renderHosting()
+
+    expect(notifiedListingIds()).toEqual([])
+  })
+
+  it('emails when payouts were already on at load, the webhook-first case', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      payoutsEnabled: true,
+      hostSessions: [makeHostSession({ listing_id: 'listing-1', status: 'open' })],
+      interest: [waitingInterest('listing-1')],
+    })
+    await renderHosting()
+
+    await waitFor(() => expect(notifiedListingIds()).toEqual(['listing-1']))
+  })
+
+  it('does not email the same listing twice on this mount', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      payoutsEnabled: true,
+      hostSessions: [makeHostSession({ listing_id: 'listing-1', status: 'open' })],
+      interest: [waitingInterest('listing-1')],
+    })
+    supabase.functions.invoke.mockResolvedValue({
+      data: { stripe_payouts_enabled: true, url: null },
+      error: null,
+    })
+    renderWithRouter(
+      <RequireAuth>
+        <Hosting />
+      </RequireAuth>,
+      { route: '/hosting?connect=return', path: '/hosting' },
+    )
+
+    expect(await screen.findByText('Payouts are set up. Guests can now book you.')).toBeInTheDocument()
+    await waitFor(() => expect(notifiedListingIds()).toEqual(['listing-1']))
+  })
+
+  it('emails waiting guests once the Connect return enables payouts, and ignores a notify failure', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    givenData({
+      listings: [makeMyListing(), makeMyListing({ id: 'listing-2', title: 'Pottery' })],
+      payoutsEnabled: false,
+      hostSessions: [
+        makeHostSession({ listing_id: 'listing-1', status: 'open' }),
+        makeHostSession({ id: 'session-2', listing_id: 'listing-2', status: 'open' }),
+      ],
+      interest: [waitingInterest('listing-1'), waitingInterest('listing-2')],
+    })
+    supabase.functions.invoke.mockImplementation(async (name) => {
+      if (name === 'create-account-link') {
+        return { data: { stripe_payouts_enabled: true, url: null }, error: null }
+      }
+      if (name === 'notify-interested') {
+        return { data: null, error: { message: 'notify down' } }
+      }
+      return { data: null, error: null }
+    })
+    renderWithRouter(
+      <RequireAuth>
+        <Hosting />
+      </RequireAuth>,
+      { route: '/hosting?connect=return', path: '/hosting' },
+    )
+
+    expect(await screen.findByText('Payouts are set up. Guests can now book you.')).toBeInTheDocument()
+    expect(notifiedListingIds()).toEqual(['listing-1', 'listing-2'])
+    expect(log).toHaveBeenCalled()
+    log.mockRestore()
   })
 
   it('re-reads Stripe on ?connect=return and offers to continue when payouts are not enabled', async () => {
@@ -2345,6 +2490,33 @@ describe('Dashboard post-payment status', () => {
 
     await screen.findByText('Booking confirmed! Your payment was successful.')
     await waitFor(() => expect(currentSearch()).toBe(''))
+  })
+
+  it('does not scroll to the top when payment query params are cleared', async () => {
+    supabase.__on('bookings', 'select', (call) =>
+      call.single ? { data: { status: 'confirmed' }, error: null } : { data: [], error: null }
+    )
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    try {
+      const { currentSearch } = renderWithDataRouter(
+        <RequireAuth>
+          <Bookings />
+        </RequireAuth>,
+        {
+          route: '/bookings?booking=booking-1',
+          path: '/bookings',
+          withScrollRestoration: true,
+        },
+      )
+      await screen.findByRole('heading', { name: 'Dashboard', level: 1 })
+      scrollTo.mockClear()
+      await screen.findByText('Booking confirmed! Your payment was successful.')
+      await waitFor(() => expect(currentSearch()).toBe(''))
+      expect(scrollTo).not.toHaveBeenCalledWith(0, 0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('only polls for the signed-in guest own booking', async () => {

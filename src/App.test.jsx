@@ -2,8 +2,9 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { writeBrowseCache } from './lib/browseCache'
 import { supabase } from './lib/supabase'
-import { makeAuthSession } from './test/fixtures'
+import { makeAuthSession, makeListing } from './test/fixtures'
 
 vi.mock('./lib/supabase')
 
@@ -89,31 +90,135 @@ describe('App routes', () => {
     ).toBeInTheDocument()
   })
 
-  it('scrolls to the top on a new route and leaves back to the browser', async () => {
+  it('renders the cached browse grid immediately on back to Home', async () => {
+    const listing = makeListing({ id: 'l-1', title: 'Latte art' })
+    writeBrowseCache({ listings: [listing], ratings: {}, keenCounts: {} })
+    supabase.__on('listings', 'select', (record) =>
+      record.single
+        ? { data: { id: 'l-1', title: 'Latte art', host_id: 'host-1', photo_urls: [] }, error: null }
+        : { data: [listing], error: null },
+    )
+    const user = userEvent.setup()
+    renderAt('/')
+
+    expect(screen.getByRole('heading', { name: 'Latte art', level: 3 })).toBeInTheDocument()
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: /Latte art/ }))
+    expect(await screen.findByRole('heading', { name: 'Latte art', level: 1 })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: "Singapore's not boring. You just haven't found your thing yet.",
+      }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Latte art', level: 3 })).toBeInTheDocument()
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('scrolls a new listing page to the top', async () => {
+    const listing = makeListing({ id: 'listing-1', title: 'Latte art' })
+    supabase.__on('listings', 'select', (record) =>
+      record.single
+        ? { data: { id: 'listing-1', title: 'Latte art', host_id: 'host-1', photo_urls: [] }, error: null }
+        : { data: [listing], error: null },
+    )
     const user = userEvent.setup()
     const scrollTo = vi.fn()
     vi.stubGlobal('scrollTo', scrollTo)
     try {
       renderAt('/')
-      await screen.findByRole('heading', {
-        level: 1,
-        name: "Singapore's not boring. You just haven't found your thing yet.",
-      })
+      await screen.findByRole('link', { name: /Latte art/ })
       scrollTo.mockClear()
 
-      await user.click(screen.getByRole('link', { name: 'Refund Policy' }))
-      expect(await screen.findByRole('heading', { name: 'Refund Policy' })).toBeInTheDocument()
+      await user.click(screen.getByRole('link', { name: /Latte art/ }))
+      expect(await screen.findByRole('heading', { name: 'Latte art', level: 1 })).toBeInTheDocument()
       expect(scrollTo).toHaveBeenCalledWith(0, 0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 
+  it('does not scroll to the top when the Home category changes', async () => {
+    supabase.__on('listings', 'select', {
+      data: [
+        makeListing({ id: 'l-1', title: 'Latte art', category: 'Food' }),
+        makeListing({ id: 'l-2', title: 'Boxing basics', category: 'Fitness' }),
+      ],
+      error: null,
+    })
+    const user = userEvent.setup()
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    try {
+      renderAt('/')
+      await screen.findByText('Latte art')
       scrollTo.mockClear()
-      await user.click(screen.getByRole('button', { name: 'Back' }))
-      expect(
-        await screen.findByRole('heading', {
-          level: 1,
-          name: "Singapore's not boring. You just haven't found your thing yet.",
-        }),
-      ).toBeInTheDocument()
-      expect(scrollTo).not.toHaveBeenCalled()
+
+      await user.click(screen.getByRole('button', { name: 'Food' }))
+      expect(screen.getByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
+      expect(screen.queryByText('Boxing basics')).not.toBeInTheDocument()
+      expect(scrollTo).not.toHaveBeenCalledWith(0, 0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('restores cached filters on back to Home', async () => {
+    const listing = makeListing({ id: 'l-1', title: 'Latte art', category: 'Food' })
+    writeBrowseCache({
+      listings: [listing, makeListing({ id: 'l-2', title: 'Boxing basics', category: 'Fitness' })],
+      ratings: {},
+      keenCounts: {},
+      filters: { category: 'Food', region: 'All', area: '', quick: null },
+    })
+    supabase.__on('listings', 'select', (record) =>
+      record.single
+        ? { data: { id: 'l-1', title: 'Latte art', host_id: 'host-1', photo_urls: [] }, error: null }
+        : { data: [listing], error: null },
+    )
+    const user = userEvent.setup()
+    renderAt('/')
+
+    expect(screen.getByRole('button', { name: 'Food' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('link', { name: /Latte art/ }))
+    expect(await screen.findByRole('heading', { name: 'Latte art', level: 1 })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(await screen.findByRole('button', { name: 'Food' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+  })
+
+  it('opens a fresh All browse page at the top from the logo', async () => {
+    const listing = makeListing({ id: 'l-1', title: 'Latte art', category: 'Food' })
+    writeBrowseCache({
+      listings: [listing, makeListing({ id: 'l-2', title: 'Boxing basics', category: 'Fitness' })],
+      ratings: {},
+      keenCounts: {},
+      filters: { category: 'Food', region: 'All', area: '', quick: null },
+    })
+    supabase.__on('listings', 'select', (record) =>
+      record.single
+        ? { data: { id: 'l-1', title: 'Latte art', host_id: 'host-1', photo_urls: [] }, error: null }
+        : { data: [listing], error: null },
+    )
+    const user = userEvent.setup()
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    try {
+      renderAt('/')
+      expect(screen.getByRole('button', { name: 'Food' })).toHaveAttribute('aria-pressed', 'true')
+      await user.click(await screen.findByRole('link', { name: /Latte art/ }))
+      expect(await screen.findByRole('heading', { name: 'Latte art', level: 1 })).toBeInTheDocument()
+      scrollTo.mockClear()
+
+      await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+      expect(await screen.findByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('heading', { name: 'Latte art', level: 3 })).toBeInTheDocument()
+      expect(screen.queryByText('Loading listings…')).not.toBeInTheDocument()
+      expect(scrollTo).toHaveBeenCalledWith(0, 0)
     } finally {
       vi.unstubAllGlobals()
     }

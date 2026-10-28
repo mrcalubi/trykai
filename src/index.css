@@ -2184,8 +2184,9 @@ input[type='radio'] {
   border-color: var(--error);
 }
 
-/* Stack idle + loading faces so the button width does not jump. */
-.ui-button {
+/* Stack idle + loading faces so the button width does not jump.
+   Only <Button> renders the faces; bare `.ui-button` links keep the flex row. */
+.ui-button:has(> .ui-button__idle) {
   display: inline-grid;
   justify-items: center;
 }
@@ -5569,11 +5570,6 @@ body.lightbox-open {
 .price-breakdown__row--total:first-child {
   padding-top: 0;
   border-top: 0;
-}
-
-.price-breakdown__note {
-  font-size: 12px;
-  color: var(--muted);
 }
 
 .checkout-pay-bar {
