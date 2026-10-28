@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigationType, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { readBrowseCache, writeBrowseCache } from '../lib/browseCache'
 import Card from '../components/ui/Card'
@@ -83,21 +83,45 @@ function EmptyPanel({ title, icon = 'search', children }) {
   )
 }
 
+function filtersForHome(searchParams, navigationType) {
+  const urlCategory = searchParams.get('category')
+  if (navigationType === 'POP') {
+    const cached = readBrowseCache()
+    return {
+      category: urlCategory || cached?.filters.category || 'All',
+      region: cached?.filters.region || 'All',
+      area: cached?.filters.area || '',
+      quick: cached?.filters.quick ?? null,
+    }
+  }
+  return {
+    category: urlCategory || 'All',
+    region: 'All',
+    area: '',
+    quick: null,
+  }
+}
+
 export default function Home() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigationType = useNavigationType()
   const [listings, setListings] = useState(() => readBrowseCache()?.listings ?? [])
   const [ratings, setRatings] = useState(() => readBrowseCache()?.ratings ?? {})
   const [keenCounts, setKeenCounts] = useState(() => readBrowseCache()?.keenCounts ?? {})
   const [loading, setLoading] = useState(() => !readBrowseCache())
   const [error, setError] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState(
-    () => searchParams.get('category') || readBrowseCache()?.filters.category || 'All',
+  const [regionFilter, setRegionFilter] = useState(
+    () => filtersForHome(searchParams, navigationType).region,
   )
-  const [regionFilter, setRegionFilter] = useState(() => readBrowseCache()?.filters.region || 'All')
-  const [areaFilter, setAreaFilter] = useState(() => readBrowseCache()?.filters.area || '')
-  const [quickFilter, setQuickFilter] = useState(() => readBrowseCache()?.filters.quick ?? null)
+  const [areaFilter, setAreaFilter] = useState(
+    () => filtersForHome(searchParams, navigationType).area,
+  )
+  const [quickFilter, setQuickFilter] = useState(
+    () => filtersForHome(searchParams, navigationType).quick,
+  )
   const [locationOpen, setLocationOpen] = useState(false)
   const skipEmptyWrite = useRef(!readBrowseCache())
+  const categoryFilter = filtersForHome(searchParams, navigationType).category
 
   useEffect(() => {
     async function fetchListings() {
@@ -185,6 +209,30 @@ export default function Home() {
     })
   }, [listings, ratings, keenCounts, categoryFilter, regionFilter, areaFilter, quickFilter, loading])
 
+  useEffect(() => {
+    function handleClick(event) {
+      if (event.defaultPrevented || event.button !== 0) return
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      const anchor = event.target.closest?.('a[href]')
+      if (!anchor || (anchor.target && anchor.target !== '_self')) return
+      let url
+      try {
+        url = new URL(anchor.getAttribute('href'), window.location.href)
+      } catch {
+        return
+      }
+      if (url.origin !== window.location.origin || url.pathname !== '/') return
+      if (url.searchParams.get('category')) return
+      setRegionFilter('All')
+      setAreaFilter('')
+      setQuickFilter(null)
+      setLocationOpen(false)
+      window.scrollTo(0, 0)
+    }
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [])
+
   const categories = useMemo(
     () => visibleCategories(listings, categoryFilter),
     [listings, categoryFilter]
@@ -217,11 +265,10 @@ export default function Home() {
   }, [listings, activeCategory, regionFilter, areaFilter, activeQuick])
 
   function chooseCategory(category) {
-    setCategoryFilter(category)
     const params = new URLSearchParams(searchParams)
     if (category === 'All') params.delete('category')
     else params.set('category', category)
-    setSearchParams(params, { replace: true })
+    setSearchParams(params, { replace: true, preventScrollReset: true })
   }
 
   function clearFilters() {

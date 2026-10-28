@@ -172,7 +172,7 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
         next.delete('payment_intent_client_secret')
         next.delete('redirect_status')
         return next
-      }, { replace: true })
+      }, { replace: true, preventScrollReset: true })
     }
 
     function remember(status) {

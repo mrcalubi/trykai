@@ -45,13 +45,3 @@ export function writeBrowseFilters(filters, now = Date.now()) {
 export function clearBrowseCache() {
   cache = null
 }
-
-/**
- * Home `?category=` and profile `?tab=` replace must keep scroll.
- * Every other new page starts at the top; back/forward restores.
- */
-export function scrollRestorationKey(location) {
-  const path = location.pathname
-  if (path === '/' || /^\/u\/[^/]+$/.test(path)) return path
-  return location.key
-}

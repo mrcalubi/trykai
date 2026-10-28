@@ -10,7 +10,6 @@ import {
 import SiteNav from './components/SiteNav'
 import BackButton, { BackSlotProvider } from './components/BackButton'
 import Footer from './components/Footer'
-import { scrollRestorationKey } from './lib/browseCache'
 import RequireAuth from './components/RequireAuth'
 import RequireAdmin from './components/RequireAdmin'
 import Home from './pages/Home'
@@ -42,7 +41,7 @@ import NotFound from './pages/NotFound'
 function AppLayout() {
   return (
     <>
-      <ScrollRestoration getKey={scrollRestorationKey} />
+      <ScrollRestoration />
       <SiteNav />
       <BackSlotProvider>
         <BackButton />
