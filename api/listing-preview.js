@@ -1,19 +1,35 @@
 /**
- * GET /listings/:id for link unfurlers (WhatsApp, iMessage, Telegram, Slack,
- * search crawlers). vercel.json rewrites only those user agents here; people
- * browsing get the static app as before.
+ * GET /listings/:id for link unfurlers (WhatsApp, iMessage, Telegram, Slack),
+ * search crawlers and AI crawlers. vercel.json rewrites only those user agents
+ * here; people browsing get the static app as before.
  *
- * Returns the normal index.html with the listing's own preview tags, so the
- * page is the same app for anyone who renders it. Any failure falls back to
- * the unchanged index.html: a missing preview must never break the link.
+ * Returns the normal index.html with the listing's own preview tags and
+ * JSON-LD, plus the listing's details as plain HTML inside #root for crawlers
+ * that do not run JavaScript. The page is still the same app for anyone who
+ * renders it. Any failure falls back to the unchanged index.html: a missing
+ * preview must never break the link.
  *
  * Reads public listing columns with the anon key, so RLS still applies: an
  * inactive listing or a suspended host's listing gets the default preview.
+ * Upcoming sessions and the rating are extras: if either read fails, the page
+ * goes out without it.
  */
 
-import { injectPreviewMeta, isListingId, listingPreviewMeta } from './_lib/linkPreview.js'
+import {
+  injectPreviewMeta,
+  injectRootContent,
+  isListingId,
+  listingPageBody,
+  listingPreviewMeta,
+  listingStructuredData,
+} from './_lib/linkPreview.js'
 
-const LISTING_COLUMNS = 'title,area,price_per_person,photo_urls'
+const BASE_COLUMNS = 'title,area,price_per_person,photo_urls'
+const LISTING_COLUMNS =
+  `${BASE_COLUMNS},description,category,duration_mins,max_guests,whats_provided,what_to_bring,` +
+  'host_id,users!host_id(display_name,is_id_verified)'
+const SESSION_COLUMNS = 'starts_at,duration_mins,spots_remaining'
+const MAX_SESSIONS = 10
 
 const FALLBACK_HTML = `<!doctype html>
 <html lang="en">
@@ -25,7 +41,7 @@ const FALLBACK_HTML = `<!doctype html>
     <!-- link-preview:end -->
     <title>TryKai</title>
   </head>
-  <body><a href="https://trykai.sg">TryKai</a></body>
+  <body><div id="root"></div><a href="https://trykai.sg">TryKai</a></body>
 </html>
 `
 
@@ -34,26 +50,68 @@ function siteOrigin(req) {
   return `https://${host}`
 }
 
-async function fetchListing(id) {
+function supabaseConfig() {
   const base = process.env.VITE_SUPABASE_URL
   const key = process.env.VITE_SUPABASE_ANON_KEY
   if (!base || !key) {
     console.warn('listing-preview: VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is not set')
     return null
   }
-  const url =
-    `${base}/rest/v1/listings?select=${LISTING_COLUMNS}` +
-    `&id=eq.${encodeURIComponent(id)}&is_active=eq.true&review_status=eq.approved&limit=1`
-  const response = await fetch(url, {
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' },
+  return { base, key }
+}
+
+async function restGet({ base, key }, path, init = {}) {
+  const response = await fetch(`${base}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Accept: 'application/json',
+      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+    },
     signal: AbortSignal.timeout(4000),
   })
   if (!response.ok) {
-    console.warn('listing-preview: listings fetch failed', response.status)
+    console.warn('listing-preview: fetch failed', path.split('?')[0], response.status)
     return null
   }
-  const rows = await response.json()
+  return response.json()
+}
+
+async function fetchListing(config, id) {
+  const filters = `&id=eq.${encodeURIComponent(id)}&is_active=eq.true&review_status=eq.approved&limit=1`
+  // A database without a newer column (what_to_bring, the host embed) still
+  // gets the basic preview rather than none.
+  const rows =
+    (await restGet(config, `listings?select=${LISTING_COLUMNS}${filters}`)) ??
+    (await restGet(config, `listings?select=${BASE_COLUMNS}${filters}`))
   return Array.isArray(rows) ? (rows[0] ?? null) : null
+}
+
+async function fetchSessions(config, id) {
+  const now = encodeURIComponent(new Date().toISOString())
+  const rows = await restGet(
+    config,
+    `sessions?select=${SESSION_COLUMNS}&listing_id=eq.${encodeURIComponent(id)}` +
+      `&status=eq.open&starts_at=gt.${now}&order=starts_at.asc&limit=${MAX_SESSIONS}`,
+  )
+  return Array.isArray(rows) ? rows : []
+}
+
+async function fetchRating(config, id) {
+  const rows = await restGet(config, 'rpc/listing_ratings', {
+    method: 'POST',
+    body: JSON.stringify({ listing_ids: [id] }),
+  })
+  return Array.isArray(rows) ? (rows[0] ?? null) : null
+}
+
+/** An extra read that may fail without taking the page down with it. */
+function optional(promise, fallback) {
+  return promise.catch((error) => {
+    console.warn('listing-preview: optional read failed', error?.message)
+    return fallback
+  })
 }
 
 export default async function handler(req, res) {
@@ -72,11 +130,21 @@ export default async function handler(req, res) {
   }
 
   let body = html
-  if (isListingId(id)) {
+  const config = isListingId(id) ? supabaseConfig() : null
+  if (config) {
     try {
-      const listing = await fetchListing(id)
-      const meta = listing ? listingPreviewMeta(listing, `${origin}/listings/${id}`) : null
-      if (meta) body = injectPreviewMeta(html, meta)
+      const [listing, sessions, rating] = await Promise.all([
+        fetchListing(config, id),
+        optional(fetchSessions(config, id), []),
+        optional(fetchRating(config, id), null),
+      ])
+      const pageUrl = `${origin}/listings/${id}`
+      const meta = listing ? listingPreviewMeta(listing, pageUrl) : null
+      if (meta) {
+        const page = { pageUrl, origin, sessions, rating }
+        meta.structuredData = listingStructuredData(listing, page)
+        body = injectRootContent(injectPreviewMeta(html, meta), listingPageBody(listing, page))
+      }
     } catch (error) {
       console.warn('listing-preview: preview failed', error?.message)
     }
