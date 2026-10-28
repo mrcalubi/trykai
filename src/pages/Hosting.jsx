@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import AddSessionsForm from '../components/AddSessionsForm'
-import { hostBannerLine, hostInterestById, keenNotifiedLine } from '../lib/keen'
+import { hostBannerLine, hostInterestById, keenNotifiedLine, listingsWithOpenUpcoming } from '../lib/keen'
 import { heldByTitleMap, heldSessionLine, isHeld, sharedBatchLine } from '../lib/sharedAvailability'
 import Button from '../components/ui/Button'
 import PageLoader from '../components/PageLoader'
@@ -118,9 +118,14 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   // The profile's calendar mirrors this tab's sessions. Keep the callback in
   // a ref so a new function each render does not reload the page.
   const onSessionsChangeRef = useRef(onSessionsChange)
+  const hostSessionsRef = useRef([])
+  const payoutsEnabledRef = useRef(payoutsEnabled)
   useEffect(() => {
     onSessionsChangeRef.current = onSessionsChange
   }, [onSessionsChange])
+  useEffect(() => {
+    payoutsEnabledRef.current = payoutsEnabled
+  }, [payoutsEnabled])
 
   const loadData = useCallback(async () => {
     const listingColumns =
@@ -191,11 +196,14 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
         // session still to come for the listings and Upcoming bookings.
         const now = Date.now()
         const rows = sessionsData ?? []
-        setHostSessions(rows.filter((session) => new Date(session.starts_at).getTime() > now))
+        const upcoming = rows.filter((session) => new Date(session.starts_at).getTime() > now)
+        hostSessionsRef.current = upcoming
+        setHostSessions(upcoming)
         setMonthSessions(monthSessionsToCount(rows, now))
         onSessionsChangeRef.current?.(rows)
       }
     } else {
+      hostSessionsRef.current = []
       setHostSessions([])
       setMonthSessions([])
       onSessionsChangeRef.current?.([])
@@ -252,12 +260,31 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
         return
       }
       if (data?.stripe_payouts_enabled) {
+        const wasOff = !payoutsEnabledRef.current
         setPayoutsEnabled(true)
         setPayoutSetupIncomplete(false)
         setPayoutChecking(false)
         setPayoutPendingCopy('')
         setBookingStatusMessage(PAYOUT_READY_COPY)
         clearConnectParam()
+        if (wasOff) {
+          const {
+            data: { session: authSession },
+          } = await supabase.auth.getSession()
+          for (const listingId of listingsWithOpenUpcoming(hostSessionsRef.current)) {
+            try {
+              const { error: notifyError } = await supabase.functions.invoke('notify-interested', {
+                body: { listing_id: listingId },
+                headers: { Authorization: `Bearer ${authSession?.access_token}` },
+              })
+              if (notifyError) {
+                console.error('notify-interested after payouts failed', listingId, notifyError)
+              }
+            } catch (notifyError) {
+              console.error('notify-interested after payouts failed', listingId, notifyError)
+            }
+          }
+        }
         return
       }
       if (data?.pending) {

@@ -9,6 +9,7 @@ const HOST = {
   avatar_url: null,
   is_host: true,
   is_id_verified: true,
+  stripe_payouts_enabled: true,
   banner_preset: 'coral',
   banner_url: null,
   featured_review_id: null,

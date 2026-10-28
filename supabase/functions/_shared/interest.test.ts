@@ -5,6 +5,7 @@ import {
   interestDecision,
   interestTallies,
   keenBadge,
+  keenNotifySkip,
   keenPeopleLine,
   parseInterestRequest,
   shouldEmailHost,
@@ -84,6 +85,14 @@ describe('interestDecision', () => {
 
   it('allows a guest', () => {
     expect(interestDecision({ callerId: 'g', listing, hostSuspended: false })).toEqual({ ok: true })
+  })
+})
+
+describe('keenNotifySkip', () => {
+  it('skips until the host can take payments', () => {
+    expect(keenNotifySkip(true)).toBeNull()
+    expect(keenNotifySkip(false)).toEqual({ notified: 0, skipped: 'payouts_not_enabled' })
+    expect(keenNotifySkip(null)).toEqual({ notified: 0, skipped: 'payouts_not_enabled' })
   })
 })
 

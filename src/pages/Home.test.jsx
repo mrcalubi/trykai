@@ -561,7 +561,9 @@ describe('Home card details', () => {
     const select = supabase.__lastCall('listings', 'select').chain.find(
       (step) => step.method === 'select'
     )?.args[0]
-    expect(select).toMatch(/users!host_id\s*\(\s*display_name,\s*avatar_url\s*\)/)
+    expect(select).toMatch(
+      /users!host_id\s*\(\s*display_name,\s*avatar_url,\s*stripe_payouts_enabled\s*\)/,
+    )
     expect(select).not.toMatch(/email|phone/)
   })
 })
@@ -587,6 +589,30 @@ describe('Home quick filters', () => {
     await screen.findByText('Cheap chess')
 
     expect(screen.queryByRole('button', { name: 'Under $30' })).not.toBeInTheDocument()
+  })
+
+  it('treats a payouts-off listing as having no dates', async () => {
+    const PAYOUTS_OFF = makeListing({
+      id: 'l-pay',
+      title: 'Closed pottery',
+      category: 'Arts',
+      users: { display_name: 'Mei', avatar_url: null, stripe_payouts_enabled: false },
+      sessions: [makeSession({ starts_at: '2099-03-10T01:00:00.000Z' })],
+    })
+    givenListings([PAYOUTS_OFF, BOXING])
+    supabase.rpc.mockImplementation(async (name) =>
+      name === 'listing_keen_counts'
+        ? { data: [{ listing_id: 'l-pay', keen_count: 3 }], error: null }
+        : { data: [], error: null },
+    )
+    renderWithRouter(<Home />)
+
+    const card = await screen.findByRole('link', { name: /Closed pottery/ })
+    expect(card.textContent).not.toContain('Tue, 10 Mar')
+    expect(await screen.findByText('3 keen')).toBeInTheDocument()
+    const keenCall = supabase.rpc.mock.calls.find(([name]) => name === 'listing_keen_counts')
+    expect(keenCall[1].p_listing_ids).toContain('l-pay')
+    expect(screen.queryByRole('button', { name: 'This weekend' })).not.toBeInTheDocument()
   })
 
   it('hides a quick filter nothing would match', async () => {

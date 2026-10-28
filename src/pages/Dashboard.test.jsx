@@ -1911,6 +1911,44 @@ describe('Dashboard payout setup', () => {
       headers: { Authorization: 'Bearer test-access-token' },
     })
     expect(screen.queryByText(/Payout setup submitted/)).not.toBeInTheDocument()
+    expect(supabase.functions.invoke.mock.calls.some(([name]) => name === 'notify-interested')).toBe(
+      false,
+    )
+  })
+
+  it('emails keen guests once payouts flip on, and ignores a notify failure', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    givenData({
+      listings: [makeMyListing(), makeMyListing({ id: 'listing-2', title: 'Pottery' })],
+      payoutsEnabled: false,
+      hostSessions: [
+        makeHostSession({ listing_id: 'listing-1', status: 'open' }),
+        makeHostSession({ id: 'session-2', listing_id: 'listing-2', status: 'open' }),
+      ],
+    })
+    supabase.functions.invoke.mockImplementation(async (name) => {
+      if (name === 'create-account-link') {
+        return { data: { stripe_payouts_enabled: true, url: null }, error: null }
+      }
+      if (name === 'notify-interested') {
+        return { data: null, error: { message: 'notify down' } }
+      }
+      return { data: null, error: null }
+    })
+    renderWithRouter(
+      <RequireAuth>
+        <Hosting />
+      </RequireAuth>,
+      { route: '/hosting?connect=return', path: '/hosting' },
+    )
+
+    expect(await screen.findByText('Payouts are set up. Guests can now book you.')).toBeInTheDocument()
+    const notified = supabase.functions.invoke.mock.calls
+      .filter(([name]) => name === 'notify-interested')
+      .map(([, options]) => options.body.listing_id)
+    expect(notified).toEqual(['listing-1', 'listing-2'])
+    expect(log).toHaveBeenCalled()
+    log.mockRestore()
   })
 
   it('re-reads Stripe on ?connect=return and offers to continue when payouts are not enabled', async () => {

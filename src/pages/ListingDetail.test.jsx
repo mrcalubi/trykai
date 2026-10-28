@@ -1154,6 +1154,8 @@ describe('ListingDetail booking', () => {
     expect(document.querySelector('.price-breakdown__total')).toHaveTextContent('$48.45')
     expect(continueToPayment()).toHaveTextContent('$48.45')
     expect(paynowRail()).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText('Total (all in)')).toBeInTheDocument()
+    expect(screen.queryByText(/Booking fee included/)).not.toBeInTheDocument()
   })
 
   it('reports a business error returned in the response body', async () => {
@@ -1221,18 +1223,41 @@ describe('ListingDetail booking', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('does not start payment when the host cannot receive payouts', async () => {
+  it('shows the keen flow to guests when the host cannot take payments', async () => {
     givenListing(
       makeListing({
         users: { display_name: 'Mei', avatar_url: null, stripe_payouts_enabled: false },
       }),
     )
+    givenSessions([makeSession()])
     givenSignedIn()
     renderPage()
 
-    expect(await screen.findByRole('button', { name: 'Book' })).toBeDisabled()
-    expect(screen.getByText(/still setting up payouts/)).toBeInTheDocument()
+    expect(await screen.findByText('No dates yet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: "I'm keen" })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Book' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Pick a date, then a time')).not.toBeInTheDocument()
+    expect(screen.queryByText(/still setting up payouts/)).not.toBeInTheDocument()
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
+  })
+
+  it('keeps dates for the host and points them to payout setup', async () => {
+    givenListing(
+      makeListing({
+        users: { display_name: 'Mei', avatar_url: null, stripe_payouts_enabled: false },
+      }),
+    )
+    givenSessions([makeSession()])
+    givenSignedIn(makeAuthSession({ user: { id: 'host-1' } }))
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Book' })).toBeDisabled()
+    expect(screen.getByText(/Guests can't book until your payouts are set up/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Set up payouts' })).toHaveAttribute(
+      'href',
+      '/u/host-1?tab=hosting',
+    )
+    expect(screen.queryByText(/still setting up payouts/)).not.toBeInTheDocument()
   })
 
   it('shows an $8 rail total without a thousands separator', async () => {

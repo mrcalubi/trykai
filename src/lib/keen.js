@@ -37,6 +37,21 @@ export function browseFlag(listing, keenCount, now = new Date(), showNew = true)
   return showNew && isRecentlyListed(listing, now) ? 'New' : undefined
 }
 
+/** Listing ids that have an upcoming open session, in first-seen order. */
+export function listingsWithOpenUpcoming(sessions, now = Date.now()) {
+  const ids = []
+  const seen = new Set()
+  for (const session of sessions ?? []) {
+    if (session.status && session.status !== 'open') continue
+    const start = new Date(session.starts_at).getTime()
+    if (!Number.isFinite(start) || start <= now) continue
+    if (!session.listing_id || seen.has(session.listing_id)) continue
+    seen.add(session.listing_id)
+    ids.push(session.listing_id)
+  }
+  return ids
+}
+
 /** listing_keen_counts rows → { [listingId]: count }. */
 export function keenCountsById(rows) {
   const byId = {}

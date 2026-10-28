@@ -157,6 +157,16 @@ export function groupSizeRange(summary: InterestSummary): string {
   return min === max ? `Groups of ${max}` : `Groups of ${min} to ${max}`
 }
 
+/**
+ * Keen "a date opened" mail only goes out when the host can take payments.
+ * Callers must not mark anyone notified when this returns a skip.
+ */
+export function keenNotifySkip(
+  payoutsEnabled: unknown,
+): { notified: 0; skipped: 'payouts_not_enabled' } | null {
+  return payoutsEnabled === true ? null : { notified: 0, skipped: 'payouts_not_enabled' }
+}
+
 export function keenPeopleLine(count: number): string {
   const n = Math.max(0, Math.floor(Number(count) || 0))
   if (n === 1) return 'Someone is keen'

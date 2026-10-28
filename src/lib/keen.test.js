@@ -7,6 +7,7 @@ import {
   hostInterestById,
   keenCountsById,
   keenNotifiedLine,
+  listingsWithOpenUpcoming,
   toggleChoice,
 } from './keen'
 
@@ -29,6 +30,24 @@ describe('browseFlag', () => {
 
   it('never shows keen on a listing that has dates', () => {
     expect(browseFlag(withDate, 5, now)).toBe('New')
+  })
+})
+
+describe('listingsWithOpenUpcoming', () => {
+  const now = Date.parse('2026-10-20T04:00:00Z')
+
+  it('keeps each listing once, soonest first, and drops the rest', () => {
+    expect(
+      listingsWithOpenUpcoming(
+        [
+          { listing_id: 'a', starts_at: '2026-10-21T04:00:00Z', status: 'open' },
+          { listing_id: 'b', starts_at: '2026-10-19T04:00:00Z', status: 'open' },
+          { listing_id: 'a', starts_at: '2026-10-22T04:00:00Z', status: 'open' },
+          { listing_id: 'c', starts_at: '2026-10-23T04:00:00Z', status: 'held' },
+        ],
+        now,
+      ),
+    ).toEqual(['a'])
   })
 })
 

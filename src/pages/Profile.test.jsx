@@ -22,6 +22,7 @@ function givenProfile(profile = {
   avatar_url: null,
   is_id_verified: true,
   is_host: true,
+  stripe_payouts_enabled: true,
 }) {
   lastProfile = profile
   supabase.__on('users', 'select', { data: profile, error: null })
@@ -145,9 +146,9 @@ describe('Profile loading and failure', () => {
     expect(screen.queryByText('ID verified')).not.toBeInTheDocument()
     const selects = supabase.__calls('users', 'select').map((call) => call.chain[0].args[0])
     expect(selects).toEqual([
-      'id, display_name, bio, avatar_url, is_host, is_id_verified, banner_preset, banner_url, featured_review_id, instagram_handle, tiktok_handle',
-      'id, display_name, bio, avatar_url, is_host, is_id_verified',
-      'id, display_name, bio, avatar_url, is_host',
+      'id, display_name, bio, avatar_url, is_host, stripe_payouts_enabled, is_id_verified, banner_preset, banner_url, featured_review_id, instagram_handle, tiktok_handle',
+      'id, display_name, bio, avatar_url, is_host, stripe_payouts_enabled, is_id_verified',
+      'id, display_name, bio, avatar_url, is_host, stripe_payouts_enabled',
     ])
   })
 
@@ -422,7 +423,7 @@ describe('Profile public content', () => {
 
     const columns = supabase.__lastCall('users', 'select').chain[0].args[0]
     expect(columns).toBe(
-      'id, display_name, bio, avatar_url, is_host, is_id_verified, banner_preset, banner_url, featured_review_id, instagram_handle, tiktok_handle'
+      'id, display_name, bio, avatar_url, is_host, stripe_payouts_enabled, is_id_verified, banner_preset, banner_url, featured_review_id, instagram_handle, tiktok_handle'
     )
     expect(columns).not.toMatch(/email|full_name|phone|created_at|is_founding_host/)
   })
@@ -1031,6 +1032,7 @@ function givenHost(overrides = {}) {
     avatar_url: null,
     is_id_verified: true,
     is_host: true,
+    stripe_payouts_enabled: true,
     ...V2_ROW,
     ...overrides,
   })
@@ -1281,6 +1283,27 @@ describe('Profile card layout', () => {
     expect(call.chain[0].args[0]).not.toMatch(/bookings/)
     expect(call.filters).toContainEqual({ method: 'eq', column: 'status', value: 'open' })
     expect(supabase.__calls('bookings', 'select')).toHaveLength(0)
+  })
+
+  it('hides Coming up when the host cannot take payments', async () => {
+    givenProfile({
+      id: HOST_ID,
+      display_name: 'Mei',
+      bio: null,
+      avatar_url: null,
+      is_id_verified: true,
+      is_host: true,
+      stripe_payouts_enabled: false,
+    })
+    givenListings([makeListing({ id: 'listing-9', title: 'Latte art', area: 'Bedok' })])
+    givenSessions([
+      makeSession({ id: 'a', listing_id: 'listing-9', starts_at: hoursFromNow(48), spots_remaining: 2 }),
+    ])
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(screen.queryByRole('region', { name: 'Coming up' })).not.toBeInTheDocument()
+    expect(supabase.__calls('sessions', 'select')).toHaveLength(0)
   })
 
   it('keeps bookings private in public preview too', async () => {
