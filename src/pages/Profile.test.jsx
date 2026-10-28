@@ -510,6 +510,11 @@ describe('Profile public content', () => {
     expect(css).toMatch(/\.profile-header__icon-btn:hover \.profile-header__tooltip/)
     expect(css).toMatch(/\.profile-header__icon-btn:focus-visible \.profile-header__tooltip/)
     expect(css).not.toMatch(/profile-header__mark/)
+    // Hosting's setup grid-area rules must not win inside the profile, or the
+    // setup checklist and the listings stack in one grid cell.
+    expect(css).toMatch(
+      /\.profile-tab-layout \.hosting__layout\.hosting__layout--setup > section \{\s*grid-area:\s*auto/,
+    )
   })
 })
 
