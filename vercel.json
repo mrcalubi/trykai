@@ -6,7 +6,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|WhatsApp|Embedly|SkypeUriPreview|iframely|Pinterest).*"
+          "value": ".*(bot|Bot|BOT|crawler|spider|facebookexternalhit|WhatsApp|Embedly|SkypeUriPreview|iframely|Pinterest|ChatGPT-User|Claude-User|Perplexity-User|MistralAI-User|Google-InspectionTool).*"
         }
       ],
       "destination": "/api/listing-preview?id=:id"
