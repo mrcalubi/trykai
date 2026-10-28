@@ -22,3 +22,12 @@ export async function saveAvatarUrl(userId, avatarUrl, client = supabase) {
 export function hasAvatarPhoto(avatarUrl) {
   return typeof avatarUrl === 'string' && Boolean(avatarUrl.trim())
 }
+
+/** Wide profile banner. Same bucket and folder as the avatar (00041 checks the path). */
+export async function uploadBannerFile(file, userId, storage = supabase.storage) {
+  const path = `${userId}/banner-${crypto.randomUUID()}.jpg`
+  const { error } = await storage.from('listing-photos').upload(path, file)
+  if (error) throw error
+  const { data } = storage.from('listing-photos').getPublicUrl(path)
+  return data.publicUrl
+}

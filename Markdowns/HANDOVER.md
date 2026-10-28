@@ -65,12 +65,13 @@ Everything below is merged to `staging`; `main` has it up to #149, and #150 is o
 - **Listing review** (`00036`): every new listing is hidden from guests until approved at `/admin/listings`. The team is emailed on save (`listing-submitted`); approve or ask for one change (`admin-listings`); the host is emailed either way. Hosting shows "In review" and "Changes needed" with the note.
 
 **Rules not to break**
-- **Singpass button**: use Singpass's own artwork in `src/assets/singpass/` (`SingpassButton.jsx`). Don't restyle it, recolour it or retype the label; Singpass's specification forbids it and production approval depends on it.
-- **"Check your details"** (`SingpassReturn.jsx`): name and date of birth stay locked; mobile stays editable and required. Retrieved data is shown as-is and nothing is saved until the host confirms. This is what was submitted to Singpass on 24 October.
+- **Singpass button**: use Singpass's own artwork in `src/assets/singpass/` (`SingpassButton.jsx`). Don't restyle it, recolour it or retype the label; Singpass's specification forbids it and the approved journey must not change.
+- **"Check your details"** (`SingpassReturn.jsx`): name and date of birth stay locked; mobile stays editable and required. Retrieved data is shown as-is and nothing is saved until the host confirms. This is the approved production journey (live 26 October).
+- **No public marketing mentions Singpass or Myinfo** without Singpass's clearance. Submit the material at least 2 weeks before it goes out (posts, ads, landing page, emails, decks). Aakash owns marketing.
 - **No NRIC numbers**, ever (DECISIONS.md, 23 October).
 - **`listings.review_status`**: clients can never write it (trigger `guard_listing_review`). Any new public listing read must also require `approved`, as browse, profiles, keen counts, checkout and link previews do.
 - **`review_note`** is readable by authenticated users only. Never add it to a query an anonymous visitor runs; the whole query fails.
-- `VITE_SINGPASS_ENABLED` decides whether the Singpass button shows: `true` on Preview (staging) only until Singpass approves production.
+- `VITE_SINGPASS_ENABLED` decides whether the Singpass button shows: `true` on Preview and Production. Singpass has been live since 26 October.
 
 ---
 
@@ -116,12 +117,12 @@ Earlier, from the 19 October handover:
 | `00030` | `booking_money_events` audit log |
 | `00031` | `booking_complaints` (guest Report a problem) |
 
-**Singpass production.** The Myinfo app was submitted for approval on 24 October (up to 2 weeks), with the user journey PDF. Production secrets are being set. Once approved: `VITE_SINGPASS_ENABLED=true` for Production in Vercel, redeploy, test on trykai.sg (OPERATIONS.md, Singpass Myinfo).
+**Singpass production.** Live since 26 October. `VITE_SINGPASS_ENABLED=true` on Preview and Production. See OPERATIONS.md, Singpass Myinfo.
 
 **Production sync.** `main` is at #163. Done 25 October.
 
 **Also open, owned by Caleb.**
-- Singpass production: app submitted 24 October (up to 2 weeks). The five production secrets are being set. On approval: `VITE_SINGPASS_ENABLED=true` for Production in Vercel, redeploy, test.
+- Singpass production: live since 26 October. Marketing mentions need Singpass clearance 2 weeks ahead.
 - Production verification-alert database webhook (`notify-verification-pending`), for upload hosts.
 - Email confirmation dashboard steps on production, if not done.
 - Phone numbers for upload hosts and guests (KIV). Edits to an approved listing are not re-reviewed (KIV).
@@ -133,8 +134,7 @@ Earlier, from the 19 October handover:
 ## Next work
 
 1. **More of the first host's feedback**: Caleb has another batch.
-2. Singpass production switch-on after approval.
-3. BUILD_BACKLOG.md for everything else.
+2. BUILD_BACKLOG.md for everything else.
 
 ---
 

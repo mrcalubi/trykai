@@ -1,5 +1,22 @@
 import { singaporeDateKey } from './sessionCalendar'
 
+/** True only when the embed says the host can take payments. */
+export function hostCanTakePayments(listing) {
+  const host = listing?.users
+  const row = Array.isArray(host) ? host[0] : host
+  return row?.stripe_payouts_enabled === true
+}
+
+/**
+ * Guests must not see dates on a listing whose host cannot take payments.
+ * Those listings sort and filter like a listing with no upcoming sessions.
+ */
+export function listingsForGuestBrowse(listings) {
+  return (listings ?? []).map((listing) =>
+    hostCanTakePayments(listing) ? listing : { ...listing, sessions: [] },
+  )
+}
+
 function upcomingStartTimes(listing, nowMs) {
   return (listing.sessions ?? [])
     .filter((session) => session?.status === 'open')

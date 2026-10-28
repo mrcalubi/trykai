@@ -15,7 +15,7 @@ import {
   publicDisplayName,
   sendResendEmail,
 } from '../_shared/email.ts'
-import { INTEREST_OPEN_DAYS } from '../_shared/interest.ts'
+import { INTEREST_OPEN_DAYS, keenNotifySkip } from '../_shared/interest.ts'
 
 const MAX_PER_CALL = 200
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -52,6 +52,15 @@ Deno.serve(async (req) => {
     if (!listing || listing.host_id !== user.id) {
       return jsonResponse({ error: 'Listing not found' }, 404)
     }
+
+    const { data: hostRow } = await admin
+      .from('users')
+      .select('stripe_payouts_enabled')
+      .eq('id', listing.host_id)
+      .maybeSingle()
+    const skip = keenNotifySkip(hostRow?.stripe_payouts_enabled)
+    if (skip) return jsonResponse(skip)
+
     if (!listing.is_active) return jsonResponse({ notified: 0, reason: 'inactive' })
     // Guests would land on a page they cannot see yet (00036).
     if (listing.review_status !== 'approved') return jsonResponse({ notified: 0, reason: 'in_review' })

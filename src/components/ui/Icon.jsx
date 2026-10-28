@@ -123,6 +123,49 @@ const PATHS = {
     </>
   ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  // Profile stats
+  calendarCheck: (
+    <>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+      <path d="M9 16l2 2 4-4" />
+    </>
+  ),
+  repeat: (
+    <>
+      <path d="M17 2.1L21 6l-4 4" />
+      <path d="M3 12V9a3 3 0 013-3h15" />
+      <path d="M7 22l-4-4 4-4" />
+      <path d="M21 12v3a3 3 0 01-3 3H3" />
+    </>
+  ),
+  ticket: (
+    <>
+      <path d="M3 8a2 2 0 002-2h14a2 2 0 002 2v2a2 2 0 000 4v2a2 2 0 00-2 2H5a2 2 0 00-2-2v-2a2 2 0 000-4V8z" />
+      <path d="M13 6v2M13 11v2M13 16v2" />
+    </>
+  ),
+  compass: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M15.5 8.5l-2 5-5 2 2-5 5-2z" />
+    </>
+  ),
+  pen: (
+    <>
+      <path d="M12 19l7-7 3 3-7 7-3-3z" />
+      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+      <path d="M2 2l7.6 7.6" />
+      <circle cx="11" cy="11" r="2" />
+    </>
+  ),
+  image: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="M21 15l-5-5L5 21" />
+    </>
+  ),
   // Categories
   grid: (
     <>

@@ -34,6 +34,20 @@ export const EMAIL_COLORS = {
  * served from it would show as broken in every inbox.
  */
 export const EMAIL_LOGO_URL = `${DEFAULT_SITE_URL}/trykai.png`
+export const EMAIL_SOCIAL_ICON_URLS = {
+  instagram: `${DEFAULT_SITE_URL}/email/instagram.png`,
+  tiktok: `${DEFAULT_SITE_URL}/email/tiktok.png`,
+} as const
+
+/**
+ * Official TryKai accounts. Clean URLs, no tracking params.
+ * Duplicated in src/lib/socials.js because Edge Functions cannot import src/.
+ * socials.test.js keeps the two copies in lockstep.
+ */
+export const TRYKAI_SOCIALS = {
+  instagram: 'https://www.instagram.com/trykaisg/',
+  tiktok: 'https://www.tiktok.com/@trykaisg',
+} as const
 
 const FONT_STACK = "Manrope,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
 const DISPLAY_STACK = "'Bricolage Grotesque',Manrope,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
@@ -1379,6 +1393,20 @@ function wrapEmail(body: string, siteUrl: string, preheader?: string): string {
           </tr>
           <tr>
             <td style="padding:20px 8px 0;font-size:13px;line-height:1.6;color:${c.muted};">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+                <tr>
+                  <td style="padding:0 12px 0 0;">
+                    <a href="${TRYKAI_SOCIALS.instagram}" title="Instagram">
+                      <img src="${EMAIL_SOCIAL_ICON_URLS.instagram}" alt="Instagram" width="24" height="24" title="Instagram" style="display:block;border:0;">
+                    </a>
+                  </td>
+                  <td>
+                    <a href="${TRYKAI_SOCIALS.tiktok}" title="TikTok">
+                      <img src="${EMAIL_SOCIAL_ICON_URLS.tiktok}" alt="TikTok" width="24" height="24" title="TikTok" style="display:block;border:0;">
+                    </a>
+                  </td>
+                </tr>
+              </table>
               TryKai<br>
               UEN 53526159D<br>
               <a href="${base}/terms" style="${QUIET_LINK_STYLE}">Terms</a>

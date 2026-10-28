@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sortListingsForBrowse } from './listingSort'
+import { listingsForGuestBrowse, sortListingsForBrowse } from './listingSort'
 import { makeListing, makeSession } from '../test/fixtures'
 
 // 10:00 on Mon 5 Oct 2026 in Singapore.
@@ -139,6 +139,17 @@ describe('sortListingsForBrowse', () => {
     expect(sorted).not.toBe(input)
     expect(ids(input)).toEqual(['later', 'sooner'])
     expect(sorted[0]).toBe(sooner)
+  })
+
+  it('clears sessions when the host cannot take payments', () => {
+    const bookable = listingWithSessions('bookable', ['2026-10-06T02:00:00.000Z'])
+    const waiting = listingWithSessions('waiting', ['2026-10-06T02:00:00.000Z'])
+    waiting.users = { ...waiting.users, stripe_payouts_enabled: false }
+
+    const [ready, hidden] = listingsForGuestBrowse([bookable, waiting])
+    expect(ready.sessions).toHaveLength(1)
+    expect(hidden.sessions).toEqual([])
+    expect(ids(sortListingsForBrowse([ready, hidden], NOW))).toEqual(['bookable', 'waiting'])
   })
 
   it('measures upcoming against the current time by default', () => {
