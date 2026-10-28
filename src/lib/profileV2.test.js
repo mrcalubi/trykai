@@ -179,6 +179,7 @@ describe('sessions', () => {
     expect(spotsLine(0)).toBe('')
     expect(spotsLine(1)).toBe('1 spot left')
     expect(spotsLine(3)).toBe('3 spots left')
+    expect(spotsLine(4)).toBe('4 spots left')
     expect(spotsLine(6)).toBe('6 spots')
   })
 

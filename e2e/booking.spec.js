@@ -136,7 +136,7 @@ test.describe('listing detail', () => {
     await page.goto('/listings/listing-latte')
     await page.getByRole('button', { name: 'Book' }).click()
 
-    await expect(page.getByRole('button', { name: /PayNow/ })).toBeDisabled()
+    await expect(page.getByRole('radio', { name: /PayNow/ })).toBeDisabled()
     await expect(
       page.getByText('PayNow is available for sessions within 80 days. Please pay by card.')
     ).toBeVisible()

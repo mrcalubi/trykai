@@ -1,3 +1,4 @@
+import { spotsLabel } from './listingSpots'
 import { singaporeDateKey } from './sessionCalendar'
 
 /**
@@ -236,8 +237,7 @@ export function spotsLine(spots) {
   if (spots == null) return ''
   const left = Number(spots)
   if (!Number.isFinite(left) || left <= 0) return ''
-  if (left <= 3) return `${left} ${left === 1 ? 'spot' : 'spots'} left`
-  return `${left} spots`
+  return spotsLabel(left)
 }
 
 /** Weekday and day number for the little date chips, in Singapore time. */
