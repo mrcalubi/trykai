@@ -1,0 +1,22 @@
+# Search engines and AI assistants may read every public page: browse,
+# listings, host profiles and policies. Account, booking and admin pages are
+# private or empty without a login, so they are kept out.
+# Staging and preview deployments also send X-Robots-Tag: noindex (vercel.json).
+
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /bookings
+Disallow: /create-listing
+Disallow: /dashboard
+Disallow: /edit-listing/
+Disallow: /forgot-password
+Disallow: /hosting
+Disallow: /login
+Disallow: /logout
+Disallow: /reset-password
+Disallow: /settings
+Disallow: /style-guide
+Disallow: /verify-identity
+
+Sitemap: https://trykai.sg/sitemap.xml

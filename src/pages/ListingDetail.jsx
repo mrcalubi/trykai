@@ -47,6 +47,7 @@ import Button from '../components/ui/Button'
 import Icon from '../components/ui/Icon'
 import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
+import { usePageTitle } from '../lib/pageTitle'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -169,6 +170,7 @@ export default function ListingDetail() {
   const location = useLocation()
 
   const [listing, setListing] = useState(null)
+  usePageTitle(listing?.title)
   // { firstMonth, lastMonth, todayKey } when the listing has upcoming sessions, else null.
   const [sessionRange, setSessionRange] = useState(null)
   const [visibleMonth, setVisibleMonth] = useState(null)
