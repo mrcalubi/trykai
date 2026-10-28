@@ -82,3 +82,9 @@ Caleb is product owner: testing, direction, review, merging, final call. Caleb a
 Cursor is used for small edits when credits allow.
 
 Start every build session, Claude or Cursor, with: *"Read ENGINEERING.md and DECISIONS.md first, then..."* For Cursor: one scope per prompt, name the branch, end with "Report anything unmapped".
+
+---
+
+## Repo scripts
+
+`node scripts/build-email-icons.mjs` writes `public/email/instagram.png` and `public/email/tiktok.png` from the SocialGlyph paths (48×48, `#4E586C` on transparent). The PNGs are committed; rerun the script if the glyphs change.
