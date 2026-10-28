@@ -632,6 +632,7 @@ supabase/functions/
 | Looking for                                                | Where                                                                                               |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Deploy every Edge Function                                 | `scripts/deploy-edge-functions.mjs`. CI deploys on push to `staging` and `main`.                    |
+| Email footer social icons                                  | `public/email/{instagram,tiktok}.png` (48×48, shown 24×24), rebuilt with `node scripts/build-email-icons.mjs`. Served from `https://trykai.sg/email/…` (`EMAIL_SOCIAL_ICON_URLS` in `_shared/email.ts`); links in `TRYKAI_SOCIALS`, mirrored in `src/lib/socials.js`. |
 | Browse page and filters                                    | `src/pages/Home.jsx`                                                                                |
 | Planning areas and browse regions                          | `src/lib/planningAreas.js`, `00016`                                                                 |
 | Neighbourhood aliases                                      | `src/data/areaAliases.js`, `src/lib/areaSearch.js`                                                  |
