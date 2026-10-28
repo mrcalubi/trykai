@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import SessionCalendar from '../SessionCalendar'
+import { isLowSpots } from '../../lib/listingSpots'
 import {
   clip,
   dateChip,
@@ -91,7 +92,7 @@ export function ComingUp({ sessions, listings }) {
         {sessions.map((session) => {
           const listing = byId.get(session.listing_id)
           const spots = spotsLine(session.spots_remaining)
-          const low = Number(session.spots_remaining) > 0 && Number(session.spots_remaining) <= 3
+          const low = isLowSpots(session.spots_remaining)
           return (
             <li key={session.id}>
               <Link to={`/listings/${session.listing_id}`} className="coming-up__card">
