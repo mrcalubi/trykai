@@ -25,6 +25,7 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+.env.sentry-build-plugin
 
 # Test output
 coverage
