@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { filesToPhotos, movePhoto, photosFromUrls, snapshotImageFiles, uploadListingPhotos } from './listingPhotos'
+import {
+  MAX_PHOTOS,
+  MOSAIC_VISIBLE_PHOTOS,
+  filesToPhotos,
+  movePhoto,
+  photosFromUrls,
+  snapshotImageFiles,
+  uploadListingPhotos,
+} from './listingPhotos'
 import { HEIC_READ_ERROR } from './heicImage'
 
 vi.mock('./compressImage', () => ({
@@ -9,6 +17,11 @@ vi.mock('./compressImage', () => ({
 import { compressImage } from './compressImage'
 
 describe('listingPhotos', () => {
+  it('caps hosts at eight photos and the mosaic at five', () => {
+    expect(MAX_PHOTOS).toBe(8)
+    expect(MOSAIC_VISIBLE_PHOTOS).toBe(5)
+  })
+
   afterEach(() => {
     compressImage.mockReset()
     compressImage.mockImplementation(async (file) => file)

@@ -7,7 +7,7 @@ import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
 import { revokePhotoUrls } from '../lib/coverCrop'
-import { photosFromUrls, uploadListingPhotos } from '../lib/listingPhotos'
+import { MAX_PHOTOS, photosFromUrls, uploadListingPhotos } from '../lib/listingPhotos'
 import ListingPricePanel from '../components/ListingPricePanel'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
 import WhatToBringFields from '../components/WhatToBringFields'
@@ -37,8 +37,6 @@ import {
   upcomingSessionsFrom,
 } from '../lib/listingDelete'
 import { monthStartIso } from '../lib/hostingDashboard'
-
-const MAX_PHOTOS = 5
 
 const LISTING_SELECT = `
   id,

@@ -237,7 +237,7 @@ function fakePhoto(hue) {
 function withPhotos(count) {
   return {
     ...LATTE_ART,
-    photo_urls: [20, 200, 320, 90, 45].slice(0, count).map(fakePhoto),
+    photo_urls: [20, 200, 320, 90, 45, 160, 280, 10].slice(0, count).map(fakePhoto),
   }
 }
 
@@ -323,6 +323,24 @@ test.describe('listing detail gallery', () => {
     // The title has to survive above the fold next to the booking card.
     await expect(page.getByRole('heading', { level: 1 })).toBeInViewport()
     await expect(page.locator('.detail-booking-card__price')).toBeInViewport()
+  })
+
+  test('offers Show all on the desktop mosaic when there are more than five photos', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'desktop mosaic only')
+    await stubAllExternalCalls(page, {
+      listings: [withPhotos(6)],
+      sessions: [OPEN_SESSION],
+      reviews: [],
+    })
+    await page.goto('/listings/listing-latte')
+
+    await expect(page.getByRole('button', { name: 'Show all 6 photos' })).toBeVisible()
+    await page.getByRole('button', { name: 'Show all 6 photos' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Learn latte art with me photos' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByText('1 / 6')).toBeVisible()
   })
 
   test('opens a clicked photo full size and steps through the set', async ({ page }) => {

@@ -5,6 +5,7 @@ import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { formatCents } from '../lib/cancellationPolicy'
 import { formatDuration } from '../lib/duration'
 import { listingCategoryAreaLine } from '../lib/listingCategories'
+import { MAX_PHOTOS } from '../lib/listingPhotos'
 import { MAX_LISTING_REVIEW_NOTE_LENGTH } from '../../supabase/functions/_shared/listingReview.ts'
 import Button from '../components/ui/Button'
 import PageLoader from '../components/PageLoader'
@@ -121,7 +122,7 @@ export default function AdminListings() {
       <article key={listing.id} className="dashboard-card listing-review">
         {listing.photo_urls.length > 0 ? (
           <div className="listing-review__photos">
-            {listing.photo_urls.slice(0, 5).map((url, index) => (
+            {listing.photo_urls.slice(0, MAX_PHOTOS).map((url, index) => (
               <a key={url} href={url} target="_blank" rel="noreferrer">
                 <img src={url} alt={`Photo ${index + 1}`} />
               </a>

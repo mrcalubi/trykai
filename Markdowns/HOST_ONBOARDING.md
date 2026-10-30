@@ -129,7 +129,7 @@ You do not need a professional. You need a phone, daylight, and five minutes.
 - **Hands in action beat an empty room.**
 - **Include one photo of the space,** so guests know what to expect.
 - **Show the real thing.** A photo that oversells produces a disappointed guest and a bad review. No stock photos.
-- Up to five photos. Drag to reorder; the first is your cover.
+- Up to eight photos. Drag to reorder; the first is your cover.
 
 Listings with good photos get noticeably more bookings. This is the single highest return five minutes you will spend.
 

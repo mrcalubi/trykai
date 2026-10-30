@@ -250,14 +250,14 @@ describe('EditListing prefill', () => {
     givenListing({ photo_urls: ['https://cdn.test/one.jpg', 'https://cdn.test/two.jpg'] })
     await renderLoaded()
 
-    expect(screen.getByText('Maximum of 5 photos (2/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (2/8)')).toBeInTheDocument()
   })
 
   it('copes with a listing that has no photos', async () => {
     givenListing({ photo_urls: null })
     await renderLoaded()
 
-    expect(screen.getByText('Maximum of 5 photos (0/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (0/8)')).toBeInTheDocument()
   })
 })
 
@@ -609,7 +609,7 @@ describe('EditListing photos', () => {
   it('keeps the existing photos and appends the newly uploaded ones', async () => {
     const { user } = await renderLoaded()
     selectFiles([imageFile('two.png')])
-    await screen.findByText('Maximum of 5 photos (2/5)')
+    await screen.findByText('Maximum of 8 photos (2/8)')
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
@@ -625,7 +625,7 @@ describe('EditListing photos', () => {
 
     await user.click(screen.getAllByRole('button', { name: 'Remove photo' })[0])
 
-    expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (1/8)')).toBeInTheDocument()
   })
 
   it('treats removing a photo as dirty and asks before leaving', async () => {
@@ -641,7 +641,7 @@ describe('EditListing photos', () => {
     expect(screen.getByRole('dialog', { name: 'Discard your changes?' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Keep editing' }))
     expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
-    expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (1/8)')).toBeInTheDocument()
   })
 
   it('drops a removed photo from the saved listing', async () => {
@@ -660,11 +660,11 @@ describe('EditListing photos', () => {
   it('lets a newly added photo be removed again', async () => {
     const { user } = await renderLoaded()
     selectFiles([imageFile('two.png')])
-    await screen.findByText('Maximum of 5 photos (2/5)')
+    await screen.findByText('Maximum of 8 photos (2/8)')
 
     await user.click(screen.getAllByRole('button', { name: 'Remove photo' })[1])
 
-    expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (1/8)')).toBeInTheDocument()
   })
 
   it('ignores files that are not images', async () => {
@@ -672,18 +672,18 @@ describe('EditListing photos', () => {
 
     selectFiles([new File(['x'], 'notes.txt', { type: 'text/plain' })])
 
-    expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (1/8)')).toBeInTheDocument()
   })
 
-  it('counts existing photos towards the five photo cap', async () => {
+  it('counts existing photos towards the eight photo cap', async () => {
     givenListing({
-      photo_urls: ['a', 'b', 'c', 'd'].map((name) => `https://cdn.test/${name}.jpg`),
+      photo_urls: ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((name) => `https://cdn.test/${name}.jpg`),
     })
     await renderLoaded()
 
-    selectFiles([imageFile('e.png'), imageFile('f.png'), imageFile('g.png')])
+    selectFiles([imageFile('h.png'), imageFile('i.png')])
 
-    expect(await screen.findByText('Maximum of 5 photos (5/5)')).toBeInTheDocument()
+    expect(await screen.findByText('Maximum of 8 photos (8/8)')).toBeInTheDocument()
     expect(screen.getByLabelText('Photos')).toBeDisabled()
   })
 
@@ -707,7 +707,7 @@ describe('EditListing photos', () => {
   it('abandons the save when a photo fails to upload', async () => {
     const { user } = await renderLoaded()
     selectFiles([imageFile('two.png')])
-    await screen.findByText('Maximum of 5 photos (2/5)')
+    await screen.findByText('Maximum of 8 photos (2/8)')
     supabase
       .__bucket('listing-photos')
       .upload.mockResolvedValue({ data: null, error: { message: 'storage full' } })

@@ -636,6 +636,39 @@ describe('ListingDetail content', () => {
     expect(document.querySelector('.detail-gallery__dots')).not.toBeInTheDocument()
   })
 
+  it('keeps the desktop mosaic at five and offers Show all when there are more', async () => {
+    givenListing(
+      makeListing({
+        photo_urls: ['a', 'b', 'c', 'd', 'e', 'f'].map((name) => `https://cdn.test/${name}.jpg`),
+      }),
+    )
+    const { user } = renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(document.querySelector('.detail-gallery__scroller')).toHaveAttribute(
+      'data-photo-count',
+      '5',
+    )
+    expect(screen.getByRole('button', { name: 'Show all 6 photos' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Show all 6 photos' }))
+    const dialog = screen.getByRole('dialog', { name: 'Learn latte art with me photos' })
+    expect(within(dialog).getByRole('img')).toHaveAttribute('src', 'https://cdn.test/a.jpg')
+    expect(within(dialog).getByText('1 / 6')).toBeInTheDocument()
+  })
+
+  it('omits Show all when the mosaic already shows every photo', async () => {
+    givenListing(
+      makeListing({
+        photo_urls: ['a', 'b', 'c', 'd', 'e'].map((name) => `https://cdn.test/${name}.jpg`),
+      }),
+    )
+    renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.queryByRole('button', { name: /Show all/ })).not.toBeInTheDocument()
+  })
+
   it('opens the clicked gallery photo in the lightbox', async () => {
     givenListing(makeListing({ photo_urls: ['https://cdn.test/a.jpg', 'https://cdn.test/b.jpg'] }))
     const { user } = renderPage()

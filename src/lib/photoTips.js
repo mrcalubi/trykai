@@ -1,7 +1,8 @@
-/** Photo guidance shared by the listing forms and the Hosting dashboard banner. */
+/** The five shots an experience needs. Shared by create and edit listing. */
 export const PHOTO_TIPS = [
-  'Natural light is your best friend. A window beats any flash.',
-  'Lead with the good stuff: the latte, the bowl, the finished piece.',
-  'Hands in action beat an empty room.',
-  'Tidy the background so your skill takes centre stage.',
+  'The result — the finished latte, bowl, or piece.',
+  'You teaching — hands in, showing how.',
+  'The setup or space.',
+  'Guests doing it.',
+  'A close-up of the detail.',
 ]

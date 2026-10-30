@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CreateListing from './CreateListing'
 import RequireAuth from '../components/RequireAuth'
@@ -406,7 +406,7 @@ describe('CreateListing validation', () => {
     const { user, currentPath } = renderPage()
     await goToPhotos(user)
     selectFiles([imageFile('latte.png')])
-    await screen.findByText('Maximum of 5 photos (1/5)')
+    await screen.findByText('Maximum of 8 photos (1/8)')
     const previewSrc = document.querySelector('.ui-card__image').getAttribute('src')
     await next(user)
     await stepHeading('Price and group size')
@@ -823,7 +823,7 @@ describe('CreateListing photos', () => {
   it('tells the host the photo maximum before they pick any', async () => {
     const { user } = renderPage()
     await goToPhotos(user)
-    expect(screen.getByText('Maximum of 5 photos (0/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (0/8)')).toBeInTheDocument()
   })
 
   it('previews each selected image and marks the first as the cover', async () => {
@@ -832,7 +832,7 @@ describe('CreateListing photos', () => {
 
     selectFiles([imageFile('a.png'), imageFile('b.png')])
 
-    expect(await screen.findByText('Maximum of 5 photos (2/5)')).toBeInTheDocument()
+    expect(await screen.findByText('Maximum of 8 photos (2/8)')).toBeInTheDocument()
     expect(screen.getAllByText('Cover')).toHaveLength(1)
   })
 
@@ -842,16 +842,16 @@ describe('CreateListing photos', () => {
 
     selectFiles([new File(['x'], 'notes.txt', { type: 'text/plain' }), imageFile()])
 
-    expect(await screen.findByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
+    expect(await screen.findByText('Maximum of 8 photos (1/8)')).toBeInTheDocument()
   })
 
-  it('caps the gallery at five photos', async () => {
+  it('caps the gallery at eight photos', async () => {
     const { user } = renderPage()
     await goToPhotos(user)
 
-    selectFiles(Array.from({ length: 8 }, (_, i) => imageFile(`p${i}.png`)))
+    selectFiles(Array.from({ length: 10 }, (_, i) => imageFile(`p${i}.png`)))
 
-    expect(await screen.findByText('Maximum of 5 photos (5/5)')).toBeInTheDocument()
+    expect(await screen.findByText('Maximum of 8 photos (8/8)')).toBeInTheDocument()
     expect(screen.getByLabelText('Photos')).toBeDisabled()
   })
 
@@ -859,28 +859,38 @@ describe('CreateListing photos', () => {
     const { user } = renderPage()
     await goToPhotos(user)
 
-    expect(screen.getByText('A few tips for great photos')).toBeInTheDocument()
+    expect(screen.getByText('Five shots an experience needs')).toBeInTheDocument()
     expect(
-      screen.getByText('Natural light is your best friend. A window beats any flash.'),
+      screen.getByText('The result — the finished latte, bowl, or piece.'),
     ).toBeInTheDocument()
-    expect(
-      screen.getByText('Lead with the good stuff: the latte, the bowl, the finished piece.'),
-    ).toBeInTheDocument()
-    expect(screen.getByText('Hands in action beat an empty room.')).toBeInTheDocument()
-    expect(
-      screen.getByText('Tidy the background so your skill takes centre stage.'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('You teaching — hands in, showing how.')).toBeInTheDocument()
+    expect(screen.getByText('The setup or space.')).toBeInTheDocument()
+    expect(screen.getByText('Guests doing it.')).toBeInTheDocument()
+    expect(screen.getByText('A close-up of the detail.')).toBeInTheDocument()
+  })
+
+  it('opens the cover preview in the lightbox', async () => {
+    const { user } = renderPage()
+    await goToPhotos(user)
+    selectFiles([imageFile('a.png'), imageFile('b.png')])
+    await screen.findByText('Maximum of 8 photos (2/8)')
+
+    await user.click(screen.getAllByRole('button', { name: 'View photos' })[0])
+    const dialog = screen.getByRole('dialog', { name: 'Learn latte art with me photos' })
+    expect(within(dialog).getByText('1 / 2')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Next photo' }))
+    expect(within(dialog).getByText('2 / 2')).toBeInTheDocument()
   })
 
   it('lets a photo be removed before submitting', async () => {
     const { user } = renderPage()
     await goToPhotos(user)
     selectFiles([imageFile('a.png'), imageFile('b.png')])
-    await screen.findByText('Maximum of 5 photos (2/5)')
+    await screen.findByText('Maximum of 8 photos (2/8)')
 
     await user.click(screen.getAllByRole('button', { name: 'Remove photo' })[0])
 
-    expect(await screen.findByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
+    expect(await screen.findByText('Maximum of 8 photos (1/8)')).toBeInTheDocument()
   })
 
   it('asks before continuing with no photos, then lets the host skip', async () => {
@@ -905,7 +915,7 @@ describe('CreateListing photos', () => {
     const { user } = renderPage()
     await goToPhotos(user)
     selectFiles([imageFile('a.png'), imageFile('b.png')])
-    await screen.findByText('Maximum of 5 photos (2/5)')
+    await screen.findByText('Maximum of 8 photos (2/8)')
     expect(screen.getByText('Drag to reorder. The first photo is your cover.')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Photo 2' }))
@@ -921,7 +931,7 @@ describe('CreateListing photos', () => {
     const { user } = renderPage()
     await goToPhotos(user)
     selectFiles([imageFile('a.png')])
-    await screen.findByText('Maximum of 5 photos (1/5)')
+    await screen.findByText('Maximum of 8 photos (1/8)')
     const preview = document.querySelector('.preview-image')
     const src = preview.getAttribute('src')
     expect(src).toMatch(/^blob:/)
@@ -941,7 +951,7 @@ describe('CreateListing photos', () => {
     const { user } = renderPage()
     await goToPhotos(user)
     selectFiles([imageFile('a.png')])
-    await screen.findByText('Maximum of 5 photos (1/5)')
+    await screen.findByText('Maximum of 8 photos (1/8)')
 
     await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
     await user.click(screen.getByRole('menuitem', { name: 'Crop' }))
@@ -954,7 +964,7 @@ describe('CreateListing photos', () => {
   async function publishWithOnePhoto(user) {
     await goToPhotos(user)
     selectFiles([imageFile('a.png')])
-    await screen.findByText('Maximum of 5 photos (1/5)')
+    await screen.findByText('Maximum of 8 photos (1/8)')
     await next(user)
     await stepHeading('Price and group size')
     await completePrice(user, VALID)
