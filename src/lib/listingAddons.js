@@ -31,6 +31,9 @@ export const ADDON_HINTS = {
   sessionLimit: 'Limit per session is 1 to 99 units.',
 }
 
+export const ADDONS_NOT_SAVED_MESSAGE =
+  "Your listing is in. Your add-ons didn't save, so add them again in Edit listing."
+
 export function isMissingAddonsTable(error) {
   const code = String(error?.code ?? '')
   if (code === 'PGRST205' || code === '42P01') return true
@@ -225,6 +228,12 @@ function writePayload(addon, position, photoUrl) {
   }
 }
 
+/**
+ * Writes the editor's add-ons. Removed rows are soft-deleted first so the
+ * 3-active cap never trips mid-save. Returns the ids of rows it inserted
+ * (keyed by the editor's `key`) even on a partial failure, so a retry updates
+ * them instead of inserting duplicates.
+ */
 export async function saveListingAddons({
   client,
   listingId,
@@ -233,15 +242,15 @@ export async function saveListingAddons({
   userId,
   storage,
 }) {
+  const insertedIds = {}
   const keptIds = new Set((addons ?? []).map((addon) => addon.id).filter(Boolean))
   const toRemove = existing.filter((row) => row.id && !keptIds.has(row.id))
-
   for (const row of toRemove) {
     const { error } = await client
       .from('listing_addons')
       .update({ is_active: false })
       .eq('id', row.id)
-    if (error) return { error }
+    if (error) return { error, insertedIds }
   }
 
   for (let index = 0; index < (addons ?? []).length; index += 1) {
@@ -250,19 +259,22 @@ export async function saveListingAddons({
     try {
       photoUrl = await photoUrlFor(addon, userId, storage)
     } catch (error) {
-      return { error }
+      return { error, insertedIds }
     }
     const payload = writePayload(addon, index, photoUrl)
     if (addon.id) {
       const { error } = await client.from('listing_addons').update(payload).eq('id', addon.id)
-      if (error) return { error }
+      if (error) return { error, insertedIds }
     } else {
-      const { error } = await client
+      const { data, error } = await client
         .from('listing_addons')
         .insert({ listing_id: listingId, ...payload })
-      if (error) return { error }
+        .select('id')
+        .single()
+      if (error) return { error, insertedIds }
+      if (data?.id) insertedIds[addon.key] = data.id
     }
   }
 
-  return { error: null }
+  return { error: null, insertedIds }
 }

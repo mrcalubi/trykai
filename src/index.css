@@ -9631,10 +9631,24 @@ body:has(.edit-profile__bar) .site-footer {
   width: fit-content;
   padding: 6px 10px;
   font-size: 13px;
-  font-weight: 600;
-  color: var(--navy);
-  background: var(--sand);
+  font-weight: 700;
+  color: var(--success);
+  background: var(--success-bg);
   border-radius: 999px;
+}
+
+.addon-card__photo-hint {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.addon-card__photo-title {
+  font-weight: 700;
+  color: var(--navy);
 }
 
 .addon-card__remove {

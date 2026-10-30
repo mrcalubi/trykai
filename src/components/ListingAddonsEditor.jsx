@@ -156,9 +156,15 @@ export default function ListingAddonsEditor({ addons, onChange, fieldHints = {} 
                   </div>
                 </>
               ) : (
-                <label htmlFor={pickerId} className="addon-card__add-photo">
-                  <Icon name="plus" size={20} />
-                </label>
+                <>
+                  <label htmlFor={pickerId} className="addon-card__add-photo">
+                    <Icon name="plus" size={20} />
+                  </label>
+                  <p className="addon-card__photo-hint">
+                    <span className="addon-card__photo-title">Photo · optional</span>
+                    Show what guests get. One clear shot of the thing itself works best.
+                  </p>
+                </>
               )}
             </div>
 

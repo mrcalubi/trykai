@@ -320,7 +320,7 @@ export default function EditListing() {
     }
 
     if (addonsAvailable && addonsLoaded) {
-      const { error: addonError } = await saveListingAddons({
+      const { error: addonError, insertedIds } = await saveListingAddons({
         client: supabase,
         listingId: id,
         addons,
@@ -329,6 +329,14 @@ export default function EditListing() {
         storage: supabase.storage,
       })
       if (addonError && !isMissingAddonsTable(addonError)) {
+        // Keep what did save, so pressing Save again updates instead of duplicating.
+        setAddons((prev) =>
+          prev.map((addon) =>
+            insertedIds?.[addon.key] ? { ...addon, id: insertedIds[addon.key] } : addon,
+          ),
+        )
+        const fresh = await loadListingAddons(supabase, id)
+        if (fresh.loaded) setSavedAddons(fresh.addons)
         setLoading(false)
         showSaveProblem(addonError)
         return

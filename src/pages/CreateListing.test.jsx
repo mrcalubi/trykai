@@ -1258,6 +1258,25 @@ describe('CreateListing add-ons', () => {
     })
   })
 
+  it('still finishes, once, when the listing saves but an add-on fails', async () => {
+    supabase.__on('listing_addons', 'insert', {
+      data: null,
+      error: { code: '23514', message: 'A listing can have at most 3 add-ons.' },
+    })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { user, currentPath } = renderPage()
+    await fillPriceWithAddon(user)
+    await completeLocation(user, VALID)
+    await stepHeading('Final touches')
+    await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(currentPath()).toBe('/hosting'))
+    expect(supabase.__calls('listings', 'insert')).toHaveLength(1)
+    expect(log).toHaveBeenCalledWith('CreateListing: add-ons did not save', expect.anything())
+    log.mockRestore()
+  })
+
   it('keeps add-ons in the create-listing draft', async () => {
     const { user } = renderPage()
     await fillPriceWithAddon(user)

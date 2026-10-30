@@ -884,6 +884,39 @@ describe('EditListing add-ons', () => {
     })
   })
 
+  it('does not insert an add-on twice when a save fails part way and is retried', async () => {
+    givenAddons([])
+    let inserts = 0
+    supabase.__on('listing_addons', 'insert', () => {
+      inserts += 1
+      if (inserts === 2) return { data: null, error: { code: '23514', message: 'boom' } }
+      return { data: { id: `addon-new-${inserts}` }, error: null }
+    })
+    const { user } = await renderLoaded()
+    await screen.findByRole('heading', { name: 'Add-ons · optional' })
+    const addonCards = () => document.querySelectorAll('.addon-card')
+    await user.click(screen.getByRole('button', { name: '+ Add an add-on' }))
+    await user.type(within(addonCards()[0]).getByLabelText('Name'), 'Kit')
+    await user.type(within(addonCards()[0]).getByLabelText('You get in Singapore dollars'), '10')
+    await user.click(screen.getByRole('button', { name: '+ Add an add-on' }))
+    await user.type(within(addonCards()[1]).getByLabelText('Name'), 'Wrap')
+    await user.type(within(addonCards()[1]).getByLabelText('You get in Singapore dollars'), '5')
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(inserts).toBe(2))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled())
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(inserts).toBe(3))
+    const names = supabase.__calls('listing_addons', 'insert').map((call) => call.payload.name)
+    expect(names).toEqual(['Kit', 'Wrap', 'Wrap'])
+    expect(
+      supabase
+        .__calls('listing_addons', 'update')
+        .some((call) => call.payload.name === 'Kit' && call.filters.some((f) => f.value === 'addon-new-1')),
+    ).toBe(true)
+  })
+
   it('treats an add-on edit as unsaved', async () => {
     givenAddons([kit])
     const { user } = await renderLoaded({

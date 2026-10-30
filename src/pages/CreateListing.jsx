@@ -45,6 +45,7 @@ import {
   writeDraft,
 } from '../lib/listingDraft'
 import {
+  ADDONS_NOT_SAVED_MESSAGE,
   addonFieldHints,
   isMissingAddonsTable,
   probeListingAddonsTable,
@@ -366,6 +367,9 @@ export default function CreateListing() {
       return
     }
 
+    // The listing exists now. An add-on failure must not keep the host here,
+    // or pressing Publish again would create a second listing.
+    let addonsFailed = false
     if (addonsAvailable && addons.length > 0 && created?.id) {
       const { error: addonError } = await saveListingAddons({
         client: supabase,
@@ -376,10 +380,8 @@ export default function CreateListing() {
         storage: supabase.storage,
       })
       if (addonError && !isMissingAddonsTable(addonError)) {
-        setLoading(false)
-        setError(listingSaveProblem(addonError).message)
-        goTo(STEPS.findIndex((item) => item.id === 'price'))
-        return
+        console.error('CreateListing: add-ons did not save', addonError)
+        addonsFailed = true
       }
     }
 
@@ -398,7 +400,10 @@ export default function CreateListing() {
     clearDraft(userId)
     photosRef.current.forEach(revokePhotoUrls)
     void notifyListingSubmitted()
-    navigate('/hosting', { replace: true })
+    navigate('/hosting', {
+      replace: true,
+      state: addonsFailed ? { message: ADDONS_NOT_SAVED_MESSAGE } : undefined,
+    })
   }
 
   if (!verificationChecked) {
