@@ -477,6 +477,7 @@ src/
 │   ├── sessionDate.js           # Session day/time; year only when it is not this year
 │   ├── sessionCalendar.js       # Singapore month grid for listing and host calendars
 │   ├── sessionBatch.js          # Bulk-create dates, date → times map, 80-day window, clash preview, 40 cap
+│   ├── sessionFormDraft.js      # Add sessions draft + open form, per tab (sessionStorage), 12h
 │   ├── listingSpots.js          # Listing spots copy, capacity floor, session_has_bookings
 │   ├── listingCategories.js     # Shared host/browse category list + area line
 │   ├── reportMailto.js          # Report links to hello@trykai.sg

@@ -18,4 +18,6 @@ afterEach(() => {
   cleanup()
   vi.useRealTimers()
   clearBrowseCache()
+  // Per-tab drafts (e.g. Add sessions) must not leak from one test into the next.
+  window.sessionStorage.clear()
 })

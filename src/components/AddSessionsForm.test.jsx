@@ -261,3 +261,43 @@ describe('AddSessionsForm per-date times', () => {
     expect(within(dateRow(second)).getByLabelText('Time')).toHaveValue('15:00')
   })
 })
+
+describe('AddSessionsForm keeps its draft', () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = vi.fn()
+  })
+
+  afterEach(() => {
+    delete HTMLElement.prototype.scrollIntoView
+  })
+
+  it('comes back with the same dates and per-date times after leaving', async () => {
+    const first = dateKeyFromToday(1)
+    const second = dateKeyFromToday(2)
+    const { user, unmount } = renderForm()
+    await selectCalendarDate(user, first)
+    await selectCalendarDate(user, second)
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '10:00' } })
+    await user.click(screen.getByRole('checkbox', { name: /Set times per date/ }))
+    fireEvent.change(within(dateRow(second)).getByLabelText('Time'), { target: { value: '14:15' } })
+
+    unmount()
+    renderForm()
+
+    expect(screen.getByRole('checkbox', { name: /Set times per date/ })).toBeChecked()
+    expect(within(dateRow(first)).getByLabelText('Time')).toHaveValue('10:00')
+    expect(within(dateRow(second)).getByLabelText('Time')).toHaveValue('14:15')
+  })
+
+  it('starts empty for a different listing', async () => {
+    const { user, unmount } = renderForm()
+    await selectCalendarDate(user, dateKeyFromToday(1))
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '10:00' } })
+    unmount()
+
+    renderForm({ listing: { ...listing, id: 'listing-2' } })
+
+    expect(screen.getByLabelText('Time')).toHaveValue('')
+    expect(screen.queryAllByRole('button', { pressed: true })).toHaveLength(0)
+  })
+})

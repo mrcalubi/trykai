@@ -4,6 +4,11 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import AddSessionsForm from '../components/AddSessionsForm'
+import {
+  clearSessionDraft,
+  readOpenSessionForm,
+  writeOpenSessionForm,
+} from '../lib/sessionFormDraft'
 import { hostBannerLine, hostInterestById, keenNotifiedLine, listingsWithOpenUpcoming } from '../lib/keen'
 import { heldByTitleMap, heldSessionLine, isHeld, sharedBatchLine } from '../lib/sharedAvailability'
 import Button from '../components/ui/Button'
@@ -87,7 +92,9 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   const [bookingStatusMessage, setBookingStatusMessage] = useState('')
   const [interestByListing, setInterestByListing] = useState({})
 
-  const [activeFormId, setActiveFormId] = useState(null)
+  // Reopens Add sessions after the host steps away (e.g. to change spots).
+  const [activeFormId, setActiveFormId] = useState(() => readOpenSessionForm())
+  const restoredFormId = useRef(activeFormId)
   const [selectedEmptyIds, setSelectedEmptyIds] = useState(() => new Set())
   const [expandedEmptyListingIds, setExpandedEmptyListingIds] = useState(() => new Set())
   const [confirmBulkDeleteListingId, setConfirmBulkDeleteListingId] = useState(null)
@@ -352,12 +359,31 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
     }
   }, [loading, connectStatus, setSearchParams, notifyWaitingGuests])
 
+  // Coming back to a restored form: bring that listing's card into view once.
+  useEffect(() => {
+    const listingId = restoredFormId.current
+    if (loading || !listingId) return
+    restoredFormId.current = null
+    if (!listings.some((listing) => listing.id === listingId)) {
+      writeOpenSessionForm(null)
+      setActiveFormId(null)
+      return
+    }
+    document
+      .getElementById(`hosting-listing-${listingId}`)
+      ?.scrollIntoView?.({ block: 'start' })
+  }, [loading, listings])
+
   function openSessionForm(listingId) {
     setActiveFormId(listingId)
+    writeOpenSessionForm(listingId)
   }
 
+  /** Cancel, a successful create, or deleting the listing: the draft is done with. */
   function closeSessionForm() {
+    if (activeFormId) clearSessionDraft(activeFormId)
     setActiveFormId(null)
+    writeOpenSessionForm(null)
   }
 
   async function handleCreateSessions(
