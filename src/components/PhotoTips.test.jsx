@@ -3,19 +3,16 @@ import { describe, expect, it } from 'vitest'
 import PhotoTips from './PhotoTips'
 
 describe('PhotoTips', () => {
-  it('lists the four agreed tips', () => {
+  it('lists the five shots an experience needs', () => {
     render(<PhotoTips />)
 
-    expect(screen.getByText('A few tips for great photos')).toBeInTheDocument()
+    expect(screen.getByText('Five shots an experience needs')).toBeInTheDocument()
     expect(
-      screen.getByText('Natural light is your best friend. A window beats any flash.'),
+      screen.getByText('The result — the finished latte, bowl, or piece.'),
     ).toBeInTheDocument()
-    expect(
-      screen.getByText('Lead with the good stuff: the latte, the bowl, the finished piece.'),
-    ).toBeInTheDocument()
-    expect(screen.getByText('Hands in action beat an empty room.')).toBeInTheDocument()
-    expect(
-      screen.getByText('Tidy the background so your skill takes centre stage.'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('You teaching — hands in, showing how.')).toBeInTheDocument()
+    expect(screen.getByText('The setup or space.')).toBeInTheDocument()
+    expect(screen.getByText('Guests doing it.')).toBeInTheDocument()
+    expect(screen.getByText('A close-up of the detail.')).toBeInTheDocument()
   })
 })

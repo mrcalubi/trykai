@@ -1,6 +1,10 @@
 import { compressImage } from './compressImage'
 import { HEIC_READ_ERROR, isHeicFile, isHeicReadError, isImageFile } from './heicImage'
 
+/** Hosts can add this many listing photos. The desktop mosaic still shows cover + 4. */
+export const MAX_PHOTOS = 8
+export const MOSAIC_VISIBLE_PHOTOS = 5
+
 function newId() {
   return crypto.randomUUID?.() ?? `photo-${Date.now()}-${Math.random()}`
 }

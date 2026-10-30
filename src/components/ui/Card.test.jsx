@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import Card from './Card'
 import Button from './Button'
 
@@ -27,6 +28,22 @@ describe('Card', () => {
     expect(screen.getByText('Sat, 30 Aug at 2:00 pm')).toBeInTheDocument()
     expect(screen.getByText('$20/person')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Book' })).toBeInTheDocument()
+  })
+
+  it('turns the image into a View photos control when asked', async () => {
+    const user = userEvent.setup()
+    const onImageClick = vi.fn()
+    render(
+      <Card
+        mode="browse"
+        title="Pottery hour"
+        image="https://cdn.test/pottery.jpg"
+        onImageClick={onImageClick}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'View photos' }))
+    expect(onImageClick).toHaveBeenCalledTimes(1)
   })
 
   it('renders the image when a source is provided', () => {

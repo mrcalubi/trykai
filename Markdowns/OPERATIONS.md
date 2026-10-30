@@ -1180,7 +1180,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 
 ## Listings
 - [ ] Creation flow complete: title, description, category, price, area, photos, what's provided
-- [ ] Photo upload working, up to 5
+- [ ] Photo upload working, up to 8
 - [ ] Listing appears on browse after creation
 - [ ] Category pills working
 - [ ] Area dropdown working

@@ -7,7 +7,7 @@ export default function PhotoTips() {
     <aside className="photo-tips" aria-label="Photo tips">
       <p className="photo-tips__title">
         <Icon name="sparkle" size={18} />
-        A few tips for great photos
+        Five shots an experience needs
       </p>
       <ul className="photo-tips__list">
         {PHOTO_TIPS.map((tip) => (

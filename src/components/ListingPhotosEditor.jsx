@@ -32,9 +32,9 @@ import {
   revokePhotoUrls,
 } from '../lib/coverCrop'
 import { HEIC_READ_ERROR, IMAGE_ACCEPT, isHeicFile, isHeicReadError } from '../lib/heicImage'
-import { filesToPhotos, movePhoto, snapshotImageFiles } from '../lib/listingPhotos'
+import { MAX_PHOTOS, filesToPhotos, movePhoto, snapshotImageFiles } from '../lib/listingPhotos'
+import PhotoLightbox from './PhotoLightbox'
 
-const MAX_PHOTOS = 5
 const NOT_PHOTOS_HINT = 'Those are not photos. Choose images instead.'
 
 function photoLabel(index, isCover) {
@@ -52,6 +52,7 @@ function PhotoTile({
   menuOpen,
   onOpenMenu,
   onCloseMenu,
+  onView,
   onCrop,
   onMakeCover,
   onUndoCrop,
@@ -128,6 +129,9 @@ function PhotoTile({
             data-photo-menu={photo.id}
             aria-label={photoLabel(index, isCover)}
           >
+            <button type="button" role="menuitem" onClick={onView}>
+              View
+            </button>
             <button type="button" role="menuitem" onClick={onCrop}>
               Crop
             </button>
@@ -170,6 +174,7 @@ export default function ListingPhotosEditor({
   const [activeId, setActiveId] = useState(null)
   const [dragOver, setDragOver] = useState(false)
   const [dropHint, setDropHint] = useState(null)
+  const [viewingIndex, setViewingIndex] = useState(null)
 
   const atCap = photos.length >= max
   const activePhoto = photos.find((photo) => photo.id === activeId)
@@ -417,6 +422,10 @@ export default function ListingPhotosEditor({
                     menuOpen={menuId === photo.id}
                     onOpenMenu={() => setMenuId(photo.id)}
                     onCloseMenu={() => setMenuId(null)}
+                    onView={() => {
+                      setMenuId(null)
+                      setViewingIndex(index)
+                    }}
                     onCrop={() => startCrop(photo)}
                     onMakeCover={() => {
                       setMenuId(null)
@@ -439,6 +448,16 @@ export default function ListingPhotosEditor({
             </DragOverlay>
           </DndContext>
         </>
+      ) : null}
+
+      {viewingIndex !== null && photos.length ? (
+        <PhotoLightbox
+          photos={photos.map((photo) => photo.previewUrl)}
+          title="Listing photos"
+          label="Listing photos"
+          startIndex={viewingIndex}
+          onClose={() => setViewingIndex(null)}
+        />
       ) : null}
 
       {croppingPhoto ? (

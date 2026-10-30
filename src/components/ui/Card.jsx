@@ -45,6 +45,7 @@ export default function Card({
   flag,
   to,
   footer,
+  onImageClick,
   className = '',
   children,
   ...props
@@ -146,12 +147,28 @@ export default function Card({
             <span className="ui-card__badge">{badge}</span>
           ) : null}
           {image ? (
-            <img
-              src={image}
-              alt={imageAlt}
-              className="ui-card__image"
-              loading={isBrowse ? 'lazy' : undefined}
-            />
+            onImageClick ? (
+              <button
+                type="button"
+                className="ui-card__image-btn"
+                onClick={onImageClick}
+                aria-label="View photos"
+              >
+                <img
+                  src={image}
+                  alt={imageAlt}
+                  className="ui-card__image"
+                  loading={isBrowse ? 'lazy' : undefined}
+                />
+              </button>
+            ) : (
+              <img
+                src={image}
+                alt={imageAlt}
+                className="ui-card__image"
+                loading={isBrowse ? 'lazy' : undefined}
+              />
+            )
           ) : (
             placeholder
           )}

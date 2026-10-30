@@ -48,6 +48,7 @@ import Icon from '../components/ui/Icon'
 import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
 import { usePageTitle } from '../lib/pageTitle'
+import { MOSAIC_VISIBLE_PHOTOS } from '../lib/listingPhotos'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -957,7 +958,7 @@ export default function ListingDetail() {
         <div className="detail-gallery">
           <div
             className="detail-gallery__scroller"
-            data-photo-count={Math.min(photos.length, 5)}
+            data-photo-count={Math.min(photos.length, MOSAIC_VISIBLE_PHOTOS)}
             onScroll={trackGalleryPosition}
           >
             {photos.map((url, i) => (
@@ -972,6 +973,15 @@ export default function ListingDetail() {
               </button>
             ))}
           </div>
+          {photos.length > MOSAIC_VISIBLE_PHOTOS ? (
+            <button
+              type="button"
+              className="detail-gallery__show-all"
+              onClick={() => setLightboxIndex(0)}
+            >
+              Show all {photos.length} photos
+            </button>
+          ) : null}
           {photos.length > 1 && (
             <>
               <div className="detail-gallery__dots" aria-hidden="true">

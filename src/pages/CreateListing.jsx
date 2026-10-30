@@ -7,8 +7,9 @@ import PostalAddressFields from '../components/PostalAddressFields'
 import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
+import PhotoLightbox from '../components/PhotoLightbox'
 import { revokePhotoUrls } from '../lib/coverCrop'
-import { uploadListingPhotos } from '../lib/listingPhotos'
+import { MAX_PHOTOS, uploadListingPhotos } from '../lib/listingPhotos'
 import PageLoader from '../components/PageLoader'
 import WaitingState from '../components/WaitingState'
 import ListingPricePanel from '../components/ListingPricePanel'
@@ -44,7 +45,6 @@ import {
 } from '../lib/listingDraft'
 import { notifyListingSubmitted } from '../lib/listingReview'
 
-const MAX_PHOTOS = 5
 const DRAFT_RESTORED = 'Draft restored. Photos are not kept in drafts, so add them again.'
 const MIN_GUESTS = 1
 const MAX_GUESTS = 50
@@ -79,6 +79,7 @@ export default function CreateListing() {
   const [whatToBring, setWhatToBring] = useState(start.whatToBring)
   const [photos, setPhotos] = useState([])
   const photosRef = useRef(photos)
+  const [previewLightbox, setPreviewLightbox] = useState(false)
   const [groupPricing, setGroupPricing] = useState(start.groupPricing)
   const [acceptedHostTerms, setAcceptedHostTerms] = useState(false)
   const [isFoundingHost, setIsFoundingHost] = useState(null)
@@ -385,6 +386,7 @@ export default function CreateListing() {
       metaItems={[area || 'Your area']}
       price={priceCents ? `${formatGuestFacingPrice(priceCents)}/person` : '$—/person'}
       flag="New"
+      onImageClick={photos.length ? () => setPreviewLightbox(true) : undefined}
     />
   )
 
@@ -775,6 +777,15 @@ export default function CreateListing() {
       ) : null}
 
       {hostTermsOpen ? <HostTermsDialog onClose={() => setHostTermsOpen(false)} /> : null}
+
+      {previewLightbox && photos.length ? (
+        <PhotoLightbox
+          photos={photos.map((photo) => photo.previewUrl)}
+          title={title.trim() || 'Your listing title'}
+          startIndex={0}
+          onClose={() => setPreviewLightbox(false)}
+        />
+      ) : null}
     </div>
   )
 }
