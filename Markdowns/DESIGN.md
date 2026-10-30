@@ -118,7 +118,7 @@ Fonts load from Google Fonts via `<link>` with `preconnect` in `index.html`, not
 ## 7. Photography
 
 - **Real, but as good as the host can make it:** natural light, no clutter, accurate to the session. No professional staging.
-- **Guidance at creation time:** create and edit show a panel titled "A few tips for great photos": natural light by a window, lead with the finished thing, hands in action, tidy background. Continue with 0 photos asks before skipping. Cover crop matches the browse card (4/3). No invented conversion stats.
+- **Guidance at creation time:** create and edit show a panel titled "Five shots an experience needs": the result, you teaching, the setup or space, guests doing it, a close-up of the detail. Up to 8 photos (`MAX_PHOTOS`); View in each tile's menu and tapping the preview cover open the lightbox. Continue with 0 photos asks before skipping. Cover crop matches the browse card (4/3). No invented conversion stats.
 - **No photo:** category tint tile with the category's line icon (section 2).
 
 ---
