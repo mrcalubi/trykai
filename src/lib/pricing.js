@@ -7,6 +7,7 @@
  */
 
 import {
+  addonGuestUnitCents,
   calculateGuestCharge,
   discountedLessonCents,
   discountedPerPersonCents,
@@ -24,6 +25,7 @@ import {
 import { formatCents } from './cancellationPolicy'
 
 export {
+  addonGuestUnitCents,
   discountedLessonCents,
   discountedPerPersonCents,
   groupDiscountRate,

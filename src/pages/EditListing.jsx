@@ -9,6 +9,7 @@ import ListingPhotosEditor from '../components/ListingPhotosEditor'
 import { revokePhotoUrls } from '../lib/coverCrop'
 import { MAX_PHOTOS, photosFromUrls, uploadListingPhotos } from '../lib/listingPhotos'
 import ListingPricePanel from '../components/ListingPricePanel'
+import ListingAddonsEditor from '../components/ListingAddonsEditor'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
 import WhatToBringFields from '../components/WhatToBringFields'
 import FieldHint from '../components/FieldHint'
@@ -28,6 +29,12 @@ import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { LISTING_CATEGORIES } from '../lib/listingCategories'
 import { notifyListingSubmitted } from '../lib/listingReview'
 import { listingEditorDraft } from '../lib/unsavedDraft'
+import {
+  addonFieldHints,
+  isMissingAddonsTable,
+  loadListingAddons,
+  saveListingAddons,
+} from '../lib/listingAddons'
 import { useUnsavedChangesGuard } from '../lib/useUnsavedChangesGuard'
 import ListingDeleteDialog from '../components/ListingDeleteDialog'
 import {
@@ -77,6 +84,10 @@ export default function EditListing() {
   const [whatsProvided, setWhatsProvided] = useState([])
   const [whatToBring, setWhatToBring] = useState([])
   const [photos, setPhotos] = useState([])
+  const [addons, setAddons] = useState([])
+  const [savedAddons, setSavedAddons] = useState([])
+  const [addonsAvailable, setAddonsAvailable] = useState(false)
+  const [addonsLoaded, setAddonsLoaded] = useState(false)
   const photosRef = useRef(photos)
   const photoPickerRef = useRef(null)
   const [isFoundingHost, setIsFoundingHost] = useState(null)
@@ -170,6 +181,11 @@ export default function EditListing() {
       const nextProvided = data.whats_provided?.length ? data.whats_provided : []
       const nextBring = data.what_to_bring?.length ? data.what_to_bring : []
       const nextPhotos = photosFromUrls(data.photo_urls)
+      const addonResult = await loadListingAddons(supabase, id)
+      const nextAddons = addonResult.addons
+      setAddonsAvailable(addonResult.available)
+      setAddonsLoaded(addonResult.loaded)
+      setSavedAddons(nextAddons)
       setTitle(nextTitle)
       setDescription(nextDescription)
       setCategory(nextCategory)
@@ -182,6 +198,7 @@ export default function EditListing() {
       setWhatsProvided(nextProvided)
       setWhatToBring(nextBring)
       setPhotos(nextPhotos)
+      setAddons(nextAddons)
       setSavedDraft(
         listingEditorDraft({
           title: nextTitle,
@@ -196,6 +213,7 @@ export default function EditListing() {
           whatsProvided: nextProvided,
           whatToBring: nextBring,
           photos: nextPhotos,
+          addons: nextAddons,
         }),
       )
       setFetching(false)
@@ -221,6 +239,7 @@ export default function EditListing() {
     if (Number.isNaN(duration) || duration < 1) hints.duration = LISTING_FIELD_HINTS.duration
     if (!area) hints.area = LISTING_FIELD_HINTS.area
     if (!fullAddress.trim()) hints.fullAddress = LISTING_FIELD_HINTS.fullAddress
+    if (addonsAvailable) Object.assign(hints, addonFieldHints(addons))
     return hints
   }
 
@@ -300,6 +319,22 @@ export default function EditListing() {
       return
     }
 
+    if (addonsAvailable && addonsLoaded) {
+      const { error: addonError } = await saveListingAddons({
+        client: supabase,
+        listingId: id,
+        addons,
+        existing: savedAddons,
+        userId,
+        storage: supabase.storage,
+      })
+      if (addonError && !isMissingAddonsTable(addonError)) {
+        setLoading(false)
+        showSaveProblem(addonError)
+        return
+      }
+    }
+
     // Stay "saving" so the unsaved-changes guard does not fire on this leave.
     // Only does anything when this edit put the listing back in the queue.
     photosRef.current.forEach(revokePhotoUrls)
@@ -359,6 +394,7 @@ export default function EditListing() {
     whatsProvided,
     whatToBring,
     photos,
+    addons,
   })
   const isDirty =
     !fetching && !loading && !leaving && savedDraft != null && currentDraft !== savedDraft
@@ -490,6 +526,10 @@ export default function EditListing() {
             price per person.
           </span>
           {discountExample ? <p className="hint group-discount-example">{discountExample}</p> : null}
+
+          {addonsAvailable ? (
+            <ListingAddonsEditor addons={addons} onChange={setAddons} fieldHints={fieldHints} />
+          ) : null}
 
           <h2 className="form-section__title">Location</h2>
           <PostalAddressFields

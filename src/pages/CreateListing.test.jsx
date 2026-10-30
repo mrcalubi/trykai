@@ -988,7 +988,14 @@ describe('CreateListing photos', () => {
       if (table !== 'listings') return entry
       return {
         ...entry,
-        insert: () => ({ then: () => new Promise(() => {}) }),
+        insert: () => {
+          const hanging = {
+            select: () => hanging,
+            single: () => hanging,
+            then: () => new Promise(() => {}),
+          }
+          return hanging
+        },
       }
     })
     try {
@@ -1210,5 +1217,73 @@ describe('CreateListing drafts', () => {
     await waitFor(() =>
       expect(window.localStorage.getItem('trykai:listing-draft:host-9')).toBeNull()
     )
+  })
+})
+
+describe('CreateListing add-ons', () => {
+  beforeEach(() => {
+    givenSignedIn('host-9')
+    givenVerification('approved')
+    supabase.__on('listings', 'insert', { data: { id: 'listing-new' }, error: null })
+  })
+
+  async function fillPriceWithAddon(user, { price = '45', addonPrice = '15' } = {}) {
+    await goToPrice(user)
+    await user.type(screen.getByLabelText('Your price per guest'), price)
+    await user.click(screen.getByRole('radio', { name: '1.5 hr' }))
+    await screen.findByRole('heading', { name: 'Add-ons · optional' })
+    await user.click(screen.getByRole('button', { name: 'Take-home kit' }))
+    await user.type(screen.getByLabelText('You get in Singapore dollars'), addonPrice)
+    await next(user)
+  }
+
+  it('inserts add-ons after the listing and its photos are saved', async () => {
+    const { user } = renderPage()
+    await fillPriceWithAddon(user)
+    await completeLocation(user, VALID)
+    await stepHeading('Final touches')
+    await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(supabase.__calls('listing_addons', 'insert')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'insert').payload).toMatchObject({
+      title: 'Learn latte art with me',
+    })
+    expect(supabase.__lastCall('listing_addons', 'insert').payload).toMatchObject({
+      listing_id: 'listing-new',
+      name: 'Take-home kit',
+      price_cents: 1500,
+      unit: 'person',
+      position: 0,
+    })
+  })
+
+  it('keeps add-ons in the create-listing draft', async () => {
+    const { user } = renderPage()
+    await fillPriceWithAddon(user)
+    await user.click(screen.getByRole('button', { name: 'Save draft' }))
+
+    const saved = JSON.parse(window.localStorage.getItem('trykai:listing-draft:host-9'))
+    expect(saved.addons).toEqual([
+      expect.objectContaining({ name: 'Take-home kit', price: '15', unit: 'person' }),
+    ])
+  })
+
+  it('hides add-ons when the table is missing and still saves the listing', async () => {
+    supabase.__on('listing_addons', 'select', {
+      data: null,
+      error: { code: 'PGRST205', message: "Could not find the table 'public.listing_addons'" },
+    })
+    const { user } = renderPage()
+    await goToPrice(user)
+    expect(screen.queryByRole('heading', { name: 'Add-ons · optional' })).not.toBeInTheDocument()
+    await completePrice(user, VALID)
+    await completeLocation(user, VALID)
+    await stepHeading('Final touches')
+    await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'insert')).toHaveLength(1))
+    expect(supabase.__calls('listing_addons', 'insert')).toHaveLength(0)
   })
 })

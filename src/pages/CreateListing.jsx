@@ -13,6 +13,7 @@ import { MAX_PHOTOS, uploadListingPhotos } from '../lib/listingPhotos'
 import PageLoader from '../components/PageLoader'
 import WaitingState from '../components/WaitingState'
 import ListingPricePanel from '../components/ListingPricePanel'
+import ListingAddonsEditor from '../components/ListingAddonsEditor'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
 import WhatToBringFields from '../components/WhatToBringFields'
 import FieldHint from '../components/FieldHint'
@@ -43,6 +44,12 @@ import {
   readDraft,
   writeDraft,
 } from '../lib/listingDraft'
+import {
+  addonFieldHints,
+  isMissingAddonsTable,
+  probeListingAddonsTable,
+  saveListingAddons,
+} from '../lib/listingAddons'
 import { notifyListingSubmitted } from '../lib/listingReview'
 
 const DRAFT_RESTORED = 'Draft restored. Photos are not kept in drafts, so add them again.'
@@ -81,6 +88,8 @@ export default function CreateListing() {
   const photosRef = useRef(photos)
   const [previewLightbox, setPreviewLightbox] = useState(false)
   const [groupPricing, setGroupPricing] = useState(start.groupPricing)
+  const [addons, setAddons] = useState(start.addons)
+  const [addonsAvailable, setAddonsAvailable] = useState(false)
   const [acceptedHostTerms, setAcceptedHostTerms] = useState(false)
   const [isFoundingHost, setIsFoundingHost] = useState(null)
   const [fieldHints, setFieldHints] = useState({})
@@ -132,6 +141,7 @@ export default function CreateListing() {
 
       const founding = await supabase.rpc('my_is_founding_host')
       setIsFoundingHost(foundingHostFromRpc(founding.data, founding.error))
+      setAddonsAvailable(await probeListingAddonsTable(supabase))
     }
 
     checkVerification()
@@ -162,6 +172,7 @@ export default function CreateListing() {
     setFullAddress(values.fullAddress)
     setWhatsProvided(values.whatsProvided)
     setWhatToBring(values.whatToBring)
+    setAddons(values.addons)
     setDraftNote(DRAFT_RESTORED)
   }
 
@@ -199,6 +210,7 @@ export default function CreateListing() {
       fullAddress,
       whatsProvided,
       whatToBring,
+      addons,
       ...pendingDraft.current,
     }
     if (isBlankDraft(values)) {
@@ -233,6 +245,7 @@ export default function CreateListing() {
       if (durationChoice == null || !Number.isInteger(durationMins) || durationMins < 1) {
         hints.duration = LISTING_FIELD_HINTS.duration
       }
+      if (addonsAvailable) Object.assign(hints, addonFieldHints(addons))
     }
     if (stepId === 'location') {
       if (!area) hints.area = LISTING_FIELD_HINTS.area
@@ -325,13 +338,21 @@ export default function CreateListing() {
       photo_urls: photoUrls,
       is_active: true,
     }
-    let { error: listingError } = await supabase.from('listings').insert(listingPayload)
+    let { data: created, error: listingError } = await supabase
+      .from('listings')
+      .insert(listingPayload)
+      .select('id')
+      .single()
     if (listingError && /duration_mins|group_pricing|what_to_bring/.test(listingError.message ?? '')) {
       const retry = { ...listingPayload }
       if (/duration_mins/.test(listingError.message ?? '')) delete retry.duration_mins
       if (/group_pricing/.test(listingError.message ?? '')) delete retry.group_pricing
       if (/what_to_bring/.test(listingError.message ?? '')) delete retry.what_to_bring
-      ;({ error: listingError } = await supabase.from('listings').insert(retry))
+      ;({ data: created, error: listingError } = await supabase
+        .from('listings')
+        .insert(retry)
+        .select('id')
+        .single())
     }
 
     if (listingError) {
@@ -343,6 +364,23 @@ export default function CreateListing() {
       }
       setError(problem.message)
       return
+    }
+
+    if (addonsAvailable && addons.length > 0 && created?.id) {
+      const { error: addonError } = await saveListingAddons({
+        client: supabase,
+        listingId: created.id,
+        addons,
+        existing: [],
+        userId,
+        storage: supabase.storage,
+      })
+      if (addonError && !isMissingAddonsTable(addonError)) {
+        setLoading(false)
+        setError(listingSaveProblem(addonError).message)
+        goTo(STEPS.findIndex((item) => item.id === 'price'))
+        return
+      }
     }
 
     const { error: hostError } = await supabase
@@ -592,6 +630,10 @@ export default function CreateListing() {
             </span>
           </label>
           {discountExample ? <p className="hint group-discount-example">{discountExample}</p> : null}
+
+          {addonsAvailable ? (
+            <ListingAddonsEditor addons={addons} onChange={setAddons} fieldHints={fieldHints} />
+          ) : null}
         </>
       )
     }

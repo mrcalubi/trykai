@@ -127,7 +127,7 @@ There is no series object. Recurring is bulk-create: the host picks dates on a c
 
 **Automatic platform tiers, host can turn them off per listing.** Guests pick 1 to N people on one booking, N = min(spots remaining, 10). The lesson price per person is discounted 5% for 2, 10% for 3, 15% for 4, and 20% for 5 or more. Never more than 20%. Hosts keep group pricing on by default (`listings.group_pricing`) and can switch it off on Create and Edit listing. They do not set their own tiers.
 
-The lesson total is the discounted per-person price times guests, in integer cents. The card fee (12%, S$2.50 floor, round up) applies once to that total. PayNow is 5% off that card total. The host fee is 10% of the discounted lesson. A group booking is one booking toward a host's first three free.
+The lesson total is the discounted per-person price times guests, in integer cents. The card fee (12%, S$2.50 floor, round up) applies once to that total. PayNow uses the sliding rate off that card total (30 October). The host fee is 10% of the discounted lesson. A group booking is one booking toward a host's first three free. Group discounts never apply to add-ons.
 
 Cancellation is the whole booking only, same four refund tiers. Removing one guest from a paid group booking is the first post-launch money item.
 
@@ -150,6 +150,19 @@ The original spec conflated two different things. They are now separated.
 | S$20 | up to S$10 each |
 | S$25 | up to S$5 each |
 | S$30+ | a paid Date Mode upgrade stops making sense |
+
+### Add-ons (paid extras)
+*Decided 30 October 2026.* Hosts can attach up to three optional extras to a listing (nicer materials, a take-home kit, a birthday surprise). Guests pick them at checkout in a later PR; this decision covers the whole feature.
+
+The host sets the price they get, in whole dollars, S$1–S$500. Guests pay that plus the 12% booking fee, rounded up to the whole dollar per unit, with no S$2.50 floor (the booking already carries it). Host S$15 → guest S$17; S$8 → S$9. There is never a host fee on add-ons, for any host; the 10% host fee stays on the lesson only. Group discounts never apply to add-ons. The PayNow saving applies to the whole total, add-ons included, at the sliding rate for that total.
+
+Unit is per person (0 up to the number of guests) or per booking (0 or 1). Optional limit per session: 1–99 units across all bookings of that session. Each add-on has a name (≤60), an optional short description (≤140) and an optional photo.
+
+Add-ons are never pre-selected. The CCS Courts case (December 2025) and CCCS guidance on pre-ticked boxes make a default-on extra a consumer-protection problem; add-ons only ever add to the price.
+
+The listing page will show them below "What you'll do" as "Add a little extra", with a quiet "+$17 per person". Browse cards and the listing price card show the base price only. Bookings keep a snapshot of what was paid (name, unit, quantity, host unit price, guest unit price). Editing or removing an add-on only affects new bookings; removing is a soft delete. Guest cancellation tiers apply to add-ons exactly like the lesson. A host cancel refunds everything.
+
+No separate admin review: like edits to an approved listing, add-ons go live straight away. Admin listing review shows them so changes can be requested.
 
 ### Small businesses on the platform
 *Decided 16 August 2026.*
@@ -698,6 +711,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 **2026-10-30 — PayNow saving slides with the basket.** PayNow is no longer a flat 5% off the card all-in total. The rate steps down as the basket grows so PayNow never earns TryKai less than card after Stripe fees (card 3.4% + S$0.50, PayNow 1.3%): 5% under $20, 4% under $30, 3% under $60, 2% otherwise (`paynowDiscountRate` in `booking.ts`). A flat 5% earned less than card on any basket over about $18, and the gap grew with groups and add-ons. Each tier is the largest whole percentage that keeps PayNow at or above card after those fees. Guests still see a percentage (the badge is "Save 5%" / "Save 4%" / "Save 3%" / "Save 2%") because under ~$100 a percentage reads bigger than the dollar amount; the PayNow saving row stays a dollar amount. The rate can step down as the basket grows (for example 3% → 2% past $60). Revisit after about 100 bookings using the PayNow share. Supersedes the 23 August 5% figure. The "price only ever gets cheaper at checkout" rule still holds.
 
 **2026-10-30 — Add sessions keeps its draft when the host steps away.** Hosts left the form to change spots ("change in listing settings") and came back to an empty form. The form now saves its dates, times (shared or per date), quick-fill, duration and "Also offer these times on" picks to `sessionStorage` for that listing, and Hosting remembers which listing had the form open and reopens it, scrolled into view (`src/lib/sessionFormDraft.js`). Per tab only, never synced, dropped after 12 hours; dates that have since passed or left the 80-day window are dropped on restore. Cancel, a successful create, or deleting the listing clears it. No "Discard changes?" prompt: keeping the draft is kinder than warning.
+
+**2026-10-30 — Add-ons (paid extras) on listings.** Hosts can create up to 3 paid add-ons per listing. The host sets the price they get, in whole dollars, S$1–S$500. Guests pay that plus the 12% booking fee, rounded up to the whole dollar per unit, with no S$2.50 floor (the booking already carries it): host S$15 → guest S$17; S$8 → S$9. No host fee on add-ons, ever, for any host; the 10% host fee stays on the lesson only. Group discounts never apply to add-ons. The PayNow saving applies to the whole total, add-ons included, at the sliding rate for that total. Unit is per person (guest picks 0 up to the number of guests) or per booking (0 or 1). Optional limit per session: 1–99 units across all bookings of that session. Each add-on has a name (≤60), an optional short description (≤140) and an optional photo. Never pre-selected, because of the CCS Courts case (December 2025) and CCCS guidance on pre-ticked boxes; add-ons only ever add to the price. The listing page shows add-ons below "What you'll do" as "Add a little extra", with a quiet "+$17 per person". Browse cards and the listing price card show the base price only. Bookings keep a snapshot of what was paid: name, unit, quantity, host unit price and guest unit price. Editing or removing an add-on only affects new bookings. Removing is a soft delete. Guest cancellation tiers apply to add-ons exactly like the lesson. A host cancel refunds everything. No separate admin review: like edits to an approved listing, add-ons go live straight away. Admin listing review shows them so changes can be requested. Host setup is this PR (`listing_addons`, Create/Edit listing editor). Guest checkout, payment, listing display and booking snapshots are the next PR.
 
 ---
 

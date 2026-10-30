@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addonGuestUnitCents,
   checkoutPriceCents,
   discountedLessonCents,
   formatCheckoutPrice,
@@ -18,6 +19,16 @@ import {
   discountedLessonCents as bookingLessonCents,
   discountedPerPersonCents,
 } from '../../supabase/functions/_shared/booking.ts'
+
+describe('addonGuestUnitCents', () => {
+  it('re-exports the booking helper with no S$2.50 floor', () => {
+    expect(addonGuestUnitCents(100)).toBe(200)
+    expect(addonGuestUnitCents(800)).toBe(900)
+    expect(addonGuestUnitCents(1500)).toBe(1700)
+    expect(addonGuestUnitCents(2500)).toBe(2800)
+    expect(addonGuestUnitCents(5000)).toBe(5600)
+  })
+})
 
 describe('guestFacingPriceCents', () => {
   it('is the card all-in total, not the raw lesson price', () => {
