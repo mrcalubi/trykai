@@ -1,3 +1,5 @@
+import * as Sentry from '@sentry/react'
+
 export const HEIC_READ_ERROR = "We couldn't read that photo. Try a JPEG or PNG."
 
 /** iOS and desktop pickers: `image/*` plus explicit HEIC so Chrome still offers it. */
@@ -41,6 +43,12 @@ export async function convertHeicToJpeg(file) {
     return new File([blob], `${base}.jpg`, { type: 'image/jpeg', lastModified: Date.now() })
   } catch (error) {
     if (isHeicReadError(error)) throw error
+    // The guest only sees "couldn't read that photo"; keep the real reason (chunk load, decoder) for us.
+    console.error('convertHeicToJpeg failed', error)
+    Sentry.captureException(error, {
+      tags: { area: 'heic-convert' },
+      extra: { fileType: file?.type || '', fileSize: file?.size ?? null },
+    })
     throw new Error(HEIC_READ_ERROR, { cause: error })
   }
 }

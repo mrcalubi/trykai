@@ -859,14 +859,14 @@ describe('CreateListing photos', () => {
     const { user } = renderPage()
     await goToPhotos(user)
 
-    expect(screen.getByText('Five shots an experience needs')).toBeInTheDocument()
+    expect(screen.getByText("Five shots we'd start with")).toBeInTheDocument()
     expect(
-      screen.getByText('The result — the finished latte, bowl, or piece.'),
+      screen.getByText('What guests make, like the finished latte, bowl or piece.'),
     ).toBeInTheDocument()
-    expect(screen.getByText('You teaching — hands in, showing how.')).toBeInTheDocument()
-    expect(screen.getByText('The setup or space.')).toBeInTheDocument()
-    expect(screen.getByText('Guests doing it.')).toBeInTheDocument()
-    expect(screen.getByText('A close-up of the detail.')).toBeInTheDocument()
+    expect(screen.getByText('Guests having a go (ask them first).')).toBeInTheDocument()
+    expect(
+      screen.getByText('Daylight from a window makes everything look better.'),
+    ).toBeInTheDocument()
   })
 
   it('opens the cover preview in the lightbox', async () => {

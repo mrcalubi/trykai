@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as Sentry from '@sentry/react'
+
+vi.mock('@sentry/react', () => ({ captureException: vi.fn() }))
+
 import {
   HEIC_READ_ERROR,
   convertHeicIfNeeded,
@@ -46,7 +50,22 @@ describe('heicImage', () => {
     const heic = new File(['h'], 'shot.heic', { type: 'image/heic' })
     vi.spyOn(heicLoader, 'importConverter').mockRejectedValue(new Error('wasm'))
 
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
     await expect(convertHeicToJpeg(heic)).rejects.toThrow(HEIC_READ_ERROR)
     expect(isHeicReadError(new Error(HEIC_READ_ERROR))).toBe(true)
+  })
+
+  it('reports the real conversion failure to Sentry', async () => {
+    const heic = new File(['h'], 'shot.heic', { type: 'image/heic' })
+    const cause = new Error('Failed to fetch dynamically imported module')
+    vi.spyOn(heicLoader, 'importConverter').mockRejectedValue(cause)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(convertHeicToJpeg(heic)).rejects.toThrow(HEIC_READ_ERROR)
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      cause,
+      expect.objectContaining({ tags: { area: 'heic-convert' } }),
+    )
   })
 })

@@ -1555,6 +1555,13 @@ a {
   color: var(--navy);
 }
 
+.photo-tips__note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--coral-ink);
+}
+
 .field-hint {
   margin-top: 6px;
   font-size: 13px;
