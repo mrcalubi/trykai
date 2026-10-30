@@ -11,7 +11,7 @@ import PageLoader from '../components/PageLoader'
 import WaitingState from '../components/WaitingState'
 import { functionReasonOrDefault } from '../lib/edgeFunctionError'
 import { compressImage } from '../lib/compressImage'
-import { HEIC_READ_ERROR, IMAGE_ACCEPT, isHeicFile, isHeicReadError } from '../lib/heicImage'
+import { HEIC_READ_ERROR, IMAGE_ACCEPT, isHeicFile } from '../lib/heicImage'
 
 /** `my_verification` returns a table, so PostgREST hands back an array. */
 function firstRow(data) {
@@ -103,7 +103,7 @@ export default function VerifyIdentity() {
       if (isHeicFile(readyId) || isHeicFile(readySelfie)) throw new Error(HEIC_READ_ERROR)
     } catch (error) {
       setLoading(false)
-      setError(isHeicReadError(error) ? HEIC_READ_ERROR : error.message)
+      setError(error.message || HEIC_READ_ERROR)
       return
     }
 

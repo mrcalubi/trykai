@@ -33,7 +33,7 @@ export default function ProfilePhotoFlow({ userId, onAvatarUrlChange, children }
 
   function setErrorStatus(error) {
     setStatusKind('error')
-    setStatus(isHeicReadError(error) ? HEIC_READ_ERROR : error.message || HEIC_READ_ERROR)
+    setStatus(isHeicReadError(error) ? error.message : error.message || HEIC_READ_ERROR)
   }
 
   function closeCrop() {

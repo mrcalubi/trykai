@@ -213,7 +213,7 @@ export default function Settings() {
       setZoom(1)
       setCroppedArea(null)
     } catch (fileError) {
-      setBannerError(isHeicReadError(fileError) ? HEIC_READ_ERROR : fileError.message || HEIC_READ_ERROR)
+      setBannerError(isHeicReadError(fileError) ? fileError.message : fileError.message || HEIC_READ_ERROR)
     } finally {
       setBannerBusy(false)
     }

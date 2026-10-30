@@ -1,6 +1,15 @@
 import * as Sentry from '@sentry/react'
 
 export const HEIC_READ_ERROR = "We couldn't read that photo. Try a JPEG or PNG."
+export const APP_UPDATED_ERROR = 'TryKai just updated. Refresh the page, then add this photo again.'
+
+/** Chrome, Safari and Firefox wording for a lazy chunk that no longer exists after a deploy. */
+export function isStaleChunkError(error) {
+  const message = String(error?.message || '')
+  return /dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(
+    message,
+  )
+}
 
 /** iOS and desktop pickers: `image/*` plus explicit HEIC so Chrome still offers it. */
 export const IMAGE_ACCEPT = 'image/*,image/heic,image/heif,.heic,.heif'
@@ -22,7 +31,7 @@ export function isImageFile(file) {
 }
 
 export function isHeicReadError(error) {
-  return Boolean(error && error.message === HEIC_READ_ERROR)
+  return Boolean(error && (error.message === HEIC_READ_ERROR || error.message === APP_UPDATED_ERROR))
 }
 
 /** Object so tests can spy without ESM live-binding issues. */
@@ -49,7 +58,7 @@ export async function convertHeicToJpeg(file) {
       tags: { area: 'heic-convert' },
       extra: { fileType: file?.type || '', fileSize: file?.size ?? null },
     })
-    throw new Error(HEIC_READ_ERROR, { cause: error })
+    throw new Error(isStaleChunkError(error) ? APP_UPDATED_ERROR : HEIC_READ_ERROR, { cause: error })
   }
 }
 

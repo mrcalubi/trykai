@@ -232,7 +232,7 @@ export default function ListingPhotosEditor({
       if (added.length) onChange([...photos, ...added.map(rememberOriginal)])
     } catch (error) {
       if (isHeicReadError(error)) {
-        setDropHint(HEIC_READ_ERROR)
+        setDropHint(error.message)
         return
       }
       console.error('ListingPhotosEditor: could not add photos', error)
