@@ -5250,6 +5250,12 @@ body.lightbox-open {
   border-color: var(--cream);
 }
 
+.session-calendar__count {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .session-day__title {
   margin: 16px 0 0;
   font-family: var(--sans);
@@ -6354,6 +6360,64 @@ body.lightbox-open {
 .add-sessions__time-row .label {
   flex: 1;
   min-width: 0;
+}
+
+.add-sessions__per-date {
+  margin: 16px 0;
+}
+
+.add-sessions__per-date-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+.add-sessions__date-times {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.add-sessions__date-times:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.add-sessions__date-times .add-sessions__times {
+  margin-bottom: 0;
+}
+
+.add-sessions__date-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.add-sessions__date-heading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.add-sessions__preview-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.add-sessions__preview-day {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.add-sessions__preview-group .add-sessions__preview-list {
+  margin: 0;
 }
 
 .add-sessions__preview {

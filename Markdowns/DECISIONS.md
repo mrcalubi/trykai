@@ -693,6 +693,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 **2026-10-30 — Listing photos cap is 8; View while editing; Show all on desktop.** Hosts can add eight photos (`MAX_PHOTOS` in `src/lib/listingPhotos.js`). Not more: a long gallery is harder to curate, dating apps that do this well (Hinge, Bumble) settle around 4–6, and an experience only needs five shots — the result, you teaching, the setup or space, guests doing it, and a close-up. The desktop listing mosaic is still cover + 4; when there are more than five, **Show all N photos** opens the lightbox at photo 1. Phone swipe already shows every photo. In the editor, **View** is first in the tile menu and opens the lightbox on that photo using the local preview. Tapping the cover on the create-listing "How guests will see it" preview (desktop aside and inline phone card) does the same. Photo tips are those five shots.
 
+**2026-10-30 — Add sessions can set different times on different dates.** Hosts still start with the same times for every picked date. **Set times per date** gives each date its own time list: turning it on copies the shared times onto every picked date; turning it off takes the first date's times for all, with no confirm. The batch is a map of date → times (`timesByDateFromLists` still builds that map from `{ dateKeys, times }`). Overlap, past-time, and 80-day rules are unchanged. Tapping a picked date on the calendar jumps to that date's row; **Remove date** unpicks it. The calendar shows a count on dates with more than one time. Review lists every session grouped by date. "Also offer these times on" still copies the accepted starts.
+
 ---
 
 # Analysed but not decided

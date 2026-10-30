@@ -118,10 +118,21 @@ export function singaporeTimeValue(iso) {
   return `${hour}:${minute}`
 }
 
-export function buildSessionStarts(dateKeys, times) {
+/** Same times on every date. Callers and tests can keep `{ dateKeys, times }`. */
+export function timesByDateFromLists(dateKeys = [], times = []) {
+  const map = {}
+  for (const dateKey of dateKeys) {
+    if (!dateKey) continue
+    map[dateKey] = [...times]
+  }
+  return map
+}
+
+/** One start per dateKey × that date's times. Dates are sorted. Empty times are skipped. */
+export function buildSessionStarts(timesByDate = {}) {
   const starts = []
-  for (const dateKey of [...dateKeys].sort()) {
-    for (const time of times) {
+  for (const dateKey of Object.keys(timesByDate).sort()) {
+    for (const time of timesByDate[dateKey] ?? []) {
       if (!time) continue
       starts.push({
         dateKey,
@@ -159,6 +170,7 @@ function hasConfirmedBooking(session) {
  * names those listings. Without `listingId`, any of the host's sessions clash.
  */
 export function previewSessionBatch({
+  timesByDate,
   dateKeys,
   times,
   durationMins,
@@ -167,7 +179,7 @@ export function previewSessionBatch({
   now = Date.now(),
 } = {}) {
   const duration = Number(durationMins)
-  const starts = buildSessionStarts(dateKeys, times)
+  const starts = buildSessionStarts(timesByDate ?? timesByDateFromLists(dateKeys, times))
 
   if (starts.length > SESSION_BATCH_MAX) {
     return { ok: false, error: SESSION_BATCH_MAX_MESSAGE, accepted: [], skipped: [] }

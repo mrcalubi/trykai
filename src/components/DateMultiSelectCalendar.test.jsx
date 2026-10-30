@@ -48,6 +48,19 @@ describe('DateMultiSelectCalendar', () => {
     expect(screen.getByRole('button', { name: /18 October/ })).toBeEnabled()
   })
 
+  it('shows a count on picked dates with more than one time', () => {
+    renderCalendar({
+      selectedDateKeys: ['2026-10-18', '2026-10-24'],
+      countsByDate: { '2026-10-18': 2, '2026-10-24': 1 },
+    })
+
+    const twoTimes = screen.getByRole('button', { name: /18 October, selected, 2 times/ })
+    expect(within(twoTimes).getByText('2')).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('button', { name: /24 October, selected/ })).queryByText('1'),
+    ).not.toBeInTheDocument()
+  })
+
   it('marks every selected date as pressed', () => {
     renderCalendar({ selectedDateKeys: ['2026-10-18', '2026-10-24'] })
 
