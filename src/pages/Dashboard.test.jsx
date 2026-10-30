@@ -687,6 +687,37 @@ describe('Dashboard add session', () => {
     expect(supabase.rpc.mock.calls.some(([name]) => name === 'add_listing_session')).toBe(false)
   })
 
+  it('reopens Add sessions with the same picks after the host leaves and comes back', async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn()
+    const first = await renderHosting()
+    await openSessionForm(first.user)
+    await fillSession(first.user, { daysAhead: 2, time: '14:15' })
+    first.unmount()
+
+    const { user } = await renderHosting()
+
+    expect(await screen.findByLabelText('Time')).toHaveValue('14:15')
+    expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(1)
+    await waitFor(() => expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled())
+
+    const cancels = within(listingCard('Latte art')).getAllByRole('button', { name: 'Cancel' })
+    await user.click(cancels[cancels.length - 1])
+    expect(screen.queryByLabelText('Time')).not.toBeInTheDocument()
+    expect(window.sessionStorage.getItem('trykai:add-sessions:listing-1')).toBeNull()
+    expect(window.sessionStorage.getItem('trykai:add-sessions:open')).toBeNull()
+    delete HTMLElement.prototype.scrollIntoView
+  })
+
+  it('forgets an open form whose listing is gone', async () => {
+    window.sessionStorage.setItem('trykai:add-sessions:open', 'deleted-listing')
+    await renderHosting()
+
+    await waitFor(() =>
+      expect(window.sessionStorage.getItem('trykai:add-sessions:open')).toBeNull(),
+    )
+    expect(screen.queryByLabelText('Time')).not.toBeInTheDocument()
+  })
+
   it('shows the listing duration and does not ask for one', async () => {
     const { user } = await renderHosting()
     await openSessionForm(user)

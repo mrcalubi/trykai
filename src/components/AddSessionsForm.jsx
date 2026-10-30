@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDuration } from '../lib/duration'
 import { formatDayTitle } from '../lib/sessionCalendar'
@@ -15,6 +15,7 @@ import {
   singaporeMonthKey,
   timesByDateFromLists,
 } from '../lib/sessionBatch'
+import { readSessionDraft, writeSessionDraft } from '../lib/sessionFormDraft'
 import Button from './ui/Button'
 import DateMultiSelectCalendar from './DateMultiSelectCalendar'
 
@@ -139,23 +140,57 @@ export default function AddSessionsForm({
   const usesListingDuration =
     Number.isInteger(listing.duration_mins) && listing.duration_mins >= 1
 
-  const [monthKey, setMonthKey] = useState(singaporeMonthKey(`${dateWindow.minDateKey}T12:00:00+08:00`))
-  const [selectedDateKeys, setSelectedDateKeys] = useState([])
-  const [weekdays, setWeekdays] = useState([])
-  const [everyWeeks, setEveryWeeks] = useState(1)
-  const [forWeeks, setForWeeks] = useState(2)
-  const [times, setTimes] = useState([''])
-  const [timesByDate, setTimesByDate] = useState({})
-  const [perDateTimes, setPerDateTimes] = useState(false)
-  const [durationMins, setDurationMins] = useState('')
+  // A host who leaves (e.g. "change in listing settings") comes back to the same form.
+  const [restored] = useState(() => readSessionDraft(listing.id))
+  const [monthKey, setMonthKey] = useState(() =>
+    singaporeMonthKey(
+      `${restored?.selectedDateKeys[0] ?? dateWindow.minDateKey}T12:00:00+08:00`,
+    ),
+  )
+  const [selectedDateKeys, setSelectedDateKeys] = useState(restored?.selectedDateKeys ?? [])
+  const [weekdays, setWeekdays] = useState(restored?.weekdays ?? [])
+  const [everyWeeks, setEveryWeeks] = useState(restored?.everyWeeks ?? 1)
+  const [forWeeks, setForWeeks] = useState(restored?.forWeeks ?? 2)
+  const [times, setTimes] = useState(restored?.times ?? [''])
+  const [timesByDate, setTimesByDate] = useState(restored?.timesByDate ?? {})
+  const [perDateTimes, setPerDateTimes] = useState(restored?.perDateTimes ?? false)
+  const [durationMins, setDurationMins] = useState(restored?.durationMins ?? '')
   const [error, setError] = useState('')
   const [preview, setPreview] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [alsoListingIds, setAlsoListingIds] = useState([])
+  const [alsoListingIds, setAlsoListingIds] = useState(() => {
+    const otherIds = new Set(otherListings.map((other) => other.id))
+    return (restored?.alsoListingIds ?? []).filter((id) => otherIds.has(id))
+  })
   const [focusDateKey, setFocusDateKey] = useState(null)
   const dateRowRefs = useRef({})
 
   const monthIndex = monthKeys.indexOf(monthKey)
+
+  useEffect(() => {
+    writeSessionDraft(listing.id, {
+      selectedDateKeys,
+      weekdays,
+      everyWeeks,
+      forWeeks,
+      times,
+      timesByDate,
+      perDateTimes,
+      durationMins,
+      alsoListingIds,
+    })
+  }, [
+    listing.id,
+    selectedDateKeys,
+    weekdays,
+    everyWeeks,
+    forWeeks,
+    times,
+    timesByDate,
+    perDateTimes,
+    durationMins,
+    alsoListingIds,
+  ])
   const duration = usesListingDuration ? listing.duration_mins : parseInt(durationMins, 10)
 
   const selectedLabel = useMemo(() => {
