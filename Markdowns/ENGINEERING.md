@@ -345,13 +345,13 @@ Also decided but **not yet built**: reschedule, once per booking, same 48 hour c
 
 **Guest fee.** Card fee is 12% of the lesson total with a S$2.50 floor, then the total is rounded UP to the nearest whole dollar so it can never dip below the floor. Browse cards still show the one-person card all-in so the price never rises between viewing and paying. Checkout recomputes from `guests_count` and the listing's `group_pricing` flag; `create-payment-intent` ignores any client total.
 
-**Group pricing.** When `listings.group_pricing` is true (the default), the lesson price per person is discounted then multiplied by guests, in integer cents: 5% for 2, 10% for 3, 15% for 4, 20% for 5 or more. Never more than 20%. The card fee and the PayNow 5% apply once to that discounted lesson total. A group booking is one booking row.
+**Group pricing.** When `listings.group_pricing` is true (the default), the lesson price per person is discounted then multiplied by guests, in integer cents: 5% for 2, 10% for 3, 15% for 4, 20% for 5 or more. Never more than 20%. The card fee and the PayNow discount apply once to that discounted lesson total. A group booking is one booking row.
 
-**PayNow.** Shown as a flat 5% discount off the card all-in total for that guest count, displayed at checkout only. PayNow is refused when the session starts more than `PAYNOW_MAX_DAYS_AHEAD` (80) days from now — Stripe cannot refund PayNow after 90 days. `create-payment-intent` returns `paynow_too_far_ahead`; the checkout UI disables PayNow and keeps card pricing. Card is unaffected.
+**PayNow.** A sliding percentage off the card all-in total for that guest count, displayed at checkout only: 5% under $20, 4% under $30, 3% under $60, 2% otherwise (`paynowDiscountRate`). Each tier is the largest whole percentage that keeps PayNow at or above card after Stripe fees (card 3.4% + S$0.50, PayNow 1.3%). The badge shows the current rate and can step down as the basket grows. PayNow is refused when the session starts more than `PAYNOW_MAX_DAYS_AHEAD` (80) days from now — Stripe cannot refund PayNow after 90 days. `create-payment-intent` returns `paynow_too_far_ahead`; the checkout UI disables PayNow and keeps card pricing. Card is unaffected.
 
 **Host fee.** 10% of the discounted lesson total, triggered per host: every non founding host's first three **confirmed** bookings are free, their fourth booking onward pays the fee. A group booking counts as one toward those three. Founding hosts (`is_founding_host`) never pay.
 
-Do not hardcode a flat percentage. Worked one-person checks: $10 → $13, $20 → $23, $25 → $28, $30 → $34, $40 → $45. PayNow example: $25 lesson → $26.60. Code of record is `booking.ts` and `pricing.js`; they must agree.
+Do not hardcode a flat percentage. Worked one-person checks: $10 → $13, $20 → $23, $25 → $28, $30 → $34, $40 → $45. PayNow example: $25 lesson → $26.88. Code of record is `booking.ts` and `pricing.js`; they must agree.
 
 ---
 

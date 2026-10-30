@@ -86,7 +86,7 @@ The 31 August and 25 August snapshots below are kept for history. They still des
 Week 5 of the original plan (25–31 August) is ending. The week-by-week sections below stay as the historical plan. Read this snapshot first.
 
 **Payment code (original weeks 5–7 and most of 9) is in the tree:**
-- Fee module matches DECISIONS.md: 12% card fee, S$2.50 floor, round up to a whole dollar, PayNow 5% off that all-in total, host fee 10% from the fourth confirmed booking, founding hosts never
+- Fee module matches DECISIONS.md: 12% card fee, S$2.50 floor, round up to a whole dollar, PayNow sliding saving off that all-in total, host fee 10% from the fourth confirmed booking, founding hosts never
 - `stripe-webhook` confirms bookings, `confirm_paid_booking` decrements spots, `cancel-booking` refunds on the four-tier rule
 - Connect Express onboarding and `release-payout` Transfers 72 hours after the session ends
 - Guest `full_address` reveal via RPC. Column grant on `listings` still too wide
@@ -1172,7 +1172,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [x] Booking confirmation email to guest (staging, 14–21 September; production `RESEND_API_KEY` unconfirmed)
 - [x] Booking notification email to host (same)
 - [ ] Platform fee correctly calculated: 12% of lesson, S$2.50 floor, round up to a whole dollar (see DECISIONS.md). Code exists in `_shared/booking.ts`
-- [ ] PayNow 5% off the advertised all-in total at checkout (not 8% versus 10%)
+- [ ] PayNow sliding saving off the advertised all-in total at checkout (not a flat 5%, and not 8% versus 10%)
 - [ ] Failed payment handled gracefully, clear error, no ghost booking
 - [ ] Payout flow tested, Transfer 72 hours after the session ends (`release-payout` scheduled; platform payouts must be manual). See **Host Transfers** above.
 - [x] Refund, cancellation, and dispute policy pages live

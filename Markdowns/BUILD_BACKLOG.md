@@ -143,7 +143,7 @@ Stripe Connect (separate charges and transfers, Express) is implemented. Do not 
 `supabase/functions/stripe-webhook` verifies `Stripe-Signature`, calls `confirm_paid_booking`, emails both parties, refunds on oversell (including a cancelled / not-`open` session), cancels pending on failed/canceled intents, syncs `stripe_payouts_enabled` from `account.updated`.
 
 ### P1.2 — Fee calculation — DONE
-`calculateGuestCharge` in `_shared/booking.ts`: 12% + S$2.50 floor, round up to a whole dollar, PayNow 5% off that total. Browse and listing show the card all-in price. Host fee 10% from the fourth confirmed booking; founding hosts never.
+`calculateGuestCharge` in `_shared/booking.ts`: 12% + S$2.50 floor, round up to a whole dollar, PayNow sliding saving off that total (`paynowDiscountRate`). Browse and listing show the card all-in price. Host fee 10% from the fourth confirmed booking; founding hosts never.
 
 ### P1.3 — Refund execution — DONE
 `cancel-booking` (JWT) issues Stripe refunds, restores spots for confirmed rows only, and applies host strikes server-side.

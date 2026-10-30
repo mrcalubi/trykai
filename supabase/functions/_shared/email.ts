@@ -2,6 +2,7 @@ import {
   calculateGuestCharge,
   discountedLessonCents,
   groupDiscountRate,
+  paynowDiscountRate,
 } from './booking.ts'
 import {
   groupSizeRange,
@@ -378,7 +379,10 @@ export function receiptRows(options: {
   if (options.paymentRail === 'paynow') {
     const paynowTotal = calculateGuestCharge(discountedLesson, 'paynow').totalAmount
     const saving = cardDiscountedTotal - paynowTotal
-    if (saving > 0) rows.push({ label: 'PayNow saving', amountCents: -saving })
+    if (saving > 0) {
+      const percent = Math.round(paynowDiscountRate(cardDiscountedTotal) * 100)
+      rows.push({ label: `PayNow saving (${percent}%)`, amountCents: -saving })
+    }
     expectedTotal = paynowTotal
   }
   return {
