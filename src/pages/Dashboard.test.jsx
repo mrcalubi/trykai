@@ -9,7 +9,7 @@ import Dashboard from './Dashboard'
 import RedirectToOwnProfile from './RedirectToOwnProfile'
 import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
-import { formatDayLabel } from '../lib/sessionCalendar'
+import { formatDayLabel, formatDayTitle } from '../lib/sessionCalendar'
 import { addSingaporeDays, singaporeDateKey } from '../lib/sessionBatch'
 import { formatSessionDateTime } from '../lib/sessionDate'
 import { renderWithDataRouter, renderWithRouter } from '../test/render'
@@ -961,7 +961,39 @@ describe('Dashboard add session', () => {
     await user.click(screen.getByRole('button', { name: 'Review sessions' }))
 
     expect(screen.getByText('This creates 8 sessions.')).toBeInTheDocument()
-    expect(within(listingCard('Latte art')).getByRole('list').querySelectorAll('li')).toHaveLength(8)
+    expect(listingCard('Latte art').querySelectorAll('.add-sessions__preview-list li')).toHaveLength(8)
+  })
+
+  it('creates the per-date starts, not a shared time on every date', async () => {
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+    const first = dateKeyFromToday(1)
+    const second = dateKeyFromToday(2)
+    await selectCalendarDate(user, first)
+    await selectCalendarDate(user, second)
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '10:00' } })
+    await user.click(screen.getByRole('button', { name: '+ add time' }))
+    fireEvent.change(screen.getByLabelText('Time 2'), { target: { value: '14:00' } })
+    await user.click(screen.getByRole('checkbox', { name: /Set times per date/ }))
+    const secondRow = screen.getByRole('group', { name: formatDayTitle(second) })
+    fireEvent.change(within(secondRow).getByLabelText('Time'), { target: { value: '15:00' } })
+    const timeRemoves = within(secondRow).getAllByRole('button', { name: 'Remove' })
+    await user.click(timeRemoves[timeRemoves.length - 1])
+
+    await reviewAndCreate(user)
+
+    await waitFor(() =>
+      expect(
+        supabase.rpc.mock.calls.filter(([name]) => name === 'add_listing_session'),
+      ).toHaveLength(3),
+    )
+    const starts = supabase.rpc.mock.calls
+      .filter(([name]) => name === 'add_listing_session')
+      .map(([, args]) => args.p_starts_at)
+      .sort()
+    expect(starts).toEqual(
+      [`${first}T02:00:00.000Z`, `${first}T06:00:00.000Z`, `${second}T07:00:00.000Z`].sort(),
+    )
   })
 })
 

@@ -19,6 +19,7 @@ import {
   singaporeTimeValue,
   singaporeWeekday,
   skipReasonFromRpcMessage,
+  timesByDateFromLists,
   SKIP_BOOKED,
 } from './sessionBatch'
 
@@ -112,9 +113,69 @@ describe('previewSessionBatch', () => {
   const durationMins = 60
 
   it('builds one start per date × time', () => {
-    expect(buildSessionStarts(['2026-10-18', '2026-10-24'], ['10:00', '14:00'])).toHaveLength(4)
+    expect(
+      buildSessionStarts(timesByDateFromLists(['2026-10-18', '2026-10-24'], ['10:00', '14:00'])),
+    ).toHaveLength(4)
     expect(singaporeDateTime('2026-10-18', '10:30').toISOString()).toBe('2026-10-18T02:30:00.000Z')
     expect(singaporeTimeValue('2026-10-18T02:30:00.000Z')).toBe('10:30')
+  })
+
+  it('copies shared times onto every date', () => {
+    expect(timesByDateFromLists(['2026-10-18', '2026-10-19'], ['10:00', '14:00'])).toEqual({
+      '2026-10-18': ['10:00', '14:00'],
+      '2026-10-19': ['10:00', '14:00'],
+    })
+  })
+
+  it('uses different times on different dates', () => {
+    const preview = previewSessionBatch({
+      timesByDate: {
+        '2026-10-18': ['10:00', '14:00'],
+        '2026-10-19': ['15:00'],
+      },
+      durationMins,
+      now: NOW,
+    })
+    expect(preview.accepted.map((item) => `${item.dateKey} ${item.time}`)).toEqual([
+      '2026-10-18 10:00',
+      '2026-10-18 14:00',
+      '2026-10-19 15:00',
+    ])
+  })
+
+  it('skips an overlap within one date and keeps the other date', () => {
+    const preview = previewSessionBatch({
+      timesByDate: {
+        '2026-10-18': ['10:00', '10:30'],
+        '2026-10-19': ['15:00'],
+      },
+      durationMins,
+      now: NOW,
+    })
+    expect(preview.accepted.map((item) => `${item.dateKey} ${item.time}`)).toEqual([
+      '2026-10-18 10:00',
+      '2026-10-19 15:00',
+    ])
+    expect(preview.skipped).toEqual([
+      expect.objectContaining({ dateKey: '2026-10-18', time: '10:30', reason: SKIP_BATCH }),
+    ])
+  })
+
+  it('skips a past time on one date and keeps a future time on another', () => {
+    const preview = previewSessionBatch({
+      timesByDate: {
+        '2026-10-16': ['10:00'],
+        '2026-10-18': ['10:00'],
+      },
+      durationMins,
+      now: NOW,
+    })
+    expect(preview.accepted).toEqual([
+      expect.objectContaining({ dateKey: '2026-10-18', time: '10:00' }),
+    ])
+    expect(preview.skipped).toEqual([
+      expect.objectContaining({ dateKey: '2026-10-16', time: '10:00', reason: SKIP_PAST }),
+    ])
   })
 
   it('allows back-to-back sessions and treats an overlap as a clash', () => {

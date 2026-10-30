@@ -476,7 +476,7 @@ src/
 │   ├── useUnsavedChangesGuard.jsx # useBlocker dialog + beforeunload while a form is dirty
 │   ├── sessionDate.js           # Session day/time; year only when it is not this year
 │   ├── sessionCalendar.js       # Singapore month grid for listing and host calendars
-│   ├── sessionBatch.js          # Bulk-create dates, 80-day window, clash preview, 40 cap
+│   ├── sessionBatch.js          # Bulk-create dates, date → times map, 80-day window, clash preview, 40 cap
 │   ├── listingSpots.js          # Listing spots copy, capacity floor, session_has_bookings
 │   ├── listingCategories.js     # Shared host/browse category list + area line
 │   ├── reportMailto.js          # Report links to hello@trykai.sg
@@ -535,7 +535,7 @@ src/
 │   ├── PostalAddressFields.jsx  # Auto postal lookup, confirmed card, unit, Area guests see
 │   ├── SessionCalendar.jsx      # Guest month calendar on listing detail
 │   ├── DateMultiSelectCalendar.jsx # Host tap-to-select dates
-│   ├── AddSessionsForm.jsx      # Bulk add: quick-fill, times, preview, create
+│   ├── AddSessionsForm.jsx      # Bulk add: quick-fill, same or per-date times, preview, create
 │   ├── PageLoader.jsx           # Page-level wait: spinner after 400ms, "Loading…" for screen readers
 │   ├── WaitingState.jsx         # Long wait card: title, illustration, messages at 0 / 4s / 12s
 │   ├── LoadingMascot.jsx        # Default WaitingState art (three dots); future mascot home
@@ -642,7 +642,7 @@ supabase/functions/
 | Browse and profile listing-card ratings                    | `listing_ratings` (`00015`); one RPC per page, never per card                                       |
 | Host-profile reviews                                       | `reviews_for_host` (`00013`); do not embed `bookings` from the client                               |
 | Delete an empty hosted session                             | `delete_empty_session` (`00012`); Hosting Delete / Delete selected, not Cancel                      |
-| Bulk-create sessions                                       | `src/lib/sessionBatch.js`; each keep is `add_listing_session` with listing spots                    |
+| Bulk-create sessions                                       | `src/lib/sessionBatch.js`; date → times map; each keep is `add_listing_session` with listing spots  |
 | Change spots per session                                   | `set_listing_spots` (`00024`); Edit listing save                                                   |
 | Move an empty session                                      | `edit_open_session` (`00024`); Hosting inline Edit; booked rows have none                          |
 | Soft-delete a listing                                      | `delete_listing` (`00015`); owner only; refuses active upcoming bookings                            |

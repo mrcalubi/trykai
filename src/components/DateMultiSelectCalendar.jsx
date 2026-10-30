@@ -12,6 +12,7 @@ export default function DateMultiSelectCalendar({
   minDateKey,
   maxDateKey,
   todayKey,
+  countsByDate = {},
   onToggleDate,
   onPrevMonth,
   onNextMonth,
@@ -61,6 +62,7 @@ export default function DateMultiSelectCalendar({
 
           const pickable = cell.dateKey >= minDateKey && cell.dateKey <= maxDateKey
           const isSelected = selected.has(cell.dateKey)
+          const timeCount = countsByDate[cell.dateKey] ?? 0
           const classes = [
             'session-calendar__day',
             pickable && 'session-calendar__day--available',
@@ -69,6 +71,12 @@ export default function DateMultiSelectCalendar({
           ]
             .filter(Boolean)
             .join(' ')
+          const extraLabel = [
+            isSelected ? 'selected' : null,
+            timeCount > 1 ? `${timeCount} times` : null,
+          ]
+            .filter(Boolean)
+            .join(', ')
 
           return (
             <button
@@ -77,10 +85,15 @@ export default function DateMultiSelectCalendar({
               className={classes}
               disabled={!pickable}
               aria-pressed={isSelected}
-              aria-label={`${formatDayLabel(cell.dateKey)}${isSelected ? ', selected' : ''}`}
+              aria-label={`${formatDayLabel(cell.dateKey)}${extraLabel ? `, ${extraLabel}` : ''}`}
               onClick={() => onToggleDate(cell.dateKey)}
             >
               <span className="session-calendar__day-number">{cell.day}</span>
+              {timeCount > 1 ? (
+                <span className="session-calendar__count" aria-hidden="true">
+                  {timeCount}
+                </span>
+              ) : null}
             </button>
           )
         })}
