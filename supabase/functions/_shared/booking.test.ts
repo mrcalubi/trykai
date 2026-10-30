@@ -5,11 +5,12 @@ import {
   HOST_FEE_FREE_BOOKINGS,
   HOST_FEE_RATE,
   LEGACY_PLATFORM_FEE_RATE,
-  PAYNOW_DISCOUNT_RATE,
+  PAYNOW_DISCOUNT_TIERS,
   PAYNOW_MAX_DAYS_AHEAD,
   PAYNOW_TOO_FAR_AHEAD,
   PAYNOW_TOO_FAR_AHEAD_MESSAGE,
   isPayNowTooFarAhead,
+  paynowDiscountRate,
   rejectPayNowIfTooFarAhead,
   calculateGuestCharge,
   calculateGuestRefund,
@@ -95,12 +96,38 @@ describe('calculateGuestCharge card path', () => {
 })
 
 describe('calculateGuestCharge PayNow path', () => {
-  it('takes 5% off the card all-in total', () => {
-    expect(PAYNOW_DISCOUNT_RATE).toBe(0.05)
-    const card = calculateGuestCharge(2500, 'card')
-    const paynow = calculateGuestCharge(2500, 'paynow')
-    expect(paynow.totalAmount).toBe(Math.round(card.totalAmount * 0.95))
-    expect(paynow.totalAmount).toBe(2660)
+  it('steps the rate down as the card total grows', () => {
+    expect(PAYNOW_DISCOUNT_TIERS.map((tier) => [tier.belowCents, tier.rate])).toEqual([
+      [2000, 0.05],
+      [3000, 0.04],
+      [6000, 0.03],
+      [Number.POSITIVE_INFINITY, 0.02],
+    ])
+    expect(paynowDiscountRate(1900)).toBe(0.05)
+    expect(paynowDiscountRate(2000)).toBe(0.04)
+    expect(paynowDiscountRate(2900)).toBe(0.04)
+    expect(paynowDiscountRate(3000)).toBe(0.03)
+    expect(paynowDiscountRate(5900)).toBe(0.03)
+    expect(paynowDiscountRate(6000)).toBe(0.02)
+  })
+
+  it('matches the published PayNow totals across the S$10 to S$40 band', () => {
+    expect(calculateGuestCharge(1000, 'card').totalAmount).toBe(1300)
+    expect(calculateGuestCharge(1000, 'paynow').totalAmount).toBe(1235)
+    expect(calculateGuestCharge(2000, 'card').totalAmount).toBe(2300)
+    expect(calculateGuestCharge(2000, 'paynow').totalAmount).toBe(2208)
+    expect(calculateGuestCharge(2500, 'card').totalAmount).toBe(2800)
+    expect(calculateGuestCharge(2500, 'paynow').totalAmount).toBe(2688)
+    expect(calculateGuestCharge(3000, 'card').totalAmount).toBe(3400)
+    expect(calculateGuestCharge(3000, 'paynow').totalAmount).toBe(3298)
+    expect(calculateGuestCharge(4000, 'card').totalAmount).toBe(4500)
+    expect(calculateGuestCharge(4000, 'paynow').totalAmount).toBe(4365)
+  })
+
+  it('uses 2% once a two-guest $30 booking crosses $60', () => {
+    const lesson = discountedLessonCents(3000, 2, true)
+    expect(calculateGuestCharge(lesson, 'card').totalAmount).toBe(6400)
+    expect(calculateGuestCharge(lesson, 'paynow').totalAmount).toBe(6272)
   })
 
   it('is cheaper than card at every published price point, never more expensive', () => {

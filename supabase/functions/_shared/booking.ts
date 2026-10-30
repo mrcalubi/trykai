@@ -7,7 +7,26 @@
 
 export const CARD_FEE_RATE = 0.12
 export const CARD_FEE_FLOOR_CENTS = 250
-export const PAYNOW_DISCOUNT_RATE = 0.05
+
+/**
+ * PayNow off the card all-in total. Each tier is the largest whole percentage
+ * that keeps PayNow at or above card after Stripe fees (card 3.4% + S$0.50,
+ * PayNow 1.3%). `belowCents` is exclusive.
+ */
+export const PAYNOW_DISCOUNT_TIERS = [
+  { belowCents: 2000, rate: 0.05 },
+  { belowCents: 3000, rate: 0.04 },
+  { belowCents: 6000, rate: 0.03 },
+  { belowCents: Number.POSITIVE_INFINITY, rate: 0.02 },
+] as const
+
+/** Sliding PayNow rate for this card all-in total, in cents. */
+export function paynowDiscountRate(cardTotalCents: number): number {
+  for (const tier of PAYNOW_DISCOUNT_TIERS) {
+    if (cardTotalCents < tier.belowCents) return tier.rate
+  }
+  return 0.02
+}
 /** Stripe will not refund PayNow after 90 days; 80 leaves a buffer. */
 export const PAYNOW_MAX_DAYS_AHEAD = 80
 export const PAYNOW_TOO_FAR_AHEAD = 'paynow_too_far_ahead'
@@ -92,9 +111,10 @@ export function roundUpToDollar(cents: number): number {
 
 /**
  * Card path: 12% of the lesson with a S$2.50 floor, then the all-in total is
- * rounded UP to the next whole dollar. PayNow is 5% off that same all-in total.
- * `platformFee` is always `totalAmount - lessonAmount` so cancellation maths
- * that treat the lesson as `total - platform_fee` stay correct.
+ * rounded UP to the next whole dollar. PayNow takes `paynowDiscountRate` off
+ * that same all-in total. `platformFee` is always `totalAmount - lessonAmount`
+ * so cancellation maths that treat the lesson as `total - platform_fee` stay
+ * correct.
  */
 export function calculateGuestCharge(
   lessonCents: number,
@@ -107,7 +127,7 @@ export function calculateGuestCharge(
   const cardTotal = roundUpToDollar(lessonCents + cardFee)
 
   if (rail === 'paynow') {
-    const totalAmount = Math.round(cardTotal * (1 - PAYNOW_DISCOUNT_RATE))
+    const totalAmount = Math.round(cardTotal * (1 - paynowDiscountRate(cardTotal)))
     return {
       lessonAmount: lessonCents,
       totalAmount,

@@ -30,6 +30,17 @@ function filledTimes(times) {
   return (times ?? []).filter(Boolean)
 }
 
+function dateErrorLabel(dateKey) {
+  return formatDayTitle(dateKey).replace(',', '')
+}
+
+function missingTimesMessage(dateKeys) {
+  const labels = dateKeys.map(dateErrorLabel)
+  const dates = labels.join(', ')
+  const remove = labels.length === 1 ? 'that date' : 'those dates'
+  return `Add a time for ${dates}, or remove ${remove}.`
+}
+
 function groupItemsByDate(items) {
   const groups = []
   const indexByKey = {}
@@ -242,7 +253,15 @@ export default function AddSessionsForm({
   function setPerDateMode(on) {
     setPreview(null)
     if (on) {
-      setTimesByDate(timesByDateFromLists(selectedDateKeys, copyTimes(times)))
+      setTimesByDate((prev) => {
+        const next = { ...prev }
+        for (const key of selectedDateKeys) {
+          if (filledTimes(next[key]).length === 0) {
+            next[key] = copyTimes(times)
+          }
+        }
+        return next
+      })
       setPerDateTimes(true)
       return
     }
@@ -297,11 +316,17 @@ export default function AddSessionsForm({
     setError('')
     setPreview(null)
 
+    if (perDateTimes) {
+      const missing = selectedDateKeys.filter((key) => filledTimes(timesByDate[key]).length === 0)
+      if (missing.length > 0) {
+        setError(missingTimesMessage(missing))
+        return
+      }
+    }
+
     const map = perDateTimes
       ? Object.fromEntries(
-          selectedDateKeys
-            .map((key) => [key, filledTimes(timesByDate[key])])
-            .filter(([, dateTimes]) => dateTimes.length > 0),
+          selectedDateKeys.map((key) => [key, filledTimes(timesByDate[key])]),
         )
       : timesByDateFromLists(selectedDateKeys, filledTimes(times))
 

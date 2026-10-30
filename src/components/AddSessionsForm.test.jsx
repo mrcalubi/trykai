@@ -224,4 +224,40 @@ describe('AddSessionsForm per-date times', () => {
     expect(screen.getByText(/on each of 2 listings/)).toBeInTheDocument()
     expect(screen.getByText('This creates 2 sessions on each of 2 listings.')).toBeInTheDocument()
   })
+
+  it('names a picked date that still has no time instead of skipping it', async () => {
+    const { user } = renderForm()
+    const first = dateKeyFromToday(1)
+    const second = dateKeyFromToday(2)
+    await selectCalendarDate(user, first)
+    await selectCalendarDate(user, second)
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '10:00' } })
+    await user.click(screen.getByRole('checkbox', { name: /Set times per date/ }))
+    fireEvent.change(within(dateRow(second)).getByLabelText('Time'), { target: { value: '' } })
+
+    await user.click(screen.getByRole('button', { name: 'Review sessions' }))
+
+    expect(
+      screen.getByText(`Add a time for ${formatDayTitle(second).replace(',', '')}, or remove that date.`),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/This creates/)).not.toBeInTheDocument()
+  })
+
+  it('restores each date\'s times when Set times per date turns back on', async () => {
+    const { user } = renderForm()
+    const first = dateKeyFromToday(1)
+    const second = dateKeyFromToday(2)
+    await selectCalendarDate(user, first)
+    await selectCalendarDate(user, second)
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '10:00' } })
+    await user.click(screen.getByRole('checkbox', { name: /Set times per date/ }))
+    fireEvent.change(within(dateRow(second)).getByLabelText('Time'), { target: { value: '15:00' } })
+
+    await user.click(screen.getByRole('checkbox', { name: /Set times per date/ }))
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '11:00' } })
+    await user.click(screen.getByRole('checkbox', { name: /Set times per date/ }))
+
+    expect(within(dateRow(first)).getByLabelText('Time')).toHaveValue('10:00')
+    expect(within(dateRow(second)).getByLabelText('Time')).toHaveValue('15:00')
+  })
 })

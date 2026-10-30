@@ -14,10 +14,12 @@ import {
   HOST_FEE_FREE_BOOKINGS,
   HOST_FEE_RATE,
   MAX_GUESTS_PER_BOOKING,
+  PAYNOW_DISCOUNT_TIERS,
   PAYNOW_MAX_DAYS_AHEAD,
   PAYNOW_TOO_FAR_AHEAD,
   PAYNOW_TOO_FAR_AHEAD_MESSAGE,
   isPayNowTooFarAhead,
+  paynowDiscountRate,
 } from '../../supabase/functions/_shared/booking.ts'
 import { formatCents } from './cancellationPolicy'
 
@@ -25,6 +27,8 @@ export {
   discountedLessonCents,
   discountedPerPersonCents,
   groupDiscountRate,
+  PAYNOW_DISCOUNT_TIERS,
+  paynowDiscountRate,
   MAX_GUESTS_PER_BOOKING,
   PAYNOW_MAX_DAYS_AHEAD,
   PAYNOW_TOO_FAR_AHEAD,

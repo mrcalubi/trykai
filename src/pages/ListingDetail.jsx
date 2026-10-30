@@ -30,6 +30,7 @@ import {
   MAX_GUESTS_PER_BOOKING,
   nextGroupTierHint,
   PAYNOW_TOO_FAR_AHEAD_MESSAGE,
+  paynowDiscountRate,
   paynowPriceCents,
 } from '../lib/pricing'
 import { formatDuration } from '../lib/duration'
@@ -680,6 +681,7 @@ export default function ListingDetail() {
   const maxGuests = Number(listing.max_guests)
   const paynowSaving = cardPrice - paynowPrice
   const showPaynowSaving = displayRail === 'paynow' && paynowSaving > 0
+  const paynowPercent = Math.round(paynowDiscountRate(cardPrice) * 100)
 
   function renderCheckout() {
     return (
@@ -799,7 +801,9 @@ export default function ListingDetail() {
                   <span className="payment-rail__copy">
                     <span className="payment-rail__row">
                       <span className="payment-rail__name">PayNow</span>
-                      {paynowBlocked ? null : <span className="paynow-badge">Save 5%</span>}
+                      {paynowBlocked ? null : (
+                        <span className="paynow-badge">Save {paynowPercent}%</span>
+                      )}
                     </span>
                   </span>
                   <span className="payment-rail__amounts">

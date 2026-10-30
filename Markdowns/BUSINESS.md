@@ -223,9 +223,9 @@ The desires that do not self extinguish:
 | Stage 2 | Repeat behaviour, 500+ bookings historically used as the volume marker | Credit bundles, multi session courses, group discounts. Host fee already running per host, not waiting on a platform-wide count. |
 | Stage 3 | 2,000+ bookings | Host subscription tier, around S$29/month. Primary long term margin driver. |
 
-**Fee numbers live in DECISIONS.md** (guest fee 12% with S$2.50 floor, round up, PayNow 5% off the all-in total, host fee 10% from the fourth confirmed booking). Do not copy them here. The 10 per cent / S$2 floor / 8-versus-10 PayNow figures that used to sit in this section were superseded on 23 August 2026.
+**Fee numbers live in DECISIONS.md** (guest fee 12% with S$2.50 floor, round up, PayNow sliding saving off the all-in total, host fee 10% from the fourth confirmed booking). Do not copy them here. The 10 per cent / S$2 floor / 8-versus-10 PayNow figures that used to sit in this section were superseded on 23 August 2026; the flat 5% PayNow figure was superseded on 30 October 2026.
 
-At a S$25 lesson the guest sees S$28 on card and S$26.60 on PayNow. Year one still does not produce meaningful profit at low volume; margin improvement comes from the host fee and from PayNow mix, not from raising the guest fee. Worked net-per-booking figures are in HANDOVER.md / the 23 August decision, not restated here.
+At a S$25 lesson the guest sees S$28 on card and S$26.88 on PayNow. Year one still does not produce meaningful profit at low volume; margin improvement comes from the host fee and from PayNow mix, not from raising the guest fee. Worked net-per-booking figures are in HANDOVER.md / the 23 August decision, not restated here.
 
 **Wants versus needs.** Pure needs categories, tutoring and certifications, are dominated by entrenched incumbents. Target the overlap instead: things that feel like wants but function like needs. Resume relevant upskilling is the clearest example.
 
