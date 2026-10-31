@@ -23,6 +23,7 @@ import {
   prepareCheckoutAddons,
   hostPayoutAfterGuestCancel,
   confirmRpcErrorKind,
+  rescheduleErrorMessage,
   decideAbandonCheckout,
   guestCancelDecision,
   discountedLessonCents,
@@ -654,6 +655,26 @@ describe('calculateGuestRefund', () => {
     expect(LEGACY_PLATFORM_FEE_RATE).toBe(0.15)
     expect(calculateGuestRefund(4500, hoursFrom(72), undefined, now)).toBe(3825)
     expect(calculateGuestRefund(4500, hoursFrom(30), undefined, now)).toBe(1913)
+  })
+})
+
+describe('rescheduleErrorMessage', () => {
+  it('maps every RPC error to a guest-facing line', () => {
+    expect(rescheduleErrorMessage('already rescheduled')).toBe("You've already moved this booking once.")
+    expect(rescheduleErrorMessage('too late to reschedule')).toBe(
+      'Moving closes 48 hours before the session.',
+    )
+    expect(rescheduleErrorMessage('insufficient add-ons')).toBe(
+      "There aren't enough of your extras left on that date.",
+    )
+    expect(rescheduleErrorMessage('insufficient spots')).toBe('Not enough spots left on that date.')
+    expect(rescheduleErrorMessage('paynow window')).toBe(
+      'PayNow bookings can only move to a date within 80 days of when you paid.',
+    )
+    expect(rescheduleErrorMessage('not allowed')).toBe('Not allowed')
+    expect(rescheduleErrorMessage('booking not found')).toBe('Booking not found')
+    expect(rescheduleErrorMessage('session not available')).toBe("That date isn't available any more.")
+    expect(rescheduleErrorMessage(undefined)).toBe("That date isn't available any more.")
   })
 })
 

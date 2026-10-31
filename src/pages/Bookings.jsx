@@ -18,11 +18,12 @@ import {
   paymentWasDeclined,
 } from '../lib/paymentReturn'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
-import { formatSessionDateTime, formatSessionTime } from '../lib/sessionDate'
+import { formatSessionDateTime, formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import { guestCalendarMarks, splitGuestBookings } from '../lib/profileV2'
 import { DateChip, TabCalendar } from '../components/profile/ProfileSections'
 import { singaporeDateKey } from '../lib/sessionCalendar'
 import { addonLineLabel, loadBookingAddonRows } from '../lib/bookingAddons'
+import { isMissingRescheduleColumn } from '../lib/bookingPage'
 
 const POLL_ATTEMPTS = 20
 const POLL_INTERVAL_MS = 2000
@@ -67,15 +68,11 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
   const [cancelLoading, setCancelLoading] = useState(false)
   const [cancelError, setCancelError] = useState('')
   const [bookingAddresses, setBookingAddresses] = useState({})
+  const [movedFromById, setMovedFromById] = useState({})
   const [nowMs] = useState(() => Date.now())
 
   const loadData = useCallback(async () => {
-    const [bookingsResult, reviewsResult] = await Promise.all([
-      withIssuedAtRetry(() =>
-        supabase
-        .from('bookings')
-        .select(
-          `
+    const bookingsSelect = `
           id,
           status,
           session_id,
@@ -85,6 +82,8 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
           stripe_charge_id,
           stripe_refund_id,
           refund_amount,
+          rescheduled_at,
+          rescheduled_from_session_id,
           sessions (
             starts_at,
             duration_mins,
@@ -97,10 +96,23 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
             )
           )
         `
-        )
-        .eq('guest_id', userId)
-        .order('created_at', { ascending: false })
-      ),
+    const bookingsSelectFallback = bookingsSelect.replace(
+      /\s*rescheduled_at,\s*rescheduled_from_session_id,/,
+      '',
+    )
+    let bookingsResult = await withIssuedAtRetry(() =>
+      supabase.from('bookings').select(bookingsSelect).eq('guest_id', userId).order('created_at', { ascending: false }),
+    )
+    if (bookingsResult.error && isMissingRescheduleColumn(bookingsResult.error)) {
+      bookingsResult = await withIssuedAtRetry(() =>
+        supabase
+          .from('bookings')
+          .select(bookingsSelectFallback)
+          .eq('guest_id', userId)
+          .order('created_at', { ascending: false }),
+      )
+    }
+    const [reviewsResult] = await Promise.all([
       supabase
         .from('reviews')
         .select('booking_id')
@@ -142,6 +154,28 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
       )
 
       setBookingAddresses(Object.fromEntries(addressEntries.filter(Boolean)))
+
+      const fromIds = [...new Set(
+        (bookingsResult.data ?? [])
+          .map((booking) => booking.rescheduled_from_session_id)
+          .filter(Boolean),
+      )]
+      if (fromIds.length > 0) {
+        const { data: fromSessions } = await supabase
+          .from('sessions')
+          .select('id, starts_at')
+          .in('id', fromIds)
+        const bySession = {}
+        for (const row of fromSessions ?? []) bySession[row.id] = row.starts_at
+        const moved = {}
+        for (const booking of bookingsResult.data ?? []) {
+          const iso = bySession[booking.rescheduled_from_session_id]
+          if (iso) moved[booking.id] = iso
+        }
+        setMovedFromById(moved)
+      } else {
+        setMovedFromById({})
+      }
     }
 
     if (!reviewsResult.error && reviewsResult.data) {
@@ -429,6 +463,7 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
                 {bookingAddresses[booking.id]}
               </>
             )}
+            {movedFromById[booking.id] ? ` · Moved from ${formatSessionDay(movedFromById[booking.id])}` : ''}
           </p>
           <div className="booking-card__actions">
             <span className={`badge badge--${booking.status}`}>

@@ -44,6 +44,15 @@ describe('payoutSkipReason', () => {
     ).toBe('hold_not_elapsed')
   })
 
+  it('follows the new session time after a booking is moved', () => {
+    const now = Date.UTC(2026, 9, 20, 12, 0)
+    const oldStart = new Date(now - PAYOUT_HOLD_MS - 3 * 60 * 60 * 1000).toISOString()
+    const newStart = new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const booking = candidate({ starts_at: oldStart, duration_mins: 90 })
+    expect(payoutSkipReason(booking, now)).toBeNull()
+    expect(payoutSkipReason({ ...booking, starts_at: newStart }, now)).toBe('hold_not_elapsed')
+  })
+
   it('counts the hold from starts_at plus duration_mins', () => {
     const startsMs = Date.UTC(2026, 9, 1, 10, 0)
     const booking = candidate({ starts_at: new Date(startsMs).toISOString(), duration_mins: 120 })

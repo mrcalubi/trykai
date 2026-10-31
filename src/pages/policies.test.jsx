@@ -103,9 +103,10 @@ describe('Cancellation Policy page', () => {
     expect(screen.queryByText(/Dashboard/)).not.toBeInTheDocument()
   })
 
-  it('does not promise a reschedule that is not built', () => {
-    expect(screen.queryByRole('heading', { name: 'Rescheduling instead of cancelling' })).not.toBeInTheDocument()
-    expect(screen.queryByText(/reschedule your booking/)).not.toBeInTheDocument()
+  it('says a guest can move a booking once before the 48 hour cutoff', () => {
+    expect(
+      screen.getByText(/You can\s+move a booking once, up to 48 hours before, at no cost/),
+    ).toBeInTheDocument()
   })
 })
 

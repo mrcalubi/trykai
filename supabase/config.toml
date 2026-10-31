@@ -480,6 +480,14 @@ verify_jwt = false
 import_map = "./functions/cancel-booking/deno.json"
 entrypoint = "./functions/cancel-booking/index.ts"
 
+# verify_jwt is false because the function checks the guest's JWT itself and
+# returns 401/403 with a readable body rather than the platform's opaque 401.
+[functions.reschedule-booking]
+enabled = true
+verify_jwt = false
+import_map = "./functions/reschedule-booking/deno.json"
+entrypoint = "./functions/reschedule-booking/index.ts"
+
 # verify_jwt is false because the function checks the caller's JWT itself and
 # returns 403 with a readable body rather than the platform's opaque 401.
 [functions.abandon-checkout]

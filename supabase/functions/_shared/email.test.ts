@@ -48,6 +48,11 @@ import {
   refundTimingCopy,
   resolvePaymentMethod,
   sendCancellationEmails,
+  sendRescheduleEmails,
+  bookingMovedGuestHtml,
+  bookingMovedGuestSubject,
+  bookingMovedHostHtml,
+  bookingMovedHostSubject,
   sendComplaintEmails,
   sendDisputeRefundEmail,
   sendHostSessionCancelledEmail,
@@ -801,6 +806,66 @@ describe('formatCents', () => {
 
   it('groups thousands the way a guest reads a price', () => {
     expect(formatCents(135800)).toBe('$1,358')
+  })
+})
+
+describe('reschedule emails', () => {
+  it('tells the guest the new date and the host what to prepare', () => {
+    expect(bookingMovedGuestSubject('10 Nov 2026, 2:00 pm')).toBe(
+      "You've moved your booking to 10 Nov 2026, 2:00 pm",
+    )
+    expect(bookingMovedHostSubject('Kai', '3 Nov 2026, 2:00 pm', '10 Nov 2026, 2:00 pm')).toBe(
+      'Kai moved their booking from 3 Nov 2026, 2:00 pm to 10 Nov 2026, 2:00 pm',
+    )
+    const guest = bookingMovedGuestHtml({
+      guestName: 'Kai',
+      listingTitle: 'Latte art',
+      sessionDate: '10 Nov 2026, 2:00 pm',
+      bookingId: 'booking-1',
+    })
+    expect(guest).toContain('You&#39;ve moved your booking to 10 Nov 2026, 2:00 pm')
+    expect(guest).toContain('Latte art is now on 10 Nov 2026, 2:00 pm')
+    expect(guest).toContain('href="https://trykai.sg/bookings/booking-1"')
+    const host = bookingMovedHostHtml({
+      hostName: 'Mei',
+      guestFirstName: 'Kai',
+      listingTitle: 'Latte art',
+      oldSessionDate: '3 Nov 2026, 2:00 pm',
+      newSessionDate: '10 Nov 2026, 2:00 pm',
+      addons: [{ name: 'Premium blooms', quantity: 1 }],
+    })
+    expect(host).toContain('Kai moved their booking for Latte art from 3 Nov 2026, 2:00 pm to 10 Nov 2026, 2:00 pm')
+    expect(host).toContain('Premium blooms × 1')
+  })
+
+  it('sends both emails and swallows a Resend failure', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+    await sendRescheduleEmails({
+      apiKey: 're_test',
+      guestEmail: 'guest@test',
+      hostEmail: 'host@test',
+      guestName: 'Kai',
+      hostName: 'Mei',
+      guestFirstName: 'Kai',
+      listingTitle: 'Latte art',
+      oldSessionDate: 'old',
+      newSessionDate: 'new',
+      bookingId: 'booking-1',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
+    await expect(
+      sendRescheduleEmails({
+        apiKey: 're_test',
+        guestEmail: 'guest@test',
+        guestFirstName: 'Kai',
+        listingTitle: 'Latte art',
+        oldSessionDate: 'old',
+        newSessionDate: 'new',
+        bookingId: 'booking-1',
+      }),
+    ).resolves.toBeUndefined()
   })
 })
 

@@ -8,6 +8,7 @@ import {
   SOLD_OUT_SESSION,
   makeAuthSession,
 } from './support/fixtures'
+import { formatSessionDay } from '../src/lib/sessionDate'
 
 test.describe('listing detail', () => {
   test('shows the host, price, description and what is provided', async ({ page }) => {
@@ -631,4 +632,95 @@ test('books with an add-on and shows it on the confirmation', async ({ page }) =
 
   await page.goto('/bookings/booking-addon')
   await expect(page.getByText('Premium blooms × 1')).toBeVisible()
+})
+
+test('moves a booking to another date and then shows the new one', async ({ page }) => {
+  const nextStarts = hoursFromNow(144)
+  const nextSession = {
+    id: 'session-next',
+    listing_id: LATTE_ART.id,
+    starts_at: nextStarts,
+    duration_mins: 90,
+    spots_remaining: 3,
+    status: 'open',
+  }
+  const booking = {
+    id: 'booking-move',
+    guest_id: SIGNED_IN_USER.id,
+    status: 'confirmed',
+    session_id: OPEN_SESSION.id,
+    guests_count: 1,
+    total_amount: 4500,
+    platform_fee: 675,
+    payment_rail: 'card',
+    created_at: hoursFromNow(-24),
+    rescheduled_at: null,
+    sessions: {
+      id: OPEN_SESSION.id,
+      starts_at: OPEN_SESSION.starts_at,
+      duration_mins: 90,
+      listings: {
+        id: LATTE_ART.id,
+        title: LATTE_ART.title,
+        photo_urls: [],
+        whats_provided: ['Materials'],
+        what_to_bring: [],
+        duration_mins: 90,
+        host_id: 'host-1',
+        area: 'Tiong Bahru',
+        price_per_person: 4500,
+        group_pricing: false,
+        users: {
+          display_name: 'Mei',
+          avatar_url: null,
+          bio: 'I teach latte art in a small studio.',
+          is_id_verified: true,
+        },
+      },
+    },
+  }
+
+  await stubAllExternalCalls(
+    page,
+    {
+      listings: [LATTE_ART],
+      sessions: [{ ...OPEN_SESSION, status: 'open' }, nextSession],
+      reviews: [],
+      bookings: [booking],
+      booking_addons: [],
+      users: [{ id: SIGNED_IN_USER.id, display_name: 'Kai', is_host: false }],
+      'rpc/listing_address': '12 Club Street, Singapore 069410',
+    },
+    {
+      session: makeAuthSession(),
+      functions: {
+        'reschedule-booking': (body) => {
+          booking.session_id = body.session_id
+          booking.rescheduled_at = new Date().toISOString()
+          booking.rescheduled_from_session_id = OPEN_SESSION.id
+          booking.sessions = {
+            ...booking.sessions,
+            id: nextSession.id,
+            starts_at: nextStarts,
+          }
+          return { ok: true, session_id: nextSession.id }
+        },
+      },
+    },
+  )
+
+  await page.goto('/login')
+  await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+  await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
+  await page.getByRole('button', { name: 'Log in' }).click()
+  await expect(page).toHaveURL(/\/$/)
+
+  await page.goto('/bookings/booking-move')
+  await expect(page.getByRole('heading', { name: LATTE_ART.title })).toBeVisible()
+  await page.getByRole('button', { name: 'Plans changed? Manage booking' }).click()
+  await page.getByRole('button', { name: new RegExp(formatSessionDay(nextStarts)) }).click()
+  await expect(page.getByText(/You can only move a booking once/)).toBeVisible()
+  await page.getByRole('button', { name: 'Move booking' }).click()
+  await expect(page.getByText(formatSessionDay(nextStarts))).toBeVisible()
+  await expect(page.getByRole('dialog', { name: "Can't make it?" })).toHaveCount(0)
 })

@@ -8,6 +8,7 @@ import Profile from './Profile'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { hoursFromNow, makeAuthSession, makeBooking, makeListing, makeReview, makeSession } from '../test/fixtures'
+import { formatSessionDay } from '../lib/sessionDate'
 vi.mock('../lib/supabase')
 
 const HOST_ID = 'host-1'
@@ -1462,5 +1463,28 @@ describe('Profile card layout', () => {
     expect(calendar).toHaveTextContent('1 upcoming')
     expect(calendar).toHaveTextContent('Upcoming')
     expect(calendar).toHaveTextContent('Attended')
+  })
+
+  it('shows Moved from the old date on a rescheduled booking', async () => {
+    const oldStart = hoursFromNow(48)
+    givenSignedIn(HOST_ID)
+    givenBookings([
+      makeBooking({
+        id: 'booking-moved',
+        session_id: 'session-new',
+        rescheduled_at: hoursFromNow(-2),
+        rescheduled_from_session_id: 'session-old',
+        sessions: {
+          starts_at: hoursFromNow(120),
+          duration_mins: 90,
+          listings: { title: 'Learn latte art with me', host_id: HOST_ID },
+        },
+      }),
+    ])
+    givenSessions([{ id: 'session-old', starts_at: oldStart }])
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'My Bookings' })
+    expect(screen.getByText(new RegExp(`Moved from ${formatSessionDay(oldStart)}`))).toBeInTheDocument()
   })
 })

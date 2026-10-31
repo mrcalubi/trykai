@@ -455,6 +455,7 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00040` (host_sessions_held) | Not applied | Not applied | Apply on staging, then production, before merging the profile card layout. After `00039`. |
 | `00042` (listing add-ons) | Not applied | Not applied | Host editor. Apply before `00043`. |
 | `00043` (booking add-ons) | Not applied | Not applied | After `00042`. Payouts are unchanged: add-ons ride inside `host_payout_amount`. |
+| `00044` (reschedule) | Not applied | Not applied | After `00043`. Caleb applies. Columns plus `reschedule_booking`. Deploy `reschedule-booking`. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
@@ -1216,7 +1217,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [ ] Guest can cancel from the Bookings tab (invokes `cancel-booking`; `/bookings` redirects there)
 - [ ] Four tier refund correctly calculated, 100 / 50 / 25 / 0 of the session and add-ons at 48hr, 24hr, 6hr; booking fee never refunded on a guest cancel; host / admin cancel still refunds everything
 - [x] Refund amount stored and included directly in the cancellation email
-- [ ] Guest can reschedule instead of cancelling, once per booking, 48hr cutoff
+- [ ] Guest can reschedule instead of cancelling, once per booking, 48hr cutoff (`00044`, `reschedule-booking`)
 - [ ] Host can cancel from the Hosting tab (`/hosting` redirects there)
 - [ ] Host cancellation increments strikes
 - [ ] Guest can report a host no show, distinct from host initiated cancel, triggering 2 strikes and account review
