@@ -4,7 +4,7 @@ export default function RefundPolicy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Refund Policy</h1>
-      <p className="policy-page__updated">Last updated: 19 October 2026</p>
+      <p className="policy-page__updated">Last updated: 31 October 2026</p>
 
       <h2>How refunds work</h2>
       <p>
@@ -12,6 +12,12 @@ export default function RefundPolicy() {
         <Link to="/cancellation-policy">Cancellation Policy</Link>. This page
         covers how and when you actually get your money back once a refund has
         been approved. Add-ons follow the same refund tiers as the session.
+      </p>
+      <p>
+        The booking fee (TryKai&apos;s platform fee, already included in the
+        all-in price) is not refunded when you cancel. It covers payment
+        processing and running TryKai. If the host cancels or does not show up,
+        you get a full refund including the booking fee.
       </p>
       <p>
         Refunds are issued to your original payment method through Stripe, our

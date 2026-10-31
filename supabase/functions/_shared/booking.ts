@@ -531,7 +531,7 @@ export const LEGACY_PLATFORM_FEE_RATE = 0.15
  * src/pages/CancellationPolicy.jsx states them. Change all three together.
  */
 export const GUEST_REFUND_TIER_RULES = [
-  { id: 'full', minHoursBefore: 48, lessonFeeShare: 1, refundsPlatformFee: true },
+  { id: 'full', minHoursBefore: 48, lessonFeeShare: 1, refundsPlatformFee: false },
   { id: 'half', minHoursBefore: 24, lessonFeeShare: 0.5, refundsPlatformFee: false },
   { id: 'quarter', minHoursBefore: 6, lessonFeeShare: 0.25, refundsPlatformFee: false },
   { id: 'none', minHoursBefore: Number.NEGATIVE_INFINITY, lessonFeeShare: 0, refundsPlatformFee: false },
@@ -590,7 +590,6 @@ export function calculateGuestRefund(
   now = Date.now(),
 ): number {
   const tier = guestRefundTierRule(sessionStartsAt, now)
-  if (tier.refundsPlatformFee) return totalAmountCents
   if (tier.lessonFeeShare === 0) return 0
   const lessonFee = totalAmountCents - platformFeeOf(totalAmountCents, platformFeeCents)
   return Math.round(lessonFee * tier.lessonFeeShare)

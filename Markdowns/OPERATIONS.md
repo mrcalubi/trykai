@@ -1214,7 +1214,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 
 ## Cancellations
 - [ ] Guest can cancel from the Bookings tab (invokes `cancel-booking`; `/bookings` redirects there)
-- [ ] Four tier refund correctly calculated, 100 / 50 / 25 / 0 at 48hr, 24hr, 6hr, with platform fee forfeited on partial tiers
+- [ ] Four tier refund correctly calculated, 100 / 50 / 25 / 0 of the session and add-ons at 48hr, 24hr, 6hr; booking fee never refunded on a guest cancel; host / admin cancel still refunds everything
 - [x] Refund amount stored and included directly in the cancellation email
 - [ ] Guest can reschedule instead of cancelling, once per booking, 48hr cutoff
 - [ ] Host can cancel from the Hosting tab (`/hosting` redirects there)

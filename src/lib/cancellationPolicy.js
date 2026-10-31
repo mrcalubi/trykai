@@ -4,9 +4,9 @@
 // supabase/functions/_shared/booking.ts (which sets the actual Stripe refund),
 // and the wording on src/pages/CancellationPolicy.jsx.
 //
-// A guest pays `total_amount`, and the platform fee is carved out of it rather
-// than added on top. So "the lesson fee" is `total_amount - platform_fee`, and a
-// refund "including the platform fee" is the whole `total_amount`.
+// A guest pays `total_amount`, and the booking fee (platform_fee) is carved
+// out of it rather than added on top. "The session and add-ons" is
+// `total_amount - platform_fee`. A guest cancel never refunds the booking fee.
 
 // Legacy fallback only: bookings taken before `platform_fee` was stored used a
 // 15% carve-out. Live charges use calculateGuestCharge in booking.ts.
@@ -15,15 +15,15 @@ export const PLATFORM_FEE_RATE = 0.15
 export const CANCELLATION_POLICY_ITEMS = [
   {
     scenario: 'Guest cancels 48+ hours before session',
-    resolution: 'Full refund, including the platform fee',
+    resolution: 'Refund of the session and add-ons. The booking fee is not refunded.',
   },
   {
     scenario: 'Guest cancels 24–48 hours before session',
-    resolution: '50% of the lesson fee refunded (platform fee not refunded)',
+    resolution: '50% of the session and add-ons refunded. The booking fee is not refunded.',
   },
   {
     scenario: 'Guest cancels 6–24 hours before session',
-    resolution: '25% of the lesson fee refunded (platform fee not refunded)',
+    resolution: '25% of the session and add-ons refunded. The booking fee is not refunded.',
   },
   {
     scenario: 'Guest cancels under 6 hours before session, or does not show up',
@@ -77,9 +77,9 @@ export const GUEST_REFUND_TIERS = [
     id: 'full',
     minHoursBefore: 48,
     lessonFeeShare: 1,
-    refundsPlatformFee: true,
+    refundsPlatformFee: false,
     describe: (refund) =>
-      `Full refund of ${formatCents(refund)}, including the platform fee ` +
+      `Refund of ${formatCents(refund)}. The booking fee isn't refunded ` +
       `(cancelled 48 or more hours before the session).`,
   },
   {
@@ -88,8 +88,8 @@ export const GUEST_REFUND_TIERS = [
     lessonFeeShare: 0.5,
     refundsPlatformFee: false,
     describe: (refund) =>
-      `Partial refund of ${formatCents(refund)} — 50% of the lesson fee ` +
-      `(cancelled 24 to 48 hours before the session). The platform fee is not refunded.`,
+      `Partial refund of ${formatCents(refund)} — 50% of the session and add-ons ` +
+      `(cancelled 24 to 48 hours before the session). The booking fee isn't refunded.`,
   },
   {
     id: 'quarter',
@@ -97,8 +97,8 @@ export const GUEST_REFUND_TIERS = [
     lessonFeeShare: 0.25,
     refundsPlatformFee: false,
     describe: (refund) =>
-      `Partial refund of ${formatCents(refund)} — 25% of the lesson fee ` +
-      `(cancelled 6 to 24 hours before the session). The platform fee is not refunded.`,
+      `Partial refund of ${formatCents(refund)} — 25% of the session and add-ons ` +
+      `(cancelled 6 to 24 hours before the session). The booking fee isn't refunded.`,
   },
   {
     id: 'none',
@@ -131,7 +131,6 @@ function platformFeeOf(totalAmountCents, platformFeeCents) {
 export function calculateGuestRefund(totalAmountCents, sessionStartsAt, platformFeeCents) {
   const tier = guestRefundTier(sessionStartsAt)
 
-  if (tier.refundsPlatformFee) return totalAmountCents
   if (tier.lessonFeeShare === 0) return 0
 
   const lessonFee = totalAmountCents - platformFeeOf(totalAmountCents, platformFeeCents)

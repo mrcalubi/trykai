@@ -185,7 +185,7 @@ test.describe('listing detail', () => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART], sessions: [], reviews: [] })
     await page.goto('/listings/listing-latte')
 
-    await expect(page.getByText(/Full refund if you cancel 48\+ hours before/)).toBeVisible()
+    await expect(page.getByText(/Refund minus the booking fee if you cancel 48\+ hours before/)).toBeVisible()
     await expect(page.getByText('Guest cancels 48+ hours before session:')).toBeHidden()
     await page.getByRole('button', { name: 'Cancellation policy' }).click()
 

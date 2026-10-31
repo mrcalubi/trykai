@@ -357,14 +357,14 @@ These are enforced in code. If you are about to change logic around any of them,
 
 ### Cancellation policy, correct version
 
-*Updated 25 October 2026. Guest tiers from 29 July 2026. Published at /cancellation-policy.*
+*Updated 31 October 2026. Guest 48h+ row changed that day: booking fee never refunded on a guest cancel. Published at /cancellation-policy.*
 
 
 | Scenario                              | Outcome                                                                                                                                                           |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Guest cancels 48hrs+ before           | Full refund, including platform fee                                                                                                                               |
-| Guest cancels 24 to 48hrs before      | 50% of lesson fee, platform fee forfeited                                                                                                                         |
-| Guest cancels 6 to 24hrs before       | 25% of lesson fee, platform fee forfeited                                                                                                                         |
+| Guest cancels 48hrs+ before           | Session and add-ons (`total_amount − platform_fee`). Booking fee not refunded                                                                                     |
+| Guest cancels 24 to 48hrs before      | 50% of session and add-ons, booking fee not refunded                                                                                                              |
+| Guest cancels 6 to 24hrs before       | 25% of session and add-ons, booking fee not refunded                                                                                                              |
 | Guest cancels under 6hrs, or no shows | No refund                                                                                                                                                         |
 | You cancel a booked session           | Every guest gets a full refund and you get one strike. Guests plan their day around your session, so we keep cancellations rare.                                  |
 | You remove a date nobody has booked   | No strike. Change your calendar freely. (`delete_empty_session`)                                                                                                  |
@@ -394,6 +394,8 @@ Also decided but **not yet built**: reschedule, once per booking, same 48 hour c
 **PayNow.** A sliding percentage off the card all-in total for that guest count, displayed at checkout only: 5% under $20, 4% under $30, 3% under $60, 2% otherwise (`paynowDiscountRate`). Each tier is the largest whole percentage that keeps PayNow at or above card after Stripe fees (card 3.4% + S$0.50, PayNow 1.3%). The badge shows the current rate and can step down as the basket grows. PayNow is refused when the session starts more than `PAYNOW_MAX_DAYS_AHEAD` (80) days from now — Stripe cannot refund PayNow after 90 days. `create-payment-intent` returns `paynow_too_far_ahead`; the checkout UI disables PayNow and keeps card pricing. Card is unaffected.
 
 **Host fee.** 10% of the discounted lesson only (`lesson = total_amount − platform_fee − addons_amount`), never of add-ons. Triggered per host: every non founding host's first three **confirmed** bookings are free, their fourth booking onward pays the fee. A group booking counts as one toward those three. Founding hosts (`is_founding_host`) never pay. Host payout is `lesson − host_fee + addons_amount`.
+
+**Guest cancel never refunds the booking fee.** `GUEST_REFUND_TIER_RULES.full` is `lessonFeeShare: 1, refundsPlatformFee: false`, so 48h+ is `total_amount − platform_fee`. Partial tiers were already fee-exclusive. Host, host no-show and admin cancels still refund `total_amount`. `hostPayoutAfterGuestCancel` is unchanged: a 48h+ guest refund is at least the host payout, so the host still gets 0. Decided 31 October 2026.
 
 Do not hardcode a flat percentage. Worked one-person checks: $10 → $13, $20 → $23, $25 → $28, $30 → $34, $40 → $45. PayNow example: $25 lesson → $26.88. Code of record is `booking.ts` and `pricing.js`; they must agree.
 

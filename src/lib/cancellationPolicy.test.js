@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CANCELLATION_POLICY_ITEMS,
@@ -79,9 +81,9 @@ describe('guestRefundTier', () => {
 })
 
 describe('calculateGuestRefund', () => {
-  it('refunds everything, platform fee included, at 48 hours or more', () => {
-    expect(calculateGuestRefund(TOTAL, hoursFromNow(72), FEE)).toBe(TOTAL)
-    expect(calculateGuestRefund(TOTAL, hoursFromNow(48), FEE)).toBe(TOTAL)
+  it('refunds the session and add-ons, never the booking fee, at 48 hours or more', () => {
+    expect(calculateGuestRefund(TOTAL, hoursFromNow(72), FEE)).toBe(LESSON_FEE)
+    expect(calculateGuestRefund(TOTAL, hoursFromNow(48), FEE)).toBe(LESSON_FEE)
   })
 
   it('refunds half the lesson fee between 24 and 48 hours', () => {
@@ -104,8 +106,8 @@ describe('calculateGuestRefund', () => {
     expect(calculateGuestRefund(TOTAL, hoursFromNow(-48), FEE)).toBe(0)
   })
 
-  it('never refunds the platform fee on a partial refund', () => {
-    for (const hours of [47, 30, 24, 20, 10, 6]) {
+  it('never refunds the booking fee on any guest cancel', () => {
+    for (const hours of [72, 48, 47, 30, 24, 20, 10, 6]) {
       expect(calculateGuestRefund(TOTAL, hoursFromNow(hours), FEE)).toBeLessThanOrEqual(LESSON_FEE)
     }
   })
@@ -152,23 +154,23 @@ describe('calculateGuestRefund', () => {
 })
 
 describe('guestRefundDescription', () => {
-  it('describes a full refund and says the platform fee is included', () => {
+  it('describes the 48h+ refund and says the booking fee is not included', () => {
     expect(guestRefundDescription(TOTAL, hoursFromNow(72), FEE)).toBe(
-      'Full refund of $45, including the platform fee (cancelled 48 or more hours before the session).'
+      "Refund of $38.25. The booking fee isn't refunded (cancelled 48 or more hours before the session)."
     )
   })
 
-  it('describes a half refund of the lesson fee', () => {
+  it('describes a half refund of the session and add-ons', () => {
     expect(guestRefundDescription(TOTAL, hoursFromNow(30), FEE)).toBe(
-      'Partial refund of $19.13 — 50% of the lesson fee (cancelled 24 to 48 hours before the session). ' +
-        'The platform fee is not refunded.'
+      'Partial refund of $19.13 — 50% of the session and add-ons (cancelled 24 to 48 hours before the session). ' +
+        "The booking fee isn't refunded."
     )
   })
 
-  it('describes a quarter refund of the lesson fee', () => {
+  it('describes a quarter refund of the session and add-ons', () => {
     expect(guestRefundDescription(TOTAL, hoursFromNow(12), FEE)).toBe(
-      'Partial refund of $9.56 — 25% of the lesson fee (cancelled 6 to 24 hours before the session). ' +
-        'The platform fee is not refunded.'
+      'Partial refund of $9.56 — 25% of the session and add-ons (cancelled 6 to 24 hours before the session). ' +
+        "The booking fee isn't refunded."
     )
   })
 
@@ -221,6 +223,12 @@ describe('CANCELLATION_POLICY_ITEMS', () => {
 
   // The summary shown in the UI, the tier table, and the maths are edited in
   // different places. These assertions fail loudly if one moves without the rest.
+  it('never promises a full refund that includes the booking fee', () => {
+    expect(CANCELLATION_POLICY_ITEMS[0].resolution).toMatch(/booking fee is not refunded/)
+    expect(CANCELLATION_POLICY_ITEMS[0].resolution).not.toMatch(/including the platform fee/)
+    expect(GUEST_REFUND_TIERS.every((tier) => tier.refundsPlatformFee === false)).toBe(true)
+  })
+
   it('publishes one guest row per refund tier', () => {
     const guestRows = CANCELLATION_POLICY_ITEMS.filter((item) =>
       item.scenario.startsWith('Guest cancels')
@@ -229,7 +237,7 @@ describe('CANCELLATION_POLICY_ITEMS', () => {
   })
 
   it.each([
-    [0, 72, TOTAL],
+    [0, 72, LESSON_FEE],
     [1, 30, Math.round(LESSON_FEE * 0.5)],
     [2, 12, Math.round(LESSON_FEE * 0.25)],
     [3, 3, 0],
@@ -261,6 +269,24 @@ describe('CANCELLATION_POLICY_ITEMS', () => {
     expect(CANCELLATION_POLICY_ITEMS[7].resolution).toBe(
       "Strikes expire 12 months after they're given."
     )
+  })
+})
+
+describe('guest-facing cancel copy', () => {
+  it('does not say Full refund if you cancel', () => {
+    const files = [
+      'src/pages/ListingDetail.jsx',
+      'src/components/CancellationPolicy.jsx',
+      'src/pages/CancellationPolicy.jsx',
+      'src/pages/RefundPolicy.jsx',
+      'src/pages/Terms.jsx',
+      'src/lib/cancellationPolicy.js',
+      'supabase/functions/_shared/email.ts',
+    ]
+    for (const file of files) {
+      const text = readFileSync(resolve(import.meta.dirname, '../..', file), 'utf8')
+      expect(text, file).not.toMatch(/Full refund if you cancel/)
+    }
   })
 })
 

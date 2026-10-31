@@ -329,7 +329,7 @@ export function refundDeadlineLines(sessionStartsAt: string): string[] {
   const start = new Date(sessionStartsAt)
   if (Number.isNaN(start.getTime())) return []
   return [
-    `Full refund if you cancel before ${formatSessionDate(shiftHours(start, -48))}`,
+    `Refund minus the booking fee if you cancel before ${formatSessionDate(shiftHours(start, -48))}`,
     `50% refund if you cancel before ${formatSessionDate(shiftHours(start, -24))}`,
     `25% refund if you cancel before ${formatSessionDate(shiftHours(start, -6))}`,
   ]
@@ -913,7 +913,7 @@ export function bookingCancelledGuestHtml(options: {
       ? `<p style="margin:0 0 16px;">We're sorry. ${escapeHtml(hostName)} had to cancel your session on ${escapeHtml(options.sessionDate)}. You'll get a full refund of ${escapeHtml(refund)}. ${escapeHtml(timing)}</p>`
       : options.refundAmountCents > 0
         ? `<p style="margin:0 0 16px;">Sorry you can't make it</p>
-    <p style="margin:0 0 16px;">Your refund of ${escapeHtml(refund)} is on its way to your ${escapeHtml(method)}. ${escapeHtml(timing)}</p>`
+    <p style="margin:0 0 16px;">Your refund of ${escapeHtml(refund)} is on its way to your ${escapeHtml(method)}. The booking fee isn't refunded. ${escapeHtml(timing)}</p>`
         : `<p style="margin:0 0 16px;">Sorry you can't make it</p>
     <p style="margin:0 0 16px;">There's no refund for this cancellation.</p>`
 

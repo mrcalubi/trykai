@@ -4,13 +4,18 @@ export default function CancellationPolicy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Cancellation Policy</h1>
-      <p className="policy-page__updated">Last updated: 25 October 2026</p>
+      <p className="policy-page__updated">Last updated: 31 October 2026</p>
 
       <p>
         This policy applies to single session bookings on TryKai. It is shown to
         guests before checkout and to hosts before a listing goes live, so there
         are no surprises on either side. Add-ons follow the same refund tiers as
         the session.
+      </p>
+      <p>
+        The booking fee (TryKai&apos;s platform fee, already included in the
+        all-in price) is not refunded when you cancel. It covers payment
+        processing and running TryKai.
       </p>
 
       <h2>If you are a guest</h2>
@@ -21,18 +26,16 @@ export default function CancellationPolicy() {
       </p>
       <ul>
         <li>
-          <strong>48 hours or more before the session starts:</strong> full
-          refund, including the platform fee.
+          <strong>48 hours or more before the session starts:</strong>{' '}
+          everything except the booking fee.
         </li>
         <li>
           <strong>Between 24 and 48 hours before the session starts:</strong>{' '}
-          50% of the lesson fee refunded. The platform fee is not refunded in
-          this case.
+          50% of the session and add-ons. The booking fee is not refunded.
         </li>
         <li>
           <strong>Between 6 and 24 hours before the session starts:</strong> 25%
-          of the lesson fee refunded. The platform fee is not refunded in this
-          case.
+          of the session and add-ons. The booking fee is not refunded.
         </li>
         <li>
           <strong>
@@ -50,7 +53,7 @@ export default function CancellationPolicy() {
       <h2>If you are a host</h2>
       <p>
         You can cancel a confirmed session at any time, but every guest booked
-        into that session receives a full refund, including the platform fee,
+        into that session receives a full refund, including the booking fee,
         regardless of how close to the session it is.
       </p>
       <p>
@@ -68,7 +71,7 @@ export default function CancellationPolicy() {
       </p>
       <ul>
         <li>
-          The affected guest receives a full refund, including the platform fee.
+          The affected guest receives a full refund, including the booking fee.
         </li>
         <li>
           TryKai may also offer the guest fair compensation at our discretion,
@@ -116,7 +119,7 @@ export default function CancellationPolicy() {
       <p>
         In rare cases, TryKai may cancel a booking directly, for example due to
         a safety concern, a suspected policy violation, or suspected fraud. If
-        this happens, the guest receives a full refund, including the platform
+        this happens, the guest receives a full refund, including the booking
         fee, and we will follow up directly by email to explain the situation.
       </p>
 

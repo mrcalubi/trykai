@@ -1,6 +1,6 @@
 # Terms of Service
 
-Last updated: 25 October 2026
+Last updated: 31 October 2026
 
 These terms apply to everyone who uses TryKai. Part 1 applies to all users. Part 2 applies when you host. Part 3 applies when you book.
 
@@ -152,7 +152,7 @@ You accept this Part when you book.
 
 ### 2. Cancellations and refunds
 
-Refunds depend on how early you cancel. See our [Cancellation Policy](/cancellation-policy) and [Refund Policy](/refund-policy) before you book.
+Refunds depend on how early you cancel. The booking fee (TryKai's platform fee, already included in the all-in price) is not refunded when you cancel. It covers payment processing and running TryKai. See our [Cancellation Policy](/cancellation-policy) and [Refund Policy](/refund-policy) before you book.
 
 ### 3. At the session
 
