@@ -13,9 +13,25 @@ describe('supabase client', () => {
 
     expect(createClient).toHaveBeenCalledExactlyOnceWith(
       import.meta.env.VITE_SUPABASE_URL,
-      import.meta.env.VITE_SUPABASE_ANON_KEY
+      import.meta.env.VITE_SUPABASE_ANON_KEY,
+      { global: { fetch: expect.any(Function) } },
     )
     expect(supabase).toEqual({ marker: 'client' })
+  })
+
+  it('never lets the browser cache an API response', async () => {
+    const { noStoreFetch } = await import('./supabase')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'))
+
+    await noStoreFetch('https://example.supabase.co/rest/v1/sessions', {
+      headers: { apikey: 'k' },
+    })
+
+    expect(fetchSpy).toHaveBeenCalledWith('https://example.supabase.co/rest/v1/sessions', {
+      headers: { apikey: 'k' },
+      cache: 'no-store',
+    })
+    fetchSpy.mockRestore()
   })
 
   it('reads a url and an anon key that are both present', () => {

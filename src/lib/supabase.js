@@ -37,7 +37,19 @@ export const authCallbackFromUrl = readAuthCallbackFromLocation()
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+/**
+ * Never let the browser cache API responses. PostgREST sends no Cache-Control
+ * header, and some statuses are cacheable by default: a 300 (ambiguous embed)
+ * on staging was replayed from disk cache on every refresh, even after the
+ * database was fixed. Data must always come from the server.
+ */
+export function noStoreFetch(input, init = {}) {
+  return fetch(input, { ...init, cache: 'no-store' })
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: { fetch: noStoreFetch },
+})
 
 let passwordRecoverySeen = authCallbackFromUrl.type === 'recovery'
 
