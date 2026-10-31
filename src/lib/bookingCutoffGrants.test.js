@@ -3,11 +3,11 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const sql = readFileSync(
-  resolve(import.meta.dirname, '../../supabase/migrations/00045_booking_cutoff_and_arrival.sql'),
+  resolve(import.meta.dirname, '../../supabase/migrations/00046_booking_cutoff_and_arrival.sql'),
   'utf8',
 )
 
-describe('00045 booking cutoff and arrival', () => {
+describe('00046 booking cutoff and arrival', () => {
   it('makes the cutoff public and owner-updatable without a review bounce', () => {
     expect(sql).toMatch(/add column if not exists booking_cutoff_hours smallint not null default 3/)
     expect(sql).toMatch(/check \(booking_cutoff_hours in \(3, 6, 12, 24, 48\)\)/)
