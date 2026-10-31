@@ -1282,6 +1282,123 @@ export function hostPayoutLine(cents: number): string {
  * sendHostSessionCancelledEmail instead — never a guest amount.
  * Never throws: a Resend failure must not undo a refund that already happened.
  */
+export function bookingMovedGuestSubject(sessionDate: string): string {
+  return `You've moved your booking to ${sessionDate}`
+}
+
+export function bookingMovedHostSubject(
+  guestFirstName: string,
+  oldDate: string,
+  newDate: string,
+): string {
+  return `${guestFirstName} moved their booking from ${oldDate} to ${newDate}`
+}
+
+export function bookingMovedGuestHtml(options: {
+  guestName?: string | null
+  listingTitle: string
+  sessionDate: string
+  bookingId: string
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
+    ${emailHeading(`You've moved your booking to ${options.sessionDate}`)}
+    <p style="margin:0 0 16px;">${escapeHtml(options.listingTitle)} is now on ${escapeHtml(options.sessionDate)}.</p>
+    ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
+    ${emailSignOff('see-you')}
+    `,
+    siteUrl,
+    `You've moved your booking to ${options.sessionDate}`,
+  )
+}
+
+export function bookingMovedHostHtml(options: {
+  hostName?: string | null
+  guestFirstName: string
+  listingTitle: string
+  oldSessionDate: string
+  newSessionDate: string
+  addons?: Array<{ name: string; quantity: number }>
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const prepare = addonPrepareLine(options.addons)
+  const guest = escapeHtml(options.guestFirstName || 'A guest')
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    ${emailHeading(`${options.guestFirstName || 'A guest'} moved their booking`)}
+    <p style="margin:0 0 16px;">${guest} moved their booking for ${escapeHtml(options.listingTitle)} from ${escapeHtml(options.oldSessionDate)} to ${escapeHtml(options.newSessionDate)}.</p>
+    ${detailRows([
+      prepare
+        ? [
+            'Add-ons to prepare',
+            escapeHtml(prepare.replace(/^Add-ons to prepare: /, '').replace(/\.$/, '')),
+          ]
+        : null,
+    ])}
+    ${primaryButton(`${siteUrl}/hosting`, 'View hosting')}
+    ${emailSignOff('see-you')}
+    `,
+    siteUrl,
+    `${options.guestFirstName || 'A guest'} moved their booking from ${options.oldSessionDate} to ${options.newSessionDate}`,
+  )
+}
+
+export async function sendRescheduleEmails(options: {
+  apiKey: string | undefined
+  guestEmail?: string | null
+  hostEmail?: string | null
+  guestName?: string | null
+  hostName?: string | null
+  guestFirstName: string
+  listingTitle: string
+  oldSessionDate: string
+  newSessionDate: string
+  bookingId: string
+  addons?: Array<{ name: string; quantity: number }>
+  siteUrl?: string
+}): Promise<void> {
+  try {
+    await sendResendEmail({
+      apiKey: options.apiKey,
+      to: options.guestEmail,
+      subject: bookingMovedGuestSubject(options.newSessionDate),
+      replyTo: GUEST_REPLY_TO,
+      html: bookingMovedGuestHtml({
+        guestName: options.guestName,
+        listingTitle: options.listingTitle,
+        sessionDate: options.newSessionDate,
+        bookingId: options.bookingId,
+        siteUrl: options.siteUrl,
+      }),
+    })
+    await sendResendEmail({
+      apiKey: options.apiKey,
+      to: options.hostEmail,
+      subject: bookingMovedHostSubject(
+        options.guestFirstName,
+        options.oldSessionDate,
+        options.newSessionDate,
+      ),
+      html: bookingMovedHostHtml({
+        hostName: options.hostName,
+        guestFirstName: options.guestFirstName,
+        listingTitle: options.listingTitle,
+        oldSessionDate: options.oldSessionDate,
+        newSessionDate: options.newSessionDate,
+        addons: options.addons,
+        siteUrl: options.siteUrl,
+      }),
+    })
+  } catch (err) {
+    console.error('sendRescheduleEmails failed', err)
+  }
+}
+
 export async function sendCancellationEmails(options: {
   apiKey: string | undefined
   cancelledBy: 'guest' | 'host'

@@ -8348,6 +8348,260 @@ body:has(.edit-profile__bar) .site-footer {
   gap: 12px;
 }
 
+.booking-page__grid {
+  display: grid;
+  gap: 20px;
+}
+
+@media (min-width: 1024px) {
+  .booking-page__grid {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+    gap: 32px;
+  }
+}
+
+.booking-page__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.booking-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--navy-light);
+  color: var(--navy);
+}
+
+.booking-pill--cancelled,
+.booking-pill--completed {
+  background: var(--bg-subtle);
+  color: var(--muted);
+}
+
+.booking-page__with {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+
+.booking-banner {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--navy);
+  color: var(--cream);
+  font-weight: 700;
+}
+
+.booking-card {
+  margin: 0 0 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface, #fff);
+}
+
+.booking-card__title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.booking-card__sub {
+  margin: 12px 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.booking-when {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.booking-date-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 56px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.booking-date-tile__weekday,
+.booking-date-tile__month {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.booking-date-tile__day {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.booking-when__day,
+.booking-when__time,
+.booking-when__duration {
+  margin: 0;
+}
+
+.booking-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.booking-action {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 88px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.booking-action__label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.booking-action__link,
+.booking-action a {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--navy);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.booking-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.booking-checklist label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.booking-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.booking-chips li {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--navy-light);
+  font-size: 13px;
+}
+
+.booking-extras {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #e8f6ee;
+  color: #1b5e3b;
+}
+
+.booking-receipt__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+
+.booking-receipt__row--save {
+  color: #1b5e3b;
+}
+
+.booking-receipt__row--total {
+  font-weight: 700;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.booking-receipt__pay {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.booking-page__foot {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+}
+
+.booking-page__manage,
+.booking-page__wrap-btn {
+  min-height: 48px;
+  height: auto;
+  white-space: normal;
+}
+
+.booking-page__manage {
+  display: block;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.booking-move-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.booking-sheet__cancel {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.booking-again {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+
 .report-problem {
   margin-top: 24px;
   padding-top: 16px;

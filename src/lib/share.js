@@ -24,7 +24,7 @@ export async function shareOrCopy({ url, title }, nav = globalThis.navigator) {
   return copyText(url, nav)
 }
 
-async function copyText(text, nav) {
+export async function copyText(text, nav) {
   try {
     if (typeof nav?.clipboard?.writeText === 'function') {
       await nav.clipboard.writeText(text)

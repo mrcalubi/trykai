@@ -47,7 +47,8 @@ export default function CancellationPolicy() {
       </ul>
       <p>
         Cancel anytime from the Bookings tab on your profile. The refund amount
-        is calculated automatically and shown to you before you confirm.
+        is calculated automatically and shown to you before you confirm. You can
+        move a booking once, up to 48 hours before, at no cost.
       </p>
 
       <h2>If you are a host</h2>

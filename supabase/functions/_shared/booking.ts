@@ -595,6 +595,20 @@ export function calculateGuestRefund(
   return Math.round(lessonFee * tier.lessonFeeShare)
 }
 
+export function rescheduleErrorMessage(message: string | undefined): string {
+  const text = (message ?? '').toLowerCase()
+  if (text.includes('already rescheduled')) return "You've already moved this booking once."
+  if (text.includes('too late to reschedule')) return 'Moving closes 48 hours before the session.'
+  if (text.includes('insufficient add-ons')) return "There aren't enough of your extras left on that date."
+  if (text.includes('insufficient spots')) return 'Not enough spots left on that date.'
+  if (text.includes('paynow window')) {
+    return 'PayNow bookings can only move to a date within 80 days of when you paid.'
+  }
+  if (text.includes('not allowed')) return 'Not allowed'
+  if (text.includes('booking not found')) return 'Booking not found'
+  return "That date isn't available any more."
+}
+
 export function confirmRpcErrorKind(message: string | undefined): 'oversell' | 'other' {
   const text = (message ?? '').toLowerCase()
   if (
