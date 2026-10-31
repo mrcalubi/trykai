@@ -4,8 +4,10 @@
 alter table public.bookings
   add column if not exists rescheduled_at timestamptz;
 
+-- No foreign key on purpose: a second bookings -> sessions key makes every
+-- PostgREST embed of bookings and sessions ambiguous (PGRST201). See 00045.
 alter table public.bookings
-  add column if not exists rescheduled_from_session_id uuid references public.sessions(id);
+  add column if not exists rescheduled_from_session_id uuid;
 
 comment on column public.bookings.rescheduled_at is
   'Set when the guest moved this booking. Null means it has never been moved.';

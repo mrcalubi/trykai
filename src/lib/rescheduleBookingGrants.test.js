@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -14,7 +14,7 @@ describe('00044 reschedule_booking', () => {
   it('adds the two columns with a select grant and no client write', () => {
     expect(sql).toMatch(/add column if not exists rescheduled_at timestamptz/)
     expect(sql).toMatch(
-      /add column if not exists rescheduled_from_session_id uuid references public\.sessions\(id\)/,
+      /add column if not exists rescheduled_from_session_id uuid;/,
     )
     expect(sql).toMatch(
       /grant select \(rescheduled_at, rescheduled_from_session_id\) on table public\.bookings to authenticated/,
@@ -108,5 +108,30 @@ describe('reschedule-booking function', () => {
     expect(fn).toContain('rescheduleErrorMessage')
     expect(fn).toContain('sendRescheduleEmails')
     expect(fn).not.toContain('apply_host_strike')
+  })
+})
+
+describe('one bookings -> sessions relationship only', () => {
+  // A second foreign key between bookings and sessions makes every PostgREST
+  // embed of the two ambiguous (PGRST201) and broke Bookings, Hosting and the
+  // webhook on staging. Keep `session_id` the only one.
+  it('never adds another bookings column that references sessions', () => {
+    const dir = resolve(import.meta.dirname, '../../supabase/migrations')
+    const offenders = readdirSync(dir)
+      .filter((name) => name.endsWith('.sql'))
+      .filter((name) =>
+        /alter table public\.bookings\s+add column[^;]*references public\.sessions/i.test(
+          readFileSync(resolve(dir, name), 'utf8'),
+        ),
+      )
+    expect(offenders).toEqual([])
+  })
+
+  it('00045 drops the key the first 00044 added', () => {
+    const sql = read('supabase/migrations/00045_reschedule_drop_fk.sql')
+    expect(sql).toMatch(
+      /alter table public\.bookings\s+drop constraint if exists bookings_rescheduled_from_session_id_fkey;/,
+    )
+    expect(sql).toMatch(/notify pgrst, 'reload schema';/)
   })
 })
