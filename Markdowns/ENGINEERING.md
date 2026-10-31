@@ -8,7 +8,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 >
 > 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 72 hours after the session ends (`starts_at` + `duration_mins`). Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). When the guest cancels, the host is emailed their payout only. When the host cancels a session, they get a strike email with no guest amounts.
-> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00042`**).** There is no `supabase/schema.sql`. Migrations are applied by hand: staging first, then production in the same sitting, after checking the project ref in the URL and that production has a backup from the last 24 hours. Refs, deploy rules and current state per environment: OPERATIONS.md, Environments and production SQL.
+> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00043`**).** There is no `supabase/schema.sql`. Migrations are applied by hand: staging first, then production in the same sitting, after checking the project ref in the URL and that production has a backup from the last 24 hours. Refs, deploy rules and current state per environment: OPERATIONS.md, Environments and production SQL.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
 > 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home shows the Lane 1 headline above the kit's** `Card` **in browse mode, with a rating on the meta line only when** `listing_ratings` **returns reviews.** Button is live on Settings and Hosting listing rows. Input is live on Settings and Login. SelectableCard is still used only by `/style-guide`.
 > 6. **All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a hex value in a component. See section 2, Styling.
@@ -188,9 +188,29 @@ is_active boolean default true
 created_at, updated_at timestamptz
 ```
 
-`00042`. Up to 3 active add-ons per listing (trigger). Photo URL trigger requires `/storage/v1/object/public/listing-photos/{host_id}/`. RLS: anon and authenticated read active add-ons of listings they can already read; the owner reads inactive too. Insert and update are the listing owner only. No DELETE grant — removing sets `is_active = false`. Column grants in the 00025 style. Guest checkout, booking snapshots and listing display are the next PR. If the table is missing (PGRST205 / 42P01), Create/Edit listing hide the editor and still save the listing.
+`00042`. Up to 3 active add-ons per listing (trigger). Photo URL trigger requires `/storage/v1/object/public/listing-photos/{host_id}/`. RLS: anon and authenticated read active add-ons of listings they can already read; the owner reads inactive too. Insert and update are the listing owner only. No DELETE grant — removing sets `is_active = false`. Column grants in the 00025 style. If the table is missing (PGRST205 / 42P01), Create/Edit listing hide the editor and still save the listing; the listing page and checkout hide add-ons the same way.
 
 Guest unit price is `addonGuestUnitCents(hostCents)` in `_shared/booking.ts`, re-exported from `src/lib/pricing.js`: 12% of the host unit, rounded up to the next whole dollar, no S$2.50 floor. Host S$15 → guest S$17; S$8 → S$9. No host fee on add-ons.
+
+`session_addon_remaining(p_session_id)` (`00043`, security definer, `search_path = public`) returns `(addon_id, remaining)` for that session's active add-ons that have a `session_limit`. `remaining = session_limit − sum(quantity)` over **confirmed** bookings of that session. Execute for anon and authenticated.
+
+### booking_addons
+
+```sql
+id uuid PK
+booking_id uuid FK → bookings on delete cascade
+addon_id uuid FK → listing_addons on delete set null
+name text
+unit text                    -- 'person' | 'booking'
+quantity integer             -- >= 1
+unit_host_cents integer
+unit_guest_cents integer
+created_at timestamptz
+```
+
+`00043`. Snapshot of what the guest bought. Indexes on `(addon_id)` and `(booking_id)`. RLS: the booking's guest or the listing's host can SELECT. No client INSERT/UPDATE/DELETE; service role writes. `bookings` also gains `addons_amount` (host share of add-ons, cents, default 0) and `addon_note` (≤120). Select of those columns for authenticated, no client write.
+
+`confirm_paid_booking` (`00043`) keeps its signature and grants. After the spots check, still holding the session row lock, it raises `'insufficient add-ons'` when a snapshot line whose listing add-on has a `session_limit` would put confirmed quantity over the limit. The webhook treats that as an oversell.
 
 ### planning_areas
 
@@ -228,10 +248,12 @@ session_id uuid FK → sessions
 guest_id uuid FK → users
 guests_count integer default 1
 total_amount integer      -- cents, guest all-in for the chosen rail
-platform_fee integer      -- cents, total_amount - lesson; rounded-up remainder is platform margin
+platform_fee integer      -- cents, total_amount - lesson - addons_amount
+addons_amount integer     -- cents, host share of add-ons (00043)
+addon_note text           -- optional, ≤120
 payment_rail text         -- 'card' | 'paynow'
-host_fee integer          -- cents, frozen at confirmation
-host_payout_amount integer -- cents, lesson minus host_fee, frozen at confirmation
+host_fee integer          -- cents, frozen at confirmation, on the lesson only
+host_payout_amount integer -- cents, lesson minus host_fee plus addons_amount
 stripe_payment_id text    -- PaymentIntent id
 stripe_charge_id text     -- Charge id, used as Transfer source_transaction
 stripe_transfer_id text
@@ -365,11 +387,13 @@ Also decided but **not yet built**: reschedule, once per booking, same 48 hour c
 
 **Guest fee.** Card fee is 12% of the lesson total with a S$2.50 floor, then the total is rounded UP to the nearest whole dollar so it can never dip below the floor. Browse cards still show the one-person card all-in so the price never rises between viewing and paying. Checkout recomputes from `guests_count` and the listing's `group_pricing` flag; `create-payment-intent` ignores any client total.
 
+**Add-ons.** `calculateBookingCharge({ lessonCents, addons, rail })` in `booking.ts` is the single source of truth when add-ons are on the booking. The lesson card total stays as today; each add-on unit is `addonGuestUnitCents` times quantity; PayNow discounts the combined card total. `addons_amount` is the host's share. `platformFee = totalAmount − lessonCents − addonsAmount`. No add-ons must match `calculateGuestCharge`.
+
 **Group pricing.** When `listings.group_pricing` is true (the default), the lesson price per person is discounted then multiplied by guests, in integer cents: 5% for 2, 10% for 3, 15% for 4, 20% for 5 or more. Never more than 20%. The card fee and the PayNow discount apply once to that discounted lesson total. A group booking is one booking row.
 
 **PayNow.** A sliding percentage off the card all-in total for that guest count, displayed at checkout only: 5% under $20, 4% under $30, 3% under $60, 2% otherwise (`paynowDiscountRate`). Each tier is the largest whole percentage that keeps PayNow at or above card after Stripe fees (card 3.4% + S$0.50, PayNow 1.3%). The badge shows the current rate and can step down as the basket grows. PayNow is refused when the session starts more than `PAYNOW_MAX_DAYS_AHEAD` (80) days from now — Stripe cannot refund PayNow after 90 days. `create-payment-intent` returns `paynow_too_far_ahead`; the checkout UI disables PayNow and keeps card pricing. Card is unaffected.
 
-**Host fee.** 10% of the discounted lesson total, triggered per host: every non founding host's first three **confirmed** bookings are free, their fourth booking onward pays the fee. A group booking counts as one toward those three. Founding hosts (`is_founding_host`) never pay.
+**Host fee.** 10% of the discounted lesson only (`lesson = total_amount − platform_fee − addons_amount`), never of add-ons. Triggered per host: every non founding host's first three **confirmed** bookings are free, their fourth booking onward pays the fee. A group booking counts as one toward those three. Founding hosts (`is_founding_host`) never pay. Host payout is `lesson − host_fee + addons_amount`.
 
 Do not hardcode a flat percentage. Worked one-person checks: $10 → $13, $20 → $23, $25 → $28, $30 → $34, $40 → $45. PayNow example: $25 lesson → $26.88. Code of record is `booking.ts` and `pricing.js`; they must agree.
 
@@ -615,11 +639,12 @@ supabase/migrations/
 ├── 00039_host_strike_events.sql
 ├── 00040_host_sessions_held.sql
 ├── 00041_profile_v2.sql
-└── 00042_listing_addons.sql
+├── 00042_listing_addons.sql
+└── 00043_booking_addons.sql
 
 supabase/functions/
 ├── _shared/
-│   ├── booking.ts               # Guest charge, group discount, host fee, refunds, add-on guest unit
+│   ├── booking.ts               # Guest charge, booking charge with add-ons, host fee, refunds
 │   ├── http.ts                  # JSON/CORS/secret helpers
 │   ├── connect.ts               # Express account v2 helpers
 │   ├── complaints.ts            # Report a problem window (start to 3 days after end), validation, evidence retention
@@ -705,6 +730,7 @@ supabase/functions/
 | Guest review eligibility                                   | `src/lib/reviewGate.js` and `guest_can_leave_review` (`00011`)                                      |
 | Guest-facing prices                                        | `src/lib/pricing.js` (`addonGuestUnitCents` from `_shared/booking.ts`)                             |
 | Listing add-ons (host editor)                              | `src/lib/listingAddons.js`, `src/components/ListingAddonsEditor.jsx`, `00042`                       |
+| Booking add-ons (checkout, snapshot, host prepare)         | `src/lib/bookingAddons.js`, `00043`, `calculateBookingCharge`                                       |
 | Routes                                                     | `src/App.jsx`                                                                                       |
 | Payment and booking creation                               | `supabase/functions/create-payment-intent/`                                                         |
 | Payment confirmation                                       | `supabase/functions/stripe-webhook/`                                                                |

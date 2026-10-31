@@ -18,6 +18,10 @@ describe('Cancellation Policy page', () => {
     renderWithRouter(<CancellationPolicy />)
   })
 
+  it('says add-ons follow the same refund tiers as the session', () => {
+    expect(screen.getByText(/Add-ons follow the same refund tiers as the session/)).toBeInTheDocument()
+  })
+
   it('publishes all four guest refund tiers', () => {
     expect(screen.getByText(/48 hours or more before the session starts:/)).toBeInTheDocument()
     expect(screen.getByText(/Between 24 and 48 hours before the session starts:/)).toBeInTheDocument()
@@ -93,6 +97,10 @@ describe('Cancellation Policy page', () => {
 describe('Refund Policy page', () => {
   beforeEach(() => {
     renderWithRouter(<RefundPolicy />)
+  })
+
+  it('says add-ons follow the same refund tiers as the session', () => {
+    expect(screen.getByText(/Add-ons follow the same refund tiers as the session/)).toBeInTheDocument()
   })
 
   it('publishes Stripe timing and the PayNow 90-day limit', () => {

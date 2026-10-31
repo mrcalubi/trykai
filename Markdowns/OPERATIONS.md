@@ -453,6 +453,8 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00038` (what guests should bring) | Applied | Applied | Production 25 October, before #163. After `00037`. |
 | `00039` (host strike events, 12-month expiry) | Applied | Applied | 25 October, after `00038`. |
 | `00040` (host_sessions_held) | Not applied | Not applied | Apply on staging, then production, before merging the profile card layout. After `00039`. |
+| `00042` (listing add-ons) | Not applied | Not applied | Host editor. Apply before `00043`. |
+| `00043` (booking add-ons) | Not applied | Not applied | After `00042`. Payouts are unchanged: add-ons ride inside `host_payout_amount`. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 

@@ -25,6 +25,19 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
+function sumAddonRows(
+  rows: Array<{ name: string; quantity: number }> | undefined,
+): Array<{ name: string; quantity: number }> {
+  const totals = new Map<string, number>()
+  for (const row of rows ?? []) {
+    const name = String(row.name ?? '').trim()
+    const quantity = Number(row.quantity) || 0
+    if (!name || quantity < 1) continue
+    totals.set(name, (totals.get(name) ?? 0) + quantity)
+  }
+  return [...totals.entries()].map(([name, quantity]) => ({ name, quantity }))
+}
+
 function userFields(value: unknown): {
   email?: string | null
   display_name?: string | null
@@ -100,24 +113,32 @@ Deno.serve(async (req) => {
       return jsonResponse(summary)
     }
 
-    const { data: bookingRows, error: bookingError } = await admin
-      .from('bookings')
-      .select(
-        `
+    const bookingSelect = `
         id,
         session_id,
         created_at,
         guests_count,
         guest_reminder_sent_at,
+        addon_note,
         users:guest_id (
           email,
           display_name,
           full_name
         )
-      `,
-      )
+      `
+    let { data: bookingRows, error: bookingError } = await admin
+      .from('bookings')
+      .select(bookingSelect)
       .eq('status', 'confirmed')
       .in('session_id', sessionIds)
+
+    if (bookingError && /addon_note/.test(bookingError.message ?? '')) {
+      ;({ data: bookingRows, error: bookingError } = await admin
+        .from('bookings')
+        .select(bookingSelect.replace(/\s*addon_note,\n/, '\n'))
+        .eq('status', 'confirmed')
+        .in('session_id', sessionIds))
+    }
 
     if (bookingError) return jsonResponse({ error: bookingError.message }, 500)
 
@@ -188,6 +209,17 @@ Deno.serve(async (req) => {
       emailsLeft -= 1
     }
 
+    const bookingIds = bookings.map((row) => row.id)
+    const { data: addonRows } = bookingIds.length
+      ? await admin.from('booking_addons').select('booking_id, name, quantity').in('booking_id', bookingIds)
+      : { data: [] }
+    const addonsByBooking = new Map<string, Array<{ name: string; quantity: number }>>()
+    for (const row of addonRows ?? []) {
+      const list = addonsByBooking.get(row.booking_id) ?? []
+      list.push({ name: row.name, quantity: row.quantity })
+      addonsByBooking.set(row.booking_id, list)
+    }
+
     const grouped = groupBookingsBySession(
       bookings.map((row) => ({
         sessionId: row.session_id,
@@ -195,6 +227,22 @@ Deno.serve(async (req) => {
         guestsCount: typeof row.guests_count === 'number' ? row.guests_count : 1,
       })),
     )
+    const extrasBySession = new Map<
+      string,
+      { addons: Array<{ name: string; quantity: number }>; notes: Array<{ name: string; note: string }> }
+    >()
+    for (const row of bookings) {
+      const extras = extrasBySession.get(row.session_id) ?? { addons: [], notes: [] }
+      extras.addons.push(...(addonsByBooking.get(row.id) ?? []))
+      const note = typeof row.addon_note === 'string' ? row.addon_note.trim() : ''
+      if (note) {
+        extras.notes.push({
+          name: publicDisplayName(userFields(row.users)) || 'A guest',
+          note,
+        })
+      }
+      extrasBySession.set(row.session_id, extras)
+    }
     const hostDue = sessions.filter((row) => !row.host_reminder_sent_at && grouped.has(row.id))
     summary.hosts_scanned = hostDue.length
 
@@ -241,6 +289,8 @@ Deno.serve(async (req) => {
           guests: group.guests,
           totalGuests: group.totalGuests,
           siteUrl,
+          addons: sumAddonRows(extrasBySession.get(row.id)?.addons),
+          notes: extrasBySession.get(row.id)?.notes,
         }),
       })
       summary.hosts_sent += 1

@@ -86,6 +86,18 @@ export function addonFromRow(row) {
   })
 }
 
+export function publicAddonFromRow(row) {
+  return {
+    id: row.id,
+    name: row.name ?? '',
+    description: row.description ?? '',
+    price_cents: Number(row.price_cents) || 0,
+    unit: row.unit === 'booking' ? 'booking' : 'person',
+    session_limit: row.session_limit != null ? Number(row.session_limit) : null,
+    photo: row.photo_url ? photoFromRemote(row.photo_url) : null,
+  }
+}
+
 export function draftAddons(value) {
   if (!Array.isArray(value)) return []
   return value.slice(0, MAX_LISTING_ADDONS).map((row) =>
@@ -189,7 +201,7 @@ export async function probeListingAddonsTable(client) {
   return !isMissingAddonsTable(error)
 }
 
-export async function loadListingAddons(client, listingId) {
+async function queryListingAddons(client, listingId, mapRow) {
   const { data, error } = await client
     .from('listing_addons')
     .select('id, name, description, price_cents, unit, session_limit, photo_url, position, is_active')
@@ -201,11 +213,19 @@ export async function loadListingAddons(client, listingId) {
   }
   if (error) return { addons: [], available: true, loaded: false, error }
   return {
-    addons: (data ?? []).map(addonFromRow),
+    addons: (data ?? []).map(mapRow),
     available: true,
     loaded: true,
     error: null,
   }
+}
+
+export async function loadListingAddons(client, listingId) {
+  return queryListingAddons(client, listingId, addonFromRow)
+}
+
+export async function loadPublicListingAddons(client, listingId) {
+  return queryListingAddons(client, listingId, publicAddonFromRow)
 }
 
 async function photoUrlFor(addon, userId, storage) {

@@ -1,9 +1,8 @@
 import Stripe from 'https://esm.sh/stripe@13.3.0?target=deno'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
-  calculateHostFee,
-  calculateHostPayout,
   confirmRpcErrorKind,
+  hostPayoutBreakdown,
 } from '../_shared/booking.ts'
 import {
   bookingConfirmedGuestHtml,
@@ -78,6 +77,8 @@ async function confirmSucceededPayment(paymentIntent: {
       guests_count,
       total_amount,
       platform_fee,
+      addons_amount,
+      addon_note,
       payment_rail,
       guest_id,
       session_id,
@@ -125,8 +126,6 @@ async function confirmSucceededPayment(paymentIntent: {
   const listing = asRecord(session?.listings)
   const host = asRecord(listing?.users)
   const hostId = listing?.host_id
-  const lessonAmount = booking.total_amount - booking.platform_fee
-
   let priorConfirmedCount = 0
   if (hostId) {
     const { count } = await admin
@@ -137,12 +136,13 @@ async function confirmSucceededPayment(paymentIntent: {
     priorConfirmedCount = count ?? 0
   }
 
-  const hostFee = calculateHostFee({
+  const { hostFee, hostPayoutAmount: hostPayout } = hostPayoutBreakdown({
+    totalAmount: booking.total_amount,
+    platformFee: booking.platform_fee,
+    addonsAmount: booking.addons_amount,
     isFoundingHost: Boolean(host?.is_founding_host),
     priorConfirmedCount,
-    lessonAmount,
   })
-  const hostPayout = calculateHostPayout(lessonAmount, hostFee)
   let chargeId = chargeIdFromPaymentIntent(paymentIntent)
   let intentForReceipt: { latest_charge?: unknown } = paymentIntent
   const chargeCard = cardDetailsFromCharge(
@@ -205,6 +205,19 @@ async function confirmSucceededPayment(paymentIntent: {
   const guestName = publicDisplayName(guestProfile)
   const hostName = publicDisplayName(host) || 'your host'
   const durationMins = session?.duration_mins ?? listing?.duration_mins
+  const { data: addonRows } = await admin
+    .from('booking_addons')
+    .select('name, quantity, unit_guest_cents')
+    .eq('booking_id', booking.id)
+  const receiptAddons = (addonRows ?? []).map((row: {
+    name?: string
+    quantity?: number
+    unit_guest_cents?: number
+  }) => ({
+    name: row.name ?? '',
+    quantity: Number(row.quantity) || 0,
+    unitGuestCents: Number(row.unit_guest_cents) || 0,
+  }))
 
   await sendResendEmail({
     apiKey,
@@ -231,6 +244,7 @@ async function confirmSucceededPayment(paymentIntent: {
       whatToBring: listing?.what_to_bring,
       bookingId: booking.id,
       siteUrl,
+      addons: receiptAddons,
     }),
   })
 
@@ -247,6 +261,9 @@ async function confirmSucceededPayment(paymentIntent: {
       guestsCount: booking.guests_count,
       hostPayoutCents: hostPayout,
       siteUrl,
+      addons: receiptAddons,
+      addonNote: typeof booking.addon_note === 'string' ? booking.addon_note : null,
+      guestFirstName: (guestName || 'A guest').trim().split(/\s+/).filter(Boolean)[0] || 'A guest',
     }),
   })
 }

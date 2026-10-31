@@ -352,6 +352,7 @@ export function receiptRows(options: {
   groupPricing?: boolean
   paymentRail?: string | null
   totalPaidCents: number
+  addons?: Array<{ name: string; quantity: number; unitGuestCents: number }>
 }): { rows: ReceiptRow[]; totalCents: number; addsUp: boolean } {
   const guestsCount = Math.max(1, Number(options.guestsCount) || 1)
   const groupPricing = options.groupPricing !== false
@@ -365,6 +366,7 @@ export function receiptRows(options: {
   const cardDiscountedTotal = calculateGuestCharge(discountedLesson, 'card').totalAmount
   const perPerson = Math.round(cardDiscountedTotal / guestsCount)
   const rate = groupDiscountRate(guestsCount, groupPricing)
+  const addons = (options.addons ?? []).filter((row) => row.quantity > 0)
 
   const rows: ReceiptRow[] = [
     {
@@ -375,15 +377,25 @@ export function receiptRows(options: {
   if (rate > 0 && cardListTotal > cardDiscountedTotal) {
     rows.push({ label: `Group discount (${Math.round(rate * 100)}%)`, amountCents: null })
   }
-  let expectedTotal = cardDiscountedTotal
+  for (const addon of addons) {
+    rows.push({
+      label: `${addon.name} × ${addon.quantity}`,
+      amountCents: addon.unitGuestCents * addon.quantity,
+    })
+  }
+  const addonsGuestCents = addons.reduce(
+    (sum, addon) => sum + addon.unitGuestCents * addon.quantity,
+    0,
+  )
+  const cardTotal = cardDiscountedTotal + addonsGuestCents
+  let expectedTotal = cardTotal
   if (options.paymentRail === 'paynow') {
-    const paynowTotal = calculateGuestCharge(discountedLesson, 'paynow').totalAmount
-    const saving = cardDiscountedTotal - paynowTotal
+    expectedTotal = Math.round(cardTotal * (1 - paynowDiscountRate(cardTotal)))
+    const saving = cardTotal - expectedTotal
     if (saving > 0) {
-      const percent = Math.round(paynowDiscountRate(cardDiscountedTotal) * 100)
+      const percent = Math.round(paynowDiscountRate(cardTotal) * 100)
       rows.push({ label: `PayNow saving (${percent}%)`, amountCents: -saving })
     }
-    expectedTotal = paynowTotal
   }
   return {
     rows,
@@ -399,6 +411,7 @@ export function receiptPriceLines(options: {
   groupPricing?: boolean
   paymentRail?: string | null
   totalPaidCents: number
+  addons?: Array<{ name: string; quantity: number; unitGuestCents: number }>
 }): string[] {
   const { rows, totalCents } = receiptRows(options)
   const lines = rows.map((row) =>
@@ -500,6 +513,7 @@ export function bookingConfirmedGuestHtml(options: {
   whatToBring?: string[] | null
   bookingId: string
   siteUrl?: string
+  addons?: Array<{ name: string; quantity: number; unitGuestCents: number }>
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
   const hostName = escapeHtml(options.hostName || 'your host')
@@ -520,6 +534,7 @@ export function bookingConfirmedGuestHtml(options: {
     groupPricing: options.groupPricing,
     paymentRail: options.paymentRail,
     totalPaidCents: options.totalPaidCents,
+    addons: options.addons,
   })
 
   return wrapEmail(
@@ -550,6 +565,14 @@ export function bookingConfirmedGuestHtml(options: {
   )
 }
 
+export function addonPrepareLine(
+  addons?: Array<{ name: string; quantity: number }>,
+): string {
+  const lines = (addons ?? []).filter((row) => row.quantity > 0 && row.name)
+  if (!lines.length) return ''
+  return `Add-ons to prepare: ${lines.map((row) => `${row.name} × ${row.quantity}`).join(', ')}.`
+}
+
 export function bookingConfirmedHostHtml(options: {
   bookingReference: string
   hostName?: string | null
@@ -559,8 +582,14 @@ export function bookingConfirmedHostHtml(options: {
   guestsCount: number
   hostPayoutCents: number
   siteUrl?: string
+  addons?: Array<{ name: string; quantity: number }>
+  addonNote?: string | null
+  guestFirstName?: string | null
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
+  const prepare = addonPrepareLine(options.addons)
+  const note = typeof options.addonNote === 'string' ? options.addonNote.trim() : ''
+  const noteFrom = (options.guestFirstName || options.guestName || 'a guest').trim().split(/\s+/)[0] || 'a guest'
   return wrapEmail(
     `
     <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
@@ -568,7 +597,9 @@ export function bookingConfirmedHostHtml(options: {
     <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
     <p style="margin:0 0 8px;"><strong>Listing:</strong> ${escapeHtml(options.listingTitle)}</p>
     <p style="margin:0 0 8px;"><strong>Date and time:</strong> ${escapeHtml(options.sessionDate)}</p>
-    <p style="margin:0 0 16px;"><strong>Guests:</strong> ${guestCountLabel(options.guestsCount)}</p>
+    <p style="margin:0 0 ${prepare || note ? '8' : '16'}px;"><strong>Guests:</strong> ${guestCountLabel(options.guestsCount)}</p>
+    ${prepare ? `<p style="margin:0 0 ${note ? '8' : '16'}px;">${escapeHtml(prepare)}</p>` : ''}
+    ${note ? `<p style="margin:0 0 16px;">Note from ${escapeHtml(noteFrom)}: ${escapeHtml(note)}</p>` : ''}
     <p style="margin:0;">${hostPayoutLine(options.hostPayoutCents)}</p>
     ${emailSignOff('see-you')}
     `,
@@ -651,6 +682,8 @@ export function hostSessionReminderHtml(options: {
   guests: Array<{ name: string; guestsCount: number }>
   totalGuests: number
   siteUrl?: string
+  addons?: Array<{ name: string; quantity: number }>
+  notes?: Array<{ name: string; note: string }>
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
   const when = reminderWhen(options.startsAt || '', options.sentAt)
@@ -664,6 +697,11 @@ export function hostSessionReminderHtml(options: {
   const totalLabel = `${total} ${total === 1 ? 'person' : 'people'}`
   const coming = total === 1 ? '1 person is' : `${total} people are`
   const showTotal = (options.guests ?? []).length > 1
+  const prepare = addonPrepareLine(options.addons)
+  const notes = (options.notes ?? [])
+    .filter((row) => row.note)
+    .map((row) => `Note from ${escapeHtml(row.name)}: ${escapeHtml(row.note)}`)
+    .join('<br>')
   return wrapEmail(
     `
     <p style="margin:0 0 16px;">${reminderGreeting(options.hostName)}</p>
@@ -673,6 +711,8 @@ export function hostSessionReminderHtml(options: {
       ["Who's coming", who],
       showTotal ? ['Total', escapeHtml(totalLabel)] : null,
       ['Day and time', escapeHtml(options.sessionDate)],
+      prepare ? ['Add-ons to prepare', escapeHtml(prepare.replace(/^Add-ons to prepare: /, '').replace(/\.$/, ''))] : null,
+      notes ? ['Notes', notes] : null,
     ])}
     ${primaryButton(`${siteUrl}/hosting`, 'View hosting')}
     <p style="margin:0 0 8px;">Need to change something? You can manage this session from your Hosting page.</p>
