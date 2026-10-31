@@ -1,3 +1,5 @@
+import { addonDraftFingerprint } from './listingAddons'
+
 export function settingsDraft({
   fullName,
   displayName,
@@ -42,6 +44,7 @@ export function listingEditorDraft({
   whatsProvided,
   whatToBring,
   photos,
+  addons,
 }) {
   return JSON.stringify({
     title,
@@ -56,5 +59,6 @@ export function listingEditorDraft({
     whatsProvided,
     whatToBring,
     photos: (photos ?? []).map(photoFingerprint),
+    addons: (addons ?? []).map(addonDraftFingerprint),
   })
 }

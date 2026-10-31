@@ -71,6 +71,36 @@ async function listQueue() {
     .limit(100)
   if (error) return jsonResponse({ error: error.message }, 500)
 
+  const listingIds = (rows ?? []).map((row) => row.id).filter(Boolean)
+  const addonsByListing = new Map<string, Record<string, unknown>[]>()
+  if (listingIds.length > 0) {
+    const { data: addonRows, error: addonError } = await adminClient()
+      .from('listing_addons')
+      .select('listing_id, name, description, price_cents, unit, photo_url, position')
+      .in('listing_id', listingIds)
+      .eq('is_active', true)
+      .order('position', { ascending: true })
+    const missingTable =
+      addonError &&
+      (addonError.code === 'PGRST205' ||
+        addonError.code === '42P01' ||
+        /PGRST205|42P01/.test(addonError.message ?? ''))
+    if (addonError && !missingTable) return jsonResponse({ error: addonError.message }, 500)
+    for (const addon of addonRows ?? []) {
+      const listingId = String(addon.listing_id ?? '')
+      if (!listingId) continue
+      const list = addonsByListing.get(listingId) ?? []
+      list.push({
+        name: addon.name,
+        description: addon.description ?? '',
+        price_cents: addon.price_cents,
+        unit: addon.unit,
+        photo_url: addon.photo_url ?? null,
+      })
+      addonsByListing.set(listingId, list)
+    }
+  }
+
   const listings = (rows ?? []).map((row) => {
     const host = (asRecord(row.users) ?? {}) as HostRow
     return {
@@ -84,6 +114,7 @@ async function listQueue() {
       photo_urls: Array.isArray(row.photo_urls) ? row.photo_urls : [],
       whats_provided: Array.isArray(row.whats_provided) ? row.whats_provided : [],
       what_to_bring: Array.isArray(row.what_to_bring) ? row.what_to_bring : [],
+      addons: addonsByListing.get(String(row.id)) ?? [],
       review_status: row.review_status,
       review_note: row.review_note,
       review_requested_at: row.review_requested_at,

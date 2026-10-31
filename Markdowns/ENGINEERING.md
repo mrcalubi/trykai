@@ -8,7 +8,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 >
 > 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 72 hours after the session ends (`starts_at` + `duration_mins`). Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). When the guest cancels, the host is emailed their payout only. When the host cancels a session, they get a strike email with no guest amounts.
-> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00036`**).** There is no `supabase/schema.sql`. Migrations are applied by hand: staging first, then production in the same sitting, after checking the project ref in the URL and that production has a backup from the last 24 hours. Refs, deploy rules and current state per environment: OPERATIONS.md, Environments and production SQL.
+> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00042`**).** There is no `supabase/schema.sql`. Migrations are applied by hand: staging first, then production in the same sitting, after checking the project ref in the URL and that production has a backup from the last 24 hours. Refs, deploy rules and current state per environment: OPERATIONS.md, Environments and production SQL.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
 > 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home shows the Lane 1 headline above the kit's** `Card` **in browse mode, with a rating on the meta line only when** `listing_ratings` **returns reviews.** Button is live on Settings and Hosting listing rows. Input is live on Settings and Login. SelectableCard is still used only by `/style-guide`.
 > 6. **All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a hex value in a component. See section 2, Styling.
@@ -171,6 +171,26 @@ After `00025`, anon and authenticated have column-level SELECT on every `listing
 `00038` adds `what_to_bring` (optional). Hosts set it on Create and Edit listing with the same chip input as custom what's-provided items, plus suggestion chips and a "Nothing, we provide everything" clear. Guests see a "What to bring" section under What's provided when the list has items, and the same list on `/bookings/:id`. The booking confirmation and the team's listing-submitted email show the same row. `listings_what_to_bring_ok` stays EXECUTE-granted: CHECK runs as the caller, so a revoke would block every authenticated listing write. `guard_listing_review` treats a change here as content on a `changes_requested` listing.
 
 **New public table.** Revoke Supabase's default `GRANT ALL` (`REVOKE ALL` from anon and authenticated) and grant only what the client uses. `00025` also revokes default privileges for role `postgres` so a later `CREATE TABLE` does not dump ALL to clients. Grant `service_role` explicitly in the same migration (`GRANT ALL ... TO service_role`): from 30 October 2026 Supabase stops granting new `public` tables to any API role automatically, `service_role` included.
+
+### listing_addons
+
+```sql
+id uuid PK
+listing_id uuid FK → listings on delete cascade
+name text                    -- 1–60 after trim
+description text default ''  -- ≤140
+price_cents integer          -- host unit price, S$1–S$500 whole dollars (100–50000, % 100 = 0)
+unit text                    -- 'person' | 'booking'
+session_limit integer        -- optional 1–99 units across all bookings of a session
+photo_url text               -- null, or in listing-photos/{host_id}/
+position smallint default 0
+is_active boolean default true
+created_at, updated_at timestamptz
+```
+
+`00042`. Up to 3 active add-ons per listing (trigger). Photo URL trigger requires `/storage/v1/object/public/listing-photos/{host_id}/`. RLS: anon and authenticated read active add-ons of listings they can already read; the owner reads inactive too. Insert and update are the listing owner only. No DELETE grant — removing sets `is_active = false`. Column grants in the 00025 style. Guest checkout, booking snapshots and listing display are the next PR. If the table is missing (PGRST205 / 42P01), Create/Edit listing hide the editor and still save the listing.
+
+Guest unit price is `addonGuestUnitCents(hostCents)` in `_shared/booking.ts`, re-exported from `src/lib/pricing.js`: 12% of the host unit, rounded up to the next whole dollar, no S$2.50 floor. Host S$15 → guest S$17; S$8 → S$9. No host fee on add-ons.
 
 ### planning_areas
 
@@ -537,6 +557,7 @@ src/
 │   ├── SessionCalendar.jsx      # Guest month calendar on listing detail
 │   ├── DateMultiSelectCalendar.jsx # Host tap-to-select dates
 │   ├── AddSessionsForm.jsx      # Bulk add: quick-fill, same or per-date times, preview, create
+│   ├── ListingAddonsEditor.jsx  # Host add-ons on Create (price step) and Edit listing
 │   ├── PageLoader.jsx           # Page-level wait: spinner after 400ms, "Loading…" for screen readers
 │   ├── WaitingState.jsx         # Long wait card: title, illustration, messages at 0 / 4s / 12s
 │   ├── LoadingMascot.jsx        # Default WaitingState art (three dots); future mascot home
@@ -590,11 +611,15 @@ supabase/migrations/
 ├── 00035_singpass_verification.sql
 ├── 00036_singpass_auto_approve_and_listing_review.sql
 ├── 00037_session_reminders.sql
-└── 00038_listing_what_to_bring.sql
+├── 00038_listing_what_to_bring.sql
+├── 00039_host_strike_events.sql
+├── 00040_host_sessions_held.sql
+├── 00041_profile_v2.sql
+└── 00042_listing_addons.sql
 
 supabase/functions/
 ├── _shared/
-│   ├── booking.ts               # Guest charge, group discount, host fee, refunds
+│   ├── booking.ts               # Guest charge, group discount, host fee, refunds, add-on guest unit
 │   ├── http.ts                  # JSON/CORS/secret helpers
 │   ├── connect.ts               # Express account v2 helpers
 │   ├── complaints.ts            # Report a problem window (start to 3 days after end), validation, evidence retention
@@ -678,7 +703,8 @@ supabase/functions/
 | Host strike events and 12-month expiry                     | `supabase/migrations/00039_host_strike_events.sql`, `src/lib/hostStrikes.js`                        |
 | Host sessions-held count                                   | `supabase/migrations/00040_host_sessions_held.sql`                                                  |
 | Guest review eligibility                                   | `src/lib/reviewGate.js` and `guest_can_leave_review` (`00011`)                                      |
-| Guest-facing prices                                        | `src/lib/pricing.js`                                                                                |
+| Guest-facing prices                                        | `src/lib/pricing.js` (`addonGuestUnitCents` from `_shared/booking.ts`)                             |
+| Listing add-ons (host editor)                              | `src/lib/listingAddons.js`, `src/components/ListingAddonsEditor.jsx`, `00042`                       |
 | Routes                                                     | `src/App.jsx`                                                                                       |
 | Payment and booking creation                               | `supabase/functions/create-payment-intent/`                                                         |
 | Payment confirmation                                       | `supabase/functions/stripe-webhook/`                                                                |

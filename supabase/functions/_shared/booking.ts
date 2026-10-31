@@ -110,6 +110,16 @@ export function roundUpToDollar(cents: number): number {
 }
 
 /**
+ * Guest unit price for a paid add-on. The host sets what they get, in whole
+ * dollars. Guests pay that plus the 12% booking fee, rounded up to the next
+ * whole dollar per unit. No S$2.50 floor — the lesson already carries it —
+ * and there is never a host fee on add-ons.
+ */
+export function addonGuestUnitCents(hostCents: number): number {
+  return roundUpToDollar(Math.round(hostCents * (1 + CARD_FEE_RATE)))
+}
+
+/**
  * Card path: 12% of the lesson with a S$2.50 floor, then the all-in total is
  * rounded UP to the next whole dollar. PayNow takes `paynowDiscountRate` off
  * that same all-in total. `platformFee` is always `totalAmount - lessonAmount`

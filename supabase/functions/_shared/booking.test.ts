@@ -34,6 +34,7 @@ import {
   shouldEmailCancellation,
   unpaidCheckoutCancelPatch,
   roundUpToDollar,
+  addonGuestUnitCents,
   spotsToRestore,
 } from './booking.ts'
 
@@ -77,6 +78,14 @@ describe('calculateGuestCharge card path', () => {
     // 12% of 3000 is 360, 3360 ceils to 3400.
     expect(roundUpToDollar(3360)).toBe(3400)
     expect(calculateGuestCharge(3000, 'card').totalAmount).toBe(3400)
+  })
+
+  it('prices an add-on unit at 12% with no S$2.50 floor, rounded up per unit', () => {
+    expect(addonGuestUnitCents(100)).toBe(200)
+    expect(addonGuestUnitCents(800)).toBe(900)
+    expect(addonGuestUnitCents(1500)).toBe(1700)
+    expect(addonGuestUnitCents(2500)).toBe(2800)
+    expect(addonGuestUnitCents(5000)).toBe(5600)
   })
 
   it('stores the platform fee as the gap between the all-in total and the lesson', () => {

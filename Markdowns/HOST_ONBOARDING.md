@@ -120,6 +120,8 @@ Your earnings depend far more on how full your session is than on your price:
 
 **This is why group bookings matter so much.** You can turn on group discounts (5% off for two guests, up to 20% for five or more). The discount comes off your price, so a group pays you a little less per head, but groups book more readily and fill your session faster.
 
+Add-ons are optional extras guests can pick when they book. You get every dollar you set; guests pay it plus the usual booking fee.
+
 ## Photos
 
 You do not need a professional. You need a phone, daylight, and five minutes.
