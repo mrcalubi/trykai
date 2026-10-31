@@ -205,6 +205,13 @@ describe('booking page helpers', () => {
         now,
       ),
     ).toBe(false)
+    expect(
+      isEligibleRescheduleSession(
+        { ...open, starts_at: '2026-11-01T00:00:00.000Z' },
+        { ...booking, sessions: { listings: { booking_cutoff_hours: 48 } } },
+        now,
+      ),
+    ).toBe(false)
   })
 
   it('quotes the cancel-now refund and recognises a missing column', () => {

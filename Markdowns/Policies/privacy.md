@@ -30,7 +30,7 @@ We do not collect your full card details. Stripe handles them.
 
 ## 3. What is public
 
-Your display name, profile photo, ID verified badge, listings and the reviews you receive as a Host are visible to anyone. Your full name, email, phone number and bookings are not public. A Host's full address is shown only to guests with a confirmed booking for that listing.
+Your display name, profile photo, ID verified badge, listings and the reviews you receive as a Host are visible to anyone. Your full name, email, phone number and bookings are not public. A Host's full address is shown only to guests with a confirmed booking for that listing. If a Host turns on a day-of contact number, confirmed guests of that session can see it from 24 hours before until the session ends, only to find the Host or sort last-minute logistics.
 
 ## 4. Identity verification
 

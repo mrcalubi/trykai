@@ -245,6 +245,12 @@ describe('Terms of Service page', () => {
     expect(screen.queryByText(/Full refund if you cancel/)).not.toBeInTheDocument()
   })
 
+  it('limits a shared day-of number to session logistics with confirmed guests', () => {
+    expect(
+      screen.getByText(/A day-of contact number you share is only for session logistics with\s+confirmed guests/),
+    ).toBeInTheDocument()
+  })
+
   it('anchors the Host and Booking parts for the listing and checkout checkboxes', () => {
     expect(screen.getByRole('heading', { name: 'Part 2: Hosting' })).toHaveAttribute(
       'id',
@@ -303,5 +309,13 @@ describe('Privacy Policy page', () => {
   it('names OneMap as the address lookup service', () => {
     expect(screen.getByText(/OneMap \(Singapore Land Authority\)/)).toBeInTheDocument()
     expect(screen.getByText(/look up and verify listing addresses/)).toBeInTheDocument()
+  })
+
+  it('says who sees a day-of number, what it is for, and when', () => {
+    expect(
+      screen.getByText(
+        /If a Host turns on a day-of contact number, confirmed guests\s+of that session can see it from 24 hours before until the session ends,\s+only to find the Host or sort last-minute logistics/,
+      ),
+    ).toBeInTheDocument()
   })
 })

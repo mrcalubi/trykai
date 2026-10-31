@@ -34,6 +34,7 @@ function givenFoundingHost(
   error = null,
   spots = { updated: 0, held: [] },
   address = '12 Coffee Road',
+  arrival = null,
 ) {
   supabase.rpc.mockImplementation(async (fn) => {
     if (fn === 'my_is_founding_host') {
@@ -44,6 +45,9 @@ function givenFoundingHost(
     }
     if (fn === 'listing_address') {
       return { data: address, error: null }
+    }
+    if (fn === 'listing_arrival_instructions') {
+      return { data: arrival, error: null }
     }
     return { data: null, error: null }
   })
@@ -109,6 +113,36 @@ describe('EditListing access control', () => {
     expect(call.chain[0].args[0]).not.toMatch(/full_address/)
     expect(call.chain[0].args[0]).not.toMatch(/\*/)
     expect(supabase.rpc).toHaveBeenCalledWith('listing_address', { listing_id: 'listing-1' })
+    expect(supabase.rpc).toHaveBeenCalledWith('listing_arrival_instructions', {
+      listing_id: 'listing-1',
+    })
+    expect(call.chain[0].args[0]).toMatch(/booking_cutoff_hours/)
+    expect(call.chain[0].args[0]).not.toMatch(/arrival_instructions/)
+  })
+
+  it('retries load without booking_cutoff_hours when the column is missing', async () => {
+    let selects = 0
+    supabase.__on('listings', 'select', () => {
+      selects += 1
+      if (selects === 1) {
+        return { data: null, error: { message: 'column listings.booking_cutoff_hours does not exist' } }
+      }
+      return {
+        data: makeListing({
+          title: 'Latte art',
+          description: 'Pull a rosetta.',
+          category: 'Food',
+          price_per_person: 4500,
+          max_guests: 4,
+          area: 'Bedok',
+          whats_provided: ['Materials'],
+          photo_urls: ['https://cdn.test/one.jpg'],
+        }),
+        error: null,
+      }
+    })
+    await renderLoaded()
+    expect(selects).toBeGreaterThanOrEqual(2)
   })
 
   it('shows a not-found message for a listing that is not theirs', async () => {
@@ -350,7 +384,30 @@ describe('EditListing saving', () => {
       full_address: '12 Coffee Road',
     })
     expect(call.payload).not.toHaveProperty('max_guests')
+    expect(call.payload).toMatchObject({
+      booking_cutoff_hours: 3,
+      arrival_instructions: null,
+    })
     expect(call.filters).toContainEqual({ method: 'eq', column: 'host_id', value: HOST_ID })
+  })
+
+  it('saves Bookings close and How to find me without sending the listing back for review', async () => {
+    givenFoundingHost(false, null, { updated: 0, held: [] }, '12 Coffee Road', 'Ring the bell')
+    givenListing({ booking_cutoff_hours: 6 })
+    const { user } = await renderLoaded()
+
+    expect(screen.getByLabelText(/How to find me/)).toHaveValue('Ring the bell')
+    expect(screen.getByLabelText('6 hours')).toBeChecked()
+    await user.click(screen.getByLabelText('12 hours'))
+    await user.clear(screen.getByLabelText(/How to find me/))
+    await user.type(screen.getByLabelText(/How to find me/), 'Lift B to #04-56')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'update').payload).toMatchObject({
+      booking_cutoff_hours: 12,
+      arrival_instructions: 'Lift B to #04-56',
+    })
   })
 
   it('saves a listing that has moved to a new address', async () => {

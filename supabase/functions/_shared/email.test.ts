@@ -6,6 +6,8 @@ import {
   bookingConfirmedGuestHtml,
   bookingConfirmedGuestSubject,
   bookingConfirmedHostHtml,
+  bookingConfirmedHostSubject,
+  hostBookingUrgencyPrefix,
   bookingReference,
   cardDetailsFromCharge,
   complaintOpsHtml,
@@ -438,6 +440,28 @@ describe('guest count and session day', () => {
     expect(bookingConfirmedGuestSubject('Latte art', 'bad')).toBe("You're in! Latte art")
     expect((bookingConfirmedGuestSubject('Latte art', SESSION_STARTS).match(/!/g) ?? []).length).toBe(1)
   })
+
+  it('prefixes the host subject when the booking is within 24 hours of the start', () => {
+    const todayStart = '2026-10-31T02:00:00.000Z'
+    const bookedToday = '2026-10-31T01:00:00.000Z'
+    const tomorrowStart = '2026-10-31T16:00:00.000Z'
+    const bookedTonight = '2026-10-31T02:00:00.000Z'
+    expect(hostBookingUrgencyPrefix(todayStart, bookedToday)).toBe('Booking for today:')
+    expect(hostBookingUrgencyPrefix(tomorrowStart, bookedTonight)).toBe('Booking for tomorrow:')
+    expect(hostBookingUrgencyPrefix(tomorrowStart, '2026-10-29T16:00:00.000Z')).toBe('')
+    expect(hostBookingUrgencyPrefix('bad', bookedToday)).toBe('')
+    expect(hostBookingUrgencyPrefix(todayStart, 'bad')).toBe('')
+    expect(hostBookingUrgencyPrefix(todayStart, bookedToday.replace('2026', '2027'))).toBe('')
+    expect(bookingConfirmedHostSubject('Latte art', todayStart, bookedToday)).toBe(
+      'Booking for today: "Latte art"',
+    )
+    expect(bookingConfirmedHostSubject('Latte art', tomorrowStart, bookedTonight)).toBe(
+      'Booking for tomorrow: "Latte art"',
+    )
+    expect(bookingConfirmedHostSubject('Latte art', SESSION_STARTS, '2026-08-01T00:00:00.000Z')).toBe(
+      'New booking for "Latte art"',
+    )
+  })
 })
 
 describe('googleCalendarUrl', () => {
@@ -677,6 +701,13 @@ describe('booking confirmation emails', () => {
     })
     expect(html).toContain('Add-ons to prepare: Premium blooms × 1, Gift wrap and card × 2.')
     expect(html).toContain('Note from Sarah: For Alex')
+  })
+
+  it('shows How to find me on the guest confirmation when the host wrote it', () => {
+    expect(hasDetail(guestReceipt({ arrivalInstructions: 'Lift B to #04-56' }), 'How to find me', 'Lift B to #04-56')).toBe(
+      true,
+    )
+    expect(guestReceipt()).not.toContain('How to find me')
   })
 })
 
@@ -1774,6 +1805,30 @@ describe('session reminder emails', () => {
       bookingId: 'booking-1',
     })
     expect(without).not.toContain('Don&#39;t forget to bring')
+  })
+
+  it('shows How to find me on the guest reminder when the host wrote it', () => {
+    const withDirections = guestSessionReminderHtml({
+      guestName: 'Sam',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(NEXT_DAY_START),
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
+      arrivalInstructions: 'Lift B to #04-56',
+      hostName: 'Mei',
+      bookingId: 'booking-1',
+    })
+    expect(hasDetail(withDirections, 'How to find me', 'Lift B to #04-56')).toBe(true)
+    const without = guestSessionReminderHtml({
+      guestName: 'Sam',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(NEXT_DAY_START),
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
+      hostName: 'Mei',
+      bookingId: 'booking-1',
+    })
+    expect(without).not.toContain('How to find me')
   })
 
   it('opens the guest reminder with the new copy, details, and sign-off', () => {

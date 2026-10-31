@@ -1,25 +1,15 @@
 import FormattedPrice from './FormattedPrice'
 import { addonGuestUnitCents } from '../lib/pricing'
-import {
-  ADDON_NOTE_HINT,
-  ADDON_NOTE_MAX,
-  maxAddonQuantity,
-  remainingForAddon,
-} from '../lib/bookingAddons'
+import { maxAddonQuantity, remainingForAddon } from '../lib/bookingAddons'
 
 export default function CheckoutAddons({
   addons,
   quantities,
   guestsCount,
   remainingById,
-  hostName,
-  note,
   onQuantity,
-  onNote,
 }) {
   if (!addons?.length) return null
-
-  const picked = addons.some((addon) => (quantities[addon.id] || 0) > 0)
 
   return (
     <div className="checkout-addons">
@@ -89,17 +79,6 @@ export default function CheckoutAddons({
           )
         })}
       </ul>
-      {picked ? (
-        <label className="checkout-addons__note">
-          <span>Anything {hostName} should know? {ADDON_NOTE_HINT}</span>
-          <input
-            type="text"
-            maxLength={ADDON_NOTE_MAX}
-            value={note}
-            onChange={(event) => onNote(event.target.value.slice(0, ADDON_NOTE_MAX))}
-          />
-        </label>
-      ) : null}
     </div>
   )
 }

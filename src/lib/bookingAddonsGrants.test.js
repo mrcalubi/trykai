@@ -102,6 +102,8 @@ describe('Hosting Prepare box', () => {
   it('renders summed add-ons and guest notes on upcoming booked sessions', () => {
     expect(hosting).toContain('hosting-prepare')
     expect(hosting).toContain('sessionPrepareBoxes')
+    expect(hosting).toContain('Prepare')
+    expect(hosting).toContain('Notes from guests')
     expect(hosting).toContain('Note from')
   })
 })

@@ -52,6 +52,11 @@ import {
   saveListingAddons,
 } from '../lib/listingAddons'
 import { notifyListingSubmitted } from '../lib/listingReview'
+import {
+  ArrivalInstructionsField,
+  BookingCutoffFields,
+} from '../components/BookingCutoffFields'
+import { arrivalInstructionsForSave, bookingCutoffHours } from '../lib/bookingCutoff'
 
 const DRAFT_RESTORED = 'Draft restored. Photos are not kept in drafts, so add them again.'
 const MIN_GUESTS = 1
@@ -83,6 +88,8 @@ export default function CreateListing() {
   const [otherMins, setOtherMins] = useState(start.otherMins)
   const [area, setArea] = useState(start.area)
   const [fullAddress, setFullAddress] = useState(start.fullAddress)
+  const [arrivalInstructions, setArrivalInstructions] = useState(start.arrivalInstructions)
+  const [bookingCutoff, setBookingCutoff] = useState(start.bookingCutoffHours)
   const [whatsProvided, setWhatsProvided] = useState(start.whatsProvided)
   const [whatToBring, setWhatToBring] = useState(start.whatToBring)
   const [photos, setPhotos] = useState([])
@@ -209,6 +216,8 @@ export default function CreateListing() {
       groupPricing,
       area,
       fullAddress,
+      arrivalInstructions,
+      bookingCutoffHours: bookingCutoff,
       whatsProvided,
       whatToBring,
       addons,
@@ -334,6 +343,8 @@ export default function CreateListing() {
       group_pricing: groupPricing,
       area,
       full_address: fullAddress.trim(),
+      arrival_instructions: arrivalInstructionsForSave(arrivalInstructions),
+      booking_cutoff_hours: bookingCutoffHours(bookingCutoff),
       whats_provided: provided,
       what_to_bring: bring,
       photo_urls: photoUrls,
@@ -344,11 +355,13 @@ export default function CreateListing() {
       .insert(listingPayload)
       .select('id')
       .single()
-    if (listingError && /duration_mins|group_pricing|what_to_bring/.test(listingError.message ?? '')) {
+    if (listingError && /duration_mins|group_pricing|what_to_bring|arrival_instructions|booking_cutoff_hours/.test(listingError.message ?? '')) {
       const retry = { ...listingPayload }
       if (/duration_mins/.test(listingError.message ?? '')) delete retry.duration_mins
       if (/group_pricing/.test(listingError.message ?? '')) delete retry.group_pricing
       if (/what_to_bring/.test(listingError.message ?? '')) delete retry.what_to_bring
+      if (/arrival_instructions/.test(listingError.message ?? '')) delete retry.arrival_instructions
+      if (/booking_cutoff_hours/.test(listingError.message ?? '')) delete retry.booking_cutoff_hours
       ;({ data: created, error: listingError } = await supabase
         .from('listings')
         .insert(retry)
@@ -639,6 +652,14 @@ export default function CreateListing() {
           {addonsAvailable ? (
             <ListingAddonsEditor addons={addons} onChange={setAddons} fieldHints={fieldHints} />
           ) : null}
+
+          <BookingCutoffFields
+            value={bookingCutoff}
+            onChange={(next) => {
+              setBookingCutoff(next)
+              persistDraft({ bookingCutoffHours: next })
+            }}
+          />
         </>
       )
     }
@@ -660,6 +681,13 @@ export default function CreateListing() {
             areaHint={<FieldHint>{fieldHints.area}</FieldHint>}
           />
           <FieldHint>{fieldHints.fullAddress}</FieldHint>
+          <ArrivalInstructionsField
+            value={arrivalInstructions}
+            onChange={(next) => {
+              setArrivalInstructions(next)
+              persistDraft({ arrivalInstructions: next })
+            }}
+          />
         </>
       )
     }

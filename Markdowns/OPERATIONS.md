@@ -457,6 +457,7 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00043` (booking add-ons) | Applied | Applied | After `00042`. Payouts are unchanged: add-ons ride inside `host_payout_amount`. |
 | `00044` (reschedule) | Applied (first version, with the foreign key) | Not applied | After `00043`. Caleb applies. Columns plus `reschedule_booking`. Deploy `reschedule-booking`. |
 | `00045` (drop reschedule FK) | Not applied | Not applied | Right after `00044`, both environments. Drops the second bookings → sessions key that made every bookings/sessions embed ambiguous (PGRST201). No-op where 00044 is the fixed version. |
+| `00046` (booking cutoff and arrival) | Not applied | Not applied | After `00045`. Caleb applies. Cutoff, How to find me, day-of number, `booking_host_contact`, `listing_arrival_instructions`; replaces `my_account` and `reschedule_booking`. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 

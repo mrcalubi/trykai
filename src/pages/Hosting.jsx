@@ -949,19 +949,26 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                   />
                   {prepareBySession[session.id] ? (
                     <div className="hosting-prepare">
-                      <p className="hosting-prepare__title">Prepare</p>
                       {prepareBySession[session.id].lines.length > 0 ? (
-                        <ul className="hosting-prepare__list">
-                          {prepareBySession[session.id].lines.map((line) => (
-                            <li key={line.name}>{addonLineLabel(line.name, line.quantity)}</li>
-                          ))}
-                        </ul>
+                        <>
+                          <p className="hosting-prepare__title">Prepare</p>
+                          <ul className="hosting-prepare__list">
+                            {prepareBySession[session.id].lines.map((line) => (
+                              <li key={line.name}>{addonLineLabel(line.name, line.quantity)}</li>
+                            ))}
+                          </ul>
+                        </>
                       ) : null}
-                      {prepareBySession[session.id].notes.map((row) => (
-                        <p key={`${row.name}-${row.note}`} className="hosting-prepare__note">
-                          Note from {row.name}: {row.note}
-                        </p>
-                      ))}
+                      {prepareBySession[session.id].notes.length > 0 ? (
+                        <>
+                          <p className="hosting-prepare__title">Notes from guests</p>
+                          {prepareBySession[session.id].notes.map((row) => (
+                            <p key={`${row.name}-${row.note}`} className="hosting-prepare__note">
+                              Note from {row.name}: {row.note}
+                            </p>
+                          ))}
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

@@ -14,5 +14,7 @@ describe('isBlankDraft', () => {
     expect(isBlankDraft({ durationChoice: 60 })).toBe(false)
     expect(isBlankDraft({ whatsProvided: ['Materials'] })).toBe(false)
     expect(isBlankDraft({ addons: [{ name: 'Take-home kit', price: '15' }] })).toBe(false)
+    expect(isBlankDraft({ arrivalInstructions: 'Lift B' })).toBe(false)
+    expect(isBlankDraft({ bookingCutoffHours: 12 })).toBe(false)
   })
 })

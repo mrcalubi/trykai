@@ -5104,6 +5104,53 @@ body.lightbox-open {
   gap: 8px;
 }
 
+.session-card__closed {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.booking-cutoff {
+  margin: 16px 0 0;
+  border: 0;
+  padding: 0;
+}
+
+.booking-cutoff__legend {
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+
+.booking-cutoff__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.booking-cutoff__option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.checkout-host-note {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.booking-contact {
+  margin: 8px 0 0;
+}
+
+.booking-where__find {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+}
+
 .session-calendar {
   margin-bottom: 20px;
 }
