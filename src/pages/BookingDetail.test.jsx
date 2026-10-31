@@ -138,6 +138,16 @@ describe('BookingDetail', () => {
     expect(screen.getByRole('button', { name: 'Cancel booking' })).toBeInTheDocument()
   })
 
+  it('lists the add-ons the guest bought', async () => {
+    givenBooking(detailBooking())
+    supabase.__on('booking_addons', 'select', {
+      data: [{ booking_id: BOOKING_ID, name: 'Premium blooms', quantity: 1, unit: 'person' }],
+      error: null,
+    })
+    renderDetail()
+    expect(await screen.findByText(/Premium blooms × 1/)).toBeInTheDocument()
+  })
+
   it('names Card when the guest did not pay with PayNow', async () => {
     givenBooking(detailBooking({ payment_rail: 'card', total_amount: 500 }))
     renderDetail()

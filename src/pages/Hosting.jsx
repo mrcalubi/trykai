@@ -57,6 +57,12 @@ import {
   listingDeleteErrorMessage,
   listingUpcomingStats,
 } from '../lib/listingDelete'
+import {
+  addonLineLabel,
+  loadBookingAddonRows,
+  loadBookingNotes,
+  sessionPrepareBoxes,
+} from '../lib/bookingAddons'
 
 function activeBookingsOn(session) {
   // Pending rows are unpaid checkouts, not guests the host has to refund.
@@ -78,6 +84,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
 
   const [listings, setListings] = useState([])
   const [hostSessions, setHostSessions] = useState([])
+  const [prepareBySession, setPrepareBySession] = useState({})
   const [monthSessions, setMonthSessions] = useState([])
   const [verificationStatus, setVerificationStatus] = useState(null)
   const [draft, setDraft] = useState(() => {
@@ -248,10 +255,34 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
         setHostSessions(upcoming)
         setMonthSessions(monthSessionsToCount(rows, now))
         onSessionsChangeRef.current?.(rows)
+        const confirmedIds = upcoming.flatMap((session) =>
+          (session.bookings ?? [])
+            .filter((booking) => booking.status === 'confirmed')
+            .map((booking) => booking.id),
+        )
+        const { rows: addonRows, available } = await loadBookingAddonRows(supabase, confirmedIds)
+        if (!available) {
+          setPrepareBySession({})
+        } else {
+          const { notes } = await loadBookingNotes(supabase, confirmedIds)
+          const guestIds = [...new Set(Object.values(notes).map((row) => row.guestId).filter(Boolean))]
+          const names = {}
+          if (guestIds.length) {
+            const { data: guests } = await supabase
+              .from('users')
+              .select('id, display_name')
+              .in('id', guestIds)
+            for (const guest of guests ?? []) {
+              names[guest.id] = guest.display_name
+            }
+          }
+          setPrepareBySession(sessionPrepareBoxes(upcoming, addonRows, notes, names))
+        }
       }
     } else {
       hostSessionsRef.current = []
       setHostSessions([])
+      setPrepareBySession({})
       setMonthSessions([])
       onSessionsChangeRef.current?.([])
     }
@@ -916,6 +947,23 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                     onDeleteSession={handleDeleteEmptySession}
                     onKeep={clearSessionConfirms}
                   />
+                  {prepareBySession[session.id] ? (
+                    <div className="hosting-prepare">
+                      <p className="hosting-prepare__title">Prepare</p>
+                      {prepareBySession[session.id].lines.length > 0 ? (
+                        <ul className="hosting-prepare__list">
+                          {prepareBySession[session.id].lines.map((line) => (
+                            <li key={line.name}>{addonLineLabel(line.name, line.quantity)}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      {prepareBySession[session.id].notes.map((row) => (
+                        <p key={`${row.name}-${row.note}`} className="hosting-prepare__note">
+                          Note from {row.name}: {row.note}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

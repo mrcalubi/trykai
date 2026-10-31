@@ -51,7 +51,7 @@ Navy and cream remain the anchor, shared across both lanes. Values are tokens in
 ### Coral: wider, still disciplined
 August restricted coral to the PayNow badge. In practice that left the site monochrome. Coral is now the **brand accent**, allowed in small doses:
 
-- **Allowed:** the dot in the wordmark, section eyebrows, step numbers, checkmarks in lists, the active underline in the category bar, the PayNow saving, "New" and "spots left" labels (as `--coral-ink` on `--coral-soft`).
+- **Allowed:** the dot in the wordmark, section eyebrows, step numbers, checkmarks in lists, the active underline in the category bar, "New" and "spots left" labels (as `--coral-ink` on `--coral-soft`). Savings are green, not coral: the PayNow badge and the "PayNow saving" row use `--success`.
 - **Never:** primary buttons (white on coral is 3.1:1, fails AA), large background fills, body text, or decoration with no meaning.
 - **Lane 2** still turns coral down to near zero and leans on navy and grey.
 
@@ -166,7 +166,7 @@ No photo banner and no persistent search bar for launch (unchanged): with tens o
 
 ### Checkout ("Confirm and pay", from the canvas "Checkout · phone" mockup)
 - **Phones and tablets:** a full-screen sheet with a back arrow (cancels and returns to the dates). **From 1024px:** the same content inside the booking card, which stops being sticky so the whole checkout scrolls with the page.
-- Session summary card (photo, title, host and area, date and time in mono, "Change"), guests row with spots left and round 44px steppers plus the group-pricing line, "Pay with" PayNow and Card as radio cards (PayNow shows the 5% saving and the struck-through card price), a price breakdown (guests all in, PayNow saving, total, "Booking fee included"), three short promises we can stand behind (host ID check, address after booking, 48-hour full refund), and the agreement line.
+- Session summary card (photo, title, host and area, date and time in mono, "Change"), guests row with spots left and round 44px steppers plus the group-pricing line, "Pay with" PayNow and Card as radio cards (PayNow shows the sliding 5–2% saving and the struck-through card price), "Make it extra" add-ons when the listing has them, a price breakdown (guests all in, one row per add-on, PayNow saving in green, total, "Booking fee included"), three short promises we can stand behind (host ID check, address after booking, 48-hour full refund), and the agreement line.
 - Choosing a method still creates the payment straight away (unchanged flow, so the server's price check runs before the guest pays). Stripe's payment form then appears with "Pay $X", pinned to the bottom of the screen on phones.
 
 ### Hosting, bookings, profile, settings, auth

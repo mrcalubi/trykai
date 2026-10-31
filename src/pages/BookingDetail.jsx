@@ -18,6 +18,7 @@ import Button from '../components/ui/Button'
 import PageLoader from '../components/PageLoader'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import ReportProblem from '../components/ReportProblem'
+import { addonLineLabel, loadBookingAddonRows } from '../lib/bookingAddons'
 
 function googleMapsUrl(address) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
@@ -39,6 +40,7 @@ export default function BookingDetail() {
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [cancelError, setCancelError] = useState('')
+  const [bookingAddons, setBookingAddons] = useState([])
 
   const loadBooking = useCallback(async () => {
     const { data, error: loadError } = await withIssuedAtRetry(() =>
@@ -99,6 +101,8 @@ export default function BookingDetail() {
 
     setBooking(data)
     setNotGuest(false)
+    const { rows } = await loadBookingAddonRows(supabase, [data.id])
+    setBookingAddons(rows)
 
     const listingId = data.sessions?.listings?.id
     if (data.status === 'confirmed' && listingId) {
@@ -260,6 +264,12 @@ export default function BookingDetail() {
       <p className="booking-detail__row">
         <strong>Guests</strong> {guestCountLabel(booking.guests_count)}
       </p>
+      {bookingAddons.length > 0 ? (
+        <p className="booking-detail__row">
+          <strong>Add-ons</strong>{' '}
+          {bookingAddons.map((row) => addonLineLabel(row.name, row.quantity)).join(', ')}
+        </p>
+      ) : null}
       <p className="booking-detail__row">
         <strong>Total paid</strong> {formatCents(booking.total_amount)}
       </p>

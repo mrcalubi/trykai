@@ -1364,7 +1364,7 @@ describe('Profile card layout', () => {
       makeSession({
         id: 'booked',
         listing_id: 'listing-9',
-        starts_at: hoursFromNow(24),
+        starts_at: hoursFromNow(3),
         listings: { title: 'Latte art' },
         bookings: [{ id: 'b1', status: 'confirmed' }],
       }),

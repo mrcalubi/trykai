@@ -653,6 +653,26 @@ describe('booking confirmation emails', () => {
     expect(html).not.toMatch(/booking fee|platform fee|host fee/i)
     expect(html).not.toMatch(/Total paid|Refund amount|Refund method/i)
   })
+
+  it('tells the host which add-ons to prepare and any note', () => {
+    const html = bookingConfirmedHostHtml({
+      bookingReference: 'A1B2C3D4',
+      hostName: 'Mei Ling',
+      guestName: 'Sarah Chen',
+      listingTitle: 'Latte art',
+      sessionDate: formatSessionDate(SESSION_STARTS),
+      guestsCount: 1,
+      hostPayoutCents: 8800,
+      addons: [
+        { name: 'Premium blooms', quantity: 1 },
+        { name: 'Gift wrap and card', quantity: 2 },
+      ],
+      addonNote: 'For Alex',
+      guestFirstName: 'Sarah',
+    })
+    expect(html).toContain('Add-ons to prepare: Premium blooms × 1, Gift wrap and card × 2.')
+    expect(html).toContain('Note from Sarah: For Alex')
+  })
 })
 
 describe('formatSessionDate', () => {
@@ -1288,6 +1308,38 @@ describe('branded receipt', () => {
     expect(sum).toBe(9408)
   })
 
+  it('includes add-on rows in the sum', () => {
+    const card = receiptRows({
+      pricePerPersonCents: 3000,
+      guestsCount: 2,
+      groupPricing: true,
+      paymentRail: 'card',
+      totalPaidCents: 9900,
+      addons: [
+        { name: 'Premium blooms', quantity: 1, unitGuestCents: 1700 },
+        { name: 'Gift wrap', quantity: 2, unitGuestCents: 900 },
+      ],
+    })
+    expect(card.addsUp).toBe(true)
+    expect(card.rows.map((row) => row.label)).toEqual(
+      expect.arrayContaining(['Premium blooms × 1', 'Gift wrap × 2']),
+    )
+    const paynow = receiptRows({
+      pricePerPersonCents: 3000,
+      guestsCount: 2,
+      groupPricing: true,
+      paymentRail: 'paynow',
+      totalPaidCents: 9702,
+      addons: [
+        { name: 'Premium blooms', quantity: 1, unitGuestCents: 1700 },
+        { name: 'Gift wrap', quantity: 2, unitGuestCents: 900 },
+      ],
+    })
+    expect(paynow.addsUp).toBe(true)
+    const sum = paynow.rows.reduce((total, row) => total + (row.amountCents ?? 0), 0)
+    expect(sum).toBe(9702)
+  })
+
   it('has the brand frame: production logo, wordmark, cream page, inbox preview', () => {
     const html = guestReceipt({ siteUrl: 'https://trykai.vercel.app' })
     expect(html).toContain(`src="${EMAIL_LOGO_URL}"`)
@@ -1516,6 +1568,22 @@ describe('session reminder emails', () => {
       totalGuests: 2,
     })
     expect(host).toContain('is today, and')
+    const withAddons = hostSessionReminderHtml({
+      hostName: 'Mei',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(SAME_DAY_START),
+      startsAt: SAME_DAY_START,
+      sentAt: SAME_DAY_SENT,
+      guests: [{ name: 'Sam', guestsCount: 2 }],
+      totalGuests: 2,
+      addons: [
+        { name: 'Premium blooms', quantity: 1 },
+        { name: 'Gift wrap and card', quantity: 2 },
+      ],
+      notes: [{ name: 'Sam', note: 'For Alex' }],
+    })
+    expect(withAddons).toContain('Premium blooms × 1, Gift wrap and card × 2')
+    expect(withAddons).toContain('Note from Sam: For Alex')
   })
 
   it('says Tomorrow when the session is the next Singapore morning', () => {

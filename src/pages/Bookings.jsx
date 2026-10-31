@@ -22,6 +22,7 @@ import { formatSessionDateTime, formatSessionTime } from '../lib/sessionDate'
 import { guestCalendarMarks, splitGuestBookings } from '../lib/profileV2'
 import { DateChip, TabCalendar } from '../components/profile/ProfileSections'
 import { singaporeDateKey } from '../lib/sessionCalendar'
+import { addonLineLabel, loadBookingAddonRows } from '../lib/bookingAddons'
 
 const POLL_ATTEMPTS = 20
 const POLL_INTERVAL_MS = 2000
@@ -42,6 +43,7 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
   const userId = useAuthedUserId()
 
   const [bookings, setBookings] = useState([])
+  const [bookingAddonsById, setBookingAddonsById] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -110,6 +112,17 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
       setError(PAGE_LOAD_ERROR)
     } else {
       setBookings(bookingsResult.data)
+      const { rows: addonRows } = await loadBookingAddonRows(
+        supabase,
+        (bookingsResult.data ?? []).map((booking) => booking.id),
+      )
+      const byId = {}
+      for (const row of addonRows) {
+        const list = byId[row.booking_id] ?? []
+        list.push(row)
+        byId[row.booking_id] = list
+      }
+      setBookingAddonsById(byId)
 
       const addressEntries = await Promise.all(
         (bookingsResult.data ?? [])
@@ -405,6 +418,11 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
             {booking.guests_count === 1
               ? '1 guest'
               : `${booking.guests_count} guests`}
+            {(bookingAddonsById[booking.id] ?? []).length > 0
+              ? ` · ${(bookingAddonsById[booking.id] ?? [])
+                  .map((row) => addonLineLabel(row.name, row.quantity))
+                  .join(', ')}`
+              : ''}
             {bookingAddresses[booking.id] && (
               <>
                 {' · '}

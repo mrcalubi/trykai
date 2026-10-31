@@ -1102,7 +1102,13 @@ describe('ListingDetail booking', () => {
 
     await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
     expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
-      body: { session_id: 'session-7', guests_count: 1, payment_rail: 'card' },
+      body: {
+        session_id: 'session-7',
+        guests_count: 1,
+        payment_rail: 'card',
+        addons: [],
+        addon_note: null,
+      },
       headers: { Authorization: 'Bearer test-access-token' },
     })
   })
@@ -1247,7 +1253,13 @@ describe('ListingDetail booking', () => {
 
     await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
     expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
-      body: { session_id: 'session-7', guests_count: 1, payment_rail: 'paynow' },
+      body: {
+        session_id: 'session-7',
+        guests_count: 1,
+        payment_rail: 'paynow',
+        addons: [],
+        addon_note: null,
+      },
       headers: { Authorization: 'Bearer test-access-token' },
     })
   })
@@ -1392,7 +1404,13 @@ describe('ListingDetail booking', () => {
 
     await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
     expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
-      body: { session_id: 'session-7', guests_count: 2, payment_rail: 'card' },
+      body: {
+        session_id: 'session-7',
+        guests_count: 2,
+        payment_rail: 'card',
+        addons: [],
+        addon_note: null,
+      },
       headers: { Authorization: 'Bearer test-access-token' },
     })
   })
@@ -1592,5 +1610,126 @@ describe('ListingDetail checkout', () => {
 
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
     expect(stripe.instance.confirmPayment).not.toHaveBeenCalled()
+  })
+})
+
+const BLOOMS = {
+  id: 'addon-blooms',
+  name: 'Premium blooms',
+  description: 'A better bunch',
+  price_cents: 1500,
+  unit: 'person',
+  session_limit: 4,
+  photo_url: null,
+  position: 0,
+  is_active: true,
+}
+
+const WRAP = {
+  id: 'addon-wrap',
+  name: 'Gift wrap',
+  description: '',
+  price_cents: 800,
+  unit: 'booking',
+  session_limit: null,
+  photo_url: null,
+  position: 1,
+  is_active: true,
+}
+
+function givenAddons(addons, remaining = []) {
+  supabase.__on('listing_addons', 'select', { data: addons, error: null })
+  const reviews = supabase.rpc.getMockImplementation()
+  supabase.rpc.mockImplementation(async (name, args) => {
+    if (name === 'session_addon_remaining') return { data: remaining, error: null }
+    if (typeof reviews === 'function') return reviews(name, args)
+    return { data: null, error: null }
+  })
+}
+
+describe('ListingDetail add-ons', () => {
+  beforeEach(() => {
+    givenListing(makeListing({ users: { display_name: 'Mei', stripe_payouts_enabled: true } }))
+    givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(72), spots_remaining: 4 })])
+    givenReviews([])
+    givenSignedIn()
+  })
+
+  it('hides Add a little extra when the listing has no add-ons', async () => {
+    givenAddons([])
+    renderPage()
+    await screen.findByText(/spots left/)
+    expect(screen.queryByRole('heading', { name: 'Add a little extra' })).not.toBeInTheDocument()
+  })
+
+  it('shows add-on cards under About this experience', async () => {
+    givenAddons([BLOOMS, WRAP])
+    renderPage()
+    expect(await screen.findByRole('heading', { name: 'Add a little extra' })).toBeInTheDocument()
+    expect(
+      screen.getByText(/Mei offers these with this session. Pick any when you book/),
+    ).toBeInTheDocument()
+    expect(screen.getByText('+$17 per person')).toBeInTheDocument()
+    expect(screen.getByText('+$9 per booking')).toBeInTheDocument()
+    expect(screen.getByText('4 per session')).toBeInTheDocument()
+  })
+
+  it('lets a guest step a per-person add-on and toggle a per-booking one', async () => {
+    givenAddons([BLOOMS, WRAP], [{ addon_id: 'addon-blooms', remaining: 2 }])
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    expect(screen.getByText(/Make it extra/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Anything Mei should know?')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
+    expect(screen.getByText('Premium blooms × 1')).toBeInTheDocument()
+    expect(screen.getByText('2 left this session')).toBeInTheDocument()
+    expect(screen.getByLabelText(/Anything Mei should know/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(screen.getByRole('button', { name: 'Added' })).toBeInTheDocument()
+    expect(screen.getByText('Gift wrap × 1')).toBeInTheDocument()
+  })
+
+  it('clamps a per-person add-on when the guest count drops', async () => {
+    givenAddons([BLOOMS])
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(screen.getByRole('button', { name: 'More guests' }))
+    await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
+    await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
+    expect(screen.getByText('Premium blooms × 2')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Fewer guests' }))
+    expect(screen.getByText('Premium blooms × 1')).toBeInTheDocument()
+    expect(screen.queryByText('Premium blooms × 2')).not.toBeInTheDocument()
+  })
+
+  it('sends picked add-ons and the note with the combined total', async () => {
+    givenAddons([BLOOMS])
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 6800 },
+      error: null,
+    })
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
+    await user.type(screen.getByLabelText(/Anything Mei should know/), 'For Alex')
+    await user.click(cardRail())
+    await user.click(continueToPayment())
+
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
+      body: {
+        session_id: 'session-7',
+        guests_count: 1,
+        payment_rail: 'card',
+        addons: [{ id: 'addon-blooms', quantity: 1 }],
+        addon_note: 'For Alex',
+      },
+      headers: { Authorization: 'Bearer test-access-token' },
+    })
   })
 })

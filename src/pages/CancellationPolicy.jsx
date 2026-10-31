@@ -9,7 +9,8 @@ export default function CancellationPolicy() {
       <p>
         This policy applies to single session bookings on TryKai. It is shown to
         guests before checkout and to hosts before a listing goes live, so there
-        are no surprises on either side.
+        are no surprises on either side. Add-ons follow the same refund tiers as
+        the session.
       </p>
 
       <h2>If you are a guest</h2>
