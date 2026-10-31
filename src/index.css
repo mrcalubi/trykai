@@ -5625,8 +5625,8 @@ body.lightbox-open {
 }
 
 .price-breakdown__row--saving {
-  font-weight: 600;
-  color: var(--coral-ink);
+  font-weight: 700;
+  color: var(--success);
 }
 
 .price-breakdown__row--total {
