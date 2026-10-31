@@ -153,6 +153,12 @@ Answer these plainly, like you are texting a friend who asked what happens:
 
 Guests see only your general area, for example Tiong Bahru, until they have a confirmed booking. Your full address is revealed only after someone has actually paid. You enter it by postal code, so it is always a real, findable address.
 
+Add **How to find me** if the pin is not enough: lift, unit, which door, what to ring. Only confirmed guests see it, on the booking page and in their emails.
+
+**Bookings close** a set time before each session: 3 hours (the default), 6, 12, 24 or 48. Pick longer if you need time to buy materials or prepare add-ons. Guests still see those times, marked Booking closed.
+
+In Settings you can add an optional **day-of contact number** and turn on sharing. Confirmed guests then get Call and WhatsApp from 24 hours before until the session ends, only for finding you or last-minute logistics. You can leave it off.
+
 If you are hosting at home, think about whether you are comfortable with that. A public or bookable venue is fine, and often easier. Follow your condo, landlord or venue rules, and keep noise and crowding considerate of neighbours.
 
 ## Cancellations, and what happens if things go wrong

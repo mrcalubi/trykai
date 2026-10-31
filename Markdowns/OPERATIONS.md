@@ -456,6 +456,7 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00042` (listing add-ons) | Not applied | Not applied | Host editor. Apply before `00043`. |
 | `00043` (booking add-ons) | Not applied | Not applied | After `00042`. Payouts are unchanged: add-ons ride inside `host_payout_amount`. |
 | `00044` (reschedule) | Not applied | Not applied | After `00043`. Caleb applies. Columns plus `reschedule_booking`. Deploy `reschedule-booking`. |
+| `00045` (booking cutoff and arrival) | Not applied | Not applied | After `00044`. Caleb applies. Cutoff, How to find me, day-of number, `booking_host_contact`. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 

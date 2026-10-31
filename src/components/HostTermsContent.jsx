@@ -80,6 +80,10 @@ export default function HostTermsContent() {
         through TryKai for the same or a related session. This does not stop you
         and a Guest having a relationship unrelated to a TryKai booking.
       </p>
+      <p>
+        A day-of contact number you share is only for session logistics with
+        confirmed guests.
+      </p>
 
       <h3>8. Tax</h3>
       <p>

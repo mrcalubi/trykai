@@ -77,10 +77,37 @@ Deno.serve(async (req) => {
     }
     let emailsLeft = REMINDER_EMAIL_CAP
 
-    const { data: windowSessions, error: sessionError } = await admin
+    let { data: windowSessions, error: sessionError } = await admin
       .from('sessions')
       .select(
         `
+        id,
+        starts_at,
+        duration_mins,
+        host_reminder_sent_at,
+        listings!inner (
+          title,
+          full_address,
+          arrival_instructions,
+          whats_provided,
+          what_to_bring,
+          users:host_id (
+            email,
+            display_name,
+            full_name
+          )
+        )
+      `,
+      )
+      .eq('status', 'open')
+      .gte('starts_at', windowStart)
+      .lte('starts_at', windowEnd)
+
+    if (sessionError && /arrival_instructions/.test(sessionError.message ?? '')) {
+      ;({ data: windowSessions, error: sessionError } = await admin
+        .from('sessions')
+        .select(
+          `
         id,
         starts_at,
         duration_mins,
@@ -97,10 +124,11 @@ Deno.serve(async (req) => {
           )
         )
       `,
-      )
-      .eq('status', 'open')
-      .gte('starts_at', windowStart)
-      .lte('starts_at', windowEnd)
+        )
+        .eq('status', 'open')
+        .gte('starts_at', windowStart)
+        .lte('starts_at', windowEnd))
+    }
 
     if (sessionError) return jsonResponse({ error: sessionError.message }, 500)
 
@@ -194,6 +222,8 @@ Deno.serve(async (req) => {
             typeof session.duration_mins === 'number' ? session.duration_mins : null,
           ),
           fullAddress: typeof listing?.full_address === 'string' ? listing.full_address : '',
+          arrivalInstructions:
+            typeof listing?.arrival_instructions === 'string' ? listing.arrival_instructions : '',
           whatsProvided: Array.isArray(listing?.whats_provided)
             ? (listing.whats_provided as string[])
             : null,

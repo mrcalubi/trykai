@@ -44,6 +44,16 @@ import {
   upcomingSessionsFrom,
 } from '../lib/listingDelete'
 import { monthStartIso } from '../lib/hostingDashboard'
+import {
+  ArrivalInstructionsField,
+  BookingCutoffFields,
+} from '../components/BookingCutoffFields'
+import {
+  DEFAULT_BOOKING_CUTOFF_HOURS,
+  arrivalInstructionsForSave,
+  bookingCutoffHours,
+  isMissingCutoffColumn,
+} from '../lib/bookingCutoff'
 
 const LISTING_SELECT = `
   id,
@@ -57,6 +67,7 @@ const LISTING_SELECT = `
   area,
   whats_provided,
   what_to_bring,
+  booking_cutoff_hours,
   photo_urls,
   host_id
 `
@@ -81,6 +92,8 @@ export default function EditListing() {
   const [groupPricing, setGroupPricing] = useState(true)
   const [area, setArea] = useState('')
   const [fullAddress, setFullAddress] = useState('')
+  const [arrivalInstructions, setArrivalInstructions] = useState('')
+  const [bookingCutoff, setBookingCutoff] = useState(DEFAULT_BOOKING_CUTOFF_HOURS)
   const [whatsProvided, setWhatsProvided] = useState([])
   const [whatToBring, setWhatToBring] = useState([])
   const [photos, setPhotos] = useState([])
@@ -124,19 +137,25 @@ export default function EditListing() {
       let listingResult = await withIssuedAtRetry(() =>
         supabase.from('listings').select(LISTING_SELECT).eq('id', id).eq('host_id', userId).single()
       )
-      if (listingResult.error && /what_to_bring/.test(listingResult.error.message ?? '')) {
+      if (listingResult.error && /what_to_bring|booking_cutoff_hours/.test(listingResult.error.message ?? '')) {
         listingResult = await withIssuedAtRetry(() =>
           supabase
             .from('listings')
-            .select(LISTING_SELECT.replace(/\s*what_to_bring,\n/, '\n'))
+            .select(
+              LISTING_SELECT.replace(/\s*what_to_bring,\n/, '\n').replace(
+                /\s*booking_cutoff_hours,\n/,
+                '\n',
+              ),
+            )
             .eq('id', id)
             .eq('host_id', userId)
             .single()
         )
       }
-      const [founding, addressResult, sessionsResult] = await Promise.all([
+      const [founding, addressResult, arrivalResult, sessionsResult] = await Promise.all([
         supabase.rpc('my_is_founding_host'),
         supabase.rpc('listing_address', { listing_id: id }),
+        supabase.rpc('listing_arrival_instructions', { listing_id: id }),
         supabase
           .from('sessions')
           .select(HOST_SESSIONS_SELECT)
@@ -178,6 +197,9 @@ export default function EditListing() {
       const nextGroupPricing = data.group_pricing !== false
       const nextArea = data.area ?? ''
       const nextAddress = typeof addressResult.data === 'string' ? addressResult.data : ''
+      const nextArrival =
+        !arrivalResult.error && typeof arrivalResult.data === 'string' ? arrivalResult.data : ''
+      const nextCutoff = bookingCutoffHours(data.booking_cutoff_hours)
       const nextProvided = data.whats_provided?.length ? data.whats_provided : []
       const nextBring = data.what_to_bring?.length ? data.what_to_bring : []
       const nextPhotos = photosFromUrls(data.photo_urls)
@@ -195,6 +217,8 @@ export default function EditListing() {
       setGroupPricing(nextGroupPricing)
       setArea(nextArea)
       setFullAddress(nextAddress)
+      setArrivalInstructions(nextArrival)
+      setBookingCutoff(nextCutoff)
       setWhatsProvided(nextProvided)
       setWhatToBring(nextBring)
       setPhotos(nextPhotos)
@@ -210,6 +234,8 @@ export default function EditListing() {
           groupPricing: nextGroupPricing,
           area: nextArea,
           fullAddress: nextAddress,
+          arrivalInstructions: nextArrival,
+          bookingCutoffHours: nextCutoff,
           whatsProvided: nextProvided,
           whatToBring: nextBring,
           photos: nextPhotos,
@@ -278,6 +304,8 @@ export default function EditListing() {
       group_pricing: groupPricing,
       area,
       full_address: fullAddress.trim(),
+      arrival_instructions: arrivalInstructionsForSave(arrivalInstructions),
+      booking_cutoff_hours: bookingCutoffHours(bookingCutoff),
       whats_provided: provided,
       what_to_bring: bring,
       photo_urls: photoUrls,
@@ -287,11 +315,17 @@ export default function EditListing() {
       .update(listingPayload)
       .eq('id', id)
       .eq('host_id', userId)
-    if (updateError && /duration_mins|group_pricing|what_to_bring/.test(updateError.message ?? '')) {
+    if (
+      updateError &&
+      (/duration_mins|group_pricing|what_to_bring/.test(updateError.message ?? '') ||
+        isMissingCutoffColumn(updateError))
+    ) {
       const retry = { ...listingPayload }
       if (/duration_mins/.test(updateError.message ?? '')) delete retry.duration_mins
       if (/group_pricing/.test(updateError.message ?? '')) delete retry.group_pricing
       if (/what_to_bring/.test(updateError.message ?? '')) delete retry.what_to_bring
+      if (/arrival_instructions/.test(updateError.message ?? '')) delete retry.arrival_instructions
+      if (/booking_cutoff_hours/.test(updateError.message ?? '')) delete retry.booking_cutoff_hours
       ;({ error: updateError } = await supabase
         .from('listings')
         .update(retry)
@@ -399,6 +433,8 @@ export default function EditListing() {
     groupPricing,
     area,
     fullAddress,
+    arrivalInstructions,
+    bookingCutoffHours: bookingCutoff,
     whatsProvided,
     whatToBring,
     photos,
@@ -539,6 +575,8 @@ export default function EditListing() {
             <ListingAddonsEditor addons={addons} onChange={setAddons} fieldHints={fieldHints} />
           ) : null}
 
+          <BookingCutoffFields value={bookingCutoff} onChange={setBookingCutoff} />
+
           <h2 className="form-section__title">Location</h2>
           <PostalAddressFields
             value={fullAddress}
@@ -549,6 +587,7 @@ export default function EditListing() {
             allowChangeAddress
           />
           <FieldHint>{fieldHints.fullAddress}</FieldHint>
+          <ArrivalInstructionsField value={arrivalInstructions} onChange={setArrivalInstructions} />
 
           <h2 className="form-section__title">Photos</h2>
           <PhotoTips />

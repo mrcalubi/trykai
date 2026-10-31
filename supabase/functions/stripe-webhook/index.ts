@@ -8,6 +8,7 @@ import {
   bookingConfirmedGuestHtml,
   bookingConfirmedGuestSubject,
   bookingConfirmedHostHtml,
+  bookingConfirmedHostSubject,
   bookingReference,
   cardDetailsFromCharge,
   formatDuration,
@@ -232,6 +233,8 @@ async function confirmSucceededPayment(paymentIntent: {
       sessionDate,
       duration,
       fullAddress: listing?.full_address ?? '',
+      arrivalInstructions:
+        typeof listing?.arrival_instructions === 'string' ? listing.arrival_instructions : '',
       guestsCount: booking.guests_count,
       pricePerPersonCents: listing?.price_per_person ?? 0,
       groupPricing: listing?.group_pricing !== false,
@@ -251,7 +254,7 @@ async function confirmSucceededPayment(paymentIntent: {
   await sendResendEmail({
     apiKey,
     to: host?.email,
-    subject: `New booking for "${listingTitle}"`,
+    subject: bookingConfirmedHostSubject(listingTitle, session?.starts_at ?? ''),
     html: bookingConfirmedHostHtml({
       bookingReference: reference,
       hostName: publicDisplayName(host),

@@ -1,7 +1,7 @@
 import { calculateGuestRefund, formatCents } from './cancellationPolicy'
 import { sessionHasEnded } from './reviewGate'
 import { singaporeDateKey } from '../../supabase/functions/_shared/email.ts'
-import { isPayNowTooFarAhead } from '../../supabase/functions/_shared/booking.ts'
+import { isBookingClosed, isPayNowTooFarAhead } from '../../supabase/functions/_shared/booking.ts'
 import { sessionForReview } from './guestBookings'
 
 export const RESCHEDULE_CUTOFF_HOURS = 48
@@ -181,6 +181,9 @@ export function isEligibleRescheduleSession(session, booking, now = Date.now()) 
   if (booking.payment_rail === 'paynow') {
     const paidAt = Date.parse(booking.created_at)
     if (isPayNowTooFarAhead(session.starts_at, Number.isFinite(paidAt) ? paidAt : now)) return false
+  }
+  if (isBookingClosed(session.starts_at, booking.sessions?.listings?.booking_cutoff_hours, now)) {
+    return false
   }
   return true
 }

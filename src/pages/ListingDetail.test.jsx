@@ -1688,12 +1688,12 @@ describe('ListingDetail add-ons', () => {
 
     expect(screen.getByText(/Make it extra/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
-    expect(screen.queryByLabelText('Anything Mei should know?')).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/Note for Mei \(optional\)/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
     expect(screen.getByText('Premium blooms × 1')).toBeInTheDocument()
     expect(screen.getByText('2 left this session')).toBeInTheDocument()
-    expect(screen.getByLabelText(/Anything Mei should know/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Note for Mei \(optional\)/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Add' }))
     expect(screen.getByRole('button', { name: 'Added' })).toBeInTheDocument()
@@ -1723,7 +1723,7 @@ describe('ListingDetail add-ons', () => {
     const { user } = renderPage()
     await user.click(await screen.findByRole('button', { name: 'Book' }))
     await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
-    await user.type(screen.getByLabelText(/Anything Mei should know/), 'For Alex')
+    await user.type(screen.getByLabelText(/Note for Mei \(optional\)/), 'For Alex')
     await user.click(cardRail())
     await user.click(continueToPayment())
 
@@ -1738,5 +1738,61 @@ describe('ListingDetail add-ons', () => {
       },
       headers: { Authorization: 'Bearer test-access-token' },
     })
+  })
+
+  it('always sends a note even when no add-ons are picked', async () => {
+    givenAddons([])
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 5100 },
+      error: null,
+    })
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.queryByRole('heading', { name: 'Add a little extra' })).not.toBeInTheDocument()
+    expect(screen.getByText(/For example, allergies or running a little late/)).toBeInTheDocument()
+    await user.type(screen.getByLabelText(/Note for Mei \(optional\)/), 'Running late')
+    await user.click(cardRail())
+    await user.click(continueToPayment())
+
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
+      body: {
+        session_id: 'session-7',
+        guests_count: 1,
+        payment_rail: 'card',
+        addons: [],
+        addon_note: 'Running late',
+      },
+      headers: { Authorization: 'Bearer test-access-token' },
+    })
+  })
+})
+
+describe('ListingDetail booking cutoff', () => {
+  it('retries the listing without booking_cutoff_hours when the column is missing', async () => {
+    let selects = 0
+    supabase.__on('listings', 'select', () => {
+      selects += 1
+      if (selects === 1) {
+        return { data: null, error: { message: 'column listings.booking_cutoff_hours does not exist' } }
+      }
+      return { data: makeListing({ users: { stripe_payouts_enabled: true } }), error: null }
+    })
+    givenSessions([makeSession()])
+    givenReviews([])
+    renderPage()
+    expect(await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })).toBeInTheDocument()
+    expect(selects).toBeGreaterThanOrEqual(2)
+  })
+
+  it('keeps a session inside the cutoff visible with Booking closed and no Book button', async () => {
+    givenListing(makeListing({ booking_cutoff_hours: 3, users: { stripe_payouts_enabled: true } }))
+    givenSessions([makeSession({ id: 'session-soon', starts_at: hoursFromNow(2), spots_remaining: 4 })])
+    givenReviews([])
+    renderPage()
+
+    expect(await screen.findByText('Booking closed')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Book' })).not.toBeInTheDocument()
+    expect(screen.getByText(/spots left/)).toBeInTheDocument()
   })
 })

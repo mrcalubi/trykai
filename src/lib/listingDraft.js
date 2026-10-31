@@ -90,6 +90,10 @@ export function draftValues(draft) {
     groupPricing: typeof draft?.groupPricing === 'boolean' ? draft.groupPricing : true,
     area: text('area'),
     fullAddress: text('fullAddress'),
+    arrivalInstructions: text('arrivalInstructions'),
+    bookingCutoffHours: [3, 6, 12, 24, 48].includes(draft?.bookingCutoffHours)
+      ? draft.bookingCutoffHours
+      : 3,
     whatsProvided: Array.isArray(draft?.whatsProvided) ? draft.whatsProvided : [],
     whatToBring: Array.isArray(draft?.whatToBring) ? draft.whatToBring : [],
     addons: draftAddons(draft?.addons),
@@ -107,6 +111,8 @@ export function isBlankDraft(draft) {
     values.durationChoice == null &&
     !values.area.trim() &&
     !values.fullAddress.trim() &&
+    !values.arrivalInstructions.trim() &&
+    values.bookingCutoffHours === 3 &&
     values.whatsProvided.length === 0 &&
     values.whatToBring.length === 0 &&
     !addonsHaveAnswers(values.addons)

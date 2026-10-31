@@ -43,6 +43,8 @@ import {
   pickedAddonLines,
 } from '../lib/bookingAddons'
 import CheckoutAddons from '../components/CheckoutAddons'
+import { CheckoutHostNote } from '../components/BookingCutoffFields'
+import { bookingClosedMessage, isBookingClosed } from '../lib/bookingCutoff'
 import { formatDuration } from '../lib/duration'
 import { edgeFunctionErrorMessage, isPayNowTooFarAheadError } from '../lib/edgeFunctionError'
 import { isLowSpots, spotsLabel } from '../lib/listingSpots'
@@ -239,6 +241,7 @@ export default function ListingDetail() {
           photo_urls,
           whats_provided,
           what_to_bring,
+          booking_cutoff_hours,
           host_id,
           review_status,
           users!host_id (
@@ -251,13 +254,16 @@ export default function ListingDetail() {
       let { data: listingData, error: listingError } = await withIssuedAtRetry(() =>
         supabase.from('listings').select(listingSelect).eq('id', id).eq('is_active', true).single()
       )
-      if (listingError && /group_pricing|what_to_bring/.test(listingError.message ?? '')) {
+      if (listingError && /group_pricing|what_to_bring|booking_cutoff_hours/.test(listingError.message ?? '')) {
         let retrySelect = listingSelect
         if (/group_pricing/.test(listingError.message ?? '')) {
           retrySelect = retrySelect.replace(/\s*group_pricing,\n/, '\n')
         }
         if (/what_to_bring/.test(listingError.message ?? '')) {
           retrySelect = retrySelect.replace(/\s*what_to_bring,\n/, '\n')
+        }
+        if (/booking_cutoff_hours/.test(listingError.message ?? '')) {
+          retrySelect = retrySelect.replace(/\s*booking_cutoff_hours,\n/, '\n')
         }
         ;({ data: listingData, error: listingError } = await withIssuedAtRetry(() =>
           supabase
@@ -498,6 +504,12 @@ export default function ListingDetail() {
       return
     }
 
+    const chosen = (monthSessions ?? []).find((row) => row.id === sessionId)
+    if (chosen && isBookingClosed(chosen.starts_at, listing?.booking_cutoff_hours)) {
+      setPaymentError(bookingClosedMessage(listing?.booking_cutoff_hours))
+      return
+    }
+
     setPaymentError('')
     setClientSecret(null)
     setBookingId(null)
@@ -572,7 +584,7 @@ export default function ListingDetail() {
         guests_count: guestsCount,
         payment_rail: paymentRail,
         addons: checkoutAddonPayload(picked),
-        addon_note: picked.length ? addonNote.trim() || null : null,
+        addon_note: addonNote.trim() || null,
       },
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -717,15 +729,19 @@ export default function ListingDetail() {
               </p>
             </div>
             <div className="session-card__actions">
-              <button
-                type="button"
-                onClick={() => handleBook(session.id)}
-                disabled={session.spots_remaining === 0 || !canTakePayments || isOwnListing}
-                aria-describedby={`session-${session.id}-time`}
-                className="btn btn--book"
-              >
-                Book
-              </button>
+              {isBookingClosed(session.starts_at, listing.booking_cutoff_hours) ? (
+                <p className="session-card__closed">Booking closed</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleBook(session.id)}
+                  disabled={session.spots_remaining === 0 || !canTakePayments || isOwnListing}
+                  aria-describedby={`session-${session.id}-time`}
+                  className="btn btn--book"
+                >
+                  Book
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -857,13 +873,12 @@ export default function ListingDetail() {
                   guestsCount={guestsCount}
                   remainingById={addonRemaining}
                   hostName={hostName}
-                  note={addonNote}
                   onQuantity={(addonId, quantity) => {
                     setAddonQuantities((current) => ({ ...current, [addonId]: Math.max(0, quantity) }))
                   }}
-                  onNote={setAddonNote}
                 />
               ) : null}
+              <CheckoutHostNote hostName={hostName} value={addonNote} onChange={setAddonNote} />
 
               <div className="payment-rails" role="radiogroup" aria-labelledby="pay-with-label">
                 <p className="checkout__label" id="pay-with-label">
