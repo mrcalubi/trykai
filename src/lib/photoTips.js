@@ -1,7 +1,12 @@
-/** Photo guidance shared by the listing forms and the Hosting dashboard banner. */
+/** Our recommended starting shots. Shared by create and edit listing. */
+export const PHOTO_TIPS_TITLE = "Five shots we'd start with"
+
 export const PHOTO_TIPS = [
-  'Natural light is your best friend. A window beats any flash.',
-  'Lead with the good stuff: the latte, the bowl, the finished piece.',
-  'Hands in action beat an empty room.',
-  'Tidy the background so your skill takes centre stage.',
+  'What guests make, like the finished latte, bowl or piece.',
+  'You teaching, hands in and showing how.',
+  'Your space, so guests can picture being there.',
+  'Guests having a go (ask them first).',
+  'A close-up of the little details.',
 ]
+
+export const PHOTO_TIPS_NOTE = 'Daylight from a window makes everything look better.'

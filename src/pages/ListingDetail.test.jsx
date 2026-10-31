@@ -636,6 +636,39 @@ describe('ListingDetail content', () => {
     expect(document.querySelector('.detail-gallery__dots')).not.toBeInTheDocument()
   })
 
+  it('keeps the desktop mosaic at five and offers Show all when there are more', async () => {
+    givenListing(
+      makeListing({
+        photo_urls: ['a', 'b', 'c', 'd', 'e', 'f'].map((name) => `https://cdn.test/${name}.jpg`),
+      }),
+    )
+    const { user } = renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(document.querySelector('.detail-gallery__scroller')).toHaveAttribute(
+      'data-photo-count',
+      '5',
+    )
+    expect(screen.getByRole('button', { name: 'Show all 6 photos' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Show all 6 photos' }))
+    const dialog = screen.getByRole('dialog', { name: 'Learn latte art with me photos' })
+    expect(within(dialog).getByRole('img')).toHaveAttribute('src', 'https://cdn.test/a.jpg')
+    expect(within(dialog).getByText('1 / 6')).toBeInTheDocument()
+  })
+
+  it('omits Show all when the mosaic already shows every photo', async () => {
+    givenListing(
+      makeListing({
+        photo_urls: ['a', 'b', 'c', 'd', 'e'].map((name) => `https://cdn.test/${name}.jpg`),
+      }),
+    )
+    renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.queryByRole('button', { name: /Show all/ })).not.toBeInTheDocument()
+  })
+
   it('opens the clicked gallery photo in the lightbox', async () => {
     givenListing(makeListing({ photo_urls: ['https://cdn.test/a.jpg', 'https://cdn.test/b.jpg'] }))
     const { user } = renderPage()
@@ -954,7 +987,7 @@ describe('ListingDetail booking', () => {
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
   })
 
-  it('offers PayNow at 5% off the advertised card total before creating a PaymentIntent', async () => {
+  it('offers PayNow at a sliding percentage off the advertised card total before creating a PaymentIntent', async () => {
     givenSignedIn()
     const { user } = renderPage()
 
@@ -965,19 +998,35 @@ describe('ListingDetail booking', () => {
     const card = screen.getByRole('radio', { name: /^Card/ })
     expect(paynow.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(paynow).toHaveClass('payment-rail--paynow')
-    expect(paynow).toHaveTextContent('Save 5%')
+    expect(paynow).toHaveTextContent('Save 3%')
+    expect(paynow).not.toHaveTextContent('Save 5%')
     expect(paynow).not.toHaveTextContent('Best price')
     expect(paynow).not.toHaveTextContent('·')
     expect(paynow).not.toHaveTextContent('Scan the QR')
     expect(paynow).toHaveAttribute('aria-checked', 'true')
     expect(paynow).toHaveTextContent('$51')
-    expect(paynow).toHaveTextContent('$48.45')
+    expect(paynow).toHaveTextContent('$49.47')
     expect(card).toHaveTextContent('$51')
     expect(card).not.toHaveTextContent('Credit or debit card')
     expect(continueToPayment()).toBeInTheDocument()
     expect(screen.getAllByRole('heading', { name: 'Confirm and pay' })).toHaveLength(1)
     expect(screen.queryByText('Pick a date, then a time')).not.toBeInTheDocument()
     expect(document.querySelector('.detail-booking-card__note')).not.toBeInTheDocument()
+  })
+
+  it('steps the PayNow badge from Save 3% to Save 2% when the basket passes $60', async () => {
+    givenListing(makeListing({ price_per_person: 4500 }))
+    givenSessions([makeSession({ id: 'session-7', spots_remaining: 4 })])
+    givenSignedIn()
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('Save 3%')
+
+    await user.click(screen.getByRole('button', { name: 'Add 1 more for 5% off' }))
+    expect(screen.getByRole('radio', { name: /^Card/ })).toHaveTextContent('$96')
+    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('Save 2%')
+    expect(screen.getByRole('radio', { name: /PayNow/ })).not.toHaveTextContent('Save 3%')
   })
 
   it('disables PayNow when the session is more than 80 days away', async () => {
@@ -994,7 +1043,7 @@ describe('ListingDetail booking', () => {
     ).toBeInTheDocument()
     expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$51')
     expect(paynow).toHaveTextContent('$51')
-    expect(paynow).not.toHaveTextContent('$48.45')
+    expect(paynow).not.toHaveTextContent('$49.47')
     expect(screen.getByRole('radio', { name: /^Card/ })).toHaveAttribute('aria-checked', 'true')
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
   })
@@ -1053,7 +1102,13 @@ describe('ListingDetail booking', () => {
 
     await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
     expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
-      body: { session_id: 'session-7', guests_count: 1, payment_rail: 'card' },
+      body: {
+        session_id: 'session-7',
+        guests_count: 1,
+        payment_rail: 'card',
+        addons: [],
+        addon_note: null,
+      },
       headers: { Authorization: 'Bearer test-access-token' },
     })
   })
@@ -1140,9 +1195,9 @@ describe('ListingDetail booking', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
     expect(paynowRail()).toHaveAttribute('aria-checked', 'true')
-    expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$48.45')
-    expect(document.querySelector('.price-breakdown__total')).toHaveTextContent('$48.45')
-    expect(continueToPayment()).toHaveTextContent('$48.45')
+    expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$49.47')
+    expect(document.querySelector('.price-breakdown__total')).toHaveTextContent('$49.47')
+    expect(continueToPayment()).toHaveTextContent('$49.47')
 
     await user.click(cardRail())
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
@@ -1152,8 +1207,8 @@ describe('ListingDetail booking', () => {
 
     await user.click(paynowRail())
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
-    expect(document.querySelector('.price-breakdown__total')).toHaveTextContent('$48.45')
-    expect(continueToPayment()).toHaveTextContent('$48.45')
+    expect(document.querySelector('.price-breakdown__total')).toHaveTextContent('$49.47')
+    expect(continueToPayment()).toHaveTextContent('$49.47')
     expect(paynowRail()).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByText('Total (all in)')).toBeInTheDocument()
     expect(screen.queryByText(/Booking fee included/)).not.toBeInTheDocument()
@@ -1186,7 +1241,7 @@ describe('ListingDetail booking', () => {
   it('asks the edge function for a PayNow intent when that rail is chosen', async () => {
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({
-      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 4845 },
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 4947 },
       error: null,
     })
     const { user } = renderPage()
@@ -1198,7 +1253,13 @@ describe('ListingDetail booking', () => {
 
     await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
     expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
-      body: { session_id: 'session-7', guests_count: 1, payment_rail: 'paynow' },
+      body: {
+        session_id: 'session-7',
+        guests_count: 1,
+        payment_rail: 'paynow',
+        addons: [],
+        addon_note: null,
+      },
       headers: { Authorization: 'Bearer test-access-token' },
     })
   })
@@ -1322,7 +1383,7 @@ describe('ListingDetail booking', () => {
     expect(screen.queryByRole('button', { name: /Add 1 more/ })).not.toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /^Card/ })).toHaveTextContent('$96')
     expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('$96')
-    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('$91.20')
+    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('$94.08')
   })
 
   it('sends the chosen guest count to create-payment-intent', async () => {
@@ -1343,7 +1404,13 @@ describe('ListingDetail booking', () => {
 
     await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
     expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
-      body: { session_id: 'session-7', guests_count: 2, payment_rail: 'card' },
+      body: {
+        session_id: 'session-7',
+        guests_count: 2,
+        payment_rail: 'card',
+        addons: [],
+        addon_note: null,
+      },
       headers: { Authorization: 'Bearer test-access-token' },
     })
   })
@@ -1543,5 +1610,126 @@ describe('ListingDetail checkout', () => {
 
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
     expect(stripe.instance.confirmPayment).not.toHaveBeenCalled()
+  })
+})
+
+const BLOOMS = {
+  id: 'addon-blooms',
+  name: 'Premium blooms',
+  description: 'A better bunch',
+  price_cents: 1500,
+  unit: 'person',
+  session_limit: 4,
+  photo_url: null,
+  position: 0,
+  is_active: true,
+}
+
+const WRAP = {
+  id: 'addon-wrap',
+  name: 'Gift wrap',
+  description: '',
+  price_cents: 800,
+  unit: 'booking',
+  session_limit: null,
+  photo_url: null,
+  position: 1,
+  is_active: true,
+}
+
+function givenAddons(addons, remaining = []) {
+  supabase.__on('listing_addons', 'select', { data: addons, error: null })
+  const reviews = supabase.rpc.getMockImplementation()
+  supabase.rpc.mockImplementation(async (name, args) => {
+    if (name === 'session_addon_remaining') return { data: remaining, error: null }
+    if (typeof reviews === 'function') return reviews(name, args)
+    return { data: null, error: null }
+  })
+}
+
+describe('ListingDetail add-ons', () => {
+  beforeEach(() => {
+    givenListing(makeListing({ users: { display_name: 'Mei', stripe_payouts_enabled: true } }))
+    givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(72), spots_remaining: 4 })])
+    givenReviews([])
+    givenSignedIn()
+  })
+
+  it('hides Add a little extra when the listing has no add-ons', async () => {
+    givenAddons([])
+    renderPage()
+    await screen.findByText(/spots left/)
+    expect(screen.queryByRole('heading', { name: 'Add a little extra' })).not.toBeInTheDocument()
+  })
+
+  it('shows add-on cards under About this experience', async () => {
+    givenAddons([BLOOMS, WRAP])
+    renderPage()
+    expect(await screen.findByRole('heading', { name: 'Add a little extra' })).toBeInTheDocument()
+    expect(
+      screen.getByText(/Mei offers these with this session. Pick any when you book/),
+    ).toBeInTheDocument()
+    expect(screen.getByText('+$17 per person')).toBeInTheDocument()
+    expect(screen.getByText('+$9 per booking')).toBeInTheDocument()
+    expect(screen.getByText('4 per session')).toBeInTheDocument()
+  })
+
+  it('lets a guest step a per-person add-on and toggle a per-booking one', async () => {
+    givenAddons([BLOOMS, WRAP], [{ addon_id: 'addon-blooms', remaining: 2 }])
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+
+    expect(screen.getByText(/Make it extra/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Anything Mei should know?')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
+    expect(screen.getByText('Premium blooms × 1')).toBeInTheDocument()
+    expect(screen.getByText('2 left this session')).toBeInTheDocument()
+    expect(screen.getByLabelText(/Anything Mei should know/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(screen.getByRole('button', { name: 'Added' })).toBeInTheDocument()
+    expect(screen.getByText('Gift wrap × 1')).toBeInTheDocument()
+  })
+
+  it('clamps a per-person add-on when the guest count drops', async () => {
+    givenAddons([BLOOMS])
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(screen.getByRole('button', { name: 'More guests' }))
+    await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
+    await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
+    expect(screen.getByText('Premium blooms × 2')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Fewer guests' }))
+    expect(screen.getByText('Premium blooms × 1')).toBeInTheDocument()
+    expect(screen.queryByText('Premium blooms × 2')).not.toBeInTheDocument()
+  })
+
+  it('sends picked add-ons and the note with the combined total', async () => {
+    givenAddons([BLOOMS])
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 6800 },
+      error: null,
+    })
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
+    await user.type(screen.getByLabelText(/Anything Mei should know/), 'For Alex')
+    await user.click(cardRail())
+    await user.click(continueToPayment())
+
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('create-payment-intent', {
+      body: {
+        session_id: 'session-7',
+        guests_count: 1,
+        payment_rail: 'card',
+        addons: [{ id: 'addon-blooms', quantity: 1 }],
+        addon_note: 'For Alex',
+      },
+      headers: { Authorization: 'Bearer test-access-token' },
+    })
   })
 })

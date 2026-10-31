@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { Route } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import EditListing from './EditListing'
@@ -250,14 +250,14 @@ describe('EditListing prefill', () => {
     givenListing({ photo_urls: ['https://cdn.test/one.jpg', 'https://cdn.test/two.jpg'] })
     await renderLoaded()
 
-    expect(screen.getByText('Maximum of 5 photos (2/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (2/8)')).toBeInTheDocument()
   })
 
   it('copes with a listing that has no photos', async () => {
     givenListing({ photo_urls: null })
     await renderLoaded()
 
-    expect(screen.getByText('Maximum of 5 photos (0/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (0/8)')).toBeInTheDocument()
   })
 })
 
@@ -609,7 +609,7 @@ describe('EditListing photos', () => {
   it('keeps the existing photos and appends the newly uploaded ones', async () => {
     const { user } = await renderLoaded()
     selectFiles([imageFile('two.png')])
-    await screen.findByText('Maximum of 5 photos (2/5)')
+    await screen.findByText('Maximum of 8 photos (2/8)')
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
@@ -625,7 +625,7 @@ describe('EditListing photos', () => {
 
     await user.click(screen.getAllByRole('button', { name: 'Remove photo' })[0])
 
-    expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (1/8)')).toBeInTheDocument()
   })
 
   it('treats removing a photo as dirty and asks before leaving', async () => {
@@ -641,7 +641,7 @@ describe('EditListing photos', () => {
     expect(screen.getByRole('dialog', { name: 'Discard your changes?' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Keep editing' }))
     expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
-    expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (1/8)')).toBeInTheDocument()
   })
 
   it('drops a removed photo from the saved listing', async () => {
@@ -660,11 +660,11 @@ describe('EditListing photos', () => {
   it('lets a newly added photo be removed again', async () => {
     const { user } = await renderLoaded()
     selectFiles([imageFile('two.png')])
-    await screen.findByText('Maximum of 5 photos (2/5)')
+    await screen.findByText('Maximum of 8 photos (2/8)')
 
     await user.click(screen.getAllByRole('button', { name: 'Remove photo' })[1])
 
-    expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (1/8)')).toBeInTheDocument()
   })
 
   it('ignores files that are not images', async () => {
@@ -672,18 +672,18 @@ describe('EditListing photos', () => {
 
     selectFiles([new File(['x'], 'notes.txt', { type: 'text/plain' })])
 
-    expect(screen.getByText('Maximum of 5 photos (1/5)')).toBeInTheDocument()
+    expect(screen.getByText('Maximum of 8 photos (1/8)')).toBeInTheDocument()
   })
 
-  it('counts existing photos towards the five photo cap', async () => {
+  it('counts existing photos towards the eight photo cap', async () => {
     givenListing({
-      photo_urls: ['a', 'b', 'c', 'd'].map((name) => `https://cdn.test/${name}.jpg`),
+      photo_urls: ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((name) => `https://cdn.test/${name}.jpg`),
     })
     await renderLoaded()
 
-    selectFiles([imageFile('e.png'), imageFile('f.png'), imageFile('g.png')])
+    selectFiles([imageFile('h.png'), imageFile('i.png')])
 
-    expect(await screen.findByText('Maximum of 5 photos (5/5)')).toBeInTheDocument()
+    expect(await screen.findByText('Maximum of 8 photos (8/8)')).toBeInTheDocument()
     expect(screen.getByLabelText('Photos')).toBeDisabled()
   })
 
@@ -707,7 +707,7 @@ describe('EditListing photos', () => {
   it('abandons the save when a photo fails to upload', async () => {
     const { user } = await renderLoaded()
     selectFiles([imageFile('two.png')])
-    await screen.findByText('Maximum of 5 photos (2/5)')
+    await screen.findByText('Maximum of 8 photos (2/8)')
     supabase
       .__bucket('listing-photos')
       .upload.mockResolvedValue({ data: null, error: { message: 'storage full' } })
@@ -827,5 +827,122 @@ describe('EditListing delete', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent(LISTING_DELETE_SESSIONS_UNAVAILABLE)
     expect(screen.queryByRole('button', { name: 'Confirm delete' })).not.toBeInTheDocument()
     expect(supabase.rpc.mock.calls.some(([name]) => name === 'delete_listing')).toBe(false)
+  })
+})
+
+describe('EditListing add-ons', () => {
+  function givenAddons(rows) {
+    supabase.__on('listing_addons', 'select', { data: rows, error: null })
+  }
+
+  const kit = {
+    id: 'addon-keep',
+    name: 'Kit',
+    description: '',
+    price_cents: 1000,
+    unit: 'person',
+    session_limit: null,
+    photo_url: null,
+    position: 0,
+    is_active: true,
+  }
+  const wrap = {
+    id: 'addon-drop',
+    name: 'Wrap',
+    description: '',
+    price_cents: 500,
+    unit: 'booking',
+    session_limit: null,
+    photo_url: null,
+    position: 1,
+    is_active: true,
+  }
+
+  it('inserts, updates and soft-deletes add-ons on save', async () => {
+    givenAddons([kit, wrap])
+    const { user } = await renderLoaded()
+    expect(await screen.findByRole('heading', { name: 'Add-ons · optional' })).toBeInTheDocument()
+
+    const addonCards = () => document.querySelectorAll('.addon-card')
+    await user.clear(within(addonCards()[0]).getByLabelText('Name'))
+    await user.type(within(addonCards()[0]).getByLabelText('Name'), 'Premium kit')
+    await user.click(within(addonCards()[1]).getByRole('button', { name: 'Remove' }))
+    await user.click(screen.getByRole('button', { name: '+ Add an add-on' }))
+    await user.type(within(addonCards()[1]).getByLabelText('Name'), 'Drinks')
+    await user.type(within(addonCards()[1]).getByLabelText('You get in Singapore dollars'), '8')
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('listing_addons', 'update').length).toBeGreaterThan(0))
+    const updates = supabase.__calls('listing_addons', 'update')
+    expect(updates.some((call) => call.payload.is_active === false && call.filters.some((f) => f.value === 'addon-drop'))).toBe(true)
+    expect(updates.some((call) => call.payload.name === 'Premium kit')).toBe(true)
+    expect(supabase.__lastCall('listing_addons', 'insert').payload).toMatchObject({
+      listing_id: 'listing-1',
+      name: 'Drinks',
+      price_cents: 800,
+    })
+  })
+
+  it('does not insert an add-on twice when a save fails part way and is retried', async () => {
+    givenAddons([])
+    let inserts = 0
+    supabase.__on('listing_addons', 'insert', () => {
+      inserts += 1
+      if (inserts === 2) return { data: null, error: { code: '23514', message: 'boom' } }
+      return { data: { id: `addon-new-${inserts}` }, error: null }
+    })
+    const { user } = await renderLoaded()
+    await screen.findByRole('heading', { name: 'Add-ons · optional' })
+    const addonCards = () => document.querySelectorAll('.addon-card')
+    await user.click(screen.getByRole('button', { name: '+ Add an add-on' }))
+    await user.type(within(addonCards()[0]).getByLabelText('Name'), 'Kit')
+    await user.type(within(addonCards()[0]).getByLabelText('You get in Singapore dollars'), '10')
+    await user.click(screen.getByRole('button', { name: '+ Add an add-on' }))
+    await user.type(within(addonCards()[1]).getByLabelText('Name'), 'Wrap')
+    await user.type(within(addonCards()[1]).getByLabelText('You get in Singapore dollars'), '5')
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(inserts).toBe(2))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled())
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(inserts).toBe(3))
+    const names = supabase.__calls('listing_addons', 'insert').map((call) => call.payload.name)
+    expect(names).toEqual(['Kit', 'Wrap', 'Wrap'])
+    expect(
+      supabase
+        .__calls('listing_addons', 'update')
+        .some((call) => call.payload.name === 'Kit' && call.filters.some((f) => f.value === 'addon-new-1')),
+    ).toBe(true)
+  })
+
+  it('treats an add-on edit as unsaved', async () => {
+    givenAddons([kit])
+    const { user } = await renderLoaded({
+      withNav: true,
+      extraRoutes: <Route path="/" element={<h1>Home</h1>} />,
+    })
+    await screen.findByDisplayValue('Kit')
+    await user.type(screen.getByLabelText('Name'), ' extra')
+    await user.click(screen.getByRole('link', { name: 'TryKai home' }))
+    expect(screen.getByRole('dialog', { name: 'Discard your changes?' })).toBeInTheDocument()
+  })
+
+  it('hides add-ons when the table is missing and still saves the listing', async () => {
+    supabase.__on('listing_addons', 'select', {
+      data: null,
+      error: { code: '42P01', message: 'relation "public.listing_addons" does not exist' },
+    })
+    const { user } = await renderLoaded()
+    expect(screen.queryByRole('heading', { name: 'Add-ons · optional' })).not.toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('Title'))
+    await user.type(screen.getByLabelText('Title'), 'Latte art two')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
+    expect(supabase.__calls('listing_addons', 'insert')).toHaveLength(0)
+    expect(supabase.__calls('listing_addons', 'update')).toHaveLength(0)
   })
 })

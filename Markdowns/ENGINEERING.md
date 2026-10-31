@@ -8,7 +8,7 @@ The working document for anyone touching the codebase, human or AI. Covers stack
 >
 > 1. **Stripe Connect is implemented in this tree: separate charges and transfers, Express accounts, decided 16 August 2026.** Guests pay the platform; host share is Transferred 72 hours after the session ends (`starts_at` + `duration_mins`). Remaining payment work is ops, not a second product decision. Platform Stripe payouts must stay **manual** so auto-payout to Aspire does not drain funds needed for those Transfers. See DECISIONS.md.
 > 2. **The four tier cancellation logic is built.** Refunds are issued by the `cancel-booking` Edge Function, not the browser. Guests are emailed the refund amount (including $0). When the guest cancels, the host is emailed their payout only. When the host cancels a session, they get a strike email with no guest amounts.
-> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00036`**).** There is no `supabase/schema.sql`. Migrations are applied by hand: staging first, then production in the same sitting, after checking the project ref in the URL and that production has a backup from the last 24 hours. Refs, deploy rules and current state per environment: OPERATIONS.md, Environments and production SQL.
+> 3. **Schema lives in** `supabase/migrations/` **(**`00001` **through** `00043`**).** There is no `supabase/schema.sql`. Migrations are applied by hand: staging first, then production in the same sitting, after checking the project ref in the URL and that production has a backup from the last 24 hours. Refs, deploy rules and current state per environment: OPERATIONS.md, Environments and production SQL.
 > 4. **A CI test suite and branch protection gate every merge.** Do not expect to merge with red checks. Match the existing plain CSS approach in `index.css`; the project does not use Tailwind.
 > 5. `Navbar.jsx` **is deleted.** `SiteNav` **is mounted once in** `App.jsx` **and renders** `TopNav` **for every route. No page mounts its own nav.** **Home shows the Lane 1 headline above the kit's** `Card` **in browse mode, with a rating on the meta line only when** `listing_ratings` **returns reviews.** Button is live on Settings and Hosting listing rows. Input is live on Settings and Login. SelectableCard is still used only by `/style-guide`.
 > 6. **All colours come from the tokens at** `:root` **in** `index.css`**.** Never hardcode a hex value in a component. See section 2, Styling.
@@ -172,6 +172,46 @@ After `00025`, anon and authenticated have column-level SELECT on every `listing
 
 **New public table.** Revoke Supabase's default `GRANT ALL` (`REVOKE ALL` from anon and authenticated) and grant only what the client uses. `00025` also revokes default privileges for role `postgres` so a later `CREATE TABLE` does not dump ALL to clients. Grant `service_role` explicitly in the same migration (`GRANT ALL ... TO service_role`): from 30 October 2026 Supabase stops granting new `public` tables to any API role automatically, `service_role` included.
 
+### listing_addons
+
+```sql
+id uuid PK
+listing_id uuid FK → listings on delete cascade
+name text                    -- 1–60 after trim
+description text default ''  -- ≤140
+price_cents integer          -- host unit price, S$1–S$500 whole dollars (100–50000, % 100 = 0)
+unit text                    -- 'person' | 'booking'
+session_limit integer        -- optional 1–99 units across all bookings of a session
+photo_url text               -- null, or in listing-photos/{host_id}/
+position smallint default 0
+is_active boolean default true
+created_at, updated_at timestamptz
+```
+
+`00042`. Up to 3 active add-ons per listing (trigger). Photo URL trigger requires `/storage/v1/object/public/listing-photos/{host_id}/`. RLS: anon and authenticated read active add-ons of listings they can already read; the owner reads inactive too. Insert and update are the listing owner only. No DELETE grant — removing sets `is_active = false`. Column grants in the 00025 style. If the table is missing (PGRST205 / 42P01), Create/Edit listing hide the editor and still save the listing; the listing page and checkout hide add-ons the same way.
+
+Guest unit price is `addonGuestUnitCents(hostCents)` in `_shared/booking.ts`, re-exported from `src/lib/pricing.js`: 12% of the host unit, rounded up to the next whole dollar, no S$2.50 floor. Host S$15 → guest S$17; S$8 → S$9. No host fee on add-ons.
+
+`session_addon_remaining(p_session_id)` (`00043`, security definer, `search_path = public`) returns `(addon_id, remaining)` for that session's active add-ons that have a `session_limit`. `remaining = session_limit − sum(quantity)` over **confirmed** bookings of that session. Execute for anon and authenticated.
+
+### booking_addons
+
+```sql
+id uuid PK
+booking_id uuid FK → bookings on delete cascade
+addon_id uuid FK → listing_addons on delete set null
+name text
+unit text                    -- 'person' | 'booking'
+quantity integer             -- >= 1
+unit_host_cents integer
+unit_guest_cents integer
+created_at timestamptz
+```
+
+`00043`. Snapshot of what the guest bought. Indexes on `(addon_id)` and `(booking_id)`. RLS: the booking's guest or the listing's host can SELECT. No client INSERT/UPDATE/DELETE; service role writes. `bookings` also gains `addons_amount` (host share of add-ons, cents, default 0) and `addon_note` (≤120). Select of those columns for authenticated, no client write.
+
+`confirm_paid_booking` (`00043`) keeps its signature and grants. After the spots check, still holding the session row lock, it raises `'insufficient add-ons'` when a snapshot line whose listing add-on has a `session_limit` would put confirmed quantity over the limit. The webhook treats that as an oversell.
+
 ### planning_areas
 
 ```sql
@@ -208,10 +248,12 @@ session_id uuid FK → sessions
 guest_id uuid FK → users
 guests_count integer default 1
 total_amount integer      -- cents, guest all-in for the chosen rail
-platform_fee integer      -- cents, total_amount - lesson; rounded-up remainder is platform margin
+platform_fee integer      -- cents, total_amount - lesson - addons_amount
+addons_amount integer     -- cents, host share of add-ons (00043)
+addon_note text           -- optional, ≤120
 payment_rail text         -- 'card' | 'paynow'
-host_fee integer          -- cents, frozen at confirmation
-host_payout_amount integer -- cents, lesson minus host_fee, frozen at confirmation
+host_fee integer          -- cents, frozen at confirmation, on the lesson only
+host_payout_amount integer -- cents, lesson minus host_fee plus addons_amount
 stripe_payment_id text    -- PaymentIntent id
 stripe_charge_id text     -- Charge id, used as Transfer source_transaction
 stripe_transfer_id text
@@ -345,13 +387,15 @@ Also decided but **not yet built**: reschedule, once per booking, same 48 hour c
 
 **Guest fee.** Card fee is 12% of the lesson total with a S$2.50 floor, then the total is rounded UP to the nearest whole dollar so it can never dip below the floor. Browse cards still show the one-person card all-in so the price never rises between viewing and paying. Checkout recomputes from `guests_count` and the listing's `group_pricing` flag; `create-payment-intent` ignores any client total.
 
-**Group pricing.** When `listings.group_pricing` is true (the default), the lesson price per person is discounted then multiplied by guests, in integer cents: 5% for 2, 10% for 3, 15% for 4, 20% for 5 or more. Never more than 20%. The card fee and the PayNow 5% apply once to that discounted lesson total. A group booking is one booking row.
+**Add-ons.** `calculateBookingCharge({ lessonCents, addons, rail })` in `booking.ts` is the single source of truth when add-ons are on the booking. The lesson card total stays as today; each add-on unit is `addonGuestUnitCents` times quantity; PayNow discounts the combined card total. `addons_amount` is the host's share. `platformFee = totalAmount − lessonCents − addonsAmount`. No add-ons must match `calculateGuestCharge`.
 
-**PayNow.** Shown as a flat 5% discount off the card all-in total for that guest count, displayed at checkout only. PayNow is refused when the session starts more than `PAYNOW_MAX_DAYS_AHEAD` (80) days from now — Stripe cannot refund PayNow after 90 days. `create-payment-intent` returns `paynow_too_far_ahead`; the checkout UI disables PayNow and keeps card pricing. Card is unaffected.
+**Group pricing.** When `listings.group_pricing` is true (the default), the lesson price per person is discounted then multiplied by guests, in integer cents: 5% for 2, 10% for 3, 15% for 4, 20% for 5 or more. Never more than 20%. The card fee and the PayNow discount apply once to that discounted lesson total. A group booking is one booking row.
 
-**Host fee.** 10% of the discounted lesson total, triggered per host: every non founding host's first three **confirmed** bookings are free, their fourth booking onward pays the fee. A group booking counts as one toward those three. Founding hosts (`is_founding_host`) never pay.
+**PayNow.** A sliding percentage off the card all-in total for that guest count, displayed at checkout only: 5% under $20, 4% under $30, 3% under $60, 2% otherwise (`paynowDiscountRate`). Each tier is the largest whole percentage that keeps PayNow at or above card after Stripe fees (card 3.4% + S$0.50, PayNow 1.3%). The badge shows the current rate and can step down as the basket grows. PayNow is refused when the session starts more than `PAYNOW_MAX_DAYS_AHEAD` (80) days from now — Stripe cannot refund PayNow after 90 days. `create-payment-intent` returns `paynow_too_far_ahead`; the checkout UI disables PayNow and keeps card pricing. Card is unaffected.
 
-Do not hardcode a flat percentage. Worked one-person checks: $10 → $13, $20 → $23, $25 → $28, $30 → $34, $40 → $45. PayNow example: $25 lesson → $26.60. Code of record is `booking.ts` and `pricing.js`; they must agree.
+**Host fee.** 10% of the discounted lesson only (`lesson = total_amount − platform_fee − addons_amount`), never of add-ons. Triggered per host: every non founding host's first three **confirmed** bookings are free, their fourth booking onward pays the fee. A group booking counts as one toward those three. Founding hosts (`is_founding_host`) never pay. Host payout is `lesson − host_fee + addons_amount`.
+
+Do not hardcode a flat percentage. Worked one-person checks: $10 → $13, $20 → $23, $25 → $28, $30 → $34, $40 → $45. PayNow example: $25 lesson → $26.88. Code of record is `booking.ts` and `pricing.js`; they must agree.
 
 ---
 
@@ -476,7 +520,8 @@ src/
 │   ├── useUnsavedChangesGuard.jsx # useBlocker dialog + beforeunload while a form is dirty
 │   ├── sessionDate.js           # Session day/time; year only when it is not this year
 │   ├── sessionCalendar.js       # Singapore month grid for listing and host calendars
-│   ├── sessionBatch.js          # Bulk-create dates, 80-day window, clash preview, 40 cap
+│   ├── sessionBatch.js          # Bulk-create dates, date → times map, 80-day window, clash preview, 40 cap
+│   ├── sessionFormDraft.js      # Add sessions draft + open form, per tab (sessionStorage), 12h
 │   ├── listingSpots.js          # Listing spots copy, capacity floor, session_has_bookings
 │   ├── listingCategories.js     # Shared host/browse category list + area line
 │   ├── reportMailto.js          # Report links to hello@trykai.sg
@@ -535,7 +580,8 @@ src/
 │   ├── PostalAddressFields.jsx  # Auto postal lookup, confirmed card, unit, Area guests see
 │   ├── SessionCalendar.jsx      # Guest month calendar on listing detail
 │   ├── DateMultiSelectCalendar.jsx # Host tap-to-select dates
-│   ├── AddSessionsForm.jsx      # Bulk add: quick-fill, times, preview, create
+│   ├── AddSessionsForm.jsx      # Bulk add: quick-fill, same or per-date times, preview, create
+│   ├── ListingAddonsEditor.jsx  # Host add-ons on Create (price step) and Edit listing
 │   ├── PageLoader.jsx           # Page-level wait: spinner after 400ms, "Loading…" for screen readers
 │   ├── WaitingState.jsx         # Long wait card: title, illustration, messages at 0 / 4s / 12s
 │   ├── LoadingMascot.jsx        # Default WaitingState art (three dots); future mascot home
@@ -589,11 +635,16 @@ supabase/migrations/
 ├── 00035_singpass_verification.sql
 ├── 00036_singpass_auto_approve_and_listing_review.sql
 ├── 00037_session_reminders.sql
-└── 00038_listing_what_to_bring.sql
+├── 00038_listing_what_to_bring.sql
+├── 00039_host_strike_events.sql
+├── 00040_host_sessions_held.sql
+├── 00041_profile_v2.sql
+├── 00042_listing_addons.sql
+└── 00043_booking_addons.sql
 
 supabase/functions/
 ├── _shared/
-│   ├── booking.ts               # Guest charge, group discount, host fee, refunds
+│   ├── booking.ts               # Guest charge, booking charge with add-ons, host fee, refunds
 │   ├── http.ts                  # JSON/CORS/secret helpers
 │   ├── connect.ts               # Express account v2 helpers
 │   ├── complaints.ts            # Report a problem window (start to 3 days after end), validation, evidence retention
@@ -642,7 +693,7 @@ supabase/functions/
 | Browse and profile listing-card ratings                    | `listing_ratings` (`00015`); one RPC per page, never per card                                       |
 | Host-profile reviews                                       | `reviews_for_host` (`00013`); do not embed `bookings` from the client                               |
 | Delete an empty hosted session                             | `delete_empty_session` (`00012`); Hosting Delete / Delete selected, not Cancel                      |
-| Bulk-create sessions                                       | `src/lib/sessionBatch.js`; each keep is `add_listing_session` with listing spots                    |
+| Bulk-create sessions                                       | `src/lib/sessionBatch.js`; date → times map; each keep is `add_listing_session` with listing spots  |
 | Change spots per session                                   | `set_listing_spots` (`00024`); Edit listing save                                                   |
 | Move an empty session                                      | `edit_open_session` (`00024`); Hosting inline Edit; booked rows have none                          |
 | Soft-delete a listing                                      | `delete_listing` (`00015`); owner only; refuses active upcoming bookings                            |
@@ -677,7 +728,9 @@ supabase/functions/
 | Host strike events and 12-month expiry                     | `supabase/migrations/00039_host_strike_events.sql`, `src/lib/hostStrikes.js`                        |
 | Host sessions-held count                                   | `supabase/migrations/00040_host_sessions_held.sql`                                                  |
 | Guest review eligibility                                   | `src/lib/reviewGate.js` and `guest_can_leave_review` (`00011`)                                      |
-| Guest-facing prices                                        | `src/lib/pricing.js`                                                                                |
+| Guest-facing prices                                        | `src/lib/pricing.js` (`addonGuestUnitCents` from `_shared/booking.ts`)                             |
+| Listing add-ons (host editor)                              | `src/lib/listingAddons.js`, `src/components/ListingAddonsEditor.jsx`, `00042`                       |
+| Booking add-ons (checkout, snapshot, host prepare)         | `src/lib/bookingAddons.js`, `00043`, `calculateBookingCharge`                                       |
 | Routes                                                     | `src/App.jsx`                                                                                       |
 | Payment and booking creation                               | `supabase/functions/create-payment-intent/`                                                         |
 | Payment confirmation                                       | `supabase/functions/stripe-webhook/`                                                                |
@@ -731,7 +784,7 @@ The gallery is one swipeable 4/3 photo per screen on phone (CSS scroll-snap, wit
 2. **Clicks Host a session / Become a host.** The hamburger (and a non-host's Bookings empty state) use `my_verification()`: `approved` is **Host a session** → `/create-listing`; `pending` is **Become a host** → `/verify-identity` (Under review); `unverified` or `rejected` is **Become a host** → the verification flow. `CreateListing.jsx` also gates on `my_verification()`. Founding-host price panel uses `my_is_founding_host()` (`00022`), not a `users` SELECT. Anyone not `approved` is sent to `/verify-identity`. An approved host visiting `/verify-identity` is redirected to `/create-listing`.
 3. **Verifies identity, with Singpass or by upload.** **Singpass** (only where `VITE_SINGPASS_ENABLED=true`): the page calls `singpass-start` (no body), which checks the caller can submit, stores state, nonce, PKCE verifier and a fresh DPoP key in `singpass_auth_sessions` (`00035`, service role only), makes the pushed authorization request (scope `openid name dob mobileno`, a Myinfo app) and returns the Singpass URL. Singpass returns the host to `/verify-identity/singpass`, which posts the query string once to `singpass-callback`: it finds the attempt by state for that user (30 minutes), exchanges the code with DPoP and a private_key_jwt assertion, verifies the ID token, fetches Myinfo userinfo with the same DPoP key (`ath` bound), checks its `sub` matches, refuses anyone under 18 (`isAdult`, partial dates read as the latest possible day), stores the details on the attempt and returns them. The page shows name and date of birth locked and the mobile number editable and required (Myinfo's mobile is self-declared; `normalizeHostMobile`). **Confirm and continue** calls `singpass-callback` with `action: 'confirm'` and the mobile, which runs `record_singpass_verification` (service role only, re-checks 18+ on full dates and that the Singpass is not linked elsewhere) to store `singpass_sub` (unique), `verified_name`, `verified_dob`, `verified_mobile` and, since `00036`, set `approved` with method `singpass` and a `verification_reviews` row with no reviewer, then deletes the attempt. The page says "You're verified" and links to `/create-listing`. **Cancel** deletes it. The OIDC client is `_shared/singpass-oidc.ts` (openid-client, as in Singpass's demo app); rules and copy are `_shared/singpass.ts`. Five Edge Function secrets: `SINGPASS_CLIENT_ID`, `SINGPASS_ISSUER`, `SINGPASS_REDIRECT_URI`, `SINGPASS_SIGNING_KEY`, `SINGPASS_ENCRYPTION_KEY`; without them both functions answer 503 and the page offers upload. Keys are made in the browser at `/admin/singpass-keys`. **Upload** (always available; the only route before 23 October). Stripe Identity is not available to Singapore-based businesses, so live sessions were refused on production; `create-identity-session` and the identity events in `stripe-webhook` stay in the tree but nothing calls them. With Singpass on, upload sits behind a small "No Singpass? Upload your ID instead" link. It asks for a passport or NRIC photo (the hint says the NRIC number may be covered) and a selfie, plus a consent box that states retention. Files go to the private `verification-docs` bucket, scoped to a folder named after the user id (`00026`: owner SELECT/INSERT/UPDATE so resubmit upsert can overwrite; no client list or read of anyone else's files). `submit_verification(p_id_photo_url, p_selfie_url, p_consent, p_teaching_plan default null)` (`00034`) records the paths, `verification_consent_at` and `pending`. The page no longer sends a teaching plan (removed 23 October; the listing says what they teach); older answers stay in `teaching_plan`. A database webhook on `users` fires `notify-verification-pending`, which emails `ADMIN_NOTIFY_EMAIL` (default `calebong2002@gmail.com`) with the teaching plan and a link to `/admin/verifications`. That function requires `NOTIFY_FUNCTION_SECRET` as `x-notify-secret` or Bearer; the webhook is set up per project in the dashboard (OPERATIONS.md).
 4. **The outcome is recorded.** Singpass hosts are already approved. Upload hosts are reviewed at `/admin/verifications`: both documents side by side (and a teaching plan, if they gave one before 23 October), approve, or reject with a reason. `review_verification` (`00007`, service role only) writes the decision, the reason, and a `verification_reviews` audit row in one transaction, so a decision cannot be applied without a record. `admin-verifications` emails the host. A rejected host also sees the reason on `/verify-identity` when they try again.
-5. **Creates the listing.** Title, description, category, price in cents, spots per session (`max_guests`), duration in minutes, postal code (looked up at 6 digits; confirmed address card; optional unit), then Area guests see (filled from OneMap's planning area when it maps to a host-picker name; searchable dropdown; neighbourhood aliases resolve to the planning area; uninhabited areas hidden; the host can change it), up to 5 photos, what's provided. Inserts into `listings` (always `pending` review, `00036`), sets `is_host = true`, calls `listing-submitted` without waiting (it emails `ADMIN_NOTIFY_EMAIL` about each of the caller's pending listings not yet notified since entering the queue, claiming `review_notified_at` first so a repeat sends nothing), navigates to `/hosting`. The team approves or asks for a change at `/admin/listings` (`admin-listings`, admin JWT); the host is emailed either way. **Does not create the first session in the same form.** Host terms checkbox is required.
+5. **Creates the listing.** Title, description, category, price in cents, spots per session (`max_guests`), duration in minutes, postal code (looked up at 6 digits; confirmed address card; optional unit), then Area guests see (filled from OneMap's planning area when it maps to a host-picker name; searchable dropdown; neighbourhood aliases resolve to the planning area; uninhabited areas hidden; the host can change it), up to 8 photos, what's provided. Inserts into `listings` (always `pending` review, `00036`), sets `is_host = true`, calls `listing-submitted` without waiting (it emails `ADMIN_NOTIFY_EMAIL` about each of the caller's pending listings not yet notified since entering the queue, claiming `review_notified_at` first so a repeat sends nothing), navigates to `/hosting`. The team approves or asks for a change at `/admin/listings` (`admin-listings`, admin JWT); the host is emailed either way. **Does not create the first session in the same form.** Host terms checkbox is required.
 6. **Adds sessions** from the Hosting tab “Add session”. Calendar dates from tomorrow through today + 80 days, optional quick-fill (weekdays every 1 / 2 weeks), one or more start times. Spots come from the listing (`N spots per session · change in listing settings`). Each date × time is one session; max 40. Preview skips past, host-wide clashes, and in-batch clashes. Each keep is `add_listing_session`. The same start time as an existing open or full session of that length still merges spots if the RPC is reached; the preview treats that overlap as a skip. Any other overlap is refused by the listing-scoped trigger, including a session that starts during another one. A session that starts when another ends is allowed. Booked sessions show first under Upcoming; empty ones on the listing card are one compact line (checkbox · date and time · Edit · Delete), next 3 then “Show all N open sessions”. Empty rows can be edited (`edit_open_session`, date and time only) or deleted one-by-one or tick-selected (`delete_empty_session`, no strike). A session with pending or confirmed bookings has Cancel and no Edit.
 7. **Payout setup.** Hosting “Set up payouts” → `create-account-link` → Stripe Express onboarding. Account Link `return_url`/`refresh_url` still use `/dashboard?connect=`, which redirects to `/hosting?connect=`, then `/u/:id?connect=&tab=hosting`. That return re-reads the account from Stripe (`{ refresh: true }`) before showing enabled, “Stripe is checking…”, or “isn't finished yet.” Book stays disabled for guests until `stripe_payouts_enabled`.
 8. **Receives bookings.** Email from `stripe-webhook` after confirmation, with guest name, session details, guest count.

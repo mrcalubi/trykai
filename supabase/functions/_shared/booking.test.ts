@@ -5,16 +5,21 @@ import {
   HOST_FEE_FREE_BOOKINGS,
   HOST_FEE_RATE,
   LEGACY_PLATFORM_FEE_RATE,
-  PAYNOW_DISCOUNT_RATE,
+  PAYNOW_DISCOUNT_TIERS,
   PAYNOW_MAX_DAYS_AHEAD,
   PAYNOW_TOO_FAR_AHEAD,
   PAYNOW_TOO_FAR_AHEAD_MESSAGE,
   isPayNowTooFarAhead,
+  paynowDiscountRate,
   rejectPayNowIfTooFarAhead,
+  calculateBookingCharge,
   calculateGuestCharge,
   calculateGuestRefund,
   calculateHostFee,
   calculateHostPayout,
+  hostPayoutBreakdown,
+  parseAddonNote,
+  prepareCheckoutAddons,
   hostPayoutAfterGuestCancel,
   confirmRpcErrorKind,
   decideAbandonCheckout,
@@ -33,6 +38,7 @@ import {
   shouldEmailCancellation,
   unpaidCheckoutCancelPatch,
   roundUpToDollar,
+  addonGuestUnitCents,
   spotsToRestore,
 } from './booking.ts'
 
@@ -78,6 +84,14 @@ describe('calculateGuestCharge card path', () => {
     expect(calculateGuestCharge(3000, 'card').totalAmount).toBe(3400)
   })
 
+  it('prices an add-on unit at 12% with no S$2.50 floor, rounded up per unit', () => {
+    expect(addonGuestUnitCents(100)).toBe(200)
+    expect(addonGuestUnitCents(800)).toBe(900)
+    expect(addonGuestUnitCents(1500)).toBe(1700)
+    expect(addonGuestUnitCents(2500)).toBe(2800)
+    expect(addonGuestUnitCents(5000)).toBe(5600)
+  })
+
   it('stores the platform fee as the gap between the all-in total and the lesson', () => {
     for (const price of [1000, 2000, 2500, 3000, 4000, 4500, 1999]) {
       const charge = calculateGuestCharge(price, 'card')
@@ -95,12 +109,39 @@ describe('calculateGuestCharge card path', () => {
 })
 
 describe('calculateGuestCharge PayNow path', () => {
-  it('takes 5% off the card all-in total', () => {
-    expect(PAYNOW_DISCOUNT_RATE).toBe(0.05)
-    const card = calculateGuestCharge(2500, 'card')
-    const paynow = calculateGuestCharge(2500, 'paynow')
-    expect(paynow.totalAmount).toBe(Math.round(card.totalAmount * 0.95))
-    expect(paynow.totalAmount).toBe(2660)
+  it('steps the rate down as the card total grows', () => {
+    expect(PAYNOW_DISCOUNT_TIERS.map((tier) => [tier.belowCents, tier.rate])).toEqual([
+      [2000, 0.05],
+      [3000, 0.04],
+      [6000, 0.03],
+      [Number.POSITIVE_INFINITY, 0.02],
+    ])
+    expect(paynowDiscountRate(1900)).toBe(0.05)
+    expect(paynowDiscountRate(2000)).toBe(0.04)
+    expect(paynowDiscountRate(2900)).toBe(0.04)
+    expect(paynowDiscountRate(3000)).toBe(0.03)
+    expect(paynowDiscountRate(5900)).toBe(0.03)
+    expect(paynowDiscountRate(6000)).toBe(0.02)
+    expect(paynowDiscountRate(Number.NaN)).toBe(0.02)
+  })
+
+  it('matches the published PayNow totals across the S$10 to S$40 band', () => {
+    expect(calculateGuestCharge(1000, 'card').totalAmount).toBe(1300)
+    expect(calculateGuestCharge(1000, 'paynow').totalAmount).toBe(1235)
+    expect(calculateGuestCharge(2000, 'card').totalAmount).toBe(2300)
+    expect(calculateGuestCharge(2000, 'paynow').totalAmount).toBe(2208)
+    expect(calculateGuestCharge(2500, 'card').totalAmount).toBe(2800)
+    expect(calculateGuestCharge(2500, 'paynow').totalAmount).toBe(2688)
+    expect(calculateGuestCharge(3000, 'card').totalAmount).toBe(3400)
+    expect(calculateGuestCharge(3000, 'paynow').totalAmount).toBe(3298)
+    expect(calculateGuestCharge(4000, 'card').totalAmount).toBe(4500)
+    expect(calculateGuestCharge(4000, 'paynow').totalAmount).toBe(4365)
+  })
+
+  it('uses 2% once a two-guest $30 booking crosses $60', () => {
+    const lesson = discountedLessonCents(3000, 2, true)
+    expect(calculateGuestCharge(lesson, 'card').totalAmount).toBe(6400)
+    expect(calculateGuestCharge(lesson, 'paynow').totalAmount).toBe(6272)
   })
 
   it('is cheaper than card at every published price point, never more expensive', () => {
@@ -573,6 +614,7 @@ describe('confirmRpcErrorKind', () => {
   it('treats an oversell as a refund-and-cancel, not a confirm', () => {
     expect(confirmRpcErrorKind('insufficient spots')).toBe('oversell')
     expect(confirmRpcErrorKind('INSUFFICIENT SPOTS remaining')).toBe('oversell')
+    expect(confirmRpcErrorKind('insufficient add-ons')).toBe('oversell')
     expect(confirmRpcErrorKind('session not open')).toBe('oversell')
     expect(confirmRpcErrorKind('SESSION NOT OPEN')).toBe('oversell')
     expect(confirmRpcErrorKind('booking not pending')).toBe('other')
@@ -658,7 +700,211 @@ describe('paymentIntentCreateParams', () => {
         guests_count: '1',
         payment_rail: 'paynow',
         platform_fee: '160',
+        addons_amount: '0',
       },
     })
+  })
+})
+
+describe('calculateBookingCharge', () => {
+  const now = new Date('2026-06-15T10:00:00.000Z').getTime()
+  const hoursFrom = (hours: number) => new Date(now + hours * 60 * 60 * 1000).toISOString()
+  const canvasAddons = [
+    { hostUnitCents: 1500, quantity: 1 },
+    { hostUnitCents: 800, quantity: 2 },
+  ]
+
+  it('matches calculateGuestCharge when there are no add-ons', () => {
+    for (const lesson of [1000, 2500, 5700, 10000]) {
+      for (const rail of ['card', 'paynow'] as const) {
+        expect(calculateBookingCharge({ lessonCents: lesson, addons: [], rail })).toMatchObject(
+          calculateGuestCharge(lesson, rail),
+        )
+      }
+    }
+  })
+
+  it('prices the canvas worked example', () => {
+    const lessonCents = discountedLessonCents(3000, 2, true)
+    expect(lessonCents).toBe(5700)
+    const card = calculateBookingCharge({ lessonCents, addons: canvasAddons, rail: 'card' })
+    expect(card).toMatchObject({
+      totalAmount: 9900,
+      addonsAmount: 3100,
+      platformFee: 1100,
+    })
+    const paynow = calculateBookingCharge({ lessonCents, addons: canvasAddons, rail: 'paynow' })
+    expect(paynowDiscountRate(card.totalAmount)).toBe(0.02)
+    expect(paynow).toMatchObject({
+      totalAmount: 9702,
+      addonsAmount: 3100,
+      platformFee: 902,
+    })
+    expect(
+      hostPayoutBreakdown({
+        totalAmount: 9900,
+        platformFee: 1100,
+        addonsAmount: 3100,
+        isFoundingHost: true,
+        priorConfirmedCount: 99,
+      }),
+    ).toMatchObject({ hostFee: 0, hostPayoutAmount: 8800 })
+    expect(
+      hostPayoutBreakdown({
+        totalAmount: 9900,
+        platformFee: 1100,
+        addonsAmount: 3100,
+        isFoundingHost: false,
+        priorConfirmedCount: 3,
+      }),
+    ).toMatchObject({ hostFee: 570, hostPayoutAmount: 8230 })
+    expect(calculateGuestRefund(9900, hoursFrom(30), 1100, now)).toBe(4400)
+  })
+
+  it('applies PayNow tiers to the combined card total', () => {
+    const cheap = calculateBookingCharge({
+      lessonCents: 1000,
+      addons: [{ hostUnitCents: 100, quantity: 1 }],
+      rail: 'paynow',
+    })
+    const cardCheap = calculateBookingCharge({
+      lessonCents: 1000,
+      addons: [{ hostUnitCents: 100, quantity: 1 }],
+      rail: 'card',
+    })
+    expect(paynowDiscountRate(cardCheap.totalAmount)).toBe(0.05)
+    expect(cheap.totalAmount).toBe(Math.round(cardCheap.totalAmount * 0.95))
+  })
+})
+
+describe('prepareCheckoutAddons', () => {
+  const catalog = [
+    {
+      id: 'blooms',
+      name: 'Premium blooms',
+      unit: 'person' as const,
+      price_cents: 1500,
+      session_limit: 2,
+      is_active: true,
+    },
+    {
+      id: 'wrap',
+      name: 'Gift wrap',
+      unit: 'booking' as const,
+      price_cents: 800,
+      is_active: true,
+    },
+  ]
+
+  it('rejects unknown ids and over-limit quantities', () => {
+    expect(
+      prepareCheckoutAddons({
+        requested: [{ id: 'gone', quantity: 1 }],
+        catalog,
+        guestsCount: 2,
+      }),
+    ).toEqual({
+      ok: false,
+      status: 400,
+      message: 'That add-on is no longer available. Refresh and try again.',
+    })
+    expect(
+      prepareCheckoutAddons({
+        requested: [{ id: 'blooms', quantity: 2 }],
+        catalog,
+        guestsCount: 2,
+        remainingByAddon: { blooms: 1 },
+      }),
+    ).toEqual({
+      ok: false,
+      status: 400,
+      message: 'Only 1 Premium blooms left for this session.',
+    })
+  })
+
+  it('ignores zeros and snapshots host and guest unit prices', () => {
+    expect(calculateBookingCharge({ lessonCents: 2500, rail: 'card' }).addonsAmount).toBe(0)
+    expect(parseAddonNote(null)).toBeNull()
+    expect(parseAddonNote('   ')).toBeNull()
+    expect(parseAddonNote(`  ${'x'.repeat(130)}  `)).toHaveLength(120)
+    expect(
+      prepareCheckoutAddons({ requested: { id: 'wrap', quantity: 1 }, catalog, guestsCount: 2 }),
+    ).toEqual({ ok: true, lines: [] })
+    expect(
+      prepareCheckoutAddons({
+        requested: [{ quantity: 1 }],
+        catalog,
+        guestsCount: 2,
+      }).ok,
+    ).toBe(false)
+    expect(
+      prepareCheckoutAddons({
+        requested: [{ id: 'wrap', quantity: '0' }, { id: 'wrap', quantity: 1 }],
+        catalog,
+        guestsCount: 2,
+      }).ok,
+    ).toBe(true)
+    expect(
+      prepareCheckoutAddons({
+        requested: [{ id: 'blooms', quantity: 1.5 }],
+        catalog,
+        guestsCount: 2,
+      }),
+    ).toMatchObject({ ok: false, message: 'Choose a whole number of each add-on.' })
+    expect(
+      prepareCheckoutAddons({
+        requested: [{ id: 'wrap', quantity: 2 }],
+        catalog,
+        guestsCount: 2,
+      }),
+    ).toMatchObject({ ok: false, message: 'That add-on is once per booking.' })
+    expect(
+      prepareCheckoutAddons({
+        requested: [{ id: 'blooms', quantity: 3 }],
+        catalog,
+        guestsCount: 2,
+      }).message,
+    ).toMatch(/at most 2/)
+    expect(
+      prepareCheckoutAddons({
+        requested: [
+          { id: 'blooms', quantity: 1 },
+          { id: 'wrap', quantity: 1 },
+          { id: 'blooms', quantity: 1 },
+          { id: 'wrap', quantity: 1 },
+        ],
+        catalog,
+        guestsCount: 2,
+      }),
+    ).toMatchObject({ ok: false, message: 'You can pick up to 3 add-ons.' })
+    const prepared = prepareCheckoutAddons({
+      requested: [
+        { id: 'blooms', quantity: 0 },
+        { id: 'wrap', quantity: 1 },
+      ],
+      catalog,
+      guestsCount: 2,
+    })
+    expect(prepared).toEqual({
+      ok: true,
+      lines: [
+        {
+          id: 'wrap',
+          name: 'Gift wrap',
+          unit: 'booking',
+          quantity: 1,
+          hostUnitCents: 800,
+          guestUnitCents: 900,
+        },
+      ],
+    })
+    expect(
+      hostPayoutBreakdown({
+        totalAmount: 5100,
+        platformFee: 600,
+        isFoundingHost: true,
+        priorConfirmedCount: 0,
+      }).hostPayoutAmount,
+    ).toBe(4500)
   })
 })

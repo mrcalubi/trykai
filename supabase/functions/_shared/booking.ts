@@ -7,7 +7,26 @@
 
 export const CARD_FEE_RATE = 0.12
 export const CARD_FEE_FLOOR_CENTS = 250
-export const PAYNOW_DISCOUNT_RATE = 0.05
+
+/**
+ * PayNow off the card all-in total. Each tier is the largest whole percentage
+ * that keeps PayNow at or above card after Stripe fees (card 3.4% + S$0.50,
+ * PayNow 1.3%). `belowCents` is exclusive.
+ */
+export const PAYNOW_DISCOUNT_TIERS = [
+  { belowCents: 2000, rate: 0.05 },
+  { belowCents: 3000, rate: 0.04 },
+  { belowCents: 6000, rate: 0.03 },
+  { belowCents: Number.POSITIVE_INFINITY, rate: 0.02 },
+] as const
+
+/** Sliding PayNow rate for this card all-in total, in cents. */
+export function paynowDiscountRate(cardTotalCents: number): number {
+  for (const tier of PAYNOW_DISCOUNT_TIERS) {
+    if (cardTotalCents < tier.belowCents) return tier.rate
+  }
+  return 0.02
+}
 /** Stripe will not refund PayNow after 90 days; 80 leaves a buffer. */
 export const PAYNOW_MAX_DAYS_AHEAD = 80
 export const PAYNOW_TOO_FAR_AHEAD = 'paynow_too_far_ahead'
@@ -91,10 +110,21 @@ export function roundUpToDollar(cents: number): number {
 }
 
 /**
+ * Guest unit price for a paid add-on. The host sets what they get, in whole
+ * dollars. Guests pay that plus the 12% booking fee, rounded up to the next
+ * whole dollar per unit. No S$2.50 floor — the lesson already carries it —
+ * and there is never a host fee on add-ons.
+ */
+export function addonGuestUnitCents(hostCents: number): number {
+  return roundUpToDollar(Math.round(hostCents * (1 + CARD_FEE_RATE)))
+}
+
+/**
  * Card path: 12% of the lesson with a S$2.50 floor, then the all-in total is
- * rounded UP to the next whole dollar. PayNow is 5% off that same all-in total.
- * `platformFee` is always `totalAmount - lessonAmount` so cancellation maths
- * that treat the lesson as `total - platform_fee` stay correct.
+ * rounded UP to the next whole dollar. PayNow takes `paynowDiscountRate` off
+ * that same all-in total. `platformFee` is always `totalAmount - lessonAmount`
+ * so cancellation maths that treat the lesson as `total - platform_fee` stay
+ * correct.
  */
 export function calculateGuestCharge(
   lessonCents: number,
@@ -107,7 +137,7 @@ export function calculateGuestCharge(
   const cardTotal = roundUpToDollar(lessonCents + cardFee)
 
   if (rail === 'paynow') {
-    const totalAmount = Math.round(cardTotal * (1 - PAYNOW_DISCOUNT_RATE))
+    const totalAmount = Math.round(cardTotal * (1 - paynowDiscountRate(cardTotal)))
     return {
       lessonAmount: lessonCents,
       totalAmount,
@@ -134,6 +164,176 @@ export function calculateHostFee(options: {
 
 export function calculateHostPayout(lessonAmount: number, hostFee: number): number {
   return lessonAmount - hostFee
+}
+
+export type BookingAddonLine = {
+  hostUnitCents: number
+  quantity: number
+}
+
+export type BookingCharge = GuestCharge & {
+  addonsAmount: number
+  addonsGuestCents: number
+  cardLessonTotal: number
+}
+
+/**
+ * Lesson card total stays as today (12%, S$2.50 floor, round up). Add-ons
+ * sit on top at their own 12% (no floor). PayNow discounts the combined
+ * card total. Hosts keep every add-on dollar; the platform fee is
+ * total − lesson − addons.
+ */
+export function calculateBookingCharge(options: {
+  lessonCents: number
+  addons?: BookingAddonLine[]
+  rail: PaymentRail
+}): BookingCharge {
+  const addons = options.addons ?? []
+  const lesson = calculateGuestCharge(options.lessonCents, 'card')
+  const cardLessonTotal = lesson.totalAmount
+  const addonsGuestCents = addons.reduce(
+    (sum, line) => sum + addonGuestUnitCents(line.hostUnitCents) * line.quantity,
+    0,
+  )
+  const addonsAmount = addons.reduce(
+    (sum, line) => sum + line.hostUnitCents * line.quantity,
+    0,
+  )
+  const cardTotal = cardLessonTotal + addonsGuestCents
+  const totalAmount =
+    options.rail === 'card'
+      ? cardTotal
+      : Math.round(cardTotal * (1 - paynowDiscountRate(cardTotal)))
+  return {
+    lessonAmount: options.lessonCents,
+    addonsAmount,
+    addonsGuestCents,
+    cardLessonTotal,
+    totalAmount,
+    platformFee: totalAmount - options.lessonCents - addonsAmount,
+  }
+}
+
+/**
+ * The host fee is on the lesson only. Add-ons pass through in full.
+ * lesson = total − platform_fee − addons_amount
+ */
+export function hostPayoutBreakdown(options: {
+  totalAmount: number
+  platformFee: number
+  addonsAmount?: number | null
+  isFoundingHost: boolean
+  priorConfirmedCount: number
+}): { lessonAmount: number; hostFee: number; hostPayoutAmount: number } {
+  const addonsAmount = Number(options.addonsAmount) || 0
+  const lessonAmount = options.totalAmount - options.platformFee - addonsAmount
+  const hostFee = calculateHostFee({
+    isFoundingHost: options.isFoundingHost,
+    priorConfirmedCount: options.priorConfirmedCount,
+    lessonAmount,
+  })
+  return {
+    lessonAmount,
+    hostFee,
+    hostPayoutAmount: calculateHostPayout(lessonAmount, hostFee) + addonsAmount,
+  }
+}
+
+export const ADDON_NOTE_MAX = 120
+export const MAX_BOOKING_ADDON_LINES = 3
+
+export type CatalogAddon = {
+  id: string
+  name: string
+  unit: 'person' | 'booking'
+  price_cents: number
+  session_limit?: number | null
+  is_active?: boolean
+}
+
+export type PreparedAddonLine = {
+  id: string
+  name: string
+  unit: 'person' | 'booking'
+  quantity: number
+  hostUnitCents: number
+  guestUnitCents: number
+}
+
+export function parseAddonNote(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim().slice(0, ADDON_NOTE_MAX)
+  return trimmed || null
+}
+
+export function prepareCheckoutAddons(options: {
+  requested: unknown
+  catalog: CatalogAddon[]
+  guestsCount: number
+  remainingByAddon?: Record<string, number>
+}):
+  | { ok: true; lines: PreparedAddonLine[] }
+  | { ok: false; status: number; message: string } {
+  const requested = Array.isArray(options.requested) ? options.requested : []
+  const byId = new Map(options.catalog.filter((row) => row.is_active !== false).map((row) => [row.id, row]))
+  const lines: PreparedAddonLine[] = []
+
+  for (const item of requested) {
+    const raw = item as { id?: unknown; quantity?: unknown }
+    const id = typeof raw.id === 'string' ? raw.id : ''
+    const quantity = raw.quantity
+    if (!id) {
+      return {
+        ok: false,
+        status: 400,
+        message: 'That add-on is no longer available. Refresh and try again.',
+      }
+    }
+    if (quantity === 0 || quantity === '0') continue
+    if (!Number.isInteger(quantity) || (quantity as number) < 1) {
+      return { ok: false, status: 400, message: 'Choose a whole number of each add-on.' }
+    }
+    const catalog = byId.get(id)
+    if (!catalog) {
+      return {
+        ok: false,
+        status: 400,
+        message: 'That add-on is no longer available. Refresh and try again.',
+      }
+    }
+    if (catalog.unit === 'booking' && quantity !== 1) {
+      return { ok: false, status: 400, message: 'That add-on is once per booking.' }
+    }
+    if (catalog.unit === 'person' && (quantity as number) > options.guestsCount) {
+      return {
+        ok: false,
+        status: 400,
+        message: `You can add ${catalog.name} for at most ${options.guestsCount} of you.`,
+      }
+    }
+    const remaining = options.remainingByAddon?.[id]
+    if (remaining != null && (quantity as number) > remaining) {
+      return {
+        ok: false,
+        status: 400,
+        message: `Only ${remaining} ${catalog.name} left for this session.`,
+      }
+    }
+    lines.push({
+      id: catalog.id,
+      name: catalog.name,
+      unit: catalog.unit,
+      quantity: quantity as number,
+      hostUnitCents: catalog.price_cents,
+      guestUnitCents: addonGuestUnitCents(catalog.price_cents),
+    })
+  }
+
+  if (lines.length > MAX_BOOKING_ADDON_LINES) {
+    return { ok: false, status: 400, message: 'You can pick up to 3 add-ons.' }
+  }
+
+  return { ok: true, lines }
 }
 
 /**
@@ -398,7 +598,11 @@ export function calculateGuestRefund(
 
 export function confirmRpcErrorKind(message: string | undefined): 'oversell' | 'other' {
   const text = (message ?? '').toLowerCase()
-  if (text.includes('insufficient spots') || text.includes('session not open')) {
+  if (
+    text.includes('insufficient spots') ||
+    text.includes('session not open') ||
+    text.includes('insufficient add-ons')
+  ) {
     return 'oversell'
   }
   return 'other'
@@ -437,6 +641,7 @@ export function paymentIntentCreateParams(options: {
   guestsCount: number
   paymentRail: PaymentRail
   platformFee: number
+  addonsAmount?: number
 }): {
   amount: number
   currency: 'sgd'
@@ -456,6 +661,7 @@ export function paymentIntentCreateParams(options: {
       guests_count: String(options.guestsCount),
       payment_rail: options.paymentRail,
       platform_fee: String(options.platformFee),
+      addons_amount: String(options.addonsAmount ?? 0),
     },
   }
 }

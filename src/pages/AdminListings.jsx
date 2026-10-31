@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { formatCents } from '../lib/cancellationPolicy'
+import { addonGuestUnitCents } from '../lib/pricing'
 import { formatDuration } from '../lib/duration'
 import { listingCategoryAreaLine } from '../lib/listingCategories'
+import { MAX_PHOTOS } from '../lib/listingPhotos'
 import { MAX_LISTING_REVIEW_NOTE_LENGTH } from '../../supabase/functions/_shared/listingReview.ts'
 import Button from '../components/ui/Button'
 import PageLoader from '../components/PageLoader'
@@ -121,7 +123,7 @@ export default function AdminListings() {
       <article key={listing.id} className="dashboard-card listing-review">
         {listing.photo_urls.length > 0 ? (
           <div className="listing-review__photos">
-            {listing.photo_urls.slice(0, 5).map((url, index) => (
+            {listing.photo_urls.slice(0, MAX_PHOTOS).map((url, index) => (
               <a key={url} href={url} target="_blank" rel="noreferrer">
                 <img src={url} alt={`Photo ${index + 1}`} />
               </a>
@@ -139,6 +141,34 @@ export default function AdminListings() {
         ) : null}
         {listing.what_to_bring?.length > 0 ? (
           <p className="dashboard-card__meta">What to bring: {listing.what_to_bring.join(', ')}</p>
+        ) : null}
+
+        {listing.addons?.length > 0 ? (
+          <div className="listing-review__addons">
+            <p className="listing-review__addons-label">Add-ons</p>
+            <ul className="listing-review__addon-list">
+              {listing.addons.map((addon, index) => (
+                <li key={`${addon.name}-${index}`} className="listing-review__addon">
+                  {addon.photo_url ? (
+                    <img src={addon.photo_url} alt="" className="listing-review__addon-photo" />
+                  ) : null}
+                  <div>
+                    <p className="listing-review__addon-name">{addon.name}</p>
+                    {addon.description ? (
+                      <p className="listing-review__addon-copy">{addon.description}</p>
+                    ) : null}
+                    <p className="dashboard-card__meta">
+                      {addon.unit === 'booking' ? 'Per booking' : 'Per person'}
+                      {' · '}
+                      host {`S${formatCents(addon.price_cents)}`}
+                      {' · '}
+                      guests {`S${formatCents(addonGuestUnitCents(addon.price_cents))}`}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
 
         <p className="listing-review__host">

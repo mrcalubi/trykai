@@ -86,7 +86,7 @@ The 31 August and 25 August snapshots below are kept for history. They still des
 Week 5 of the original plan (25–31 August) is ending. The week-by-week sections below stay as the historical plan. Read this snapshot first.
 
 **Payment code (original weeks 5–7 and most of 9) is in the tree:**
-- Fee module matches DECISIONS.md: 12% card fee, S$2.50 floor, round up to a whole dollar, PayNow 5% off that all-in total, host fee 10% from the fourth confirmed booking, founding hosts never
+- Fee module matches DECISIONS.md: 12% card fee, S$2.50 floor, round up to a whole dollar, PayNow sliding saving off that all-in total, host fee 10% from the fourth confirmed booking, founding hosts never
 - `stripe-webhook` confirms bookings, `confirm_paid_booking` decrements spots, `cancel-booking` refunds on the four-tier rule
 - Connect Express onboarding and `release-payout` Transfers 72 hours after the session ends
 - Guest `full_address` reveal via RPC. Column grant on `listings` still too wide
@@ -453,6 +453,8 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00038` (what guests should bring) | Applied | Applied | Production 25 October, before #163. After `00037`. |
 | `00039` (host strike events, 12-month expiry) | Applied | Applied | 25 October, after `00038`. |
 | `00040` (host_sessions_held) | Not applied | Not applied | Apply on staging, then production, before merging the profile card layout. After `00039`. |
+| `00042` (listing add-ons) | Not applied | Not applied | Host editor. Apply before `00043`. |
+| `00043` (booking add-ons) | Not applied | Not applied | After `00042`. Payouts are unchanged: add-ons ride inside `host_payout_amount`. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
@@ -1172,7 +1174,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 - [x] Booking confirmation email to guest (staging, 14–21 September; production `RESEND_API_KEY` unconfirmed)
 - [x] Booking notification email to host (same)
 - [ ] Platform fee correctly calculated: 12% of lesson, S$2.50 floor, round up to a whole dollar (see DECISIONS.md). Code exists in `_shared/booking.ts`
-- [ ] PayNow 5% off the advertised all-in total at checkout (not 8% versus 10%)
+- [ ] PayNow sliding saving off the advertised all-in total at checkout (not a flat 5%, and not 8% versus 10%)
 - [ ] Failed payment handled gracefully, clear error, no ghost booking
 - [ ] Payout flow tested, Transfer 72 hours after the session ends (`release-payout` scheduled; platform payouts must be manual). See **Host Transfers** above.
 - [x] Refund, cancellation, and dispute policy pages live
@@ -1180,7 +1182,7 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 
 ## Listings
 - [ ] Creation flow complete: title, description, category, price, area, photos, what's provided
-- [ ] Photo upload working, up to 5
+- [ ] Photo upload working, up to 8
 - [ ] Listing appears on browse after creation
 - [ ] Category pills working
 - [ ] Area dropdown working

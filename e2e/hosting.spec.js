@@ -160,10 +160,11 @@ test.describe('verified host create listing', () => {
 
     await expect(page.getByRole('heading', { name: 'Add photos' })).toBeVisible()
     await page.getByLabel('Photos').setInputFiles('src/assets/categories/food.png')
-    await expect(page.getByText('Maximum of 5 photos (1/5)')).toBeVisible()
+    await expect(page.getByText('Maximum of 8 photos (1/8)')).toBeVisible()
     await expect(page.getByText('Cover', { exact: true })).toBeVisible()
     await expect(page.getByText('Drag to reorder. The first photo is your cover.')).toBeVisible()
     await page.getByRole('button', { name: 'Photo 1 (cover)' }).click()
+    await expect(page.getByRole('menuitem', { name: 'View' })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Crop' })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Make cover' })).toHaveCount(0)
     await next()

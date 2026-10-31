@@ -11,7 +11,7 @@ export default function RefundPolicy() {
         Refund eligibility is set by our{' '}
         <Link to="/cancellation-policy">Cancellation Policy</Link>. This page
         covers how and when you actually get your money back once a refund has
-        been approved.
+        been approved. Add-ons follow the same refund tiers as the session.
       </p>
       <p>
         Refunds are issued to your original payment method through Stripe, our

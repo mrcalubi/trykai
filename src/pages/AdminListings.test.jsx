@@ -74,10 +74,48 @@ describe('AdminListings', () => {
     expect(within(card).getByText('Pour hearts and tulips on your own flat white.')).toBeInTheDocument()
     expect(within(card).getByText('Provided: Milk, Espresso')).toBeInTheDocument()
     expect(within(card).getByText('What to bring: Apron')).toBeInTheDocument()
+    expect(within(card).queryByText('Add-ons')).not.toBeInTheDocument()
     expect(within(card).getByText(/Singpass: TAN MEI LING/)).toBeInTheDocument()
     expect(within(card).getAllByRole('img')).toHaveLength(2)
     const [, options] = supabase.functions.invoke.mock.calls[0]
     expect(options.headers.Authorization).toMatch(/^Bearer /)
+  })
+
+  it('shows active add-ons with host and guest prices', async () => {
+    givenQueue([
+      makeListing({
+        addons: [
+          {
+            name: 'Take-home kit',
+            description: 'Your own set of tools.',
+            price_cents: 1500,
+            unit: 'person',
+            photo_url: 'https://cdn.test/kit.jpg',
+          },
+          {
+            name: 'Birthday surprise',
+            description: '',
+            price_cents: 800,
+            unit: 'booking',
+            photo_url: null,
+          },
+        ],
+      }),
+    ])
+    renderPage()
+
+    await screen.findByText('Latte art for beginners')
+    const card = cardFor('Latte art for beginners')
+    expect(within(card).getByText('Add-ons')).toBeInTheDocument()
+    expect(within(card).getByText('Take-home kit')).toBeInTheDocument()
+    expect(within(card).getByText('Your own set of tools.')).toBeInTheDocument()
+    expect(within(card).getByText(/Per person · host S\$15 · guests S\$17/)).toBeInTheDocument()
+    expect(within(card).getByText('Birthday surprise')).toBeInTheDocument()
+    expect(within(card).getByText(/Per booking · host S\$8 · guests S\$9/)).toBeInTheDocument()
+    expect(card.querySelector('.listing-review__addon-photo')).toHaveAttribute(
+      'src',
+      'https://cdn.test/kit.jpg',
+    )
   })
 
   it('says when nothing is waiting', async () => {

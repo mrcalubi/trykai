@@ -146,7 +146,7 @@ function guestReceipt(overrides = {}) {
     pricePerPersonCents: 2500,
     groupPricing: true,
     paymentRail: 'paynow',
-    totalPaidCents: 9120,
+    totalPaidCents: 9408,
     paymentMethod: 'PayNow',
     sessionStartsAt: SESSION_STARTS,
     durationMins: 90,
@@ -365,7 +365,7 @@ describe('receiptPriceLines', () => {
       totalPaidCents: 475,
     })
     expect(lines[0]).toBe('$2.50 per person x 2 guests')
-    expect(lines).toContain('PayNow saving $0.25')
+    expect(lines).toContain('PayNow saving (5%) $0.25')
     expect(lines.at(-1)).toBe('Total paid $4.75')
     expect(lines.join('\n')).not.toMatch(/group discount/i)
   })
@@ -376,10 +376,10 @@ describe('receiptPriceLines', () => {
       guestsCount: 4,
       groupPricing: true,
       paymentRail: 'paynow',
-      totalPaidCents: 9120,
+      totalPaidCents: 9408,
     })
-    expect(lines).toContain('PayNow saving $4.80')
-    expect(lines).toContain('Total paid $91.20')
+    expect(lines).toContain('PayNow saving (2%) $1.92')
+    expect(lines).toContain('Total paid $94.08')
   })
 
   it('omits the group discount when the listing does not offer it', () => {
@@ -526,8 +526,8 @@ describe('booking confirmation emails', () => {
     expect(receiptCells(html)).toEqual([
       ['$24 per person x 4 guests', '$96'],
       ['Group discount (15%)', 'Included'],
-      ['PayNow saving', '−$4.80'],
-      ['Total paid', '$91.20'],
+      ['PayNow saving (2%)', '−$1.92'],
+      ['Total paid', '$94.08'],
     ])
     expect(html).not.toContain('−$16')
     expect(html).toContain('Paid with PayNow')
@@ -652,6 +652,26 @@ describe('booking confirmation emails', () => {
     expect(html).toContain('UEN 53526159D')
     expect(html).not.toMatch(/booking fee|platform fee|host fee/i)
     expect(html).not.toMatch(/Total paid|Refund amount|Refund method/i)
+  })
+
+  it('tells the host which add-ons to prepare and any note', () => {
+    const html = bookingConfirmedHostHtml({
+      bookingReference: 'A1B2C3D4',
+      hostName: 'Mei Ling',
+      guestName: 'Sarah Chen',
+      listingTitle: 'Latte art',
+      sessionDate: formatSessionDate(SESSION_STARTS),
+      guestsCount: 1,
+      hostPayoutCents: 8800,
+      addons: [
+        { name: 'Premium blooms', quantity: 1 },
+        { name: 'Gift wrap and card', quantity: 2 },
+      ],
+      addonNote: 'For Alex',
+      guestFirstName: 'Sarah',
+    })
+    expect(html).toContain('Add-ons to prepare: Premium blooms × 1, Gift wrap and card × 2.')
+    expect(html).toContain('Note from Sarah: For Alex')
   })
 })
 
@@ -1281,11 +1301,43 @@ describe('branded receipt', () => {
   it('reports whether the receipt rows add up', () => {
     const base = { pricePerPersonCents: 2500, guestsCount: 4, groupPricing: true }
     expect(receiptRows({ ...base, paymentRail: 'card', totalPaidCents: 9600 }).addsUp).toBe(true)
-    expect(receiptRows({ ...base, paymentRail: 'paynow', totalPaidCents: 9120 }).addsUp).toBe(true)
+    expect(receiptRows({ ...base, paymentRail: 'paynow', totalPaidCents: 9408 }).addsUp).toBe(true)
     expect(receiptRows({ ...base, paymentRail: 'card', totalPaidCents: 9120 }).addsUp).toBe(false)
-    const { rows } = receiptRows({ ...base, paymentRail: 'paynow', totalPaidCents: 9120 })
+    const { rows } = receiptRows({ ...base, paymentRail: 'paynow', totalPaidCents: 9408 })
     const sum = rows.reduce((total, row) => total + (row.amountCents ?? 0), 0)
-    expect(sum).toBe(9120)
+    expect(sum).toBe(9408)
+  })
+
+  it('includes add-on rows in the sum', () => {
+    const card = receiptRows({
+      pricePerPersonCents: 3000,
+      guestsCount: 2,
+      groupPricing: true,
+      paymentRail: 'card',
+      totalPaidCents: 9900,
+      addons: [
+        { name: 'Premium blooms', quantity: 1, unitGuestCents: 1700 },
+        { name: 'Gift wrap', quantity: 2, unitGuestCents: 900 },
+      ],
+    })
+    expect(card.addsUp).toBe(true)
+    expect(card.rows.map((row) => row.label)).toEqual(
+      expect.arrayContaining(['Premium blooms × 1', 'Gift wrap × 2']),
+    )
+    const paynow = receiptRows({
+      pricePerPersonCents: 3000,
+      guestsCount: 2,
+      groupPricing: true,
+      paymentRail: 'paynow',
+      totalPaidCents: 9702,
+      addons: [
+        { name: 'Premium blooms', quantity: 1, unitGuestCents: 1700 },
+        { name: 'Gift wrap', quantity: 2, unitGuestCents: 900 },
+      ],
+    })
+    expect(paynow.addsUp).toBe(true)
+    const sum = paynow.rows.reduce((total, row) => total + (row.amountCents ?? 0), 0)
+    expect(sum).toBe(9702)
   })
 
   it('has the brand frame: production logo, wordmark, cream page, inbox preview', () => {
@@ -1516,6 +1568,22 @@ describe('session reminder emails', () => {
       totalGuests: 2,
     })
     expect(host).toContain('is today, and')
+    const withAddons = hostSessionReminderHtml({
+      hostName: 'Mei',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(SAME_DAY_START),
+      startsAt: SAME_DAY_START,
+      sentAt: SAME_DAY_SENT,
+      guests: [{ name: 'Sam', guestsCount: 2 }],
+      totalGuests: 2,
+      addons: [
+        { name: 'Premium blooms', quantity: 1 },
+        { name: 'Gift wrap and card', quantity: 2 },
+      ],
+      notes: [{ name: 'Sam', note: 'For Alex' }],
+    })
+    expect(withAddons).toContain('Premium blooms × 1, Gift wrap and card × 2')
+    expect(withAddons).toContain('Note from Sam: For Alex')
   })
 
   it('says Tomorrow when the session is the next Singapore morning', () => {

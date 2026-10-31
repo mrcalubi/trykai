@@ -237,7 +237,7 @@ function fakePhoto(hue) {
 function withPhotos(count) {
   return {
     ...LATTE_ART,
-    photo_urls: [20, 200, 320, 90, 45].slice(0, count).map(fakePhoto),
+    photo_urls: [20, 200, 320, 90, 45, 160, 280, 10].slice(0, count).map(fakePhoto),
   }
 }
 
@@ -323,6 +323,24 @@ test.describe('listing detail gallery', () => {
     // The title has to survive above the fold next to the booking card.
     await expect(page.getByRole('heading', { level: 1 })).toBeInViewport()
     await expect(page.locator('.detail-booking-card__price')).toBeInViewport()
+  })
+
+  test('offers Show all on the desktop mosaic when there are more than five photos', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'desktop mosaic only')
+    await stubAllExternalCalls(page, {
+      listings: [withPhotos(6)],
+      sessions: [OPEN_SESSION],
+      reviews: [],
+    })
+    await page.goto('/listings/listing-latte')
+
+    await expect(page.getByRole('button', { name: 'Show all 6 photos' })).toBeVisible()
+    await page.getByRole('button', { name: 'Show all 6 photos' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Learn latte art with me photos' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByText('1 / 6')).toBeVisible()
   })
 
   test('opens a clicked photo full size and steps through the set', async ({ page }) => {
@@ -526,4 +544,91 @@ test.describe('booking reviews', () => {
 
     await expect(page.locator('.star-picker__btn--active')).toHaveCount(4)
   })
+})
+
+test('books with an add-on and shows it on the confirmation', async ({ page }) => {
+  const booking = {
+    id: 'booking-addon',
+    guest_id: SIGNED_IN_USER.id,
+    status: 'confirmed',
+    guests_count: 1,
+    total_amount: 6800,
+    platform_fee: 600,
+    payment_rail: 'card',
+    sessions: {
+      starts_at: hoursFromNow(72),
+      duration_mins: 90,
+      listings: {
+        id: LATTE_ART.id,
+        title: LATTE_ART.title,
+        photo_urls: [],
+        whats_provided: ['Materials'],
+        host_id: 'host-1',
+        users: { display_name: 'Mei', avatar_url: null },
+      },
+    },
+  }
+  await stubAllExternalCalls(
+    page,
+    {
+      listings: [LATTE_ART],
+      sessions: [OPEN_SESSION],
+      reviews: [],
+      listing_addons: [
+        {
+          id: 'addon-blooms',
+          listing_id: LATTE_ART.id,
+          name: 'Premium blooms',
+          description: 'A better bunch',
+          price_cents: 1500,
+          unit: 'person',
+          session_limit: 4,
+          photo_url: null,
+          position: 0,
+          is_active: true,
+        },
+      ],
+      'rpc/session_addon_remaining': [{ addon_id: 'addon-blooms', remaining: 4 }],
+      'rpc/reviews_for_listing': [],
+      bookings: [booking],
+      booking_addons: [
+        {
+          booking_id: 'booking-addon',
+          name: 'Premium blooms',
+          quantity: 1,
+          unit: 'person',
+        },
+      ],
+      users: [{ id: SIGNED_IN_USER.id, display_name: 'Kai', is_host: false }],
+    },
+    {
+      session: makeAuthSession(),
+      functions: {
+        'create-payment-intent': {
+          clientSecret: 'cs_test_1',
+          booking_id: 'booking-addon',
+          total_amount: 6800,
+          platform_fee: 600,
+          payment_rail: 'card',
+        },
+      },
+    },
+  )
+
+  await page.goto('/login')
+  await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+  await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
+  await page.getByRole('button', { name: 'Log in' }).click()
+  await expect(page).toHaveURL(/\/$/)
+
+  await page.goto('/listings/listing-latte')
+  await expect(page.getByRole('heading', { name: 'Add a little extra' })).toBeVisible()
+  await page.getByRole('button', { name: 'Book' }).click()
+  await page.getByRole('button', { name: 'More Premium blooms' }).click()
+  await expect(page.getByText('Premium blooms × 1')).toBeVisible()
+  await page.getByRole('radio', { name: /^Card/ }).click()
+  await page.getByRole('button', { name: /Continue to payment/ }).click()
+
+  await page.goto('/bookings/booking-addon')
+  await expect(page.getByText('Premium blooms × 1')).toBeVisible()
 })

@@ -23,15 +23,26 @@ import {
   singaporeMonthKey,
 } from '../lib/sessionCalendar'
 import {
-  checkoutPriceCents,
+  addonGuestUnitCents,
+  calculateBookingCharge,
+  discountedLessonCents,
   groupPriceLabel,
   guestFacingPriceCents,
   isPayNowTooFarAhead,
   MAX_GUESTS_PER_BOOKING,
   nextGroupTierHint,
   PAYNOW_TOO_FAR_AHEAD_MESSAGE,
-  paynowPriceCents,
+  paynowDiscountRate,
 } from '../lib/pricing'
+import { loadPublicListingAddons } from '../lib/listingAddons'
+import {
+  addonLineLabel,
+  checkoutAddonPayload,
+  clampAddonQuantities,
+  guestAddonPriceLabel,
+  pickedAddonLines,
+} from '../lib/bookingAddons'
+import CheckoutAddons from '../components/CheckoutAddons'
 import { formatDuration } from '../lib/duration'
 import { edgeFunctionErrorMessage, isPayNowTooFarAheadError } from '../lib/edgeFunctionError'
 import { isLowSpots, spotsLabel } from '../lib/listingSpots'
@@ -48,6 +59,7 @@ import Icon from '../components/ui/Icon'
 import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
 import { usePageTitle } from '../lib/pageTitle'
+import { MOSAIC_VISIBLE_PHOTOS } from '../lib/listingPhotos'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -201,6 +213,11 @@ export default function ListingDetail() {
   const bookingRef = useRef(null)
   const [bookingInView, setBookingInView] = useState(false)
   const [shareNote, setShareNote] = useState('')
+  const [listingAddons, setListingAddons] = useState([])
+  const [addonsAvailable, setAddonsAvailable] = useState(false)
+  const [addonQuantities, setAddonQuantities] = useState({})
+  const [addonNote, setAddonNote] = useState('')
+  const [addonRemaining, setAddonRemaining] = useState({})
 
   useEffect(() => {
     async function fetchListing() {
@@ -259,6 +276,10 @@ export default function ListingDetail() {
       }
 
       setListing(listingData)
+
+      const addonsResult = await loadPublicListingAddons(supabase, listingData.id)
+      setListingAddons(addonsResult.addons)
+      setAddonsAvailable(addonsResult.available)
 
       // `is_id_verified` arrives with migration 00023; before that the column
       // is missing and the badge simply stays hidden.
@@ -389,6 +410,22 @@ export default function ListingDetail() {
     return () => observer.disconnect()
   }, [loading, listing])
 
+  useEffect(() => {
+    if (!checkoutSessionId || !addonsAvailable) return undefined
+    let cancelled = false
+    supabase.rpc('session_addon_remaining', { p_session_id: checkoutSessionId }).then(({ data, error }) => {
+      if (cancelled || error) return
+      const next = {}
+      for (const row of data ?? []) {
+        if (row?.addon_id) next[row.addon_id] = Number(row.remaining)
+      }
+      setAddonRemaining(next)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [checkoutSessionId, addonsAvailable])
+
   // CSS scroll-snap does the swiping; this only keeps the position dots in step.
   function trackGalleryPosition(e) {
     const { scrollLeft, clientWidth } = e.currentTarget
@@ -411,6 +448,9 @@ export default function ListingDetail() {
     const unpaidId = bookingId
     setCheckoutSessionId(null)
     setGuestsCount(1)
+    setAddonQuantities({})
+    setAddonNote('')
+    setAddonRemaining({})
     setCheckoutRail(defaultCheckoutRail(findCachedSession(checkoutSessionId)?.starts_at, payNowBlockedByServer))
     setClientSecret(null)
     setBookingId(null)
@@ -465,6 +505,9 @@ export default function ListingDetail() {
     setPayNowBlockedByServer(false)
     setCheckoutRail(defaultCheckoutRail(findCachedSession(sessionId)?.starts_at))
     setGuestsCount(1)
+    setAddonQuantities({})
+    setAddonNote('')
+    setAddonRemaining({})
     setCheckoutSessionId(sessionId)
   }
 
@@ -481,6 +524,9 @@ export default function ListingDetail() {
       void abandonUnpaidCheckout(unpaidId)
     }
     setGuestsCount(next)
+    setAddonQuantities((current) =>
+      clampAddonQuantities(current, listingAddons, next, addonRemaining),
+    )
   }
 
   function findCachedSession(sessionId) {
@@ -505,22 +551,28 @@ export default function ListingDetail() {
       return
     }
 
-    const shownAmount = checkoutPriceCents(
-      listing.price_per_person,
-      paymentRail,
-      guestsCount,
-      groupPricing,
-    )
+    const shownAmount = calculateBookingCharge({
+      lessonCents: discountedLessonCents(
+        listing.price_per_person,
+        guestsCount,
+        groupPricing,
+      ),
+      addons: pickedAddonLines(listingAddons, addonQuantities),
+      rail: paymentRail,
+    }).totalAmount
 
     setCheckoutRail(paymentRail)
     setBookingLoading(true)
     setPaymentError('')
 
+    const picked = pickedAddonLines(listingAddons, addonQuantities)
     const { data, error: fnError } = await supabase.functions.invoke('create-payment-intent', {
       body: {
         session_id: checkoutSessionId,
         guests_count: guestsCount,
         payment_rail: paymentRail,
+        addons: checkoutAddonPayload(picked),
+        addon_note: picked.length ? addonNote.trim() || null : null,
       },
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -580,8 +632,22 @@ export default function ListingDetail() {
   const areaLabel = visibleAreaLabel(revealedAddress, listing.area)
   const photos = listing.photo_urls?.length ? listing.photo_urls : []
   const groupPricing = listing.group_pricing !== false
-  const cardPrice = guestFacingPriceCents(listing.price_per_person, guestsCount, groupPricing)
-  const paynowPrice = paynowPriceCents(listing.price_per_person, guestsCount, groupPricing)
+  const pickedAddons = pickedAddonLines(listingAddons, addonQuantities)
+  const lessonCents = discountedLessonCents(listing.price_per_person, guestsCount, groupPricing)
+  const cardCharge = calculateBookingCharge({
+    lessonCents,
+    addons: pickedAddons,
+    rail: 'card',
+  })
+  const paynowCharge = calculateBookingCharge({
+    lessonCents,
+    addons: pickedAddons,
+    rail: 'paynow',
+  })
+  const cardPrice = checkoutSessionId
+    ? cardCharge.totalAmount
+    : guestFacingPriceCents(listing.price_per_person, 1, groupPricing)
+  const paynowPrice = paynowCharge.totalAmount
   const canTakePayments = hostCanTakePayments()
   const isOwnListing = viewerIsHost()
   const publicSessionRange = isOwnListing || canTakePayments ? sessionRange : null
@@ -600,12 +666,11 @@ export default function ListingDetail() {
   const paynowBlocked =
     payNowBlockedByServer || isPayNowTooFarAhead(checkoutSession?.starts_at)
   const displayRail = paynowBlocked || checkoutRail !== 'paynow' ? 'card' : 'paynow'
-  const checkoutPrice = checkoutPriceCents(
-    listing.price_per_person,
-    displayRail,
-    guestsCount,
-    groupPricing,
-  )
+  const checkoutPrice = checkoutSessionId
+    ? displayRail === 'paynow'
+      ? paynowCharge.totalAmount
+      : cardCharge.totalAmount
+    : guestFacingPriceCents(listing.price_per_person, 1, groupPricing)
   const listingRating =
     reviews.length > 0
       ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
@@ -677,8 +742,11 @@ export default function ListingDetail() {
   })
   const duration = formatDuration(listing.duration_mins)
   const maxGuests = Number(listing.max_guests)
-  const paynowSaving = cardPrice - paynowPrice
+  const checkoutCardTotal = cardCharge.totalAmount
+  const checkoutPaynowTotal = paynowCharge.totalAmount
+  const paynowSaving = checkoutCardTotal - checkoutPaynowTotal
   const showPaynowSaving = displayRail === 'paynow' && paynowSaving > 0
+  const paynowPercent = Math.round(paynowDiscountRate(checkoutCardTotal) * 100)
 
   function renderCheckout() {
     return (
@@ -782,6 +850,21 @@ export default function ListingDetail() {
                 </div>
               )}
 
+              {addonsAvailable && listingAddons.length > 0 ? (
+                <CheckoutAddons
+                  addons={listingAddons}
+                  quantities={addonQuantities}
+                  guestsCount={guestsCount}
+                  remainingById={addonRemaining}
+                  hostName={hostName}
+                  note={addonNote}
+                  onQuantity={(addonId, quantity) => {
+                    setAddonQuantities((current) => ({ ...current, [addonId]: Math.max(0, quantity) }))
+                  }}
+                  onNote={setAddonNote}
+                />
+              ) : null}
+
               <div className="payment-rails" role="radiogroup" aria-labelledby="pay-with-label">
                 <p className="checkout__label" id="pay-with-label">
                   Pay with
@@ -798,7 +881,9 @@ export default function ListingDetail() {
                   <span className="payment-rail__copy">
                     <span className="payment-rail__row">
                       <span className="payment-rail__name">PayNow</span>
-                      {paynowBlocked ? null : <span className="paynow-badge">Save 5%</span>}
+                      {paynowBlocked ? null : (
+                        <span className="paynow-badge">Save {paynowPercent}%</span>
+                      )}
                     </span>
                   </span>
                   <span className="payment-rail__amounts">
@@ -844,16 +929,22 @@ export default function ListingDetail() {
               </div>
 
               <div className="price-breakdown">
-                {cardPrice !== checkoutPrice ? (
-                  <p className="price-breakdown__row">
-                    <span>
-                      {guestsCount} guest{guestsCount === 1 ? '' : 's'}, all in
-                    </span>
+                <p className="price-breakdown__row">
+                  <span>
+                    {guestsCount} guest{guestsCount === 1 ? '' : 's'}, all in
+                  </span>
+                  <span className="price-breakdown__amount">
+                    <FormattedPrice cents={cardCharge.cardLessonTotal} />
+                  </span>
+                </p>
+                {pickedAddons.map((addon) => (
+                  <p key={addon.id} className="price-breakdown__row">
+                    <span>{addonLineLabel(addon.name, addon.quantity)}</span>
                     <span className="price-breakdown__amount">
-                      <FormattedPrice cents={cardPrice} />
+                      <FormattedPrice cents={addonGuestUnitCents(addon.hostUnitCents) * addon.quantity} />
                     </span>
                   </p>
-                ) : null}
+                ))}
                 {showPaynowSaving ? (
                   <p className="price-breakdown__row price-breakdown__row--saving">
                     <span>PayNow saving</span>
@@ -957,7 +1048,7 @@ export default function ListingDetail() {
         <div className="detail-gallery">
           <div
             className="detail-gallery__scroller"
-            data-photo-count={Math.min(photos.length, 5)}
+            data-photo-count={Math.min(photos.length, MOSAIC_VISIBLE_PHOTOS)}
             onScroll={trackGalleryPosition}
           >
             {photos.map((url, i) => (
@@ -972,6 +1063,15 @@ export default function ListingDetail() {
               </button>
             ))}
           </div>
+          {photos.length > MOSAIC_VISIBLE_PHOTOS ? (
+            <button
+              type="button"
+              className="detail-gallery__show-all"
+              onClick={() => setLightboxIndex(0)}
+            >
+              Show all {photos.length} photos
+            </button>
+          ) : null}
           {photos.length > 1 && (
             <>
               <div className="detail-gallery__dots" aria-hidden="true">
@@ -1068,6 +1168,35 @@ export default function ListingDetail() {
             <h2 className="detail-section__title">About this experience</h2>
             <p className="detail-description">{listing.description}</p>
           </section>
+
+          {addonsAvailable && listingAddons.length > 0 ? (
+            <section className="detail-section listing-extras">
+              <h2 className="detail-section__title">Add a little extra</h2>
+              <p className="listing-extras__intro">
+                {hostName} offers these with this session. Pick any when you book, for one person or
+                everyone.
+              </p>
+              <ul className="listing-extras__list">
+                {listingAddons.map((addon) => (
+                  <li key={addon.id} className="listing-extras__card">
+                    {addon.photo?.remoteUrl ? (
+                      <img src={addon.photo.remoteUrl} alt="" className="listing-extras__photo" />
+                    ) : null}
+                    <div className="listing-extras__copy">
+                      <p className="listing-extras__name">{addon.name}</p>
+                      {addon.description ? (
+                        <p className="listing-extras__desc">{addon.description}</p>
+                      ) : null}
+                      <p className="listing-extras__price">{guestAddonPriceLabel(addon)}</p>
+                      {addon.session_limit != null ? (
+                        <p className="listing-extras__limit">{addon.session_limit} per session</p>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           {listing.whats_provided?.length > 0 && (
             <section className="detail-section">

@@ -3,6 +3,8 @@
  * host can leave and come back. Hosting reads the same draft to offer Continue.
  */
 
+import { addonsHaveAnswers, draftAddons } from './listingAddons'
+
 export const LISTING_STEPS = [
   {
     id: 'basics',
@@ -90,6 +92,7 @@ export function draftValues(draft) {
     fullAddress: text('fullAddress'),
     whatsProvided: Array.isArray(draft?.whatsProvided) ? draft.whatsProvided : [],
     whatToBring: Array.isArray(draft?.whatToBring) ? draft.whatToBring : [],
+    addons: draftAddons(draft?.addons),
   }
 }
 
@@ -105,6 +108,7 @@ export function isBlankDraft(draft) {
     !values.area.trim() &&
     !values.fullAddress.trim() &&
     values.whatsProvided.length === 0 &&
-    values.whatToBring.length === 0
+    values.whatToBring.length === 0 &&
+    !addonsHaveAnswers(values.addons)
   )
 }

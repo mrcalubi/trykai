@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEffect } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -79,9 +79,12 @@ describe('ListingPhotosEditor', () => {
     expect(screen.queryByRole('button', { name: 'Crop' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Photo 1 (cover)' }))
-    expect(screen.getByRole('menuitem', { name: 'Crop' })).toBeInTheDocument()
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'View',
+      'Crop',
+      'Remove',
+    ])
     expect(screen.queryByRole('menuitem', { name: 'Make cover' })).not.toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Remove' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('menuitem', { name: 'Crop' }))
     expect(screen.getByText('Crop the cover')).toBeInTheDocument()
@@ -316,6 +319,21 @@ describe('ListingPhotosEditor', () => {
     dropFiles([new File(['notes'], 'notes.txt', { type: 'text/plain' })])
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(screen.getByText('Those are not photos. Choose images instead.')).toBeInTheDocument()
+  })
+
+  it('opens View from the tile menu at that photo', async () => {
+    const user = userEvent.setup()
+    render(<ListingPhotosEditor photos={photos} onChange={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Photo 2' }))
+    await user.click(screen.getByRole('menuitem', { name: 'View' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Listing photos' })
+    expect(within(dialog).getByRole('img')).toHaveAttribute('src', 'https://cdn.test/b.jpg')
+    expect(within(dialog).getByText('2 / 2')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Next photo' }))
+    expect(within(dialog).getByRole('img')).toHaveAttribute('src', 'blob:a')
+    expect(within(dialog).getByText('1 / 2')).toBeInTheDocument()
   })
 
   it('respects the photo cap when dropping more than the remaining slots', async () => {

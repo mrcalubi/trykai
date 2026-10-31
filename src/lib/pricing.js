@@ -7,6 +7,8 @@
  */
 
 import {
+  addonGuestUnitCents,
+  calculateBookingCharge,
   calculateGuestCharge,
   discountedLessonCents,
   discountedPerPersonCents,
@@ -14,17 +16,23 @@ import {
   HOST_FEE_FREE_BOOKINGS,
   HOST_FEE_RATE,
   MAX_GUESTS_PER_BOOKING,
+  PAYNOW_DISCOUNT_TIERS,
   PAYNOW_MAX_DAYS_AHEAD,
   PAYNOW_TOO_FAR_AHEAD,
   PAYNOW_TOO_FAR_AHEAD_MESSAGE,
   isPayNowTooFarAhead,
+  paynowDiscountRate,
 } from '../../supabase/functions/_shared/booking.ts'
 import { formatCents } from './cancellationPolicy'
 
 export {
+  addonGuestUnitCents,
+  calculateBookingCharge,
   discountedLessonCents,
   discountedPerPersonCents,
   groupDiscountRate,
+  PAYNOW_DISCOUNT_TIERS,
+  paynowDiscountRate,
   MAX_GUESTS_PER_BOOKING,
   PAYNOW_MAX_DAYS_AHEAD,
   PAYNOW_TOO_FAR_AHEAD,
@@ -67,10 +75,18 @@ export function checkoutPriceCents(
   rail = 'card',
   guestsCount = 1,
   groupPricing = true,
+  addons = [],
 ) {
-  return rail === 'paynow'
-    ? paynowPriceCents(pricePerPersonCents, guestsCount, groupPricing)
-    : guestFacingPriceCents(pricePerPersonCents, guestsCount, groupPricing)
+  if (!addons.length) {
+    return rail === 'paynow'
+      ? paynowPriceCents(pricePerPersonCents, guestsCount, groupPricing)
+      : guestFacingPriceCents(pricePerPersonCents, guestsCount, groupPricing)
+  }
+  return calculateBookingCharge({
+    lessonCents: discountedLessonCents(pricePerPersonCents, guestsCount, groupPricing),
+    addons,
+    rail,
+  }).totalAmount
 }
 
 export function formatCheckoutPrice(

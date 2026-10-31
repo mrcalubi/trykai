@@ -13,5 +13,6 @@ describe('isBlankDraft', () => {
     expect(isBlankDraft({ title: 'Pottery' })).toBe(false)
     expect(isBlankDraft({ durationChoice: 60 })).toBe(false)
     expect(isBlankDraft({ whatsProvided: ['Materials'] })).toBe(false)
+    expect(isBlankDraft({ addons: [{ name: 'Take-home kit', price: '15' }] })).toBe(false)
   })
 })
