@@ -14,6 +14,7 @@ import {
   rejectPayNowIfTooFarAhead,
   calculateBookingCharge,
   calculateGuestCharge,
+  GUEST_REFUND_TIER_RULES,
   calculateGuestRefund,
   calculateHostFee,
   calculateHostPayout,
@@ -199,6 +200,30 @@ describe('calculateHostFee', () => {
     expect(hostPayoutAfterGuestCancel(8500, 9600)).toBe(0)
     expect(hostPayoutAfterGuestCancel(0, 2800)).toBe(0)
     expect(hostPayoutAfterGuestCancel(Number.NaN, 100)).toBe(0)
+  })
+
+  it('still leaves the host with 0 after a 48h+ guest cancel', () => {
+    const now = new Date('2026-06-15T10:00:00.000Z').getTime()
+    const starts = new Date(now + 72 * 60 * 60 * 1000).toISOString()
+    const card = calculateBookingCharge({ lessonCents: 2500, rail: 'card' })
+    const refund = calculateGuestRefund(card.totalAmount, starts, card.platformFee, now)
+    expect(refund).toBe(2500)
+    expect(hostPayoutAfterGuestCancel(2500, refund)).toBe(0)
+    expect(hostPayoutAfterGuestCancel(2250, refund)).toBe(0)
+
+    const withAddons = calculateBookingCharge({
+      lessonCents: 2500,
+      addons: [{ hostUnitCents: 1500, quantity: 1 }],
+      rail: 'card',
+    })
+    const addonRefund = calculateGuestRefund(
+      withAddons.totalAmount,
+      starts,
+      withAddons.platformFee,
+      now,
+    )
+    expect(addonRefund).toBe(4000)
+    expect(hostPayoutAfterGuestCancel(4000, addonRefund)).toBe(0)
   })
 })
 
@@ -598,14 +623,36 @@ describe('calculateGuestRefund', () => {
   const hoursFrom = (hours: number) => new Date(now + hours * 60 * 60 * 1000).toISOString()
 
   it('matches the published four-tier table on a stored platform fee', () => {
-    expect(calculateGuestRefund(4500, hoursFrom(72), 675, now)).toBe(4500)
+    expect(GUEST_REFUND_TIER_RULES.every((tier) => tier.refundsPlatformFee === false)).toBe(true)
+    expect(calculateGuestRefund(4500, hoursFrom(72), 675, now)).toBe(3825)
     expect(calculateGuestRefund(4500, hoursFrom(30), 675, now)).toBe(1913)
     expect(calculateGuestRefund(4500, hoursFrom(12), 675, now)).toBe(956)
     expect(calculateGuestRefund(4500, hoursFrom(3), 675, now)).toBe(0)
   })
 
+  it('keeps the booking fee on card and PayNow, with and without add-ons', () => {
+    const card = calculateBookingCharge({ lessonCents: 2500, rail: 'card' })
+    expect(calculateGuestRefund(card.totalAmount, hoursFrom(72), card.platformFee, now)).toBe(2500)
+    expect(calculateGuestRefund(card.totalAmount, hoursFrom(30), card.platformFee, now)).toBe(1250)
+
+    const paynow = calculateBookingCharge({ lessonCents: 2500, rail: 'paynow' })
+    expect(calculateGuestRefund(paynow.totalAmount, hoursFrom(72), paynow.platformFee, now)).toBe(2500)
+
+    const addons = [{ hostUnitCents: 1500, quantity: 1 }]
+    const cardAddons = calculateBookingCharge({ lessonCents: 2500, addons, rail: 'card' })
+    expect(calculateGuestRefund(cardAddons.totalAmount, hoursFrom(72), cardAddons.platformFee, now)).toBe(4000)
+    expect(calculateGuestRefund(cardAddons.totalAmount, hoursFrom(30), cardAddons.platformFee, now)).toBe(2000)
+    expect(calculateGuestRefund(cardAddons.totalAmount, hoursFrom(12), cardAddons.platformFee, now)).toBe(1000)
+
+    const paynowAddons = calculateBookingCharge({ lessonCents: 2500, addons, rail: 'paynow' })
+    expect(
+      calculateGuestRefund(paynowAddons.totalAmount, hoursFrom(72), paynowAddons.platformFee, now),
+    ).toBe(4000)
+  })
+
   it('falls back to the legacy 15% rate when no fee was stored', () => {
     expect(LEGACY_PLATFORM_FEE_RATE).toBe(0.15)
+    expect(calculateGuestRefund(4500, hoursFrom(72), undefined, now)).toBe(3825)
     expect(calculateGuestRefund(4500, hoursFrom(30), undefined, now)).toBe(1913)
   })
 })
@@ -649,7 +696,7 @@ describe('refundAmountForCancel', () => {
         sessionStartsAt: starts,
         now,
       }),
-    ).toBe(2800)
+    ).toBe(2500)
   })
 
   it('repays the whole charge when the host or admin cancels', () => {

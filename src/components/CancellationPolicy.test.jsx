@@ -15,7 +15,8 @@ describe('GuestCancellationNote', () => {
     render(<GuestCancellationNote />)
     const toggle = screen.getByRole('button', { name: 'Cancellation policy' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.getByText(/Full refund if you cancel 48\+ hours before/)).toBeInTheDocument()
+    expect(screen.getByText(/Refund minus the booking fee if you cancel 48\+ hours before/)).toBeInTheDocument()
+    expect(screen.queryByText(/Full refund if you cancel/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Full refund, including the platform fee/)).not.toBeInTheDocument()
   })
 

@@ -1112,9 +1112,9 @@ describe('Dashboard guest cancellation', () => {
   })
 
   it.each([
-    [72, 'Full refund of $45, including the platform fee'],
-    [30, 'Partial refund of $19.13 — 50% of the lesson fee'],
-    [12, 'Partial refund of $9.56 — 25% of the lesson fee'],
+    [72, "Refund of $38.25. The booking fee isn't refunded"],
+    [30, 'Partial refund of $19.13 — 50% of the session and add-ons'],
+    [12, 'Partial refund of $9.56 — 25% of the session and add-ons'],
     [3, 'No refund (cancelled less than 6 hours before the session).'],
   ])('quotes the published refund %i hours before the session', async (hours, quote) => {
     givenData({ bookings: [bookingCancelledAt(hours)] })

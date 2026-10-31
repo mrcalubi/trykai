@@ -5,7 +5,7 @@ export default function Terms() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Terms of Service</h1>
-      <p className="policy-page__updated">Last updated: 25 October 2026</p>
+      <p className="policy-page__updated">Last updated: 31 October 2026</p>
 
       <p>
         These terms apply to everyone who uses TryKai. Part 1 applies to all
@@ -190,7 +190,9 @@ export default function Terms() {
 
       <h3>2. Cancellations and refunds</h3>
       <p>
-        Refunds depend on how early you cancel. See our{' '}
+        Refunds depend on how early you cancel. The booking fee (TryKai&apos;s
+        platform fee, already included in the all-in price) is not refunded when
+        you cancel. It covers payment processing and running TryKai. See our{' '}
         <Link to="/cancellation-policy">Cancellation Policy</Link> and{' '}
         <Link to="/refund-policy">Refund Policy</Link> before you book.
       </p>

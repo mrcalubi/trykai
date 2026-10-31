@@ -240,7 +240,8 @@ describe('BookingDetail', () => {
     const { user } = renderDetail()
 
     await user.click(await screen.findByRole('button', { name: 'Cancel booking' }))
-    expect(screen.getByText(/Full refund of \$4\.75/)).toBeInTheDocument()
+    expect(screen.getByText(/Refund of \$1\.90/)).toBeInTheDocument()
+    expect(screen.getByText(/The booking fee isn't refunded/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
     await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalled())

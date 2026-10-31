@@ -44,7 +44,7 @@ export function GuestCancellationNote() {
   return (
     <div className="guest-cancel-note">
       <p className="guest-cancel-note__line">
-        Full refund if you cancel 48+ hours before ·{' '}
+        Refund minus the booking fee if you cancel 48+ hours before ·{' '}
         <button
           type="button"
           className="guest-cancel-note__link"

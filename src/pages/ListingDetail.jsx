@@ -984,7 +984,7 @@ export default function ListingDetail() {
                 </p>
                 <p className="checkout-promises__item">
                   <Icon name="wallet" size={14} />
-                  Full refund if you cancel 48 or more hours before the session.
+                  Cancel 48 or more hours before for a refund of everything except the booking fee.
                 </p>
               </div>
 

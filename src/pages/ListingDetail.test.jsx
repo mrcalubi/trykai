@@ -740,7 +740,8 @@ describe('ListingDetail sessions', () => {
 
     await screen.findByRole('button', { name: 'Book' })
     expect(screen.queryByRole('button', { name: /Cancellation Policy/ })).not.toBeInTheDocument()
-    expect(screen.getByText(/Full refund if you cancel 48\+ hours before/)).toBeInTheDocument()
+    expect(screen.getByText(/Refund minus the booking fee if you cancel 48\+ hours before/)).toBeInTheDocument()
+    expect(screen.queryByText(/Full refund if you cancel/)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Cancellation policy' }))
 
@@ -1012,6 +1013,12 @@ describe('ListingDetail booking', () => {
     expect(screen.getAllByRole('heading', { name: 'Confirm and pay' })).toHaveLength(1)
     expect(screen.queryByText('Pick a date, then a time')).not.toBeInTheDocument()
     expect(document.querySelector('.detail-booking-card__note')).not.toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Cancel 48 or more hours before for a refund of everything except the booking fee.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/Full refund if you cancel/)).not.toBeInTheDocument()
   })
 
   it('steps the PayNow badge from Save 3% to Save 2% when the basket passes $60', async () => {

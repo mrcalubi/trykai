@@ -407,7 +407,7 @@ describe('receiptPriceLines', () => {
 describe('refundDeadlineLines', () => {
   it('turns the 48 / 24 / 6 hour cutoffs into Singapore dates', () => {
     const lines = refundDeadlineLines(SESSION_STARTS)
-    expect(lines[0]).toBe(`Full refund if you cancel before ${formatSessionDate('2026-08-26T11:00:00.000Z')}`)
+    expect(lines[0]).toBe(`Refund minus the booking fee if you cancel before ${formatSessionDate('2026-08-26T11:00:00.000Z')}`)
     expect(lines[1]).toBe(`50% refund if you cancel before ${formatSessionDate('2026-08-27T11:00:00.000Z')}`)
     expect(lines[2]).toBe(`25% refund if you cancel before ${formatSessionDate('2026-08-28T05:00:00.000Z')}`)
     expect(refundDeadlineLines('not-a-date')).toEqual([])
@@ -811,6 +811,7 @@ describe('cancellation emails', () => {
     expect(html).toContain("Sorry you can't make it")
     expect(html).not.toContain("Sorry you can't make Latte art.")
     expect(html).toContain('Your refund of $51 is on its way to your PayNow.')
+    expect(html).toContain("The booking fee isn't refunded.")
     expect(html).toContain('PayNow refunds are usually faster than card refunds.')
     expect(html).not.toContain('5 to 10 business days')
     expect(html).toContain('Listing:</strong> Latte art')
@@ -851,6 +852,7 @@ describe('cancellation emails', () => {
     expect(html).toContain('Hi caleb2,')
     expect(html).toContain("We're sorry. Mei Ling had to cancel your session on 28 Aug 2026, 7:00 pm.")
     expect(html).toContain("You'll get a full refund of $51.")
+    expect(html).not.toContain("The booking fee isn't refunded.")
     expect(html).toContain('Card refunds usually take 5 to 10 business days to appear.')
     expect(html).not.toContain('PayNow refunds are usually faster')
     expect(html).toContain('Date and time:</strong> 28 Aug 2026, 7:00 pm')

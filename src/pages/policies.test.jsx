@@ -24,9 +24,24 @@ describe('Cancellation Policy page', () => {
 
   it('publishes all four guest refund tiers', () => {
     expect(screen.getByText(/48 hours or more before the session starts:/)).toBeInTheDocument()
+    expect(screen.getByText(/everything except the booking fee/)).toBeInTheDocument()
     expect(screen.getByText(/Between 24 and 48 hours before the session starts:/)).toBeInTheDocument()
+    expect(screen.getByText(/50% of the session and add-ons/)).toBeInTheDocument()
     expect(screen.getByText(/Between 6 and 24 hours before the session starts:/)).toBeInTheDocument()
+    expect(screen.getByText(/25% of the session and add-ons/)).toBeInTheDocument()
     expect(screen.getByText(/Less than 6 hours before the session starts, or a no show:/)).toBeInTheDocument()
+    expect(screen.queryByText(/Full refund if you cancel/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/full refund, including the platform fee/i)).not.toBeInTheDocument()
+  })
+
+  it('defines the booking fee once and keeps a full refund for host cancel', () => {
+    expect(
+      screen.getByText(
+        /The booking fee \(TryKai's platform fee, already included in the\s+all-in price\) is not refunded when you cancel/,
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/It covers payment\s+processing and running TryKai/)).toBeInTheDocument()
+    expect(screen.getAllByText(/full refund, including the booking fee/).length).toBeGreaterThanOrEqual(2)
   })
 
   it('states that three strikes deactivates a host listing', () => {
@@ -128,6 +143,15 @@ describe('Refund Policy page', () => {
     expect(screen.getByRole('heading', { name: 'No extra fees' })).toBeInTheDocument()
   })
 
+  it('says the booking fee is not refunded when the guest cancels', () => {
+    expect(
+      screen.getByText(
+        /The booking fee \(TryKai's platform fee, already included in the\s+all-in price\) is not refunded when you cancel/,
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/full refund including the booking fee/)).toBeInTheDocument()
+  })
+
   it('defers refund eligibility to the cancellation policy', () => {
     expect(screen.getByRole('link', { name: 'Cancellation Policy' })).toHaveAttribute(
       'href',
@@ -209,6 +233,15 @@ describe('Terms of Service page', () => {
 
   it('says host strikes expire after 12 months', () => {
     expect(screen.getByText(/Strikes expire 12 months after they.re given/)).toBeInTheDocument()
+  })
+
+  it('says the booking fee is not refunded when the guest cancels', () => {
+    expect(
+      screen.getByText(
+        /The booking fee \(TryKai's platform fee, already included in the all-in price\) is not refunded when you cancel/,
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/Full refund if you cancel/)).not.toBeInTheDocument()
   })
 
   it('anchors the Host and Booking parts for the listing and checkout checkboxes', () => {
