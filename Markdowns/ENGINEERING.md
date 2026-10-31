@@ -379,7 +379,7 @@ These are enforced in code. If you are about to change logic around any of them,
 
 All boundaries are measured in Singapore time, from the moment of cancellation to session start. Exactly 48:00:00 counts as within the 48 hour tier.
 
-**Reschedule (31 October 2026).** `bookings.rescheduled_at` and `rescheduled_from_session_id` (select grant, no client write). `public.reschedule_booking(p_booking_id, p_new_session_id)` is security definer, service_role only. Same per-host advisory lock as confirm; both session rows locked in id order. Rules: confirmed and never moved; old session more than 48h out; new session a different open future session of the same listing; spots and add-on limits; host overlap null; PayNow new start within 80 days of `created_at`; new session outside `listings.booking_cutoff_hours` (`00046`, raises `'bookings closed'`). Spots return to the old session and leave the new one; reminders clear; old holds release when no confirmed bookings remain; new clashes are held. Price and payout amounts do not change; payouts follow the new session times. Edge function `reschedule-booking` checks the guest JWT, calls the RPC, maps errors, and emails both sides. Immediate suspension independent of the strike counter, for safety reports (fields exist; the app does not query them). Host strike appeals: hosts email `hello@trykai.sg` with the booking reference and what happened; `admin_remove_host_strike` is the SQL path (OPERATIONS.md). No admin UI (BUILD_BACKLOG KIV).
+**Reschedule (31 October 2026).** `bookings.rescheduled_at` and `rescheduled_from_session_id` (a plain uuid with **no foreign key**: `session_id` must stay the only bookings → sessions key, or every PostgREST embed of the two fails as ambiguous, PGRST201; `00045` drops the key the first `00044` added; a test guards it) (select grant, no client write). `public.reschedule_booking(p_booking_id, p_new_session_id)` is security definer, service_role only. Same per-host advisory lock as confirm; both session rows locked in id order. Rules: confirmed and never moved; old session more than 48h out; new session a different open future session of the same listing; spots and add-on limits; host overlap null; PayNow new start within 80 days of `created_at`; new session outside `listings.booking_cutoff_hours` (`00046`, raises `'bookings closed'`). Spots return to the old session and leave the new one; reminders clear; old holds release when no confirmed bookings remain; new clashes are held. Price and payout amounts do not change; payouts follow the new session times. Edge function `reschedule-booking` checks the guest JWT, calls the RPC, maps errors, and emails both sides. Immediate suspension independent of the strike counter, for safety reports (fields exist; the app does not query them). Host strike appeals: hosts email `hello@trykai.sg` with the booking reference and what happened; `admin_remove_host_strike` is the SQL path (OPERATIONS.md). No admin UI (BUILD_BACKLOG KIV).
 
 ---
 
@@ -650,6 +650,7 @@ supabase/migrations/
 ├── 00042_listing_addons.sql
 ├── 00043_booking_addons.sql
 ├── 00044_reschedule_booking.sql
+├── 00045_reschedule_drop_fk.sql
 └── 00046_booking_cutoff_and_arrival.sql
 
 supabase/functions/
