@@ -34,6 +34,8 @@ import {
   isValidGuestsCount,
   nextHostStrikeState,
   paymentIntentCreateParams,
+  bookingClosedMessage,
+  isBookingClosed,
   isHostBookingOwnListing,
   prepareBooking,
   refundAmountForCancel,
@@ -446,6 +448,24 @@ describe('prepareBooking', () => {
     }
   })
 
+  it('rejects a session inside the host booking cutoff', () => {
+    expect(
+      prepareBooking(
+        sessionWith({
+          starts_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+          listings: { price_per_person: 2500, host_id: 'host-1', booking_cutoff_hours: 3 },
+        }),
+        1,
+        'card',
+      ),
+    ).toEqual({
+      ok: false,
+      status: 400,
+      message: bookingClosedMessage(3),
+    })
+    expect(isBookingClosed(new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), 3)).toBe(false)
+  })
+
   it('rejects an unknown payment rail', () => {
     expect(prepareBooking(sessionWith(), 1, 'grabpay')).toEqual({
       ok: false,
@@ -673,6 +693,12 @@ describe('rescheduleErrorMessage', () => {
     )
     expect(rescheduleErrorMessage('not allowed')).toBe('Not allowed')
     expect(rescheduleErrorMessage('booking not found')).toBe('Booking not found')
+    expect(rescheduleErrorMessage('bookings closed')).toBe(
+      'Bookings for this session closed 3 hours before it starts.',
+    )
+    expect(rescheduleErrorMessage('bookings closed 24 hours')).toBe(
+      'Bookings for this session closed 24 hours before it starts.',
+    )
     expect(rescheduleErrorMessage('session not available')).toBe("That date isn't available any more.")
     expect(rescheduleErrorMessage(undefined)).toBe("That date isn't available any more.")
   })

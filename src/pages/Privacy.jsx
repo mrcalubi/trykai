@@ -2,7 +2,7 @@ export default function Privacy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Privacy Policy</h1>
-      <p className="policy-page__updated">Last updated: 23 October 2026</p>
+      <p className="policy-page__updated">Last updated: 31 October 2026</p>
 
       <p>
         This policy explains how TryKai collects, uses, shares and protects your
@@ -94,7 +94,9 @@ export default function Privacy() {
         reviews you receive as a Host are visible to anyone. Your full name,
         email, phone number and bookings are not public. A Host&apos;s full
         address is shown only to guests with a confirmed booking for that
-        listing.
+        listing. If a Host turns on a day-of contact number, confirmed guests
+        of that session can see it from 24 hours before until the session ends,
+        only to find the Host or sort last-minute logistics.
       </p>
 
       <h2>4. Identity verification</h2>

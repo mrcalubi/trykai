@@ -28,6 +28,7 @@ import {
 } from '../lib/profileV2'
 import { settingsDraft } from '../lib/unsavedDraft'
 import { useUnsavedChangesGuard } from '../lib/useUnsavedChangesGuard'
+import { dayOfPhoneError, dayOfPhoneLocal, parseDayOfPhone } from '../lib/dayOfPhone'
 
 const PROFILE_V2_COLUMNS =
   'banner_preset, banner_url, featured_review_id, instagram_handle, tiktok_handle'
@@ -61,6 +62,10 @@ export default function Settings() {
   const [email, setEmail] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [isHost, setIsHost] = useState(false)
+  const [dayOfAvailable, setDayOfAvailable] = useState(false)
+  const [dayOfPhone, setDayOfPhone] = useState('')
+  const [shareDayOfPhone, setShareDayOfPhone] = useState(false)
+  const [dayOfPhoneHint, setDayOfPhoneHint] = useState('')
   const [v2Available, setV2Available] = useState(false)
   const [v2, setV2] = useState(EMPTY_V2)
   const [savedV2, setSavedV2] = useState(EMPTY_V2)
@@ -121,6 +126,11 @@ export default function Settings() {
     setEmail(row.email || '')
     setAvatarUrl(row.avatar_url || '')
     setIsHost(Boolean(row.is_host))
+    const hasDayOf = typeof row.share_day_of_phone === 'boolean'
+    setDayOfAvailable(hasDayOf)
+    setDayOfPhone(hasDayOf ? dayOfPhoneLocal(row.day_of_phone) : '')
+    setShareDayOfPhone(hasDayOf ? Boolean(row.share_day_of_phone) : false)
+    setDayOfPhoneHint('')
     setV2Available(hasV2)
     setV2(nextV2)
     setSavedV2(nextV2)
@@ -131,6 +141,8 @@ export default function Settings() {
         displayName: nextDisplayName,
         bio: nextBio,
         ...nextV2,
+        dayOfPhone: hasDayOf ? dayOfPhoneLocal(row.day_of_phone) : '',
+        shareDayOfPhone: hasDayOf ? Boolean(row.share_day_of_phone) : false,
       }),
     )
     setLoading(false)
@@ -270,6 +282,13 @@ export default function Settings() {
     }
     if (v2Available && (nextSocialErrors.instagram || nextSocialErrors.tiktok)) return
 
+    const storedPhone = parseDayOfPhone(dayOfPhone)
+    const phoneError = dayOfAvailable
+      ? dayOfPhoneError(dayOfPhone, { required: shareDayOfPhone })
+      : ''
+    setDayOfPhoneHint(phoneError)
+    if (phoneError) return
+
     setSaving(true)
 
     const nextV2 = { ...v2, instagram, tiktok }
@@ -277,6 +296,10 @@ export default function Settings() {
       full_name: name,
       display_name: handle,
       bio: bio.trim() || null,
+    }
+    if (dayOfAvailable) {
+      payload.day_of_phone = storedPhone
+      payload.share_day_of_phone = shareDayOfPhone && Boolean(storedPhone)
     }
     if (v2Available) {
       // Only send what changed, so a profile saved before 00041 behaves the same.
@@ -289,10 +312,16 @@ export default function Settings() {
       }
     }
 
-    const { error: updateError } = await supabase
+    let { error: updateError } = await supabase
       .from('users')
       .update(payload)
       .eq('id', userId)
+    if (updateError && /day_of_phone|share_day_of_phone/.test(updateError.message ?? '')) {
+      const retry = { ...payload }
+      delete retry.day_of_phone
+      delete retry.share_day_of_phone
+      ;({ error: updateError } = await supabase.from('users').update(retry).eq('id', userId))
+    }
 
     setSaving(false)
 
@@ -308,13 +337,29 @@ export default function Settings() {
     setBio(nextBio)
     setV2(nextV2)
     setSavedV2(nextV2)
-    setSavedDraft(settingsDraft({ fullName: name, displayName: handle, bio: nextBio, ...nextV2 }))
+    setSavedDraft(
+      settingsDraft({
+        fullName: name,
+        displayName: handle,
+        bio: nextBio,
+        ...nextV2,
+        dayOfPhone,
+        shareDayOfPhone,
+      }),
+    )
     setSaveStatusKind('success')
     setSaveStatus('Saved')
     notifyAccountUpdated()
   }
 
-  const currentDraft = settingsDraft({ fullName, displayName, bio, ...v2 })
+  const currentDraft = settingsDraft({
+    fullName,
+    displayName,
+    bio,
+    ...v2,
+    dayOfPhone,
+    shareDayOfPhone,
+  })
   const isDirty = !loading && !saving && savedDraft != null && currentDraft !== savedDraft
   const unsavedGuard = useUnsavedChangesGuard(isDirty)
 
@@ -680,6 +725,40 @@ export default function Settings() {
                 hint="Private, never shown publicly."
                 error={nameError}
               />
+
+              {dayOfAvailable && isHost ? (
+                <div className="settings-day-of">
+                  <Input
+                    id="settings-day-of-phone"
+                    label="Day-of contact number (optional)"
+                    type="tel"
+                    value={dayOfPhone}
+                    onChange={(event) => {
+                      setDayOfPhone(event.target.value)
+                      setDayOfPhoneHint('')
+                      clearSaveFeedback()
+                    }}
+                    autoComplete="tel"
+                    hint="8-digit Singapore number. Shown only if you turn the toggle on."
+                    error={dayOfPhoneHint}
+                  />
+                  <label className="toggle-card">
+                    <input
+                      type="checkbox"
+                      checked={shareDayOfPhone}
+                      onChange={(event) => {
+                        setShareDayOfPhone(event.target.checked)
+                        clearSaveFeedback()
+                      }}
+                    />
+                    <span className="toggle-card__copy">
+                      <span className="toggle-card__title">
+                        Show it to confirmed guests from 24 hours before until the session ends.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              ) : null}
 
               <div className="settings-email">
                 <Input

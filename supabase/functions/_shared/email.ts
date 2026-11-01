@@ -501,6 +501,7 @@ export function bookingConfirmedGuestHtml(options: {
   sessionDate: string
   duration?: string
   fullAddress?: string
+  arrivalInstructions?: string | null
   guestsCount: number
   pricePerPersonCents: number
   groupPricing?: boolean
@@ -546,6 +547,7 @@ export function bookingConfirmedGuestHtml(options: {
       ['Date and time', escapeHtml(options.sessionDate)],
       ['Duration', duration],
       ['Address', address],
+      ['How to find me', options.arrivalInstructions ? escapeHtml(options.arrivalInstructions) : ''],
       ['Guests', guestCountLabel(options.guestsCount)],
       ["What's provided", provided ? escapeHtml(provided) : ''],
       ['What to bring', bring ? escapeHtml(bring) : ''],
@@ -571,6 +573,30 @@ export function addonPrepareLine(
   const lines = (addons ?? []).filter((row) => row.quantity > 0 && row.name)
   if (!lines.length) return ''
   return `Add-ons to prepare: ${lines.map((row) => `${row.name} × ${row.quantity}`).join(', ')}.`
+}
+
+export function hostBookingUrgencyPrefix(
+  startsAt: string,
+  bookedAt: string | Date | number = Date.now(),
+): string {
+  const start = new Date(startsAt).getTime()
+  const booked = new Date(bookedAt).getTime()
+  if (Number.isNaN(start) || Number.isNaN(booked)) return ''
+  if (start < booked || start - booked > 24 * 60 * 60 * 1000) return ''
+  const startKey = singaporeDateKey(startsAt)
+  const bookedKey = singaporeDateKey(booked)
+  if (!startKey || !bookedKey) return ''
+  if (startKey === bookedKey) return 'Booking for today:'
+  return 'Booking for tomorrow:'
+}
+
+export function bookingConfirmedHostSubject(
+  listingTitle: string,
+  startsAt: string,
+  bookedAt: string | Date | number = Date.now(),
+): string {
+  const prefix = hostBookingUrgencyPrefix(startsAt, bookedAt)
+  return prefix ? `${prefix} "${listingTitle}"` : `New booking for "${listingTitle}"`
 }
 
 export function bookingConfirmedHostHtml(options: {
@@ -625,6 +651,7 @@ export function guestSessionReminderHtml(options: {
   sentAt?: string | Date | number
   duration?: string
   fullAddress?: string
+  arrivalInstructions?: string | null
   whatsProvided?: string[] | null
   whatToBring?: string[] | null
   hostName: string
@@ -647,6 +674,7 @@ export function guestSessionReminderHtml(options: {
       ['Day and time', escapeHtml(options.sessionDate)],
       ['Duration', duration],
       ['Address', address],
+      ['How to find me', options.arrivalInstructions ? escapeHtml(options.arrivalInstructions) : ''],
       ["What's provided", provided ? escapeHtml(provided) : ''],
       ['Host', hostName],
     ])}

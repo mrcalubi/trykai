@@ -50,6 +50,18 @@ test.describe('listing detail', () => {
     await expect(page.getByRole('button', { name: 'Book' })).toBeEnabled()
   })
 
+  test('keeps a session inside the cutoff visible but closed', async ({ page }) => {
+    await stubAllExternalCalls(page, {
+      listings: [{ ...LATTE_ART, booking_cutoff_hours: 3 }],
+      sessions: [{ ...OPEN_SESSION, starts_at: hoursFromNow(2), spots_remaining: 3, status: 'open' }],
+      reviews: [],
+    })
+    await page.goto('/listings/listing-latte')
+
+    await expect(page.getByText('Booking closed')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Book' })).toHaveCount(0)
+  })
+
   test('will not let a sold-out session be booked', async ({ page }) => {
     await stubAllExternalCalls(page, {
       listings: [LATTE_ART],
@@ -625,6 +637,7 @@ test('books with an add-on and shows it on the confirmation', async ({ page }) =
   await page.goto('/listings/listing-latte')
   await expect(page.getByRole('heading', { name: 'Add a little extra' })).toBeVisible()
   await page.getByRole('button', { name: 'Book' }).click()
+  await expect(page.getByLabel(/Note for Mei \(optional\)/)).toBeVisible()
   await page.getByRole('button', { name: 'More Premium blooms' }).click()
   await expect(page.getByText('Premium blooms × 1')).toBeVisible()
   await page.getByRole('radio', { name: /^Card/ }).click()
@@ -632,6 +645,48 @@ test('books with an add-on and shows it on the confirmation', async ({ page }) =
 
   await page.goto('/bookings/booking-addon')
   await expect(page.getByText('Premium blooms × 1')).toBeVisible()
+})
+
+test('sends a host note when the listing has no add-ons', async ({ page }) => {
+  let intentBody = null
+  await stubAllExternalCalls(
+    page,
+    {
+      listings: [LATTE_ART],
+      sessions: [{ ...OPEN_SESSION, status: 'open' }],
+      reviews: [],
+      listing_addons: [],
+      'rpc/reviews_for_listing': [],
+      users: [{ id: SIGNED_IN_USER.id, display_name: 'Kai', is_host: false }],
+    },
+    {
+      session: makeAuthSession(),
+      functions: {
+        'create-payment-intent': (body) => {
+          intentBody = body
+          return {
+            clientSecret: 'cs_test_note',
+            booking_id: 'booking-note',
+            total_amount: 5100,
+          }
+        },
+      },
+    },
+  )
+
+  await page.goto('/login')
+  await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+  await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
+  await page.getByRole('button', { name: 'Log in' }).click()
+  await expect(page).toHaveURL(/\/$/)
+
+  await page.goto('/listings/listing-latte')
+  await page.getByRole('button', { name: 'Book' }).click()
+  await expect(page.getByRole('heading', { name: 'Add a little extra' })).toHaveCount(0)
+  await page.getByLabel(/Note for Mei \(optional\)/).fill('Running a little late')
+  await page.getByRole('radio', { name: /^Card/ }).click()
+  await page.getByRole('button', { name: /Continue to payment/ }).click()
+  await expect.poll(() => intentBody?.addon_note).toBe('Running a little late')
 })
 
 test('moves a booking to another date and then shows the new one', async ({ page }) => {

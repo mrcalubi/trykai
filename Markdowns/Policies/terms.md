@@ -129,6 +129,8 @@ If you cancel a session with bookings, every guest gets a full refund and you re
 
 Do not ask for or accept payment outside TryKai from a Guest you met through TryKai for the same or a related session. This does not stop you and a Guest having a relationship unrelated to a TryKai booking.
 
+A day-of contact number you share is only for session logistics with confirmed guests.
+
 ### 8. Tax
 
 Income you earn through TryKai may be taxable. You are responsible for your own tax, including declaring income to IRAS. We do not give tax advice.

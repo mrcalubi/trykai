@@ -1359,6 +1359,10 @@ describe('Profile card layout', () => {
   })
 
   it('moves the hosting calendar into the Hosting tab with booked and open marks', async () => {
+    // Pin the clock mid-month: "3 hours from now" on the last evening of a
+    // month lands in the next month and the calendar no longer shows it.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-15T04:00:00Z'))
     givenSignedIn(HOST_ID)
     givenListings([makeListing({ id: 'listing-9', title: 'Latte art', category: 'Food' })])
     givenSessions([

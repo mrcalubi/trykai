@@ -74,9 +74,11 @@ function givenBooking(booking) {
   supabase.__on('bookings', 'select', { data: booking, error: null })
 }
 
-function givenAddress(address) {
+function givenAddress(address, { arrival = null, phone = null } = {}) {
   supabase.rpc.mockImplementation(async (name) => {
     if (name === 'listing_address') return { data: address, error: null }
+    if (name === 'listing_arrival_instructions') return { data: arrival, error: null }
+    if (name === 'booking_host_contact') return { data: phone, error: null }
     return { data: null, error: null }
   })
 }
@@ -122,6 +124,8 @@ describe('BookingDetail', () => {
       expect.stringContaining('calendar.google.com'),
     )
     expect(supabase.rpc).toHaveBeenCalledWith('listing_address', { listing_id: 'listing-1' })
+    expect(supabase.rpc).toHaveBeenCalledWith('listing_arrival_instructions', { listing_id: 'listing-1' })
+    expect(supabase.rpc).toHaveBeenCalledWith('booking_host_contact', { p_booking_id: BOOKING_ID })
     expect(screen.getByText(/12 Club Street, Singapore 069410/)).toBeInTheDocument()
     expect(screen.getByText('Only guests see the exact address.')).toBeInTheDocument()
     expect(screen.getByText('Apron')).toBeInTheDocument()
@@ -269,6 +273,49 @@ describe('BookingDetail', () => {
     const bring = screen.getByRole('heading', { name: 'Before you go' })
     expect(where.compareDocumentPosition(bring) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Plans changed? Manage booking' })).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('shows How to find me and day-of Call and WhatsApp when the RPCs return them', async () => {
+    givenAddress('12 Club Street, Singapore 069410', {
+      arrival: 'Lift B to #04-56, ring the bell',
+      phone: '+6591234567',
+    })
+    givenBooking(detailBooking())
+    renderDetail()
+
+    expect(await screen.findByText('Lift B to #04-56, ring the bell')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Call' })).toHaveAttribute('href', 'tel:+6591234567')
+    expect(screen.getByRole('link', { name: 'WhatsApp' })).toHaveAttribute(
+      'href',
+      'https://wa.me/6591234567',
+    )
+  })
+
+  it('hides Call and WhatsApp when the contact RPC returns nothing', async () => {
+    givenBooking(detailBooking())
+    renderDetail()
+    await screen.findByRole('heading', { name: 'Where' })
+    expect(screen.queryByRole('link', { name: 'Call' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'WhatsApp' })).not.toBeInTheDocument()
+  })
+
+  it('repeats Call and WhatsApp on the day-of banner', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-31T04:00:00.000Z'))
+    givenAddress('12 Club Street, Singapore 069410', { phone: '+6591234567' })
+    givenBooking(
+      detailBooking({
+        sessions: {
+          ...detailBooking().sessions,
+          starts_at: '2026-10-31T08:00:00.000Z',
+        },
+      }),
+    )
+    renderDetail()
+    expect(await screen.findByText(/Today · starts in/)).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Call' })).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: 'WhatsApp' })).toHaveLength(2)
     vi.useRealTimers()
   })
 

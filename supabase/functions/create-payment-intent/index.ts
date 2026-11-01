@@ -2,6 +2,8 @@ import Stripe from 'https://esm.sh/stripe@13.3.0?target=deno'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   calculateBookingCharge,
+  bookingClosedMessage,
+  isBookingClosed,
   isHostBookingOwnListing,
   parseAddonNote,
   paymentIntentCreateParams,
@@ -239,6 +241,14 @@ Deno.serve(async (req) => {
     if (freshSession.status !== 'open' || new Date(freshSession.starts_at).getTime() <= Date.now()) {
       await cancelBooking(admin, booking.id)
       return jsonResponse({ error: 'Session is not available' }, 400)
+    }
+
+    if (isBookingClosed(freshSession.starts_at, listing?.booking_cutoff_hours)) {
+      await cancelBooking(admin, booking.id)
+      return jsonResponse(
+        { error: bookingClosedMessage(listing?.booking_cutoff_hours) },
+        400,
+      )
     }
 
     const freshPayNow = rejectPayNowIfTooFarAhead(paymentRail, freshSession.starts_at)

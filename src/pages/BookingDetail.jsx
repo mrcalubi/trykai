@@ -29,6 +29,7 @@ import {
   startsInCopy,
   writeBringChecks,
 } from '../lib/bookingPage'
+import { HostContactLinks } from '../components/BookingCutoffFields'
 import {
   bookingReference,
   formatPaymentMethod,
@@ -80,6 +81,7 @@ const BOOKING_SELECT = `
       area,
       price_per_person,
       group_pricing,
+      booking_cutoff_hours,
       users:host_id (
         display_name,
         avatar_url,
@@ -145,6 +147,8 @@ export default function BookingDetail() {
   const userId = useAuthedUserId()
   const [booking, setBooking] = useState(null)
   const [address, setAddress] = useState('')
+  const [arrivalInstructions, setArrivalInstructions] = useState('')
+  const [hostPhone, setHostPhone] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notGuest, setNotGuest] = useState(false)
@@ -201,10 +205,18 @@ export default function BookingDetail() {
     const listingId = listing?.id
     const hostId = listing?.host_id
     if (data.status === 'confirmed' && listingId) {
-      const { data: revealed } = await supabase.rpc('listing_address', { listing_id: listingId })
+      const [{ data: revealed }, { data: arrival }, { data: contact }] = await Promise.all([
+        supabase.rpc('listing_address', { listing_id: listingId }),
+        supabase.rpc('listing_arrival_instructions', { listing_id: listingId }),
+        supabase.rpc('booking_host_contact', { p_booking_id: data.id }),
+      ])
       setAddress(typeof revealed === 'string' ? revealed : '')
+      setArrivalInstructions(typeof arrival === 'string' ? arrival : '')
+      setHostPhone(typeof contact === 'string' ? contact : '')
     } else {
       setAddress('')
+      setArrivalInstructions('')
+      setHostPhone('')
     }
 
     if (hostId) {
@@ -485,6 +497,8 @@ export default function BookingDetail() {
           Copy address
         </button>
       </p>
+      {arrivalInstructions ? <p className="booking-where__find">{arrivalInstructions}</p> : null}
+      {hostPhone ? <HostContactLinks phone={hostPhone} /> : null}
       <p className="hint">Only guests see the exact address.</p>
     </section>
   ) : null
@@ -601,7 +615,10 @@ export default function BookingDetail() {
       </div>
 
       {dayOf && !cancelled ? (
-        <p className="booking-banner">Today · {startsInCopy(startsAt, nowMs)}</p>
+        <div className="booking-banner">
+          <p>Today · {startsInCopy(startsAt, nowMs)}</p>
+          {hostPhone ? <HostContactLinks phone={hostPhone} /> : null}
+        </div>
       ) : null}
 
       {note ? <p className="hint">{note}</p> : null}
