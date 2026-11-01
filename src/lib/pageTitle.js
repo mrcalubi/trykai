@@ -6,7 +6,7 @@ import { useEffect } from 'react'
  * a profile) call usePageTitle once it has loaded.
  */
 
-export const SITE_TITLE = 'TryKai — find your thing in Singapore'
+export const SITE_TITLE = 'TryKai · Find your thing in Singapore'
 
 /** "Terms of Service · TryKai", or the site title when there is no name. */
 export function pageTitle(name) {

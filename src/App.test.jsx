@@ -380,7 +380,7 @@ describe('App page titles', () => {
   it('uses the site title on browse', async () => {
     renderAt('/')
     await screen.findByRole('heading', { level: 1 })
-    expect(document.title).toBe('TryKai — find your thing in Singapore')
+    expect(document.title).toBe('TryKai · Find your thing in Singapore')
   })
 
   it('names static pages from their route', async () => {
