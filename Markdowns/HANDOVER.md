@@ -1,33 +1,33 @@
 # TryKai: Handover
 
-*Written 24 October 2026, updated 25 October against `staging` (#161 merged; `main` at #163). Supersedes the 19 October handover. Read this first if you are Cursor, a new Claude chat, or anyone picking up the code.*
+*Written 1 November 2026 against `staging` at #234, with the release to `main` open as #235. Supersedes the 25 October handover. Read this first if you are Cursor, a new Claude chat, or anyone picking up the code.*
 
 ---
 
 ## What TryKai is
 
-Peer to peer skill and experience marketplace for Singapore. Individuals list short, in person sessions teaching a skill. Most sessions are S$15 to S$30; S$10 to S$40 is guidance, not a rule, and the database caps a listing at S$500 as a typo guard (`00028`). Guests browse, book, and pay through the platform. TryKai takes a booking fee. Runs as a website, not an app.
+Peer to peer skill and experience marketplace for Singapore. Individuals list short, in person sessions teaching a skill. Most sessions are S$15 to S$30 (S$10 to S$40 is guidance; the database caps a listing at S$500 as a typo guard). Guests browse, book and pay through the platform. Runs as a website, not an app.
 
-Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. **The first host was onboarded on 23 October 2026**; her feedback is the next round of UI work.
+Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. **Hosts so far:** the first host (23 October) and **Nicholas** (flower arranging, late October, `is_founding_host` set on production). Most of the 28 October to 1 November work came from Nicholas's feedback.
 
-**Team.** Caleb, CEO and product, carries all legal and financial liability. Rui Heng Leong, engineer, 8 hours a week. Aakash Chidambaram, marketing, growth, host recruitment.
+**Team.** Caleb, CEO and product, carries all legal and financial liability. Rui Heng Leong, engineer, 8 hours a week. Aakash Chidambaram, marketing, growth, host recruitment. TryKai's own earnings go to the business account (Aspire); how they reach the founders is set by the founders' agreement.
 
 ---
 
 ## Source of truth
 
-**The repo's `Markdowns/` folder is current.** Claude Project copies are synced from it and may lag. One fact, one home. When two docs disagree, say so rather than picking one. For any change, read the matching section of `ENGINEERING.md` (how it works), `DECISIONS.md` (why, newest entries at the bottom of the log) and `OPERATIONS.md` (what someone has to do by hand).
+**The repo's `Markdowns/` folder is current.** Claude Project copies are synced from it and may lag (synced 1 November). One fact, one home. When two docs disagree, say so rather than picking one. For any change, read the matching section of `ENGINEERING.md` (how it works), `DECISIONS.md` (why, newest entries at the bottom of the log) and `OPERATIONS.md` (what someone has to do by hand, and the migration table).
 
 ---
 
-## How the work is done now (from 24 October)
+## How the work is done now
 
-- **Cursor builds most code again.** Claude (Claude Code in the TryKai Project chat) built everything from 19 to 24 October while Cursor was down; see "Catching up" below. Claude now handles reviews, docs, research, Singpass and anything that needs a long read of the repo.
-- Either way: branch from `staging`, one scope per branch, run `npm run verify` (lint, coverage, build), open a PR into `staging`. Caleb merges. Nobody pushes to `staging` or `main` directly.
-- Cursor prompt pattern: start with "Read Markdowns/HANDOVER.md, ENGINEERING.md and DECISIONS.md first", one scope, name the branch, end with "Report anything unmapped".
-- **Secrets stay with Caleb.** Never hold or ask for a Supabase access token. Never paste secrets or private keys into chat. Caleb applies migrations and sets secrets himself.
-- One step at a time. Short lists. Honest pushback over validation. Distinguish verified, inferred and guessed.
-- When something touches money, safety or auth, err toward Rui Heng's call.
+- **Cursor builds.** Claude (Claude Code in the TryKai Project) writes Cursor prompts, reviews every PR (migration and money paths line by line), fixes small things directly on the PR branch, resolves merge conflicts, and opens the `staging` → `main` release PRs.
+- **Design happens on the canvas first.** Design artifact "TryKai profile card layout" (https://claude.ai/artifact/JS7ACYVJxdeND4idRJcpCU), pages: Profile v2, Add-ons, Booking page. Cursor cannot see the canvas, so prompts describe it in words and Claude checks the result with screenshots or Caleb checks on staging.
+- Branch from `staging`, one scope per branch, `npm run verify` and `npm run test:e2e`, PR into `staging`. **Caleb merges.** Nobody pushes to `staging` or `main` directly.
+- Cursor prompt pattern: branch name, numbered scope, a Docs section (DECISIONS, ENGINEERING, OPERATIONS), a Tests section ("keep the coverage floors"), and "Report the PR link and any unmapped items".
+- **Secrets stay with Caleb.** Never hold or ask for a Supabase access token. Caleb applies migrations and sets secrets himself.
+- Caleb's preferences: one step at a time, plain language, honest pushback over validation, numbers over adjectives, **no em dashes in anything written for him or shown to users**.
 
 ---
 
@@ -35,118 +35,87 @@ Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. **The first host 
 
 | | Staging | Production |
 |---|---|---|
-| Supabase project | `trykai-staging` (Free plan, "TryKai Staging" org) | "Kai" (Pro, "TryKai" org, region Mumbai `ap-south-1`) |
+| Supabase project | `trykai-staging` (Free plan) | "Kai" (Pro, Mumbai `ap-south-1`) |
 | Project ref | `hzgybclfvpuxkmytdoos` | `dqqlwofluvhikebtjune` |
 | Site | trykai.vercel.app | trykai.sg |
 | Branch | `staging` | `main` |
 
-**Both projects show the "PRODUCTION" label in the Supabase dashboard.** Check the ref in the URL before running any SQL. On 18 October migrations were applied to production first by mistake.
+**Both projects show the "PRODUCTION" label in the Supabase dashboard.** Check the ref in the URL before any SQL.
 
-**Deploys.** CI (`.github/workflows/ci.yml`) runs lint, unit tests (coverage floors: statements 92%, branches 87%), Playwright, build, and Edge Function checks. A push to `staging` deploys every Edge Function to staging; a push to `main` deploys to production via the `PRODUCTION_SUPABASE_PROJECT_REF` secret. Pull requests never deploy.
-
-**Migrations are not automatic.** Apply by hand in the SQL Editor: staging first, test, then production in the same sitting. Before any SQL on production, confirm a backup from the last 24 hours exists (OPERATIONS.md, Production SQL).
+CI runs lint, unit tests (floors: statements 92%, branches 87%), Playwright, build and Edge Function checks. A push to `staging` deploys every Edge Function to staging; a push to `main` deploys to production. Pull requests never deploy. Migrations are applied by hand: staging first, then production, with a production backup from the last 24 hours.
 
 ---
 
-## Catching up: what changed 19 to 24 October
+## Shipped 26 October to 1 November
 
-Everything below is merged to `staging`; `main` has it up to #149, and #150 is on `staging` only until the next sync. Details and reasons are in DECISIONS.md under the same dates.
+Details and reasons are in DECISIONS.md under the same dates.
 
-**Guests**
-- Home hero: Browse sessions button and the "Coming up" heading removed. Browse heading visually hidden; result count under the filters; peeking category row; smaller icon category badge. Cards for listings with no dates show no date line.
-- **I'm keen** (`00032`): on a listing with no dates a guest says when suits them; the host sees the tally and keen guests are emailed when dates are added (`listing-interest`, `notify-interested`).
-- Link previews for crawlers (`api/listing-preview.js`) and Share falls back to copying the link.
-- Branded email frame and booking receipt (`_shared/email.ts`).
-- **Email confirmation at signup**: a 6-digit code in the same tab (`Login.jsx`, `confirm-signup.html` generated from `_shared/email.ts`). The dashboard steps are in OPERATIONS.md.
+**Profile, home and polish (#173 to #217).** Profile v2 (`00041`): banner, pills, stat cards, About, featured review, medals; Bookings, Hosting, Listings and Reviews as tabs on `/u/:id`. Unsaved-changes guard. Profile photo editor. Checkout asks "pick a method, then continue". Footer and email social icons. Payout gating and host setup checklist. Fresh Home from the logo, back restores scroll. Host strike events with 12-month expiry (`00039`), `host_sessions_held` (`00040`). SEO and canonical www host. Sentry. Singpass Myinfo live on production (26 October).
 
-**Hosts**
-- **Shared availability** (`00033`): a host can't be booked in two places at once; overlapping sessions show as "Taken".
-- **Verification**: Stripe Identity is gone (not offered to Singapore businesses). **Singpass Myinfo** is the main route (`00035`, `singpass-start`, `singpass-callback`, `/verify-identity/singpass`): name, date of birth and mobile, never NRIC. A Singpass host is **approved on the spot** (`00036`). Upload (ID photo and selfie) is the fallback, reviewed by hand at `/admin/verifications`. The "What would you like to teach?" question was added (`00034`) and then removed from the page; old answers stay in `users.teaching_plan`.
-- **Listing review** (`00036`): every new listing is hidden from guests until approved at `/admin/listings`. The team is emailed on save (`listing-submitted`); approve or ask for one change (`admin-listings`); the host is emailed either way. Hosting shows "In review" and "Changes needed" with the note.
+**From Nicholas's feedback (#218 to #234).**
+- **Photos:** 8 per listing, View in the tile menu, Show all on desktop, warmer five-shot tips. HEIC failures after a deploy now say "TryKai just updated. Refresh the page" and go to Sentry.
+- **Sessions:** different times on different dates; the Add sessions draft survives leaving the page; **bookings close 3, 6, 12, 24 or 48 hours before** a session (per listing, default 3).
+- **PayNow saving slides with the basket:** 5% under $20, 4% under $30, 3% under $60, 2% from $60, so PayNow never earns less than card after Stripe fees.
+- **Add-ons** (`00042`, `00043`): up to 3 per listing, per person or per booking, optional photo and per-session limit. Guest pays the host's price plus 12%, rounded up per unit. **Host keeps 100%; no host fee on add-ons.** Never pre-selected. Bookings snapshot what was bought.
+- **Booking fee is not refunded on guest cancellations** (any tier). Host, no-show and admin cancels still refund everything. Disclosed on the policy pages and one checkout line, no amounts.
+- **Rescheduling** (`00044`, `00045`): a guest can move a confirmed booking once, up to 48 hours before, to another open session of the same listing. Price never changes.
+- **Booking page rebuilt** to the canvas: When (Add to calendar, Invite a friend), Where (How to find it, Get directions, Copy address, day-of Call and WhatsApp), host card, receipt, a Manage booking sheet (move first, cancel one tap further), day-of, after and cancelled states.
+- **How to find me, day-of number, note to host** (`00046`): private arrival directions, an opt-in host phone shown to confirmed guests from 24 hours before until the session ends, and a note on every booking.
+- **Fixes:** a second bookings to sessions foreign key broke every PostgREST embed (now one key only, guarded by a test); supabase-js requests use `cache: 'no-store'`; buttons inherit the page font; site title "TryKai · Find your thing in Singapore".
 
-**Rules not to break**
-- **Singpass button**: use Singpass's own artwork in `src/assets/singpass/` (`SingpassButton.jsx`). Don't restyle it, recolour it or retype the label; Singpass's specification forbids it and the approved journey must not change.
-- **"Check your details"** (`SingpassReturn.jsx`): name and date of birth stay locked; mobile stays editable and required. Retrieved data is shown as-is and nothing is saved until the host confirms. This is the approved production journey (live 26 October).
-- **No public marketing mentions Singpass or Myinfo** without Singpass's clearance. Submit the material at least 2 weeks before it goes out (posts, ads, landing page, emails, decks). Aakash owns marketing.
-- **No NRIC numbers**, ever (DECISIONS.md, 23 October).
-- **`listings.review_status`**: clients can never write it (trigger `guard_listing_review`). Any new public listing read must also require `approved`, as browse, profiles, keen counts, checkout and link previews do.
-- **`review_note`** is readable by authenticated users only. Never add it to a query an anonymous visitor runs; the whole query fails.
-- `VITE_SINGPASS_ENABLED` decides whether the Singpass button shows: `true` on Preview and Production. Singpass has been live since 26 October.
+**Decided, not built:** chat (deferred until in-app or WhatsApp notifications; the higher-value use is pre-booking questions). No "Verified with Singpass" badge: Singpass asked us not to; every verified host keeps "ID verified".
 
 ---
 
-## Shipped 24 to 25 October (Cursor builds, Claude reviews)
+## Money model now
 
-From the first host's feedback (23 October onboarding) and Aakash. Details in DECISIONS.md.
+| | Rule | Code |
+|---|---|---|
+| Guest price | Host price + 12% (S$2.50 floor), rounded up to the dollar; group discount 5/10/15/20% on the lesson only | `booking.ts`, `pricing.js` |
+| PayNow | Sliding 5/4/3/2% off the whole card total, add-ons included | `paynowDiscountRate` |
+| Add-ons | `ceil(host price × 1.12)` per unit; host keeps the host price | `calculateBookingCharge` |
+| Host fee | 10% of the **lesson only**, after the host's first 3 confirmed bookings; founding hosts never | `hostPayoutBreakdown` |
+| Guest cancel | 48h+: everything except the booking fee; 24 to 48h: 50% of lesson and add-ons; 6 to 24h: 25%; under 6h: nothing | `calculateGuestRefund` |
+| Host payout | 72 hours after the session ends, by the hourly `release-payout` job | OPERATIONS, Host Transfers |
 
-- **Photos** (#154, #156, #157): drag and drop files onto the drop zone, which now says "Add photos". Every photo can be cropped at 4:3; each crop starts from the original and can be undone in this session ("Undo crop" in the tile menu, "Reset to original" in the dialog). Editor tiles are 4:3. The tile menu closes on any tap outside it.
-- **Loading states** (#155): Button `loading`, `PageLoader`, and `WaitingState` with `LoadingMascot.jsx` (three bouncing dots now; the mascot replaces it later). Used on checkout, payouts, Singpass, Create listing ("Uploading photo 2 of 4") and most buttons. Checkout keeps Stripe's PaymentElement mounted behind the waiting panel; never unmount it while confirmPayment runs.
-- **Session reminders** (#158, #160, `00037`): hourly `send-reminders` emails the guest (per booking) and the host (per session) when a session starts in 2 to 24 hours, skipping bookings made in the last 6 hours. "Today" or "Tomorrow" by Singapore date, weekday in the date, warm copy, "Don't forget to bring" when the listing has items. Needs `REMINDERS_CRON_SECRET` plus three Vault secrets per project (OPERATIONS.md, Session reminders). Tested on staging 24 October.
-- **What to bring** (#159, `00038`): optional `listings.what_to_bring` (up to 5 items, 40 characters each) on Create and Edit listing, the listing page, booking detail, the confirmation email, the reminder, and the admin review card. The CHECK function must stay EXECUTE-granted to anon and authenticated, or every listing save fails.
-- **Payout return** (#161, merged): back from Stripe with nothing due, Hosting says "Stripe is checking your details" and re-checks for 60 seconds instead of "needs your bank details".
-- **Decided, not built:** host pricing rounding left as it is (DECISIONS.md, 24 October).
+**Open question for Caleb:** on a late guest cancel the host fee is still 10% of the whole lesson even when the host keeps only half or a quarter of it. Scaling it to the kept share is a one-line change to decide before non-founding hosts get bookings.
 
 ---
 
-## State on 25 October
+## State on 1 November
 
-**Migrations.** See OPERATIONS.md, Migration state, for what is applied where. Added since 19 October:
+**Migrations.** `00001` to `00046` are applied on **staging and production**. The newest: `00042` listing add-ons, `00043` booking add-ons, `00044` reschedule, `00045` drop the second bookings to sessions key, `00046` cutoff, arrival, day-of number. A test now fails if two migrations share a number.
 
-| | What it does |
-|---|---|
-| `00032` | `listing_interests` (I'm keen), `listing_keen_counts`, host notices |
-| `00033` | Shared availability across a host's listings |
-| `00034` | `users.teaching_plan` (no longer asked) |
-| `00035` | Singpass Myinfo: `singpass_sub`, `verified_name`, `verified_dob`, `verified_mobile`, `singpass_auth_sessions` |
-| `00036` | Singpass approves on the spot; listing review (`review_status`, `listing_reviews`, `review_listing`) |
-| `00037` | Session reminders: `guest_reminder_sent_at`, `host_reminder_sent_at`, hourly `invoke_send_reminders` |
-| `00038` | `listings.what_to_bring` |
+**Production.** `main` has everything to #231. **#235** (booking page layout #233, site title #234, Singpass docs #232) is open; merge when green. Stripe live: Connected accounts webhook done (25 October), platform payout schedule **Manual** (set 1 November), payout cron running hourly.
 
-Earlier, from the 19 October handover:
-
-| | What it does |
-|---|---|
-| `00022` | `my_is_founding_host()` |
-| `00023` | User PII locked: clients cannot read email, full name, phone. `my_account()`, generated `is_id_verified` |
-| `00024` | `edit_open_session`, `set_listing_spots`, column UPDATE revokes on sessions and listings |
-| `00025` | Table grants tightened. `full_address` only through `listing_address()`. No TRUNCATE, TRIGGER, REFERENCES for clients |
-| `00026` | Storage: `listing-photos` no client list; `verification-docs` private, owner insert and update |
-| `00027` | Suspended hosts' listings hidden from browse, detail and profiles |
-| `00028` | Listing price ceiling S$500 |
-| `00029` | Dispute payout hold, partial refunds |
-| `00030` | `booking_money_events` audit log |
-| `00031` | `booking_complaints` (guest Report a problem) |
-
-**Singpass production.** Live since 26 October. `VITE_SINGPASS_ENABLED=true` on Preview and Production. See OPERATIONS.md, Singpass Myinfo.
-
-**Production sync.** `main` is at #163. Done 25 October.
-
-**Also open, owned by Caleb.**
-- Singpass production: live since 26 October. Marketing mentions need Singpass clearance 2 weeks ahead.
-- Production verification-alert database webhook (`notify-verification-pending`), for upload hosts.
-- Email confirmation dashboard steps on production, if not done.
-- Phone numbers for upload hosts and guests (KIV). Edits to an approved listing are not re-reviewed (KIV).
-
-**Production is on Supabase Pro** (daily backups, no inactivity pause). Production sits in Mumbai by accident; moving it to Singapore is post-launch. All TryKai money goes through Aspire.
+**Manual payouts, how to.** Host money moves automatically. TryKai's own share waits in the Stripe balance until someone clicks Balances → Pay out. Before paying out, run on production:
+```sql
+select coalesce(sum(host_payout_amount), 0) / 100.0 as owed_to_hosts_sgd
+from public.bookings
+where status = 'confirmed' and payout_released_at is null and stripe_refund_id is null;
+```
+Safe to pay out = Stripe Available minus `owed_to_hosts_sgd` minus about S$50 buffer. Monthly is fine.
 
 ---
 
 ## Next work
 
-1. **More of the first host's feedback**: Caleb has another batch.
-2. BUILD_BACKLOG.md for everything else.
+1. **Merge #235**, hard refresh trykai.sg, check a booking page on a phone.
+2. **Prompt C, review photos** (ready, not started). Guests attach up to 3 photos to a review; migration `00047_review_photos.sql` (`reviews.photo_urls`, public `review-photos` bucket with own-folder policies, `reviews_for_listing` and `reviews_for_host` return the photos); one shared review form used by Bookings and BookingDetail; thumbnails and lightbox on the listing, profile and featured review; a quiet Report link; privacy policy line. The full prompt is in the appendix below.
+3. Caleb's call on the host fee for late cancellations (above).
+4. More host feedback as it comes.
+5. BUILD_BACKLOG.md for everything else.
 
 ---
 
-## Carried, status not rechecked this session
-
-From the 21 September handover. Confirm or close at the next scrum.
+## Carried, status not rechecked
 
 - Whether the two September test cancellations were refunded on Stripe
 - Insurance quote
-- Founders' agreement unsigned; Rui Heng not yet told about the profit share
+- Founders' agreement unsigned
 - Safety response protocol drafted, not ratified
 - Account deletion needs an anonymisation design (Rui Heng). Manual via contact us until then
+- One real card booking on production, then refund it (OPERATIONS checklist)
 
 ---
 
@@ -156,9 +125,36 @@ These cost real hours. Treat them as rules.
 
 1. **Check the project ref in the URL before any SQL.** The dashboard label is not enough.
 2. **Confirm production has a backup from the last 24 hours before any production SQL.**
-3. **Verify the branch every time.** `git branch --show-current` after every checkout.
-4. **Commit as soon as something looks right on localhost.**
-5. **A push to `staging` or `main` deploys every Edge Function.** Each function bundles `_shared/` at deploy time. Deploy only by merging, never from a feature branch.
-6. **Set new function secrets on production before merging to `main`.** A function that needs a secret goes live the moment `main` deploys it.
-7. **Check that secrets exist before debugging code.** A missing `RESEND_API_KEY` once failed silently for an hour.
-8. **Grant and revoke breakages share a shape:** a policy or write touching a column that was not granted. Test every flow that touches a table after a grant change.
+3. **Apply a migration before merging code that reads it.** Code that selects a missing column breaks the page (or, in `stripe-webhook`, leaves a paid booking pending). Merging deploys Edge Functions immediately.
+4. **Migration numbers are unique.** Two PRs once both shipped `00045`; renumber before merging (a test now catches it).
+5. **Keep `bookings.session_id` the only foreign key from bookings to sessions.** A second one makes every `bookings (...)` or `sessions (...)` embed fail as ambiguous (HTTP 300, PGRST201).
+6. **A browser can cache an API error.** If a page keeps failing after a database fix, check DevTools Network for "(disk cache)". Our client now sends `cache: 'no-store'`.
+7. **After a deploy, hard refresh before testing.** A tab opened before a release asks for old code chunks (HEIC once failed this way).
+8. **Verify the branch every time** (`git branch --show-current`). Cursor sometimes keeps work in its own workspace without pushing; ask it to push to a named branch.
+9. **A push to `staging` or `main` deploys every Edge Function.** Set new function secrets on production before merging to `main`.
+10. **Grant and revoke breakages share a shape:** a policy or query touching a column that was not granted. Test every flow that touches a table after a grant change.
+11. **Date-relative tests break at month ends.** Pin the clock (`vi.setSystemTime`) when a test builds sessions "N hours from now" and checks a month view.
+
+---
+
+## Appendix: prompt C (review photos), ready to paste into Cursor
+
+```
+Branch: feat/review-photos (from staging)
+
+Guests can attach up to 3 photos to a review. Match the canvas board "Booking page · Day of, after, cancelled" (After state: stars, comment, photo tiles, consent line).
+
+1. Migration supabase/migrations/00047_review_photos.sql (Caleb applies it):
+   - reviews.photo_urls text[] not null default '{}' check (cardinality(photo_urls) <= 3);
+     trigger: every url must contain '/storage/v1/object/public/review-photos/' || reviewer_id || '/'.
+   - Public bucket 'review-photos'; storage policies like listing-photos in 00026: insert, update, delete only in the caller's own folder; no list.
+   - Redefine reviews_for_listing and reviews_for_host to also return photo_urls (keep signatures and grants; follow 00013).
+2. Review form: ONE shared component used by Bookings.jsx and BookingDetail.jsx (both insert reviews today). Stars and comment as now, plus up to 3 photo tiles using the same picker, HEIC conversion, compression, "TryKai just updated" message and upload as listing photos. Line under the tiles: "Add up to 3 photos of what you made. Only photos you took, and ask before including anyone else." Upload before inserting the review; if an upload fails, keep the text and say which photo failed.
+3. Display: ReviewCard shows thumbnails; tapping opens the existing lightbox. Listing page, host profile, featured review.
+4. Moderation: a quiet "Report" link on reviews with photos (mailto hello@trykai.sg with the review id). OPERATIONS: how to remove a photo (Table Editor photo_urls, then delete the object). Privacy policy: review photos are public.
+5. Docs: DECISIONS, ENGINEERING, OPERATIONS (apply 00047).
+6. Tests: migration (cap, folder check, storage policies, read functions return photo_urls), form (0 to 3 photos, upload failure, HEIC), display and lightbox, the migration-number guard. Keep the coverage floors.
+
+Run npm run verify and npm run test:e2e. Report the PR link and any unmapped items.
+```
+
