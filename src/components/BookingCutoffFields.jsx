@@ -58,7 +58,7 @@ export function CheckoutHostNote({ hostName, value, onChange }) {
         value={value}
         onChange={(event) => onChange(event.target.value.slice(0, 120))}
       />
-      <span className="hint">For example, allergies or running a little late.</span>
+      <span className="hint">Anything you&apos;d like {hostName} to know.</span>
     </label>
   )
 }

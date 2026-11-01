@@ -119,6 +119,14 @@ body {
   background: var(--bg);
 }
 
+/* Buttons and fields don't inherit the page font by default; chips fell back to Arial. */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
 #root {
   min-height: 100svh;
   display: flex;
@@ -9842,6 +9850,10 @@ body:has(.edit-profile__bar) .site-footer {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.addons-ideas__chips + .hint {
+  margin-top: 10px;
 }
 
 .addons-chip {

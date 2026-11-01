@@ -35,7 +35,7 @@ describe('BookingCutoffFields', () => {
   it('always shows a note field for the host', () => {
     renderWithRouter(<CheckoutHostNote hostName="Mei" value="" onChange={() => {}} />)
     expect(screen.getByLabelText(/Note for Mei \(optional\)/)).toBeInTheDocument()
-    expect(screen.getByText('For example, allergies or running a little late.')).toBeInTheDocument()
+    expect(screen.getByText(/Anything you.d like .+ to know\./)).toBeInTheDocument()
   })
 
   it('builds Call and WhatsApp links from a stored number', () => {

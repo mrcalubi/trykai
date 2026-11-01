@@ -78,3 +78,15 @@ describe('00046 booking cutoff and arrival', () => {
     expect(rpc).not.toContain('apply_host_strike')
   })
 })
+
+describe('confirmation email gets How to find it', () => {
+  // The guest confirmation printed an empty row: the webhook never selected
+  // arrival_instructions, so the email builder always got ''.
+  it('the Stripe webhook loads arrival_instructions with the listing', () => {
+    const webhook = readFileSync(
+      resolve(import.meta.dirname, '../../supabase/functions/stripe-webhook/index.ts'),
+      'utf8',
+    )
+    expect(webhook).toMatch(/full_address,\s*arrival_instructions,/)
+  })
+})
