@@ -608,6 +608,7 @@ export function bookingConfirmedHostHtml(options: {
   guestsCount: number
   hostPayoutCents: number
   siteUrl?: string
+  hostId?: string | null
   addons?: Array<{ name: string; quantity: number }>
   addonNote?: string | null
   guestFirstName?: string | null
@@ -616,6 +617,9 @@ export function bookingConfirmedHostHtml(options: {
   const prepare = addonPrepareLine(options.addons)
   const note = typeof options.addonNote === 'string' ? options.addonNote.trim() : ''
   const noteFrom = (options.guestFirstName || options.guestName || 'a guest').trim().split(/\s+/)[0] || 'a guest'
+  const hostingHref = options.hostId
+    ? `${siteUrl}/u/${encodeURIComponent(options.hostId)}?tab=hosting`
+    : `${siteUrl}/hosting`
   return wrapEmail(
     `
     <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
@@ -627,6 +631,7 @@ export function bookingConfirmedHostHtml(options: {
     ${prepare ? `<p style="margin:0 0 ${note ? '8' : '16'}px;">${escapeHtml(prepare)}</p>` : ''}
     ${note ? `<p style="margin:0 0 16px;">Note from ${escapeHtml(noteFrom)}: ${escapeHtml(note)}</p>` : ''}
     <p style="margin:0;">${hostPayoutLine(options.hostPayoutCents)}</p>
+    ${primaryButton(hostingHref, 'View in Hosting')}
     ${emailSignOff('see-you')}
     `,
     siteUrl,

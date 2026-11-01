@@ -683,6 +683,23 @@ describe('booking confirmation emails', () => {
     expect(html).toContain('UEN 53526159D')
     expect(html).not.toMatch(/booking fee|platform fee|host fee/i)
     expect(html).not.toMatch(/Total paid|Refund amount|Refund method/i)
+    expect(html).toContain('View in Hosting')
+    expect(html).toContain('https://trykai.sg/hosting')
+  })
+
+  it('links the host new-booking button to the Hosting tab when a host id is present', () => {
+    const html = bookingConfirmedHostHtml({
+      bookingReference: 'A1B2C3D4',
+      hostName: 'Mei Ling',
+      guestName: 'Sarah',
+      listingTitle: 'Latte art',
+      sessionDate: formatSessionDate(SESSION_STARTS),
+      guestsCount: 1,
+      hostPayoutCents: 8500,
+      hostId: 'host-1',
+    })
+    expect(html).toContain('View in Hosting')
+    expect(html).toContain('https://trykai.sg/u/host-1?tab=hosting')
   })
 
   it('tells the host which add-ons to prepare and any note', () => {

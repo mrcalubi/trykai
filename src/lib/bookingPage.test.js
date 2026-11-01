@@ -9,6 +9,7 @@ import {
   cancelTiersSentence,
   dateTileParts,
   downloadIcs,
+  formatBookingWhenDay,
   guestFirstName,
   googleMapsUrl,
   isBookingDayOf,
@@ -89,6 +90,8 @@ describe('booking page helpers', () => {
     expect(tile.day).toBe('10')
     expect(tile.month).toBe('Nov')
     expect(dateTileParts('nope')).toBeNull()
+    expect(formatBookingWhenDay(iso)).toBe('Tuesday, 10 November')
+    expect(formatBookingWhenDay('nope')).toBe('')
 
     const ics = bookingIcs({
       title: 'Latte art, extra',
