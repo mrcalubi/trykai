@@ -38,7 +38,7 @@ Cover four things:
 
 **3. Mark them as a founding host.** Set `is_founding_host` on their account so the price panel shows "Founding host: no host fee, ever."
 
-**4. Stripe Connect onboarding.** *Expect friction.* This is a separate step from the identity check in step 2, and it will feel like repetition to them: Connect is about where the money lands, so Stripe collects bank details and its own identity information for payout compliance. For someone offering a S$20 session it is a second round of paperwork. Warn them it is coming, explain that it is how they get paid, and stay on the call while they do it.
+**4. Stripe Connect onboarding.** *Expect friction.* This is a separate step from the identity check in step 2, and it will feel like repetition to them: Connect is about where the money lands, so Stripe collects bank details and its own identity information for payout compliance. For someone offering a S$20 session it is a second round of paperwork. Warn them it is coming, explain that it is how they get paid, and stay on the call while they do it. **If Stripe's own Singpass option fails** ("error retrieving information" after they scan the QR and log in), it is Stripe's step, not ours: have them go back and choose to upload their ID document instead, which works. Report the Singpass error to Stripe support with the connected account ID (`acct_…`).
 
 **5. Build the listing together, using the listing copy template below.** Do not let them do this alone the first time. Walk through the guidelines in Part B, particularly pricing and photos.
 
