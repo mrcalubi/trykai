@@ -660,7 +660,7 @@ export default function BookingDetail() {
           <a href={bookingHelpMailto(booking.id)}>Email {REPORT_EMAIL}</a>
         </p>
       )}
-      <ReportProblem booking={booking} />
+      <ReportProblem booking={booking} buttonLabel={canReport ? 'Report it within 3 days' : undefined} />
     </div>
   )
 
@@ -796,12 +796,10 @@ export default function BookingDetail() {
                       : 'No upcoming dates yet'}
                   </p>
                   <Link to={`/listings/${listing.id}`} className="ui-button ui-button--secondary booking-page__wrap-btn">
-                    Go again
+                    See dates
                   </Link>
-                  <Link to={`/listings/${listing.id}`}>See dates</Link>
                 </div>
               ) : null}
-              <ReportProblem booking={booking} buttonLabel="Report it within 3 days" />
             </section>
           ) : null}
 

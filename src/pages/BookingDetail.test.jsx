@@ -365,12 +365,13 @@ describe('BookingDetail', () => {
     renderDetail()
     expect(await screen.findByRole('heading', { name: 'How was it with Mei Ling?' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Leave a review' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Go again' })).toHaveAttribute('href', '/listings/listing-1')
     expect(screen.getByRole('link', { name: 'See dates' })).toHaveAttribute('href', '/listings/listing-1')
+    expect(screen.queryByRole('link', { name: 'Go again' })).not.toBeInTheDocument()
+    // One report entry point only: the help line, not a second one in this card.
+    expect(screen.getAllByRole('button', { name: 'Report it within 3 days' })).toHaveLength(1)
     expect(screen.queryByRole('button', { name: /Find another time with/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Manage booking/ })).not.toBeInTheDocument()
     expect(screen.getByText(/Something wrong with this booking/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Report a problem' })).toBeInTheDocument()
   })
 
   it('shows the refund on a cancelled booking', async () => {
