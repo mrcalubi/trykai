@@ -734,6 +734,8 @@ Still true: SingPass and MyInfo remain out of reach pre incorporation. Veriff an
 
 
 **2026-10-31 — Only one foreign key between bookings and sessions.** The first `00044` gave `rescheduled_from_session_id` a foreign key to sessions. PostgREST then saw two relationships and refused every `bookings (...)`/`sessions (...)` embed (PGRST201), which broke Bookings, Hosting and the money functions on staging. `00045` drops it, `00044` no longer adds it, and a test fails if any migration adds another bookings column that references sessions.
+
+**2026-11-01 — No "Verified with Singpass" badge; hosts keep the generic "ID verified".** Singpass Partner Support (Kelsey, 30 October) asked us not to use "Verified with Singpass", so it isn't read as Singpass endorsing the profile or process; a generic "Verified" with no mention of Singpass is fine. Every verified host already shows "ID verified" whether they used Singpass or the upload path, so the planned Singpass-only badge is dropped and nothing public changes. The Verify with Singpass button inside the identity check (official artwork, approved journey) is unaffected, and the 26 October rule on marketing mentions still applies.
 ---
 
 # Analysed but not decided
