@@ -370,7 +370,7 @@ export function receiptRows(options: {
 
   const rows: ReceiptRow[] = [
     {
-      label: `${formatCents(perPerson)} per person x ${guestCountLabel(guestsCount)}`,
+      label: `${formatCents(perPerson)} per person × ${guestCountLabel(guestsCount)}`,
       amountCents: cardDiscountedTotal,
     },
   ]
@@ -547,7 +547,7 @@ export function bookingConfirmedGuestHtml(options: {
       ['Date and time', escapeHtml(options.sessionDate)],
       ['Duration', duration],
       ['Address', address],
-      ['How to find me', options.arrivalInstructions ? escapeHtml(options.arrivalInstructions) : ''],
+      ['How to find it', options.arrivalInstructions ? escapeHtml(options.arrivalInstructions) : ''],
       ['Guests', guestCountLabel(options.guestsCount)],
       ["What's provided", provided ? escapeHtml(provided) : ''],
       ['What to bring', bring ? escapeHtml(bring) : ''],
@@ -557,9 +557,9 @@ export function bookingConfirmedGuestHtml(options: {
     ${options.paymentRail === 'paynow' ? `<p style="margin:0 0 16px;font-size:14px;color:${EMAIL_COLORS.muted};">Your bank will show this payment as Stripe Payments Singapore.</p>` : ''}
     ${calendar ? `<p style="margin:0 0 8px;"><a href="${escapeHtml(calendar)}" style="${LINK_STYLE}">Add to Google Calendar</a></p>` : ''}
     ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
-    <p style="margin:0 0 8px;">Questions for your host? Reply to this email.</p>
+    <p style="margin:0 0 8px;">Questions? Reply to this email and we'll help.</p>
     <p style="margin:0 0 16px;"><a href="${siteUrl}" style="${LINK_STYLE}">Browse more experiences</a></p>
-    <p style="margin:0;font-size:13px;color:${EMAIL_COLORS.muted};">Need to change plans? <a href="${siteUrl}/cancellation-policy" style="${QUIET_LINK_STYLE}">Cancellation policy</a></p>
+    <p style="margin:0;font-size:13px;color:${EMAIL_COLORS.muted};">Need to change plans? <a href="${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}" style="${QUIET_LINK_STYLE}">Move or cancel your booking</a> · <a href="${siteUrl}/cancellation-policy" style="${QUIET_LINK_STYLE}">Cancellation policy</a></p>
     ${emailSignOff('see-you')}
     `,
     siteUrl,
@@ -674,7 +674,7 @@ export function guestSessionReminderHtml(options: {
       ['Day and time', escapeHtml(options.sessionDate)],
       ['Duration', duration],
       ['Address', address],
-      ['How to find me', options.arrivalInstructions ? escapeHtml(options.arrivalInstructions) : ''],
+      ['How to find it', options.arrivalInstructions ? escapeHtml(options.arrivalInstructions) : ''],
       ["What's provided", provided ? escapeHtml(provided) : ''],
       ['Host', hostName],
     ])}

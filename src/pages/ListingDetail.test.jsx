@@ -1749,7 +1749,7 @@ describe('ListingDetail add-ons', () => {
     const { user } = renderPage()
     await user.click(await screen.findByRole('button', { name: 'Book' }))
     expect(screen.queryByRole('heading', { name: 'Add a little extra' })).not.toBeInTheDocument()
-    expect(screen.getByText(/For example, allergies or running a little late/)).toBeInTheDocument()
+    expect(screen.getByText(/Anything you.d like .+ to know\./)).toBeInTheDocument()
     await user.type(screen.getByLabelText(/Note for Mei \(optional\)/), 'Running late')
     await user.click(cardRail())
     await user.click(continueToPayment())

@@ -345,7 +345,7 @@ describe('receiptPriceLines', () => {
       paymentRail: 'card',
       totalPaidCents: 2800,
     })
-    expect(lines[0]).toBe('$28 per person x 1 guest')
+    expect(lines[0]).toBe('$28 per person × 1 guest')
     expect(lines.at(-1)).toBe('Total paid $28')
     expect(lines.join('\n')).not.toMatch(/booking fee|platform fee/i)
   })
@@ -358,7 +358,7 @@ describe('receiptPriceLines', () => {
       paymentRail: 'card',
       totalPaidCents: 9600,
     })
-    expect(lines[0]).toBe('$24 per person x 4 guests')
+    expect(lines[0]).toBe('$24 per person × 4 guests')
     expect(lines).toContain('Group discount (15%)')
     expect(lines.join('\n')).not.toMatch(/−\$16|booking fee|platform fee/i)
   })
@@ -371,7 +371,7 @@ describe('receiptPriceLines', () => {
       paymentRail: 'paynow',
       totalPaidCents: 475,
     })
-    expect(lines[0]).toBe('$2.50 per person x 2 guests')
+    expect(lines[0]).toBe('$2.50 per person × 2 guests')
     expect(lines).toContain('PayNow saving (5%) $0.25')
     expect(lines.at(-1)).toBe('Total paid $4.75')
     expect(lines.join('\n')).not.toMatch(/group discount/i)
@@ -407,7 +407,7 @@ describe('receiptPriceLines', () => {
       paymentRail: 'card',
       totalPaidCents: 2800,
     })
-    expect(lines[0]).toBe('$28 per person x 1 guest')
+    expect(lines[0]).toBe('$28 per person × 1 guest')
   })
 })
 
@@ -553,7 +553,7 @@ describe('booking confirmation emails', () => {
     expect(hasDetail(html, 'Guests', '4 guests')).toBe(true)
     expect(hasDetail(html, "What&#39;s provided", 'Apron, Coffee beans')).toBe(true)
     expect(receiptCells(html)).toEqual([
-      ['$24 per person x 4 guests', '$96'],
+      ['$24 per person × 4 guests', '$96'],
       ['Group discount (15%)', 'Included'],
       ['PayNow saving (2%)', '−$1.92'],
       ['Total paid', '$94.08'],
@@ -573,7 +573,9 @@ describe('booking confirmation emails', () => {
     expect(html.replace('<!DOCTYPE html>', '')).not.toContain('!')
     expect(html).toContain('href="https://trykai.sg/bookings/booking-1"')
     expect(html).toContain('View booking')
-    expect(html).toContain('Questions for your host? Reply to this email.')
+    expect(html).toContain("Questions? Reply to this email and we'll help.")
+    expect(html).toContain('Move or cancel your booking')
+    expect(html).not.toContain('Questions for your host')
     expect(html).toContain('Browse more experiences')
     expect(html).toContain('See you there,')
     expect(html).toContain('The TryKai team')
@@ -626,7 +628,7 @@ describe('booking confirmation emails', () => {
     })
     expect(hasDetail(html, 'Guests', '1 guest')).toBe(true)
     expect(receiptCells(html)).toEqual([
-      ['$28 per person x 1 guest', '$28'],
+      ['$28 per person × 1 guest', '$28'],
       ['Total paid', '$28'],
     ])
     expect(html).toContain('Paid with Visa ending in 4242')
@@ -703,11 +705,11 @@ describe('booking confirmation emails', () => {
     expect(html).toContain('Note from Sarah: For Alex')
   })
 
-  it('shows How to find me on the guest confirmation when the host wrote it', () => {
-    expect(hasDetail(guestReceipt({ arrivalInstructions: 'Lift B to #04-56' }), 'How to find me', 'Lift B to #04-56')).toBe(
+  it('shows How to find it on the guest confirmation when the host wrote it', () => {
+    expect(hasDetail(guestReceipt({ arrivalInstructions: 'Lift B to #04-56' }), 'How to find it', 'Lift B to #04-56')).toBe(
       true,
     )
-    expect(guestReceipt()).not.toContain('How to find me')
+    expect(guestReceipt()).not.toContain('How to find it')
   })
 })
 
@@ -1393,7 +1395,7 @@ describe('branded receipt', () => {
   it('shows only the total when the rows would not add up to what was paid', () => {
     const html = guestReceipt({ totalPaidCents: 9999 })
     expect(receiptCells(html)).toEqual([['Total paid', '$99.99']])
-    expect(html).not.toContain('per person x')
+    expect(html).not.toContain('per person x ')
   })
 
   it('reports whether the receipt rows add up', () => {
@@ -1807,7 +1809,7 @@ describe('session reminder emails', () => {
     expect(without).not.toContain('Don&#39;t forget to bring')
   })
 
-  it('shows How to find me on the guest reminder when the host wrote it', () => {
+  it('shows How to find it on the guest reminder when the host wrote it', () => {
     const withDirections = guestSessionReminderHtml({
       guestName: 'Sam',
       listingTitle: 'Latte art',
@@ -1818,7 +1820,7 @@ describe('session reminder emails', () => {
       hostName: 'Mei',
       bookingId: 'booking-1',
     })
-    expect(hasDetail(withDirections, 'How to find me', 'Lift B to #04-56')).toBe(true)
+    expect(hasDetail(withDirections, 'How to find it', 'Lift B to #04-56')).toBe(true)
     const without = guestSessionReminderHtml({
       guestName: 'Sam',
       listingTitle: 'Latte art',
@@ -1828,7 +1830,7 @@ describe('session reminder emails', () => {
       hostName: 'Mei',
       bookingId: 'booking-1',
     })
-    expect(without).not.toContain('How to find me')
+    expect(without).not.toContain('How to find it')
   })
 
   it('opens the guest reminder with the new copy, details, and sign-off', () => {

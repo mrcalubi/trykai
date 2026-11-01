@@ -91,6 +91,7 @@ async function confirmSucceededPayment(paymentIntent: {
           title,
           host_id,
           full_address,
+          arrival_instructions,
           duration_mins,
           price_per_person,
           group_pricing,
