@@ -52,6 +52,7 @@ function givenProfile({
   bio = '',
   email = 'mei@example.com',
   avatar_url: avatarUrl = null,
+  ...rest
 } = {}) {
   account = {
     full_name: fullName,
@@ -59,6 +60,7 @@ function givenProfile({
     bio,
     email,
     avatar_url: avatarUrl,
+    ...rest,
   }
   supabase.rpc.mockImplementation(async (fn) => {
     if (fn === 'my_account') {
@@ -695,5 +697,76 @@ describe('Edit profile v2 fields', () => {
     expect(bar).toMatch(/safe-area-inset-bottom/)
     expect(css).toMatch(/body:has\(\.edit-profile__bar\) \.site-footer \{[\s\S]*?margin-bottom/)
     expect(css).toMatch(/\.featured-choices \{[\s\S]*?min-inline-size:\s*0/)
+  })
+})
+
+describe('Settings day-of contact number', () => {
+  it('hides the field from guests', async () => {
+    await renderSettings()
+    expect(screen.queryByLabelText('Day-of contact number (optional)')).not.toBeInTheDocument()
+  })
+
+  it('hides the field before the column exists', async () => {
+    givenProfile({ is_host: true })
+    await renderSettings()
+    expect(screen.queryByLabelText('Day-of contact number (optional)')).not.toBeInTheDocument()
+  })
+
+  it('rejects an invalid Singapore number when the host turns sharing on', async () => {
+    givenProfile({ is_host: true, share_day_of_phone: false, day_of_phone: null })
+    const { user } = await renderSettings()
+
+    expect(screen.getByLabelText('Day-of contact number (optional)')).toBeInTheDocument()
+    expect(
+      screen.getByText('Show it to confirmed guests from 24 hours before until the session ends.'),
+    ).toBeInTheDocument()
+
+    await user.click(
+      screen.getByLabelText('Show it to confirmed guests from 24 hours before until the session ends.'),
+    )
+    await user.type(screen.getByLabelText('Day-of contact number (optional)'), '11111111')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(
+      await screen.findByText('Use an 8-digit Singapore number starting with 3, 6, 8 or 9.'),
+    ).toBeInTheDocument()
+    expect(supabase.__calls('users', 'update')).toHaveLength(0)
+  })
+
+  it('retries a save without the day-of columns when they are missing', async () => {
+    givenProfile({ is_host: true, share_day_of_phone: false, day_of_phone: null })
+    let updates = 0
+    supabase.__on('users', 'update', ({ payload }) => {
+      updates += 1
+      if (payload.day_of_phone !== undefined) {
+        return { data: null, error: { message: 'column users.day_of_phone does not exist' } }
+      }
+      Object.assign(account, payload)
+      return { data: null, error: null }
+    })
+    const { user } = await renderSettings()
+    await user.type(screen.getByLabelText('Day-of contact number (optional)'), '91234567')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(updates).toBe(2))
+    expect(supabase.__lastCall('users', 'update').payload.day_of_phone).toBeUndefined()
+    expect(await screen.findByRole('status')).toHaveTextContent('Saved')
+  })
+
+  it('saves a +65 number and the share toggle', async () => {
+    givenProfile({ is_host: true, share_day_of_phone: false, day_of_phone: null })
+    const { user } = await renderSettings()
+
+    await user.type(screen.getByLabelText('Day-of contact number (optional)'), '9123 4567')
+    await user.click(
+      screen.getByLabelText('Show it to confirmed guests from 24 hours before until the session ends.'),
+    )
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.__calls('users', 'update')).toHaveLength(1))
+    expect(supabase.__lastCall('users', 'update').payload).toMatchObject({
+      day_of_phone: '+6591234567',
+      share_day_of_phone: true,
+    })
   })
 })

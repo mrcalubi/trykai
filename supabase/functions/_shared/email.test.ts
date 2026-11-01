@@ -6,6 +6,8 @@ import {
   bookingConfirmedGuestHtml,
   bookingConfirmedGuestSubject,
   bookingConfirmedHostHtml,
+  bookingConfirmedHostSubject,
+  hostBookingUrgencyPrefix,
   bookingReference,
   cardDetailsFromCharge,
   complaintOpsHtml,
@@ -48,6 +50,11 @@ import {
   refundTimingCopy,
   resolvePaymentMethod,
   sendCancellationEmails,
+  sendRescheduleEmails,
+  bookingMovedGuestHtml,
+  bookingMovedGuestSubject,
+  bookingMovedHostHtml,
+  bookingMovedHostSubject,
   sendComplaintEmails,
   sendDisputeRefundEmail,
   sendHostSessionCancelledEmail,
@@ -338,7 +345,7 @@ describe('receiptPriceLines', () => {
       paymentRail: 'card',
       totalPaidCents: 2800,
     })
-    expect(lines[0]).toBe('$28 per person x 1 guest')
+    expect(lines[0]).toBe('$28 per person × 1 guest')
     expect(lines.at(-1)).toBe('Total paid $28')
     expect(lines.join('\n')).not.toMatch(/booking fee|platform fee/i)
   })
@@ -351,7 +358,7 @@ describe('receiptPriceLines', () => {
       paymentRail: 'card',
       totalPaidCents: 9600,
     })
-    expect(lines[0]).toBe('$24 per person x 4 guests')
+    expect(lines[0]).toBe('$24 per person × 4 guests')
     expect(lines).toContain('Group discount (15%)')
     expect(lines.join('\n')).not.toMatch(/−\$16|booking fee|platform fee/i)
   })
@@ -364,7 +371,7 @@ describe('receiptPriceLines', () => {
       paymentRail: 'paynow',
       totalPaidCents: 475,
     })
-    expect(lines[0]).toBe('$2.50 per person x 2 guests')
+    expect(lines[0]).toBe('$2.50 per person × 2 guests')
     expect(lines).toContain('PayNow saving (5%) $0.25')
     expect(lines.at(-1)).toBe('Total paid $4.75')
     expect(lines.join('\n')).not.toMatch(/group discount/i)
@@ -400,14 +407,14 @@ describe('receiptPriceLines', () => {
       paymentRail: 'card',
       totalPaidCents: 2800,
     })
-    expect(lines[0]).toBe('$28 per person x 1 guest')
+    expect(lines[0]).toBe('$28 per person × 1 guest')
   })
 })
 
 describe('refundDeadlineLines', () => {
   it('turns the 48 / 24 / 6 hour cutoffs into Singapore dates', () => {
     const lines = refundDeadlineLines(SESSION_STARTS)
-    expect(lines[0]).toBe(`Full refund if you cancel before ${formatSessionDate('2026-08-26T11:00:00.000Z')}`)
+    expect(lines[0]).toBe(`Refund minus the booking fee if you cancel before ${formatSessionDate('2026-08-26T11:00:00.000Z')}`)
     expect(lines[1]).toBe(`50% refund if you cancel before ${formatSessionDate('2026-08-27T11:00:00.000Z')}`)
     expect(lines[2]).toBe(`25% refund if you cancel before ${formatSessionDate('2026-08-28T05:00:00.000Z')}`)
     expect(refundDeadlineLines('not-a-date')).toEqual([])
@@ -432,6 +439,28 @@ describe('guest count and session day', () => {
     )
     expect(bookingConfirmedGuestSubject('Latte art', 'bad')).toBe("You're in! Latte art")
     expect((bookingConfirmedGuestSubject('Latte art', SESSION_STARTS).match(/!/g) ?? []).length).toBe(1)
+  })
+
+  it('prefixes the host subject when the booking is within 24 hours of the start', () => {
+    const todayStart = '2026-10-31T02:00:00.000Z'
+    const bookedToday = '2026-10-31T01:00:00.000Z'
+    const tomorrowStart = '2026-10-31T16:00:00.000Z'
+    const bookedTonight = '2026-10-31T02:00:00.000Z'
+    expect(hostBookingUrgencyPrefix(todayStart, bookedToday)).toBe('Booking for today:')
+    expect(hostBookingUrgencyPrefix(tomorrowStart, bookedTonight)).toBe('Booking for tomorrow:')
+    expect(hostBookingUrgencyPrefix(tomorrowStart, '2026-10-29T16:00:00.000Z')).toBe('')
+    expect(hostBookingUrgencyPrefix('bad', bookedToday)).toBe('')
+    expect(hostBookingUrgencyPrefix(todayStart, 'bad')).toBe('')
+    expect(hostBookingUrgencyPrefix(todayStart, bookedToday.replace('2026', '2027'))).toBe('')
+    expect(bookingConfirmedHostSubject('Latte art', todayStart, bookedToday)).toBe(
+      'Booking for today: "Latte art"',
+    )
+    expect(bookingConfirmedHostSubject('Latte art', tomorrowStart, bookedTonight)).toBe(
+      'Booking for tomorrow: "Latte art"',
+    )
+    expect(bookingConfirmedHostSubject('Latte art', SESSION_STARTS, '2026-08-01T00:00:00.000Z')).toBe(
+      'New booking for "Latte art"',
+    )
   })
 })
 
@@ -524,7 +553,7 @@ describe('booking confirmation emails', () => {
     expect(hasDetail(html, 'Guests', '4 guests')).toBe(true)
     expect(hasDetail(html, "What&#39;s provided", 'Apron, Coffee beans')).toBe(true)
     expect(receiptCells(html)).toEqual([
-      ['$24 per person x 4 guests', '$96'],
+      ['$24 per person × 4 guests', '$96'],
       ['Group discount (15%)', 'Included'],
       ['PayNow saving (2%)', '−$1.92'],
       ['Total paid', '$94.08'],
@@ -544,7 +573,9 @@ describe('booking confirmation emails', () => {
     expect(html.replace('<!DOCTYPE html>', '')).not.toContain('!')
     expect(html).toContain('href="https://trykai.sg/bookings/booking-1"')
     expect(html).toContain('View booking')
-    expect(html).toContain('Questions for your host? Reply to this email.')
+    expect(html).toContain("Questions? Reply to this email and we'll help.")
+    expect(html).toContain('Move or cancel your booking')
+    expect(html).not.toContain('Questions for your host')
     expect(html).toContain('Browse more experiences')
     expect(html).toContain('See you there,')
     expect(html).toContain('The TryKai team')
@@ -597,7 +628,7 @@ describe('booking confirmation emails', () => {
     })
     expect(hasDetail(html, 'Guests', '1 guest')).toBe(true)
     expect(receiptCells(html)).toEqual([
-      ['$28 per person x 1 guest', '$28'],
+      ['$28 per person × 1 guest', '$28'],
       ['Total paid', '$28'],
     ])
     expect(html).toContain('Paid with Visa ending in 4242')
@@ -672,6 +703,13 @@ describe('booking confirmation emails', () => {
     })
     expect(html).toContain('Add-ons to prepare: Premium blooms × 1, Gift wrap and card × 2.')
     expect(html).toContain('Note from Sarah: For Alex')
+  })
+
+  it('shows How to find it on the guest confirmation when the host wrote it', () => {
+    expect(hasDetail(guestReceipt({ arrivalInstructions: 'Lift B to #04-56' }), 'How to find it', 'Lift B to #04-56')).toBe(
+      true,
+    )
+    expect(guestReceipt()).not.toContain('How to find it')
   })
 })
 
@@ -804,6 +842,66 @@ describe('formatCents', () => {
   })
 })
 
+describe('reschedule emails', () => {
+  it('tells the guest the new date and the host what to prepare', () => {
+    expect(bookingMovedGuestSubject('10 Nov 2026, 2:00 pm')).toBe(
+      "You've moved your booking to 10 Nov 2026, 2:00 pm",
+    )
+    expect(bookingMovedHostSubject('Kai', '3 Nov 2026, 2:00 pm', '10 Nov 2026, 2:00 pm')).toBe(
+      'Kai moved their booking from 3 Nov 2026, 2:00 pm to 10 Nov 2026, 2:00 pm',
+    )
+    const guest = bookingMovedGuestHtml({
+      guestName: 'Kai',
+      listingTitle: 'Latte art',
+      sessionDate: '10 Nov 2026, 2:00 pm',
+      bookingId: 'booking-1',
+    })
+    expect(guest).toContain('You&#39;ve moved your booking to 10 Nov 2026, 2:00 pm')
+    expect(guest).toContain('Latte art is now on 10 Nov 2026, 2:00 pm')
+    expect(guest).toContain('href="https://trykai.sg/bookings/booking-1"')
+    const host = bookingMovedHostHtml({
+      hostName: 'Mei',
+      guestFirstName: 'Kai',
+      listingTitle: 'Latte art',
+      oldSessionDate: '3 Nov 2026, 2:00 pm',
+      newSessionDate: '10 Nov 2026, 2:00 pm',
+      addons: [{ name: 'Premium blooms', quantity: 1 }],
+    })
+    expect(host).toContain('Kai moved their booking for Latte art from 3 Nov 2026, 2:00 pm to 10 Nov 2026, 2:00 pm')
+    expect(host).toContain('Premium blooms × 1')
+  })
+
+  it('sends both emails and swallows a Resend failure', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+    await sendRescheduleEmails({
+      apiKey: 're_test',
+      guestEmail: 'guest@test',
+      hostEmail: 'host@test',
+      guestName: 'Kai',
+      hostName: 'Mei',
+      guestFirstName: 'Kai',
+      listingTitle: 'Latte art',
+      oldSessionDate: 'old',
+      newSessionDate: 'new',
+      bookingId: 'booking-1',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
+    await expect(
+      sendRescheduleEmails({
+        apiKey: 're_test',
+        guestEmail: 'guest@test',
+        guestFirstName: 'Kai',
+        listingTitle: 'Latte art',
+        oldSessionDate: 'old',
+        newSessionDate: 'new',
+        bookingId: 'booking-1',
+      }),
+    ).resolves.toBeUndefined()
+  })
+})
+
 describe('cancellation emails', () => {
   it('tells a guest who cancelled that the refund is on its way', () => {
     const html = guestCancelMail()
@@ -811,6 +909,7 @@ describe('cancellation emails', () => {
     expect(html).toContain("Sorry you can't make it")
     expect(html).not.toContain("Sorry you can't make Latte art.")
     expect(html).toContain('Your refund of $51 is on its way to your PayNow.')
+    expect(html).toContain("The booking fee isn't refunded.")
     expect(html).toContain('PayNow refunds are usually faster than card refunds.')
     expect(html).not.toContain('5 to 10 business days')
     expect(html).toContain('Listing:</strong> Latte art')
@@ -851,6 +950,7 @@ describe('cancellation emails', () => {
     expect(html).toContain('Hi caleb2,')
     expect(html).toContain("We're sorry. Mei Ling had to cancel your session on 28 Aug 2026, 7:00 pm.")
     expect(html).toContain("You'll get a full refund of $51.")
+    expect(html).not.toContain("The booking fee isn't refunded.")
     expect(html).toContain('Card refunds usually take 5 to 10 business days to appear.')
     expect(html).not.toContain('PayNow refunds are usually faster')
     expect(html).toContain('Date and time:</strong> 28 Aug 2026, 7:00 pm')
@@ -1295,7 +1395,7 @@ describe('branded receipt', () => {
   it('shows only the total when the rows would not add up to what was paid', () => {
     const html = guestReceipt({ totalPaidCents: 9999 })
     expect(receiptCells(html)).toEqual([['Total paid', '$99.99']])
-    expect(html).not.toContain('per person x')
+    expect(html).not.toContain('per person x ')
   })
 
   it('reports whether the receipt rows add up', () => {
@@ -1707,6 +1807,30 @@ describe('session reminder emails', () => {
       bookingId: 'booking-1',
     })
     expect(without).not.toContain('Don&#39;t forget to bring')
+  })
+
+  it('shows How to find it on the guest reminder when the host wrote it', () => {
+    const withDirections = guestSessionReminderHtml({
+      guestName: 'Sam',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(NEXT_DAY_START),
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
+      arrivalInstructions: 'Lift B to #04-56',
+      hostName: 'Mei',
+      bookingId: 'booking-1',
+    })
+    expect(hasDetail(withDirections, 'How to find it', 'Lift B to #04-56')).toBe(true)
+    const without = guestSessionReminderHtml({
+      guestName: 'Sam',
+      listingTitle: 'Latte art',
+      sessionDate: formatReminderSessionDate(NEXT_DAY_START),
+      startsAt: NEXT_DAY_START,
+      sentAt: NEXT_DAY_SENT,
+      hostName: 'Mei',
+      bookingId: 'booking-1',
+    })
+    expect(without).not.toContain('How to find it')
   })
 
   it('opens the guest reminder with the new copy, details, and sign-off', () => {

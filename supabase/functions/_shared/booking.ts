@@ -35,6 +35,29 @@ export const PAYNOW_TOO_FAR_AHEAD_MESSAGE =
 export const HOST_FEE_RATE = 0.1
 export const HOST_FEE_FREE_BOOKINGS = 3
 export const MAX_GUESTS_PER_BOOKING = 10
+export const BOOKING_CUTOFF_HOURS = [3, 6, 12, 24, 48] as const
+export const DEFAULT_BOOKING_CUTOFF_HOURS = 3
+
+export function bookingCutoffHours(value: unknown): number {
+  const hours = Number(value)
+  return (BOOKING_CUTOFF_HOURS as readonly number[]).includes(hours)
+    ? hours
+    : DEFAULT_BOOKING_CUTOFF_HOURS
+}
+
+export function isBookingClosed(
+  startsAt: string | Date | null | undefined,
+  cutoffHours: unknown,
+  now = Date.now(),
+): boolean {
+  const start = new Date(startsAt ?? '').getTime()
+  if (Number.isNaN(start)) return false
+  return now >= start - bookingCutoffHours(cutoffHours) * 60 * 60 * 1000
+}
+
+export function bookingClosedMessage(cutoffHours: unknown): string {
+  return `Bookings for this session closed ${bookingCutoffHours(cutoffHours)} hours before it starts.`
+}
 
 /** 0 / 5 / 10 / 15 / 20 percent. Never more than 20. */
 export function groupDiscountRate(
@@ -79,6 +102,7 @@ export interface BookingSession {
     price_per_person?: number | null
     host_id?: string | null
     group_pricing?: boolean | null
+    booking_cutoff_hours?: number | null
   } | null
 }
 
@@ -496,6 +520,14 @@ export function prepareBooking(
   const payNowWindow = rejectPayNowIfTooFarAhead(paymentRail, session.starts_at)
   if (payNowWindow) return payNowWindow
 
+  if (isBookingClosed(session.starts_at, session.listings?.booking_cutoff_hours)) {
+    return {
+      ok: false,
+      status: 400,
+      message: bookingClosedMessage(session.listings?.booking_cutoff_hours),
+    }
+  }
+
   if (session.spots_remaining < guestsCount) {
     return { ok: false, status: 400, message: 'Not enough spots' }
   }
@@ -531,7 +563,7 @@ export const LEGACY_PLATFORM_FEE_RATE = 0.15
  * src/pages/CancellationPolicy.jsx states them. Change all three together.
  */
 export const GUEST_REFUND_TIER_RULES = [
-  { id: 'full', minHoursBefore: 48, lessonFeeShare: 1, refundsPlatformFee: true },
+  { id: 'full', minHoursBefore: 48, lessonFeeShare: 1, refundsPlatformFee: false },
   { id: 'half', minHoursBefore: 24, lessonFeeShare: 0.5, refundsPlatformFee: false },
   { id: 'quarter', minHoursBefore: 6, lessonFeeShare: 0.25, refundsPlatformFee: false },
   { id: 'none', minHoursBefore: Number.NEGATIVE_INFINITY, lessonFeeShare: 0, refundsPlatformFee: false },
@@ -590,10 +622,27 @@ export function calculateGuestRefund(
   now = Date.now(),
 ): number {
   const tier = guestRefundTierRule(sessionStartsAt, now)
-  if (tier.refundsPlatformFee) return totalAmountCents
   if (tier.lessonFeeShare === 0) return 0
   const lessonFee = totalAmountCents - platformFeeOf(totalAmountCents, platformFeeCents)
   return Math.round(lessonFee * tier.lessonFeeShare)
+}
+
+export function rescheduleErrorMessage(message: string | undefined): string {
+  const text = (message ?? '').toLowerCase()
+  if (text.includes('already rescheduled')) return "You've already moved this booking once."
+  if (text.includes('too late to reschedule')) return 'Moving closes 48 hours before the session.'
+  if (text.includes('insufficient add-ons')) return "There aren't enough of your extras left on that date."
+  if (text.includes('insufficient spots')) return 'Not enough spots left on that date.'
+  if (text.includes('paynow window')) {
+    return 'PayNow bookings can only move to a date within 80 days of when you paid.'
+  }
+  if (text.includes('bookings closed')) {
+    const hours = Number(text.match(/(\d+)\s*hours/)?.[1])
+    return bookingClosedMessage(Number.isFinite(hours) ? hours : DEFAULT_BOOKING_CUTOFF_HOURS)
+  }
+  if (text.includes('not allowed')) return 'Not allowed'
+  if (text.includes('booking not found')) return 'Booking not found'
+  return "That date isn't available any more."
 }
 
 export function confirmRpcErrorKind(message: string | undefined): 'oversell' | 'other' {

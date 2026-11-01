@@ -594,6 +594,44 @@ describe('CreateListing submission', () => {
     expect(supabase.__lastCall('listings', 'insert').payload.group_pricing).toBe(false)
   })
 
+  it('saves Bookings close and How to find me', async () => {
+    const { user } = renderPage()
+    await goToPrice(user)
+    expect(
+      screen.getByText('Pick longer if you need time to buy materials or prepare add-ons.'),
+    ).toBeInTheDocument()
+    await user.click(screen.getByLabelText('24 hours'))
+    await completePrice(user, VALID)
+    await stepHeading('Where it happens')
+    await user.type(screen.getByLabelText(/How to find me/), '  Lift B to #04-56  ')
+    await completeLocation(user, VALID)
+    await stepHeading('Final touches')
+    await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+
+    await waitFor(() => expect(supabase.__calls('listings', 'insert')).toHaveLength(1))
+    expect(supabase.__lastCall('listings', 'insert').payload).toMatchObject({
+      booking_cutoff_hours: 24,
+      arrival_instructions: 'Lift B to #04-56',
+    })
+  })
+
+  it('retries create without cutoff and arrival columns when they are missing', async () => {
+    let inserts = 0
+    supabase.__on('listings', 'insert', ({ payload }) => {
+      inserts += 1
+      if (payload.booking_cutoff_hours !== undefined) {
+        return { data: null, error: { message: 'column listings.booking_cutoff_hours does not exist' } }
+      }
+      return { data: { id: 'listing-retry' }, error: null }
+    })
+    const { user } = renderPage()
+    await fillValidForm(user)
+    await user.click(screen.getByRole('button', { name: 'Create listing' }))
+    await waitFor(() => expect(inserts).toBe(2))
+    expect(supabase.__lastCall('listings', 'insert').payload.booking_cutoff_hours).toBeUndefined()
+  })
+
   it('promotes the user to a host and lands them on the hosting tab', async () => {
     const { user, currentPath } = renderPage()
     await fillValidForm(user)

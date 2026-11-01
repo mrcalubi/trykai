@@ -69,7 +69,8 @@ describe('guestCancellationNote', () => {
   })
 
   it('quotes the cancellation policy for a paid booking', () => {
-    expect(guestCancellationNote(booking())).toContain('Full refund of $45')
+    expect(guestCancellationNote(booking())).toContain('Refund of $38.25')
+    expect(guestCancellationNote(booking())).toContain("The booking fee isn't refunded")
   })
 })
 

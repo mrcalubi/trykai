@@ -24,9 +24,24 @@ describe('Cancellation Policy page', () => {
 
   it('publishes all four guest refund tiers', () => {
     expect(screen.getByText(/48 hours or more before the session starts:/)).toBeInTheDocument()
+    expect(screen.getByText(/everything except the booking fee/)).toBeInTheDocument()
     expect(screen.getByText(/Between 24 and 48 hours before the session starts:/)).toBeInTheDocument()
+    expect(screen.getByText(/50% of the session and add-ons/)).toBeInTheDocument()
     expect(screen.getByText(/Between 6 and 24 hours before the session starts:/)).toBeInTheDocument()
+    expect(screen.getByText(/25% of the session and add-ons/)).toBeInTheDocument()
     expect(screen.getByText(/Less than 6 hours before the session starts, or a no show:/)).toBeInTheDocument()
+    expect(screen.queryByText(/Full refund if you cancel/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/full refund, including the platform fee/i)).not.toBeInTheDocument()
+  })
+
+  it('defines the booking fee once and keeps a full refund for host cancel', () => {
+    expect(
+      screen.getByText(
+        /The booking fee \(TryKai's platform fee, already included in the\s+all-in price\) is not refunded when you cancel/,
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/It covers payment\s+processing and running TryKai/)).toBeInTheDocument()
+    expect(screen.getAllByText(/full refund, including the booking fee/).length).toBeGreaterThanOrEqual(2)
   })
 
   it('states that three strikes deactivates a host listing', () => {
@@ -88,9 +103,10 @@ describe('Cancellation Policy page', () => {
     expect(screen.queryByText(/Dashboard/)).not.toBeInTheDocument()
   })
 
-  it('does not promise a reschedule that is not built', () => {
-    expect(screen.queryByRole('heading', { name: 'Rescheduling instead of cancelling' })).not.toBeInTheDocument()
-    expect(screen.queryByText(/reschedule your booking/)).not.toBeInTheDocument()
+  it('says a guest can move a booking once before the 48 hour cutoff', () => {
+    expect(
+      screen.getByText(/You can\s+move a booking once, up to 48 hours before, at no cost/),
+    ).toBeInTheDocument()
   })
 })
 
@@ -126,6 +142,15 @@ describe('Refund Policy page', () => {
 
   it('promises no fee is charged to receive a refund', () => {
     expect(screen.getByRole('heading', { name: 'No extra fees' })).toBeInTheDocument()
+  })
+
+  it('says the booking fee is not refunded when the guest cancels', () => {
+    expect(
+      screen.getByText(
+        /The booking fee \(TryKai's platform fee, already included in the\s+all-in price\) is not refunded when you cancel/,
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/full refund including the booking fee/)).toBeInTheDocument()
   })
 
   it('defers refund eligibility to the cancellation policy', () => {
@@ -211,6 +236,21 @@ describe('Terms of Service page', () => {
     expect(screen.getByText(/Strikes expire 12 months after they.re given/)).toBeInTheDocument()
   })
 
+  it('says the booking fee is not refunded when the guest cancels', () => {
+    expect(
+      screen.getByText(
+        /The booking fee \(TryKai's platform fee, already included in the all-in price\) is not refunded when you cancel/,
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/Full refund if you cancel/)).not.toBeInTheDocument()
+  })
+
+  it('limits a shared day-of number to session logistics with confirmed guests', () => {
+    expect(
+      screen.getByText(/A day-of contact number you share is only for session logistics with\s+confirmed guests/),
+    ).toBeInTheDocument()
+  })
+
   it('anchors the Host and Booking parts for the listing and checkout checkboxes', () => {
     expect(screen.getByRole('heading', { name: 'Part 2: Hosting' })).toHaveAttribute(
       'id',
@@ -269,5 +309,13 @@ describe('Privacy Policy page', () => {
   it('names OneMap as the address lookup service', () => {
     expect(screen.getByText(/OneMap \(Singapore Land Authority\)/)).toBeInTheDocument()
     expect(screen.getByText(/look up and verify listing addresses/)).toBeInTheDocument()
+  })
+
+  it('says who sees a day-of number, what it is for, and when', () => {
+    expect(
+      screen.getByText(
+        /If a Host turns on a day-of contact number, confirmed guests\s+of that session can see it from 24 hours before until the session ends,\s+only to find the Host or sort last-minute logistics/,
+      ),
+    ).toBeInTheDocument()
   })
 })

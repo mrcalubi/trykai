@@ -114,7 +114,7 @@ Still to do:
 - One-click admin button can follow
 
 ### P0.5 — Cancellation logic rebuilt to four tiers — DONE
-`calculateGuestRefund` implements 100 / 50 / 25 / 0 at 48, 24, and 6 hours, platform fee forfeited on partial tiers. `cancel-booking` issues the Stripe refund. Spot restore only for confirmed rows. Guests are emailed the refund amount (including $0); the host is emailed only on a guest cancel.
+`calculateGuestRefund` implements 100 / 50 / 25 / 0 of the session and add-ons at 48, 24, and 6 hours; the booking fee is never refunded on a guest cancel. `cancel-booking` issues the Stripe refund. Spot restore only for confirmed rows. Guests are emailed the refund amount (including $0); the host is emailed only on a guest cancel.
 
 ### P0.6 — Spots decrement, atomically — DONE
 `confirm_paid_booking` decrements `spots_remaining` by `guests_count` under a row lock in the same operation that flips the booking to confirmed. CHECK constraint `spots_remaining >= 0`. Stripe webhook is the caller. Guest-callable `confirm_booking` from `00002` was dropped; the wrapper in `00005` is service_role only.
@@ -220,7 +220,7 @@ In this order after warm-contact launch:
 6. **`full_name` database-level fix.** Revoke anon SELECT once nothing public reads the column (P2.13). Public surfaces already show `display_name`.
 7. **Handle `refund.failed`.** Stripe can fail a refund after we have already written `cancelled` and emailed the guest. Listen for the event, alert `hello@trykai.sg`, and do not leave the booking looking refunded when it is not.
 8. **Sessions beyond 80 days (closed).** PayNow checkout and the host add-sessions calendar both stop at `PAYNOW_MAX_DAYS_AHEAD` (80). Direct INSERT could still write a later row; no product path does.
-9. **Refund Stripe fees after 100 bookings.** Launch absorbs Stripe’s kept processing fee on full refunds (~S$1.45 card / ~S$0.35 PayNow). Review then; leaning towards making the booking fee non-refundable on 48h+ guest cancellations, with notice.
+9. **Refund Stripe fees after 100 bookings.** Guest cancels no longer refund the booking fee (31 October 2026). Host / admin full refunds still absorb Stripe’s kept processing fee (~S$1.45 card / ~S$0.35 PayNow). Review those after 100 bookings.
 10. ~~**Host-wide session overlap in the database.**~~ Done 20 October as shared availability (`00033`): the first confirmed booking sets the host's other overlapping sessions aside. Follow-up (KIV): a travel buffer between back-to-back sessions at different places.
 11. **Revoke client session INSERT.** Hosts still have INSERT on `sessions` for the pre-`00018` duration fallback. A crafted insert can set its own `spots_total`. The product path uses `add_listing_session`.
 12. **`add_listing_session` should ignore client `p_spots`.** Hosting sends `listings.max_guests`, but the RPC still accepts any positive number. After launch, take spots from the locked listing row.

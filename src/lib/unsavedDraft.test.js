@@ -9,6 +9,34 @@ describe('settingsDraft', () => {
     expect(edited).not.toBe(saved)
     expect(restored).toBe(saved)
   })
+
+  it('changes when the day-of number or share toggle changes', () => {
+    const saved = settingsDraft({
+      fullName: 'Mei Ling',
+      displayName: 'Mei',
+      bio: '',
+      dayOfPhone: '',
+      shareDayOfPhone: false,
+    })
+    expect(
+      settingsDraft({
+        fullName: 'Mei Ling',
+        displayName: 'Mei',
+        bio: '',
+        dayOfPhone: '91234567',
+        shareDayOfPhone: false,
+      }),
+    ).not.toBe(saved)
+    expect(
+      settingsDraft({
+        fullName: 'Mei Ling',
+        displayName: 'Mei',
+        bio: '',
+        dayOfPhone: '',
+        shareDayOfPhone: true,
+      }),
+    ).not.toBe(saved)
+  })
 })
 
 describe('listingEditorDraft', () => {
@@ -58,5 +86,27 @@ describe('listingEditorDraft', () => {
       addons: [{ id: null, name: 'Kit', description: '', price: '15', unit: 'person' }],
     })
     expect(withAddon).not.toBe(saved)
+  })
+
+  it('changes when How to find me or Bookings close changes', () => {
+    const fields = {
+      title: 'Latte art',
+      description: 'Pull a rosetta.',
+      category: 'Food',
+      price: '45',
+      maxGuests: '4',
+      durationMins: '90',
+      groupPricing: true,
+      area: 'Bedok',
+      fullAddress: '12 Coffee Road',
+      arrivalInstructions: '',
+      bookingCutoffHours: 3,
+      whatsProvided: ['Materials'],
+      whatToBring: [],
+      photos: [],
+    }
+    const saved = listingEditorDraft(fields)
+    expect(listingEditorDraft({ ...fields, arrivalInstructions: 'Lift B' })).not.toBe(saved)
+    expect(listingEditorDraft({ ...fields, bookingCutoffHours: 24 })).not.toBe(saved)
   })
 })

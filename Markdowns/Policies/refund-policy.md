@@ -1,10 +1,12 @@
 # Refund Policy
 
-Last updated: 19 October 2026
+Last updated: 31 October 2026
 
 ## How refunds work
 
 Refund eligibility is set by our [Cancellation Policy](/cancellation-policy). This page covers how and when you actually get your money back once a refund has been approved.
+
+The booking fee (TryKai's platform fee, already included in the all-in price) is not refunded when you cancel. It covers payment processing and running TryKai. If the host cancels or does not show up, you get a full refund including the booking fee.
 
 Refunds are issued to your original payment method through Stripe, our payment processor. You never need to do anything to receive a refund once a cancellation is confirmed, it happens automatically and the amount is shown to you immediately in your cancellation confirmation email.
 

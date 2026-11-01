@@ -452,9 +452,12 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00037` (session reminders) | Applied | Applied | Staging 24 October; production 25 October, before #163 |
 | `00038` (what guests should bring) | Applied | Applied | Production 25 October, before #163. After `00037`. |
 | `00039` (host strike events, 12-month expiry) | Applied | Applied | 25 October, after `00038`. |
-| `00040` (host_sessions_held) | Not applied | Not applied | Apply on staging, then production, before merging the profile card layout. After `00039`. |
-| `00042` (listing add-ons) | Not applied | Not applied | Host editor. Apply before `00043`. |
-| `00043` (booking add-ons) | Not applied | Not applied | After `00042`. Payouts are unchanged: add-ons ride inside `host_payout_amount`. |
+| `00040` (host_sessions_held) | Applied | Applied | Apply on staging, then production, before merging the profile card layout. After `00039`. |
+| `00042` (listing add-ons) | Applied | Applied | Host editor. Apply before `00043`. |
+| `00043` (booking add-ons) | Applied | Applied | After `00042`. Payouts are unchanged: add-ons ride inside `host_payout_amount`. |
+| `00044` (reschedule) | Applied (first version, with the foreign key) | Not applied | After `00043`. Caleb applies. Columns plus `reschedule_booking`. Deploy `reschedule-booking`. |
+| `00045` (drop reschedule FK) | Not applied | Not applied | Right after `00044`, both environments. Drops the second bookings → sessions key that made every bookings/sessions embed ambiguous (PGRST201). No-op where 00044 is the fixed version. |
+| `00046` (booking cutoff and arrival) | Not applied | Not applied | After `00045`. Caleb applies. Cutoff, How to find me, day-of number, `booking_host_contact`, `listing_arrival_instructions`; replaces `my_account` and `reschedule_booking`. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
@@ -1214,9 +1217,9 @@ Run through this before soft launch. Mark every item done, not done, or blocked.
 
 ## Cancellations
 - [ ] Guest can cancel from the Bookings tab (invokes `cancel-booking`; `/bookings` redirects there)
-- [ ] Four tier refund correctly calculated, 100 / 50 / 25 / 0 at 48hr, 24hr, 6hr, with platform fee forfeited on partial tiers
+- [ ] Four tier refund correctly calculated, 100 / 50 / 25 / 0 of the session and add-ons at 48hr, 24hr, 6hr; booking fee never refunded on a guest cancel; host / admin cancel still refunds everything
 - [x] Refund amount stored and included directly in the cancellation email
-- [ ] Guest can reschedule instead of cancelling, once per booking, 48hr cutoff
+- [ ] Guest can reschedule instead of cancelling, once per booking, 48hr cutoff (`00044`, `reschedule-booking`)
 - [ ] Host can cancel from the Hosting tab (`/hosting` redirects there)
 - [ ] Host cancellation increments strikes
 - [ ] Guest can report a host no show, distinct from host initiated cancel, triggering 2 strikes and account review

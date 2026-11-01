@@ -28,7 +28,7 @@ function safetyMailto(bookingId) {
  * Guest quality complaint (Dispute Policy): open from the session start until
  * 3 days after it ends. Safety reports stay on email with no time limit.
  */
-export default function ReportProblem({ booking }) {
+export default function ReportProblem({ booking, buttonLabel = 'Report a problem' }) {
   const [reportedAt, setReportedAt] = useState(null)
   const [open, setOpen] = useState(false)
   const [description, setDescription] = useState('')
@@ -126,7 +126,7 @@ export default function ReportProblem({ booking }) {
             setOpen(true)
           }}
         >
-          Report a problem
+          {buttonLabel}
         </Button>
       ) : null}
 

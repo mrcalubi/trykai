@@ -89,4 +89,17 @@ describe('booking addon helpers', () => {
       notes: [{ name: 'Mei', note: 'For Alex' }],
     })
   })
+
+  it('still builds a box when the only thing to show is a guest note', () => {
+    const boxes = sessionPrepareBoxes(
+      [{ id: 's1', bookings: [{ id: 'b1', status: 'confirmed', guest_id: 'g1' }] }],
+      [],
+      { b1: { guestId: 'g1', note: 'Allergic to nuts' } },
+      { g1: 'Sam Chen' },
+    )
+    expect(boxes.s1).toEqual({
+      lines: [],
+      notes: [{ name: 'Sam', note: 'Allergic to nuts' }],
+    })
+  })
 })

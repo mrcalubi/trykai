@@ -329,7 +329,7 @@ export function refundDeadlineLines(sessionStartsAt: string): string[] {
   const start = new Date(sessionStartsAt)
   if (Number.isNaN(start.getTime())) return []
   return [
-    `Full refund if you cancel before ${formatSessionDate(shiftHours(start, -48))}`,
+    `Refund minus the booking fee if you cancel before ${formatSessionDate(shiftHours(start, -48))}`,
     `50% refund if you cancel before ${formatSessionDate(shiftHours(start, -24))}`,
     `25% refund if you cancel before ${formatSessionDate(shiftHours(start, -6))}`,
   ]
@@ -370,7 +370,7 @@ export function receiptRows(options: {
 
   const rows: ReceiptRow[] = [
     {
-      label: `${formatCents(perPerson)} per person x ${guestCountLabel(guestsCount)}`,
+      label: `${formatCents(perPerson)} per person × ${guestCountLabel(guestsCount)}`,
       amountCents: cardDiscountedTotal,
     },
   ]
@@ -501,6 +501,7 @@ export function bookingConfirmedGuestHtml(options: {
   sessionDate: string
   duration?: string
   fullAddress?: string
+  arrivalInstructions?: string | null
   guestsCount: number
   pricePerPersonCents: number
   groupPricing?: boolean
@@ -546,6 +547,7 @@ export function bookingConfirmedGuestHtml(options: {
       ['Date and time', escapeHtml(options.sessionDate)],
       ['Duration', duration],
       ['Address', address],
+      ['How to find it', options.arrivalInstructions ? escapeHtml(options.arrivalInstructions) : ''],
       ['Guests', guestCountLabel(options.guestsCount)],
       ["What's provided", provided ? escapeHtml(provided) : ''],
       ['What to bring', bring ? escapeHtml(bring) : ''],
@@ -555,9 +557,9 @@ export function bookingConfirmedGuestHtml(options: {
     ${options.paymentRail === 'paynow' ? `<p style="margin:0 0 16px;font-size:14px;color:${EMAIL_COLORS.muted};">Your bank will show this payment as Stripe Payments Singapore.</p>` : ''}
     ${calendar ? `<p style="margin:0 0 8px;"><a href="${escapeHtml(calendar)}" style="${LINK_STYLE}">Add to Google Calendar</a></p>` : ''}
     ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
-    <p style="margin:0 0 8px;">Questions for your host? Reply to this email.</p>
+    <p style="margin:0 0 8px;">Questions? Reply to this email and we'll help.</p>
     <p style="margin:0 0 16px;"><a href="${siteUrl}" style="${LINK_STYLE}">Browse more experiences</a></p>
-    <p style="margin:0;font-size:13px;color:${EMAIL_COLORS.muted};">Need to change plans? <a href="${siteUrl}/cancellation-policy" style="${QUIET_LINK_STYLE}">Cancellation policy</a></p>
+    <p style="margin:0;font-size:13px;color:${EMAIL_COLORS.muted};">Need to change plans? <a href="${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}" style="${QUIET_LINK_STYLE}">Move or cancel your booking</a> · <a href="${siteUrl}/cancellation-policy" style="${QUIET_LINK_STYLE}">Cancellation policy</a></p>
     ${emailSignOff('see-you')}
     `,
     siteUrl,
@@ -571,6 +573,30 @@ export function addonPrepareLine(
   const lines = (addons ?? []).filter((row) => row.quantity > 0 && row.name)
   if (!lines.length) return ''
   return `Add-ons to prepare: ${lines.map((row) => `${row.name} × ${row.quantity}`).join(', ')}.`
+}
+
+export function hostBookingUrgencyPrefix(
+  startsAt: string,
+  bookedAt: string | Date | number = Date.now(),
+): string {
+  const start = new Date(startsAt).getTime()
+  const booked = new Date(bookedAt).getTime()
+  if (Number.isNaN(start) || Number.isNaN(booked)) return ''
+  if (start < booked || start - booked > 24 * 60 * 60 * 1000) return ''
+  const startKey = singaporeDateKey(startsAt)
+  const bookedKey = singaporeDateKey(booked)
+  if (!startKey || !bookedKey) return ''
+  if (startKey === bookedKey) return 'Booking for today:'
+  return 'Booking for tomorrow:'
+}
+
+export function bookingConfirmedHostSubject(
+  listingTitle: string,
+  startsAt: string,
+  bookedAt: string | Date | number = Date.now(),
+): string {
+  const prefix = hostBookingUrgencyPrefix(startsAt, bookedAt)
+  return prefix ? `${prefix} "${listingTitle}"` : `New booking for "${listingTitle}"`
 }
 
 export function bookingConfirmedHostHtml(options: {
@@ -625,6 +651,7 @@ export function guestSessionReminderHtml(options: {
   sentAt?: string | Date | number
   duration?: string
   fullAddress?: string
+  arrivalInstructions?: string | null
   whatsProvided?: string[] | null
   whatToBring?: string[] | null
   hostName: string
@@ -647,6 +674,7 @@ export function guestSessionReminderHtml(options: {
       ['Day and time', escapeHtml(options.sessionDate)],
       ['Duration', duration],
       ['Address', address],
+      ['How to find it', options.arrivalInstructions ? escapeHtml(options.arrivalInstructions) : ''],
       ["What's provided", provided ? escapeHtml(provided) : ''],
       ['Host', hostName],
     ])}
@@ -913,7 +941,7 @@ export function bookingCancelledGuestHtml(options: {
       ? `<p style="margin:0 0 16px;">We're sorry. ${escapeHtml(hostName)} had to cancel your session on ${escapeHtml(options.sessionDate)}. You'll get a full refund of ${escapeHtml(refund)}. ${escapeHtml(timing)}</p>`
       : options.refundAmountCents > 0
         ? `<p style="margin:0 0 16px;">Sorry you can't make it</p>
-    <p style="margin:0 0 16px;">Your refund of ${escapeHtml(refund)} is on its way to your ${escapeHtml(method)}. ${escapeHtml(timing)}</p>`
+    <p style="margin:0 0 16px;">Your refund of ${escapeHtml(refund)} is on its way to your ${escapeHtml(method)}. The booking fee isn't refunded. ${escapeHtml(timing)}</p>`
         : `<p style="margin:0 0 16px;">Sorry you can't make it</p>
     <p style="margin:0 0 16px;">There's no refund for this cancellation.</p>`
 
@@ -1282,6 +1310,123 @@ export function hostPayoutLine(cents: number): string {
  * sendHostSessionCancelledEmail instead — never a guest amount.
  * Never throws: a Resend failure must not undo a refund that already happened.
  */
+export function bookingMovedGuestSubject(sessionDate: string): string {
+  return `You've moved your booking to ${sessionDate}`
+}
+
+export function bookingMovedHostSubject(
+  guestFirstName: string,
+  oldDate: string,
+  newDate: string,
+): string {
+  return `${guestFirstName} moved their booking from ${oldDate} to ${newDate}`
+}
+
+export function bookingMovedGuestHtml(options: {
+  guestName?: string | null
+  listingTitle: string
+  sessionDate: string
+  bookingId: string
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
+    ${emailHeading(`You've moved your booking to ${options.sessionDate}`)}
+    <p style="margin:0 0 16px;">${escapeHtml(options.listingTitle)} is now on ${escapeHtml(options.sessionDate)}.</p>
+    ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
+    ${emailSignOff('see-you')}
+    `,
+    siteUrl,
+    `You've moved your booking to ${options.sessionDate}`,
+  )
+}
+
+export function bookingMovedHostHtml(options: {
+  hostName?: string | null
+  guestFirstName: string
+  listingTitle: string
+  oldSessionDate: string
+  newSessionDate: string
+  addons?: Array<{ name: string; quantity: number }>
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const prepare = addonPrepareLine(options.addons)
+  const guest = escapeHtml(options.guestFirstName || 'A guest')
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    ${emailHeading(`${options.guestFirstName || 'A guest'} moved their booking`)}
+    <p style="margin:0 0 16px;">${guest} moved their booking for ${escapeHtml(options.listingTitle)} from ${escapeHtml(options.oldSessionDate)} to ${escapeHtml(options.newSessionDate)}.</p>
+    ${detailRows([
+      prepare
+        ? [
+            'Add-ons to prepare',
+            escapeHtml(prepare.replace(/^Add-ons to prepare: /, '').replace(/\.$/, '')),
+          ]
+        : null,
+    ])}
+    ${primaryButton(`${siteUrl}/hosting`, 'View hosting')}
+    ${emailSignOff('see-you')}
+    `,
+    siteUrl,
+    `${options.guestFirstName || 'A guest'} moved their booking from ${options.oldSessionDate} to ${options.newSessionDate}`,
+  )
+}
+
+export async function sendRescheduleEmails(options: {
+  apiKey: string | undefined
+  guestEmail?: string | null
+  hostEmail?: string | null
+  guestName?: string | null
+  hostName?: string | null
+  guestFirstName: string
+  listingTitle: string
+  oldSessionDate: string
+  newSessionDate: string
+  bookingId: string
+  addons?: Array<{ name: string; quantity: number }>
+  siteUrl?: string
+}): Promise<void> {
+  try {
+    await sendResendEmail({
+      apiKey: options.apiKey,
+      to: options.guestEmail,
+      subject: bookingMovedGuestSubject(options.newSessionDate),
+      replyTo: GUEST_REPLY_TO,
+      html: bookingMovedGuestHtml({
+        guestName: options.guestName,
+        listingTitle: options.listingTitle,
+        sessionDate: options.newSessionDate,
+        bookingId: options.bookingId,
+        siteUrl: options.siteUrl,
+      }),
+    })
+    await sendResendEmail({
+      apiKey: options.apiKey,
+      to: options.hostEmail,
+      subject: bookingMovedHostSubject(
+        options.guestFirstName,
+        options.oldSessionDate,
+        options.newSessionDate,
+      ),
+      html: bookingMovedHostHtml({
+        hostName: options.hostName,
+        guestFirstName: options.guestFirstName,
+        listingTitle: options.listingTitle,
+        oldSessionDate: options.oldSessionDate,
+        newSessionDate: options.newSessionDate,
+        addons: options.addons,
+        siteUrl: options.siteUrl,
+      }),
+    })
+  } catch (err) {
+    console.error('sendRescheduleEmails failed', err)
+  }
+}
+
 export async function sendCancellationEmails(options: {
   apiKey: string | undefined
   cancelledBy: 'guest' | 'host'

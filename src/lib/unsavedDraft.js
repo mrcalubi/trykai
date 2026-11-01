@@ -9,6 +9,8 @@ export function settingsDraft({
   instagram = '',
   tiktok = '',
   featuredReviewId = null,
+  dayOfPhone = '',
+  shareDayOfPhone = false,
 }) {
   return JSON.stringify({
     fullName,
@@ -19,6 +21,8 @@ export function settingsDraft({
     instagram,
     tiktok,
     featuredReviewId,
+    dayOfPhone,
+    shareDayOfPhone,
   })
 }
 
@@ -41,6 +45,8 @@ export function listingEditorDraft({
   groupPricing,
   area,
   fullAddress,
+  arrivalInstructions,
+  bookingCutoffHours,
   whatsProvided,
   whatToBring,
   photos,
@@ -56,6 +62,8 @@ export function listingEditorDraft({
     groupPricing,
     area,
     fullAddress,
+    arrivalInstructions,
+    bookingCutoffHours,
     whatsProvided,
     whatToBring,
     photos: (photos ?? []).map(photoFingerprint),
