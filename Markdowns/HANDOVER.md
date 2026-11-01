@@ -78,7 +78,7 @@ Details and reasons are in DECISIONS.md under the same dates.
 | Guest cancel | 48h+: everything except the booking fee; 24 to 48h: 50% of lesson and add-ons; 6 to 24h: 25%; under 6h: nothing | `calculateGuestRefund` |
 | Host payout | 72 hours after the session ends, by the hourly `release-payout` job | OPERATIONS, Host Transfers |
 
-**Open question for Caleb:** on a late guest cancel the host fee is still 10% of the whole lesson even when the host keeps only half or a quarter of it. Scaling it to the kept share is a one-line change to decide before non-founding hosts get bookings.
+**Decided 1 November:** on a late guest cancel the host fee stays 10% of the whole lesson, even when the host keeps only half or a quarter of it. The host is paid without teaching, so the full fee stands. Hosts see only the final "You'll receive" amount.
 
 ---
 
@@ -102,9 +102,8 @@ Safe to pay out = Stripe Available minus `owed_to_hosts_sgd` minus about S$50 bu
 
 1. **Merge #235**, hard refresh trykai.sg, check a booking page on a phone.
 2. **Prompt C, review photos** (ready, not started). Guests attach up to 3 photos to a review; migration `00047_review_photos.sql` (`reviews.photo_urls`, public `review-photos` bucket with own-folder policies, `reviews_for_listing` and `reviews_for_host` return the photos); one shared review form used by Bookings and BookingDetail; thumbnails and lightbox on the listing, profile and featured review; a quiet Report link; privacy policy line. The full prompt is in the appendix below.
-3. Caleb's call on the host fee for late cancellations (above).
-4. More host feedback as it comes.
-5. BUILD_BACKLOG.md for everything else.
+3. More host feedback as it comes.
+4. BUILD_BACKLOG.md for everything else.
 
 ---
 
