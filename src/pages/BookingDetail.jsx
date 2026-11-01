@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
@@ -7,6 +7,7 @@ import { formatDuration } from '../lib/duration'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { guestBookingActions, guestCancellationNote } from '../lib/guestBookings'
 import { publicName } from '../lib/publicName'
+import { REPORT_EMAIL } from '../lib/reportMailto'
 import { SHARE_NOTES, copyText, shareOrCopy } from '../lib/share'
 import {
   bookingCountdown,
@@ -16,6 +17,7 @@ import {
   cancelTiersSentence,
   dateTileParts,
   downloadIcs,
+  formatBookingWhenDay,
   googleMapsUrl,
   appleMapsUrl,
   isBookingDayOf,
@@ -29,6 +31,7 @@ import {
   startsInCopy,
   writeBringChecks,
 } from '../lib/bookingPage'
+import { canReportProblem } from '../../supabase/functions/_shared/complaints.ts'
 import { HostContactLinks } from '../components/BookingCutoffFields'
 import {
   bookingReference,
@@ -140,6 +143,83 @@ function withHostLine(hostName, area, guestsCount) {
   return [hostName ? `with ${hostName}` : null, area, guestCountLabel(guestsCount)]
     .filter(Boolean)
     .join(' · ')
+}
+
+function bookingHelpMailto(bookingId) {
+  return `mailto:${REPORT_EMAIL}?subject=${encodeURIComponent(`Help with booking ${bookingReference(bookingId)}`)}`
+}
+
+function BookingMenu({ label, variant = 'primary', items }) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef(null)
+  const menuId = useId()
+
+  useEffect(() => {
+    if (!open) return undefined
+    function onPointerDown(event) {
+      if (!rootRef.current?.contains(event.target)) setOpen(false)
+    }
+    function onKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setOpen(false)
+        rootRef.current?.querySelector('button')?.focus()
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  if (!items?.length) return null
+
+  return (
+    <div className="booking-menu" ref={rootRef}>
+      <Button
+        variant={variant}
+        className="booking-page__wrap-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {label}
+      </Button>
+      {open ? (
+        <ul id={menuId} role="menu" className="booking-menu__list">
+          {items.map((item) => (
+            <li key={item.label} role="none">
+              {item.href ? (
+                <a
+                  role="menuitem"
+                  className="booking-menu__item"
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                >
+                  {item.label}
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="booking-menu__item"
+                  onClick={() => {
+                    setOpen(false)
+                    item.onSelect?.()
+                  }}
+                >
+                  {item.label}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  )
 }
 
 export default function BookingDetail() {
@@ -377,7 +457,8 @@ export default function BookingDetail() {
   const session = booking.sessions
   const listing = session?.listings
   const host = listing?.users
-  const hostName = publicName(host) || 'your host'
+  const hostName = publicName(host)
+  const hostLabel = hostName || 'your host'
   const photo = listing?.photo_urls?.[0]
   const startsAt = session?.starts_at
   const durationMins = session?.duration_mins ?? listing?.duration_mins
@@ -417,8 +498,12 @@ export default function BookingDetail() {
   const ref = bookingReference(booking.id)
   const addonNote =
     bookingAddons.length > 0
-      ? `${hostName} is preparing your extras: ${bookingAddons.map((row) => addonLineLabel(row.name, row.quantity)).join(', ')}`
+      ? `${hostLabel} is preparing your extras: ${bookingAddons.map((row) => addonLineLabel(row.name, row.quantity)).join(', ')}`
       : ''
+  const canReport = canReportProblem(booking, nowMs)
+  const whenDay = startsAt ? formatBookingWhenDay(startsAt) : ''
+  const whenTime = [timeRange(startsAt, durationMins), formatDuration(durationMins)].filter(Boolean).join(' · ')
+  const pillClass = statusLabel ? `booking-pill booking-pill--${statusLabel.toLowerCase()}` : ''
 
   function downloadAppleCalendar() {
     const ics = bookingIcs({
@@ -437,67 +522,65 @@ export default function BookingDetail() {
       {tile ? (
         <div className="booking-when">
           <div className="booking-date-tile" aria-hidden="true">
-            <span className="booking-date-tile__weekday">{tile.weekday}</span>
             <span className="booking-date-tile__day">{tile.day}</span>
             <span className="booking-date-tile__month">{tile.month}</span>
           </div>
           <div>
-            <p className="booking-when__day">{formatSessionDay(startsAt)}</p>
-            <p className="booking-when__time">{timeRange(startsAt, durationMins)}</p>
-            {formatDuration(durationMins) ? (
-              <p className="booking-when__duration">{formatDuration(durationMins)}</p>
-            ) : null}
+            <p className="booking-when__day">{whenDay}</p>
+            {whenTime ? <p className="booking-when__time">{whenTime}</p> : null}
           </div>
         </div>
       ) : (
         <p>Date TBC</p>
       )}
-      <div className="booking-actions">
+      <div className="booking-card__btns">
         {calendar ? (
-          <div className="booking-action">
-            <Icon name="calendar" size={18} />
-            <p className="booking-action__label">Calendar</p>
-            <a href={calendar}>Google</a>
-            <button type="button" className="booking-action__link" onClick={downloadAppleCalendar}>
-              Apple
-            </button>
-          </div>
-        ) : null}
-        {address ? (
-          <div className="booking-action">
-            <Icon name="pin" size={18} />
-            <p className="booking-action__label">Directions</p>
-            <a href={googleMapsUrl(address)}>Google Maps</a>
-            <a href={appleMapsUrl(address)}>Apple Maps</a>
-          </div>
+          <BookingMenu
+            label="Add to calendar"
+            items={[
+              { label: 'Google Calendar', href: calendar },
+              { label: 'Apple Calendar', onSelect: downloadAppleCalendar },
+            ]}
+          />
         ) : null}
         {listing?.id ? (
-          <div className="booking-action">
-            <Icon name="share" size={18} />
-            <p className="booking-action__label">Invite a friend</p>
-            <button type="button" className="booking-action__link" onClick={onInvite}>
-              Share listing
-            </button>
-          </div>
+          <Button variant="secondary" className="booking-page__wrap-btn" onClick={onInvite}>
+            Invite a friend
+          </Button>
         ) : null}
       </div>
     </section>
   )
 
   const whereCard = address ? (
-    <section className="booking-card">
-      <h2 className="booking-card__title">Where</h2>
-      <p className="booking-where__address">{address}</p>
-      <p className="booking-where__links">
-        <a href={googleMapsUrl(address)}>Google Maps</a>
-        {' · '}
-        <a href={appleMapsUrl(address)}>Apple Maps</a>
-        {' · '}
-        <button type="button" className="booking-action__link" onClick={() => onCopy(address, 'Address copied')}>
+    <section className="booking-card booking-where">
+      <div className="booking-where__head">
+        <span className="booking-where__pin" aria-hidden="true">
+          <Icon name="pin" size={18} />
+        </span>
+        <div>
+          <h2 className="eyebrow">Where</h2>
+          <p className="booking-where__address">{address}</p>
+        </div>
+      </div>
+      {arrivalInstructions ? (
+        <div className="booking-where__find">
+          <p className="booking-where__find-label">How to find it</p>
+          <p>{arrivalInstructions}</p>
+        </div>
+      ) : null}
+      <div className="booking-card__btns">
+        <BookingMenu
+          label="Get directions"
+          items={[
+            { label: 'Google Maps', href: googleMapsUrl(address) },
+            { label: 'Apple Maps', href: appleMapsUrl(address) },
+          ]}
+        />
+        <Button variant="secondary" className="booking-page__wrap-btn" onClick={() => onCopy(address, 'Address copied')}>
           Copy address
-        </button>
-      </p>
-      {arrivalInstructions ? <p className="booking-where__find">{arrivalInstructions}</p> : null}
+        </Button>
+      </div>
       {hostPhone ? <HostContactLinks phone={hostPhone} /> : null}
       <p className="hint">Only guests see the exact address.</p>
     </section>
@@ -541,21 +624,45 @@ export default function BookingDetail() {
     ) : null
 
   const hostCard = listing?.host_id ? (
-    <section className="booking-card">
-      <Link to={`/u/${listing.host_id}`} className="detail-host booking-detail__host">
-        <Avatar avatarUrl={host?.avatar_url} displayName={publicName(host)} className="detail-host__avatar" />
+    <section className="booking-card booking-host">
+      <div className="booking-host__row">
+        <Avatar avatarUrl={host?.avatar_url} displayName={hostName} className="detail-host__avatar" />
         <div>
-          <p className="detail-host__name">{hostName}</p>
+          <p className="booking-host__name">{hostName ? `Your host, ${hostName}` : 'Your host'}</p>
           {host?.is_id_verified ? <VerifiedBadge /> : null}
           <HostRating reviews={hostReviews} />
         </div>
-      </Link>
+      </div>
       <BioPreview bio={host?.bio} lines={2} />
       <Link to={`/u/${listing.host_id}`} className="booking-detail__link">
         View profile
       </Link>
     </section>
   ) : null
+
+  const manageRow = canManage ? (
+    <button type="button" className="booking-manage" onClick={openSheet}>
+      <span className="booking-manage__copy">
+        <span className="booking-manage__title">Manage booking</span>
+        <span className="booking-manage__hint">Move to another date, or cancel</span>
+      </span>
+      <Icon name="chevronRight" size={20} />
+    </button>
+  ) : null
+
+  const helpLine = cancelled ? null : (
+    <div className="booking-help">
+      {canReport ? (
+        <p className="booking-help__line">Something wrong with this booking?</p>
+      ) : (
+        <p className="booking-help__line">
+          Need help with this booking?{' '}
+          <a href={bookingHelpMailto(booking.id)}>Email {REPORT_EMAIL}</a>
+        </p>
+      )}
+      <ReportProblem booking={booking} buttonLabel={canReport ? 'Report it within 3 days' : undefined} />
+    </div>
+  )
 
   const receiptCard = (
     <section className="booking-card">
@@ -596,35 +703,46 @@ export default function BookingDetail() {
 
   return (
     <div className="page booking-page">
-      <div className="booking-page__hero">
-        {listing?.id ? (
-          <Link to={`/listings/${listing.id}`} className="booking-detail__listing">
-            {photo ? <img src={photo} alt="" className="booking-detail__photo" /> : null}
-            <div className="booking-page__pills">
-              {statusLabel ? (
-                <span className={`booking-pill booking-pill--${statusLabel.toLowerCase()}`}>{statusLabel}</span>
-              ) : null}
-              {countdown && !cancelled ? <span className="booking-pill booking-pill--soon">{countdown}</span> : null}
-            </div>
-            <h1 className="booking-detail__title">{listing.title || 'Untitled listing'}</h1>
-          </Link>
-        ) : (
-          <h1 className="booking-detail__title">{listing?.title || 'Unknown listing'}</h1>
-        )}
-        <p className="booking-page__with">{withHostLine(hostName, listing?.area, booking.guests_count)}</p>
-      </div>
-
-      {dayOf && !cancelled ? (
-        <div className="booking-banner">
-          <p>Today · {startsInCopy(startsAt, nowMs)}</p>
-          {hostPhone ? <HostContactLinks phone={hostPhone} /> : null}
-        </div>
-      ) : null}
+      <Link to="/bookings" className="booking-page__back">
+        <Icon name="chevronLeft" size={16} />
+        Your bookings
+      </Link>
 
       {note ? <p className="hint">{note}</p> : null}
 
       <div className="booking-page__grid">
         <div className="booking-page__main">
+          <div className="booking-page__cover">
+            {listing?.id ? (
+              <Link to={`/listings/${listing.id}`} className="booking-page__cover-link" aria-label={listing.title || 'Listing'}>
+                {photo ? <img src={photo} alt="" /> : null}
+              </Link>
+            ) : photo ? (
+              <img src={photo} alt="" />
+            ) : null}
+            <div className="booking-page__pills">
+              {statusLabel ? <span className={pillClass}>{statusLabel}</span> : <span />}
+              {countdown && !cancelled ? <span className="booking-pill booking-pill--soon">{countdown}</span> : <span />}
+            </div>
+          </div>
+
+          {listing?.id ? (
+            <h1 className="booking-detail__title">
+              <Link to={`/listings/${listing.id}`} className="booking-detail__listing">
+                {listing.title || 'Untitled listing'}
+              </Link>
+            </h1>
+          ) : (
+            <h1 className="booking-detail__title">{listing?.title || 'Unknown listing'}</h1>
+          )}
+          <p className="booking-page__with">{withHostLine(hostLabel, listing?.area, booking.guests_count)}</p>
+
+          {dayOf && !cancelled ? (
+            <div className="booking-banner">
+              <p>Today · {startsInCopy(startsAt, nowMs)}</p>
+            </div>
+          ) : null}
+
           {cancelled ? (
             <section className="booking-card">
               <h2 className="booking-card__title">
@@ -645,7 +763,7 @@ export default function BookingDetail() {
 
           {ended && !cancelled ? (
             <section className="booking-card">
-              <h2 className="booking-card__title">How was it with {hostName}?</h2>
+              <h2 className="booking-card__title">How was it with {hostLabel}?</h2>
               {alreadyReviewed ? (
                 <p className="hint">Review submitted</p>
               ) : canReview ? (
@@ -678,51 +796,24 @@ export default function BookingDetail() {
                       : 'No upcoming dates yet'}
                   </p>
                   <Link to={`/listings/${listing.id}`} className="ui-button ui-button--secondary booking-page__wrap-btn">
-                    Go again
+                    See dates
                   </Link>
-                  <Link to={`/listings/${listing.id}`}>See dates</Link>
                 </div>
               ) : null}
-              <ReportProblem booking={booking} buttonLabel="Report it within 3 days" />
             </section>
           ) : null}
 
-          {dayOf && !cancelled ? (
-            <>
-              {whereCard}
-              {packingCard}
-              {whenCard}
-            </>
-          ) : (
-            <>
-              {whenCard}
-              {whereCard}
-              {packingCard}
-            </>
-          )}
+          {whenCard}
+          {whereCard}
+          {packingCard}
         </div>
         <div className="booking-page__side">
           {hostCard}
           {receiptCard}
+          {manageRow}
+          {helpLine}
         </div>
       </div>
-
-      {canManage ? (
-        <div className="booking-page__foot">
-          <button type="button" className="booking-page__manage" onClick={openSheet}>
-            Plans changed? Manage booking
-          </button>
-          <div className="booking-page__report">
-            Something not right? <ReportProblem booking={booking} />
-          </div>
-        </div>
-      ) : cancelled ? null : ended ? null : (
-        <div className="booking-page__foot">
-          <div className="booking-page__report">
-            Something not right? <ReportProblem booking={booking} />
-          </div>
-        </div>
-      )}
 
       {sheetOpen ? (
         <div className="confirm-dialog-backdrop confirm-dialog-backdrop--sheet">

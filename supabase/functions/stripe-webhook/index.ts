@@ -265,6 +265,7 @@ async function confirmSucceededPayment(paymentIntent: {
       guestsCount: booking.guests_count,
       hostPayoutCents: hostPayout,
       siteUrl,
+      hostId: typeof hostId === 'string' ? hostId : null,
       addons: receiptAddons,
       addonNote: typeof booking.addon_note === 'string' ? booking.addon_note : null,
       guestFirstName: (guestName || 'A guest').trim().split(/\s+/).filter(Boolean)[0] || 'A guest',

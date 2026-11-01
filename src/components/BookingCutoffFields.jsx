@@ -67,10 +67,13 @@ export function HostContactLinks({ phone }) {
   const call = `tel:${phone}`
   const chat = `https://wa.me/${String(phone).replace(/^\+/, '')}`
   return (
-    <p className="booking-contact">
-      <a href={call}>Call</a>
-      {' · '}
-      <a href={chat}>WhatsApp</a>
-    </p>
+    <div className="booking-contact">
+      <a href={call} className="ui-button ui-button--secondary">
+        Call
+      </a>
+      <a href={chat} className="ui-button ui-button--secondary">
+        WhatsApp
+      </a>
+    </div>
   )
 }
