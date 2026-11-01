@@ -115,14 +115,14 @@ describe('BookingDetail', () => {
     renderDetail()
 
     expect(await screen.findByRole('heading', { name: 'Latte art' })).toBeInTheDocument()
-    expect(screen.getByText('Confirmed')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Your bookings' })).toHaveAttribute('href', '/bookings')
+    expect(screen.getByText('Confirmed')).toHaveClass('booking-pill--confirmed')
+    expect(screen.getByText(/In \d+ days/)).toHaveClass('booking-pill--soon')
     expect(screen.getByText(/with Mei Ling · Tiong Bahru · 2 guests/)).toBeInTheDocument()
-    expect(screen.getByText(formatSessionDay(startsAt))).toBeInTheDocument()
     expect(screen.getByText(new RegExp(formatSessionTime(startsAt)))).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Google' })).toHaveAttribute(
-      'href',
-      expect.stringContaining('calendar.google.com'),
-    )
+    expect(screen.getByRole('button', { name: 'Add to calendar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Invite a friend' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Google Maps' })).not.toBeInTheDocument()
     expect(supabase.rpc).toHaveBeenCalledWith('listing_address', { listing_id: 'listing-1' })
     expect(supabase.rpc).toHaveBeenCalledWith('listing_arrival_instructions', { listing_id: 'listing-1' })
     expect(supabase.rpc).toHaveBeenCalledWith('booking_host_contact', { p_booking_id: BOOKING_ID })
@@ -130,13 +130,21 @@ describe('BookingDetail', () => {
     expect(screen.getByText('Only guests see the exact address.')).toBeInTheDocument()
     expect(screen.getByText('Apron')).toBeInTheDocument()
     expect(screen.getByText('Water bottle')).toBeInTheDocument()
+    expect(screen.getByText('Your host, Mei Ling')).toBeInTheDocument()
     expect(screen.getByText('ID verified')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View profile' })).toHaveAttribute('href', '/u/host-1')
     expect(screen.getByText('Total paid')).toBeInTheDocument()
     expect(screen.getByText(/Paid with PayNow/)).toBeInTheDocument()
     expect(screen.getByText(/Ref A1B2C3D4/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Plans changed? Manage booking' })).toBeInTheDocument()
-    expect(screen.getByText(/Something not right/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Manage booking/ })).toBeInTheDocument()
+    expect(screen.getByText('Move to another date, or cancel')).toBeInTheDocument()
+    expect(screen.getByText(/Need help with this booking/)).toBeInTheDocument()
+    expect(
+      screen
+        .getAllByRole('link', { name: 'Email hello@trykai.sg' })
+        .some((link) => link.getAttribute('href')?.includes('Help%20with%20booking%20A1B2C3D4')),
+    ).toBe(true)
+    expect(screen.queryByText(/Something not right/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Full refund if you cancel/)).not.toBeInTheDocument()
     expect(supabase.__lastCall('bookings', 'select').chain[0].args[0]).not.toMatch(/full_name/)
   })
@@ -165,7 +173,7 @@ describe('BookingDetail', () => {
     supabase.functions.invoke.mockResolvedValue({ data: { ok: true, refund_amount: 190 }, error: null })
     const { user } = renderDetail()
 
-    await user.click(await screen.findByRole('button', { name: 'Plans changed? Manage booking' }))
+    await user.click(await screen.findByRole('button', { name: /Manage booking/ }))
     expect(screen.getByRole('heading', { name: "Can't make it?" })).toBeInTheDocument()
     expect(screen.getByText(/If you cancel now:/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Cancel booking' }))
@@ -192,7 +200,7 @@ describe('BookingDetail', () => {
     supabase.functions.invoke.mockResolvedValue({ data: { ok: true, session_id: next.id }, error: null })
     const { user } = renderDetail()
 
-    await user.click(await screen.findByRole('button', { name: 'Plans changed? Manage booking' }))
+    await user.click(await screen.findByRole('button', { name: /Manage booking/ }))
     await user.click(await screen.findByRole('button', { name: new RegExp(formatSessionDay(next.starts_at)) }))
     expect(screen.getByText(/You can only move a booking once/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Move booking' }))
@@ -206,8 +214,30 @@ describe('BookingDetail', () => {
   it('says why moving is closed after a first move', async () => {
     givenBooking(detailBooking({ rescheduled_at: hoursFromNow(-2) }))
     const { user } = renderDetail()
-    await user.click(await screen.findByRole('button', { name: 'Plans changed? Manage booking' }))
+    await user.click(await screen.findByRole('button', { name: /Manage booking/ }))
     expect(screen.getByText("You've already moved this booking once")).toBeInTheDocument()
+  })
+
+  it('opens Add to calendar and Get directions menus without duplicate maps links', async () => {
+    givenBooking(detailBooking())
+    const { user } = renderDetail()
+
+    await user.click(await screen.findByRole('button', { name: 'Add to calendar' }))
+    expect(screen.getByRole('menuitem', { name: 'Google Calendar' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('calendar.google.com'),
+    )
+    expect(screen.getByRole('menuitem', { name: 'Apple Calendar' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Get directions' }))
+    expect(screen.getAllByRole('menuitem', { name: 'Google Maps' })).toHaveLength(1)
+    expect(screen.getAllByRole('menuitem', { name: 'Apple Maps' })).toHaveLength(1)
+    expect(screen.queryByRole('link', { name: 'Google Maps' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Apple Maps' })).not.toBeInTheDocument()
+    await user.click(document.body)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('downloads an Apple calendar file from the browser', async () => {
@@ -225,7 +255,8 @@ describe('BookingDetail', () => {
       return node
     })
     const { user } = renderDetail()
-    await user.click(await screen.findByRole('button', { name: 'Apple' }))
+    await user.click(await screen.findByRole('button', { name: 'Add to calendar' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Apple Calendar' }))
     expect(clicks).toEqual(['trykai-booking.ics'])
     expect(createObjectURL).toHaveBeenCalled()
     vi.restoreAllMocks()
@@ -234,7 +265,7 @@ describe('BookingDetail', () => {
   it('copies the listing link when the share sheet is missing', async () => {
     givenBooking(detailBooking())
     const { user } = renderDetail()
-    await user.click(await screen.findByRole('button', { name: 'Share listing' }))
+    await user.click(await screen.findByRole('button', { name: 'Invite a friend' }))
     expect(await screen.findByText(SHARE_NOTES.copied)).toBeInTheDocument()
     expect(await navigator.clipboard.readText()).toMatch(/\/listings\/listing-1$/)
   })
@@ -256,7 +287,7 @@ describe('BookingDetail', () => {
     expect(box).toBeChecked()
   })
 
-  it('puts directions first on the day of the session', async () => {
+  it('keeps When before Where on the day of the session', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-31T04:00:00.000Z'))
     givenBooking(
@@ -269,14 +300,16 @@ describe('BookingDetail', () => {
     )
     renderDetail()
     expect(await screen.findByText(/Today · starts in/)).toBeInTheDocument()
+    const when = screen.getByRole('heading', { name: 'When' })
     const where = screen.getByRole('heading', { name: 'Where' })
     const bring = screen.getByRole('heading', { name: 'Before you go' })
+    expect(when.compareDocumentPosition(where) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(where.compareDocumentPosition(bring) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Plans changed? Manage booking' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Manage booking/ })).toBeInTheDocument()
     vi.useRealTimers()
   })
 
-  it('shows How to find me and day-of Call and WhatsApp when the RPCs return them', async () => {
+  it('shows How to find it and day-of Call and WhatsApp when the RPCs return them', async () => {
     givenAddress('12 Club Street, Singapore 069410', {
       arrival: 'Lift B to #04-56, ring the bell',
       phone: '+6591234567',
@@ -284,7 +317,8 @@ describe('BookingDetail', () => {
     givenBooking(detailBooking())
     renderDetail()
 
-    expect(await screen.findByText('Lift B to #04-56, ring the bell')).toBeInTheDocument()
+    expect(await screen.findByText('How to find it')).toBeInTheDocument()
+    expect(screen.getByText('Lift B to #04-56, ring the bell')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Call' })).toHaveAttribute('href', 'tel:+6591234567')
     expect(screen.getByRole('link', { name: 'WhatsApp' })).toHaveAttribute(
       'href',
@@ -300,7 +334,7 @@ describe('BookingDetail', () => {
     expect(screen.queryByRole('link', { name: 'WhatsApp' })).not.toBeInTheDocument()
   })
 
-  it('repeats Call and WhatsApp on the day-of banner', async () => {
+  it('shows Call and WhatsApp only once on the day of the session', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-31T04:00:00.000Z'))
     givenAddress('12 Club Street, Singapore 069410', { phone: '+6591234567' })
@@ -314,8 +348,8 @@ describe('BookingDetail', () => {
     )
     renderDetail()
     expect(await screen.findByText(/Today · starts in/)).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'Call' })).toHaveLength(2)
-    expect(screen.getAllByRole('link', { name: 'WhatsApp' })).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: 'Call' })).toHaveLength(1)
+    expect(screen.getAllByRole('link', { name: 'WhatsApp' })).toHaveLength(1)
     vi.useRealTimers()
   })
 
@@ -334,7 +368,9 @@ describe('BookingDetail', () => {
     expect(screen.getByRole('link', { name: 'Go again' })).toHaveAttribute('href', '/listings/listing-1')
     expect(screen.getByRole('link', { name: 'See dates' })).toHaveAttribute('href', '/listings/listing-1')
     expect(screen.queryByRole('button', { name: /Find another time with/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Plans changed? Manage booking' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Manage booking/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/Something wrong with this booking/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Report a problem' })).toBeInTheDocument()
   })
 
   it('shows the refund on a cancelled booking', async () => {
@@ -468,7 +504,7 @@ describe('Report a problem', () => {
     })
     renderDetail()
 
-    expect(await screen.findByText(/You reported a problem on/)).toBeInTheDocument()
+    expect((await screen.findAllByText(/You reported a problem on/)).length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: 'Report it within 3 days' })).not.toBeInTheDocument()
     expect(supabase.__lastCall('booking_complaints', 'select').chain[0].args[0]).toBe('created_at')
   })
@@ -477,17 +513,19 @@ describe('Report a problem', () => {
     givenBooking(detailBooking({ sessions: ended(73) }))
     renderDetail()
 
-    expect(await screen.findByRole('link', { name: 'Email hello@trykai.sg' })).toHaveAttribute(
-      'href',
-      'mailto:hello@trykai.sg?subject=Safety%20report%3A%20booking%20A1B2C3D4',
-    )
+    const mails = await screen.findAllByRole('link', { name: 'Email hello@trykai.sg' })
+    expect(mails.some((link) => link.getAttribute('href')?.includes('Safety%20report'))).toBe(true)
+    expect(mails.some((link) => link.getAttribute('href')?.includes('Help%20with%20booking'))).toBe(true)
     expect(screen.queryByRole('button', { name: 'Report it within 3 days' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Report a problem' })).not.toBeInTheDocument()
   })
 
   it('is not offered before the session starts', async () => {
     givenBooking(detailBooking())
     renderDetail()
-    expect(await screen.findByRole('link', { name: 'Email hello@trykai.sg' })).toBeInTheDocument()
+    const mails = await screen.findAllByRole('link', { name: 'Email hello@trykai.sg' })
+    expect(mails.some((link) => link.getAttribute('href')?.includes('Help%20with%20booking'))).toBe(true)
+    expect(mails.some((link) => link.getAttribute('href')?.includes('Safety%20report'))).toBe(true)
     expect(screen.queryByRole('button', { name: 'Report a problem' })).not.toBeInTheDocument()
   })
 

@@ -9,6 +9,7 @@ import {
   makeAuthSession,
 } from './support/fixtures'
 import { formatSessionDay } from '../src/lib/sessionDate'
+import { formatBookingWhenDay } from '../src/lib/bookingPage'
 
 test.describe('listing detail', () => {
   test('shows the host, price, description and what is provided', async ({ page }) => {
@@ -772,10 +773,10 @@ test('moves a booking to another date and then shows the new one', async ({ page
 
   await page.goto('/bookings/booking-move')
   await expect(page.getByRole('heading', { name: LATTE_ART.title })).toBeVisible()
-  await page.getByRole('button', { name: 'Plans changed? Manage booking' }).click()
+  await page.getByRole('button', { name: /Manage booking/ }).click()
   await page.getByRole('button', { name: new RegExp(formatSessionDay(nextStarts)) }).click()
   await expect(page.getByText(/You can only move a booking once/)).toBeVisible()
   await page.getByRole('button', { name: 'Move booking' }).click()
-  await expect(page.getByText(formatSessionDay(nextStarts))).toBeVisible()
+  await expect(page.getByText(formatBookingWhenDay(nextStarts))).toBeVisible()
   await expect(page.getByRole('dialog', { name: "Can't make it?" })).toHaveCount(0)
 })

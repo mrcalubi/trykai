@@ -82,6 +82,18 @@ export function dateTileParts(iso) {
   }
 }
 
+/** "Monday, 2 November" on the booking When card. Singapore time. */
+export function formatBookingWhenDay(iso) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat('en-SG', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'Asia/Singapore',
+  }).format(date)
+}
+
 export function icsStamp(value) {
   return new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
 }
