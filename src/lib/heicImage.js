@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/react'
 
 export const HEIC_READ_ERROR = "We couldn't read that photo. Try a JPEG or PNG."
+export const HEIC_UPDATED_ERROR = 'TryKai just updated. Refresh the page.'
 
 /** iOS and desktop pickers: `image/*` plus explicit HEIC so Chrome still offers it. */
 export const IMAGE_ACCEPT = 'image/*,image/heic,image/heif,.heic,.heif'
@@ -25,6 +26,18 @@ export function isHeicReadError(error) {
   return Boolean(error && error.message === HEIC_READ_ERROR)
 }
 
+export function isHeicUpdatedError(error) {
+  return Boolean(error && error.message === HEIC_UPDATED_ERROR)
+}
+
+export function isHeicPickerError(error) {
+  return isHeicReadError(error) || isHeicUpdatedError(error)
+}
+
+function isChunkLoadFailure(error) {
+  return /Failed to fetch dynamically imported module/i.test(String(error?.message || ''))
+}
+
 /** Object so tests can spy without ESM live-binding issues. */
 export const heicLoader = {
   async importConverter() {
@@ -42,14 +55,14 @@ export async function convertHeicToJpeg(file) {
     const base = String(file.name || 'photo').replace(/\.[^.]+$/, '') || 'photo'
     return new File([blob], `${base}.jpg`, { type: 'image/jpeg', lastModified: Date.now() })
   } catch (error) {
-    if (isHeicReadError(error)) throw error
-    // The guest only sees "couldn't read that photo"; keep the real reason (chunk load, decoder) for us.
+    if (isHeicPickerError(error)) throw error
+    // The guest only sees a short line; keep the real reason (chunk load, decoder) for us.
     console.error('convertHeicToJpeg failed', error)
     Sentry.captureException(error, {
       tags: { area: 'heic-convert' },
       extra: { fileType: file?.type || '', fileSize: file?.size ?? null },
     })
-    throw new Error(HEIC_READ_ERROR, { cause: error })
+    throw new Error(isChunkLoadFailure(error) ? HEIC_UPDATED_ERROR : HEIC_READ_ERROR, { cause: error })
   }
 }
 

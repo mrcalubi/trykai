@@ -365,6 +365,12 @@ describe('BookingDetail', () => {
     renderDetail()
     expect(await screen.findByRole('heading', { name: 'How was it with Mei Ling?' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Leave a review' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Photos')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Add up to 3 photos of what you made. Only photos you took, and ask before including anyone else.',
+      ),
+    ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'See dates' })).toHaveAttribute('href', '/listings/listing-1')
     expect(screen.queryByRole('link', { name: 'Go again' })).not.toBeInTheDocument()
     // One report entry point only: the help line, not a second one in this card.

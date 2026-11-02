@@ -50,8 +50,8 @@ import Button from '../components/ui/Button'
 import Icon from '../components/ui/Icon'
 import PageLoader from '../components/PageLoader'
 import ReportProblem from '../components/ReportProblem'
-import StarPicker from '../components/StarPicker'
 import BioPreview from '../components/BioPreview'
+import ReviewForm from '../components/ReviewForm'
 import VerifiedBadge from '../components/VerifiedBadge'
 import HostRating from '../components/HostRating'
 
@@ -246,10 +246,6 @@ export default function BookingDetail() {
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [cancelError, setCancelError] = useState('')
-  const [reviewRating, setReviewRating] = useState(0)
-  const [reviewComment, setReviewComment] = useState('')
-  const [reviewError, setReviewError] = useState('')
-  const [reviewLoading, setReviewLoading] = useState(false)
   const [nowMs] = useState(() => Date.now())
 
   const loadBooking = useCallback(async () => {
@@ -396,35 +392,6 @@ export default function BookingDetail() {
     setSheetOpen(false)
     setConfirmMove(null)
     await loadBooking()
-  }
-
-  async function handleReview(event) {
-    event.preventDefault()
-    setReviewError('')
-    if (reviewRating < 1 || reviewRating > 5) {
-      setReviewError('Please select a star rating.')
-      return
-    }
-    const hostId = booking.sessions?.listings?.host_id
-    if (!hostId) {
-      setReviewError('Could not find host for this booking.')
-      return
-    }
-    setReviewLoading(true)
-    const { error: insertError } = await supabase.from('reviews').insert({
-      booking_id: booking.id,
-      reviewer_id: userId,
-      reviewee_id: hostId,
-      rating: reviewRating,
-      comment: reviewComment.trim() || null,
-      role: 'guest',
-    })
-    setReviewLoading(false)
-    if (insertError) {
-      setReviewError(insertError.message)
-      return
-    }
-    setAlreadyReviewed(true)
   }
 
   function toggleBring(item) {
@@ -767,26 +734,12 @@ export default function BookingDetail() {
               {alreadyReviewed ? (
                 <p className="hint">Review submitted</p>
               ) : canReview ? (
-                <form onSubmit={handleReview} className="form">
-                  <label className="label">
-                    Rating
-                    <StarPicker value={reviewRating} onChange={setReviewRating} />
-                  </label>
-                  <label className="label">
-                    Comment
-                    <textarea
-                      value={reviewComment}
-                      onChange={(event) => setReviewComment(event.target.value)}
-                      placeholder="Share your experience…"
-                      rows={3}
-                      className="input input--textarea"
-                    />
-                  </label>
-                  {reviewError ? <p className="error-message">{reviewError}</p> : null}
-                  <Button type="submit" loading={reviewLoading} loadingLabel="Submitting">
-                    Leave a review
-                  </Button>
-                </form>
+                <ReviewForm
+                  booking={booking}
+                  userId={userId}
+                  submitLabel="Leave a review"
+                  onSubmitted={() => setAlreadyReviewed(true)}
+                />
               ) : null}
               {listing?.id ? (
                 <div className="booking-again">

@@ -10,6 +10,7 @@ import {
   starsText,
 } from '../../lib/profileV2'
 import { formatSessionTime } from '../../lib/sessionDate'
+import ReviewPhotoThumbs from '../ReviewPhotoThumbs'
 import {
   formatDayTitle,
   shiftMonth,
@@ -51,6 +52,7 @@ export function FeaturedReviewCard({ review, isOwn, reviewCount = 0 }) {
         “
       </span>
       <blockquote className="featured-review__text">{clip(review.comment, 220) || 'Five stars.'}</blockquote>
+      <ReviewPhotoThumbs paths={review.photo_paths} title="Featured review" />
       <p className="featured-review__by">
         {reviewerName(review)} ·{' '}
         <span aria-label={`${review.rating} out of 5 stars`}>{starsText(review.rating)}</span>

@@ -1,4 +1,4 @@
-import { convertHeicIfNeeded, isHeicReadError } from './heicImage'
+import { convertHeicIfNeeded, isHeicPickerError } from './heicImage'
 
 const MAX_EDGE = 1600
 const QUALITY = 0.82
@@ -71,7 +71,7 @@ async function sourceFromFile(file) {
  * conversion throws; any other failure returns the file we can already read
  * (the converted JPEG, never the raw HEIC).
  */
-export async function compressImage(file, { maxEdge = MAX_EDGE, quality = QUALITY } = {}) {
+export async function compressImage(file, { maxEdge = MAX_EDGE, quality = QUALITY, strict = false } = {}) {
   const working = await convertHeicIfNeeded(file)
   let close = () => {}
   try {
@@ -82,7 +82,11 @@ export async function compressImage(file, { maxEdge = MAX_EDGE, quality = QUALIT
     const image = source.image
     const sourceWidth = image.naturalWidth || image.width
     const sourceHeight = image.naturalHeight || image.height
-    if (!sourceWidth || !sourceHeight) return fallback(working, new Error('Could not read the photo'))
+    if (!sourceWidth || !sourceHeight) {
+      const error = new Error('Could not read the photo')
+      if (strict) throw error
+      return fallback(working, error)
+    }
 
     const scale = Math.min(1, maxEdge / Math.max(sourceWidth, sourceHeight))
     const width = Math.max(1, Math.round(sourceWidth * scale))
@@ -92,14 +96,19 @@ export async function compressImage(file, { maxEdge = MAX_EDGE, quality = QUALIT
     canvas.width = width
     canvas.height = height
     const ctx = canvas.getContext('2d')
-    if (!ctx) return fallback(working, new Error('no 2d context'))
+    if (!ctx) {
+      const error = new Error('no 2d context')
+      if (strict) throw error
+      return fallback(working, error)
+    }
 
     ctx.drawImage(image, 0, 0, width, height)
     const blob = await canvasToBlob(canvas, 'image/jpeg', quality)
     const base = String(working.name || 'photo').replace(/\.[^.]+$/, '') || 'photo'
     return new File([blob], `${base}.jpg`, { type: 'image/jpeg', lastModified: Date.now() })
   } catch (error) {
-    if (isHeicReadError(error)) throw error
+    if (isHeicPickerError(error)) throw error
+    if (strict) throw error
     return fallback(working, error)
   } finally {
     close()

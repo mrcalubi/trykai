@@ -1301,6 +1301,26 @@ describe('Profile card layout', () => {
     )
   })
 
+  it('shows featured review photos from photo_paths', async () => {
+    givenRpcs({
+      hostReviews: [
+        makeReview({
+          rating: 5,
+          comment: 'New five',
+          created_at: '2026-05-01T00:00:00Z',
+          photo_paths: ['user-1/a.jpg'],
+        }),
+      ],
+    })
+    renderPage()
+
+    const featured = await screen.findByRole('region', { name: 'What guests say' })
+    expect(within(featured).getByRole('button', { name: 'View review photo 1 of 1' }).querySelector('img')).toHaveAttribute(
+      'src',
+      'https://cdn.test/review-photos/user-1/a.jpg',
+    )
+  })
+
   it('shows a Coming up strip of open sessions in the next 30 days on the public profile', async () => {
     givenListings([makeListing({ id: 'listing-9', title: 'Latte art', area: 'Bedok' })])
     givenSessions([
