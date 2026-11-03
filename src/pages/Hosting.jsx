@@ -63,6 +63,7 @@ import {
   loadBookingNotes,
   sessionPrepareBoxes,
 } from '../lib/bookingAddons'
+import { HostReviewsDueList } from '../components/HostReviewForm'
 
 function activeBookingsOn(session) {
   // Pending rows are unpaid checkouts, not guests the host has to refund.
@@ -128,6 +129,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   const [payoutPendingCopy, setPayoutPendingCopy] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
+  const [reviewsDue, setReviewsDue] = useState([])
 
   // The profile's calendar mirrors this tab's sessions. Keep the callback in
   // a ref so a new function each render does not reload the page.
@@ -286,6 +288,9 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
       setMonthSessions([])
       onSessionsChangeRef.current?.([])
     }
+
+    const { data: dueRows } = await supabase.rpc('host_reviews_due')
+    setReviewsDue(dueRows ?? [])
 
     setLoading(false)
     // Emails can take a few seconds; never hold the Hosting page for them.
@@ -976,6 +981,8 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
             </div>
           </section>
         ) : null}
+
+        <HostReviewsDueList rows={reviewsDue} />
 
         <section className="hosting-listings" aria-labelledby="hosting-listings-title">
           <h2 id="hosting-listings-title" className="hosting__section-title">

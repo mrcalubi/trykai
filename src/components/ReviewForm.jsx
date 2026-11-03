@@ -7,21 +7,26 @@ import {
   filesToReviewPhotos,
   uploadReviewPhotos,
 } from '../lib/reviewPhotos'
+import {
+  firstRow,
+  notifyReviewEmails,
+  reviewClosedOnLabel,
+  reviewRpcErrorMessage,
+} from '../lib/twoWayReviews'
 import StarPicker from './StarPicker'
+import ReviewPrivateNote from './ReviewPrivateNote'
 import Button from './ui/Button'
 
-const DUPLICATE_REVIEW = "You've already reviewed this booking."
-
-function reviewInsertMessage(insertError) {
-  if (insertError?.code === '23505' || /reviews_booking_id_role/.test(insertError?.message || '')) {
-    return DUPLICATE_REVIEW
-  }
-  return insertError?.message || "That review didn't save. Try again."
-}
-
-export default function ReviewForm({ booking, userId, onSubmitted, className = 'form review-form' }) {
+export default function ReviewForm({
+  booking,
+  userId,
+  onSubmitted,
+  className = 'form review-form',
+  closedOn,
+}) {
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
+  const [privateNote, setPrivateNote] = useState('')
   const [photos, setPhotos] = useState([])
   const [error, setError] = useState('')
   const [photoError, setPhotoError] = useState('')
@@ -62,23 +67,25 @@ export default function ReviewForm({ booking, userId, onSubmitted, className = '
     setLoading(true)
     try {
       const photoPaths = photos.length > 0 ? await uploadReviewPhotos(photos, userId, supabase.storage) : []
-      const row = {
-        booking_id: booking.id,
-        reviewer_id: userId,
-        reviewee_id: hostId,
-        rating,
-        comment: comment.trim() || null,
-        role: 'guest',
-      }
-      // Send photo_paths only when there are photos, so a text review still
-      // saves if this code ever reaches a database without 00047.
-      if (photoPaths.length > 0) row.photo_paths = photoPaths
-      const { error: insertError } = await supabase.from('reviews').insert(row)
-      if (insertError) {
-        setError(reviewInsertMessage(insertError))
+      const { data, error: rpcError } = await supabase.rpc('post_review', {
+        p_booking_id: booking.id,
+        p_reviewee_id: hostId,
+        p_rating: rating,
+        p_comment: comment.trim() || null,
+        p_photo_paths: photoPaths,
+        p_private_note: privateNote.trim() || null,
+      })
+      if (rpcError) {
+        setError(
+          reviewRpcErrorMessage(rpcError, {
+            closedOn: closedOn || reviewClosedOnLabel(booking.sessions?.starts_at),
+          }),
+        )
         return
       }
-      onSubmitted?.()
+      const posted = firstRow(data)
+      void notifyReviewEmails(posted?.review_id)
+      onSubmitted?.(posted)
     } catch (caught) {
       setError(caught?.message || "That photo didn't upload. Try again or pick a different one.")
     } finally {
@@ -135,6 +142,7 @@ export default function ReviewForm({ booking, userId, onSubmitted, className = '
           </p>
         ) : null}
       </div>
+      <ReviewPrivateNote value={privateNote} onChange={setPrivateNote} />
       {error ? <p className="error-message">{error}</p> : null}
       <Button type="submit" loading={loading} loadingLabel="Posting" className="review-form__submit">
         Post review

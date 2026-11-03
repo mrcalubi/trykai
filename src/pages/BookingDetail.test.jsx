@@ -74,11 +74,13 @@ function givenBooking(booking) {
   supabase.__on('bookings', 'select', { data: booking, error: null })
 }
 
-function givenAddress(address, { arrival = null, phone = null } = {}) {
+function givenAddress(address, { arrival = null, phone = null, reviewState = null, hostRating = null } = {}) {
   supabase.rpc.mockImplementation(async (name) => {
     if (name === 'listing_address') return { data: address, error: null }
     if (name === 'listing_arrival_instructions') return { data: arrival, error: null }
     if (name === 'booking_host_contact') return { data: phone, error: null }
+    if (name === 'my_review_state') return { data: reviewState, error: null }
+    if (name === 'host_rating') return { data: hostRating, error: null }
     return { data: null, error: null }
   })
 }
@@ -416,6 +418,35 @@ describe('BookingDetail', () => {
     expect(screen.queryByRole('button', { name: /Find another time with/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Manage booking/ })).not.toBeInTheDocument()
     expect(screen.getByText(/Something wrong with this booking/)).toBeInTheDocument()
+    expect(screen.getByText('Anything TryKai should know?')).toBeInTheDocument()
+  })
+
+  it('thanks the guest while the review is waiting to go live', async () => {
+    givenAddress('12 Club Street, Singapore 069410', {
+      reviewState: [
+        {
+          can_review: false,
+          i_reviewed: true,
+          my_review_public: false,
+          other_side_reviewed: false,
+          reveal_after: '2026-11-10T12:00:00.000Z',
+          deadline: '2026-11-10T12:00:00.000Z',
+        },
+      ],
+    })
+    givenBooking(
+      detailBooking({
+        sessions: {
+          ...detailBooking().sessions,
+          starts_at: hoursFromNow(-5),
+        },
+      }),
+    )
+    renderDetail()
+    expect(
+      await screen.findByText(/Thanks for your review. It goes live when Mei Ling reviews you too/),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Post review' })).not.toBeInTheDocument()
   })
 
   it('shows the refund on a cancelled booking', async () => {

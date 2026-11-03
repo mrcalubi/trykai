@@ -54,6 +54,7 @@ function givenData({
   payoutsEnabled = true,
   verificationStatus = 'approved',
   interest = [],
+  reviewsDue = [],
 } = {}) {
   supabase.__on('listings', 'select', { data: listings, error: null })
   supabase.__on('bookings', 'select', (call) =>
@@ -75,6 +76,9 @@ function givenData({
   givenRpc(async (name, args) => {
     if (name === 'host_listing_interest') {
       return { data: interest, error: null }
+    }
+    if (name === 'host_reviews_due') {
+      return { data: reviewsDue, error: null }
     }
     if (previousRpc) return previousRpc(name, args)
     return { data: null, error: null }
@@ -1893,6 +1897,31 @@ describe('Hosting draft listing', () => {
   })
 })
 
+describe('Hosting reviews due', () => {
+  it('lists guests to review after the session', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      reviewsDue: [
+        {
+          booking_id: 'booking-1',
+          guest_id: 'guest-1',
+          guest_display_name: 'Sam',
+          listing_title: 'Latte art',
+          starts_at: hoursFromNow(-24),
+          deadline: hoursFromNow(24 * 5),
+          host_reviewed: false,
+          guest_reviewed: true,
+        },
+      ],
+    })
+    await renderHosting()
+
+    expect(screen.getByRole('heading', { name: '1 guest to review' })).toBeInTheDocument()
+    expect(screen.getByText(/Sam left you a review. Review Sam to see it/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
+  })
+})
+
 describe('Hosting without photo tips', () => {
   it('leaves the photo tips to the listing forms', async () => {
     givenData({ listings: [makeMyListing()] })
@@ -2354,6 +2383,24 @@ describe('Dashboard reviews', () => {
     await renderBookings()
 
     expect(screen.getByRole('link', { name: 'Leave a review' })).toBeInTheDocument()
+  })
+
+  it('does not invite a review after the 7-day window', async () => {
+    givenData({
+      bookings: [
+        makeBooking({
+          id: 'booking-old',
+          sessions: {
+            starts_at: hoursFromNow(-8 * 24),
+            duration_mins: 90,
+            listings: { title: 'Latte art', host_id: HOST_ID },
+          },
+        }),
+      ],
+    })
+    await renderBookings()
+
+    expect(screen.queryByRole('link', { name: 'Leave a review' })).not.toBeInTheDocument()
   })
 
   it('does not invite a review on a pending booking', async () => {

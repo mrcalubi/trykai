@@ -67,6 +67,12 @@ import {
   listingChangesSubject,
   listingSubmittedOpsHtml,
   listingSubmittedSubject,
+  reviewNudgeGuestHtml,
+  reviewNudgeGuestSubject,
+  reviewNudgeHostHtml,
+  reviewNudgeHostSubject,
+  reviewPrivateNoteOpsHtml,
+  reviewPrivateNoteOpsSubject,
 } from './email.ts'
 
 afterEach(() => {
@@ -1939,5 +1945,52 @@ describe('session reminder emails', () => {
     expect(html).toContain('Hi &lt;b&gt;Mei&lt;/b&gt;!')
     expect(html).not.toContain('<img src=x>')
     expect(html).toContain('&lt;img src=x&gt;')
+  })
+})
+
+describe('two-way review emails', () => {
+  it('asks the host to review the guest from the Hosting tab', () => {
+    expect(reviewNudgeHostSubject('Sam', 'Latte art')).toBe('Sam reviewed Latte art')
+    const html = reviewNudgeHostHtml({
+      siteUrl: 'https://trykai.sg',
+      hostName: 'Mei',
+      hostId: 'host-1',
+      guestName: 'Sam',
+      listingTitle: 'Latte art',
+      deadline: 'Tue, 10 Nov',
+    })
+    expect(html).toContain('Hi Mei,')
+    expect(html).toContain('Review Sam by Tue, 10 Nov to see what they said. Both reviews go live together.')
+    expect(html).toContain('https://trykai.sg/u/host-1?tab=hosting')
+    expect(html).toContain('See you there,')
+  })
+
+  it('asks the guest to leave their review on the booking page', () => {
+    expect(reviewNudgeGuestSubject('Mei')).toBe('Mei reviewed you')
+    const html = reviewNudgeGuestHtml({
+      siteUrl: 'https://trykai.sg',
+      guestName: 'Sam',
+      hostName: 'Mei',
+      bookingId: 'booking-1',
+      deadline: 'Tue, 10 Nov',
+    })
+    expect(html).toContain('Leave your review by Tue, 10 Nov to see it.')
+    expect(html).toContain('https://trykai.sg/bookings/booking-1#review')
+  })
+
+  it('escapes a private note to hello@', () => {
+    expect(reviewPrivateNoteOpsSubject()).toBe('Private note on a review')
+    const html = reviewPrivateNoteOpsHtml({
+      siteUrl: 'https://trykai.sg',
+      bookingReference: 'A1B2C3D4',
+      listingTitle: '<b>Latte</b>',
+      authorName: 'Sam',
+      authorRole: 'guest',
+      note: '<script>alert(1)</script>',
+    })
+    expect(html).toContain('A1B2C3D4')
+    expect(html).toContain('&lt;b&gt;Latte&lt;/b&gt;')
+    expect(html).not.toContain('<script>alert(1)</script>')
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
   })
 })

@@ -168,7 +168,7 @@ Once per booking, same 48 hour cutoff. Published as available. Recovers bookings
 **Done.** `/bookings` and RLS (`00011` `guest_can_leave_review`) both require a `confirmed` booking after `starts_at + duration_mins`, with `reviewee_id` the listing host. Unique on `(booking_id, role)`. Host→guest reviews are still P2.4.
 
 ### P2.4 — Host to guest reviews
-**Post launch (P3).** Two way reviews are promised. Insert policy is guest-only. No host UI. After that path exists, the browse rating filter can follow.
+**Done, 3 November 2026.** Two-way reviews with a 7-day blind reveal. `post_review`, host form on Hosting, public "From hosts" on the guest profile, private notes to TryKai. Browse rating filter can follow.
 
 ### P2.5 — Session auto complete
 `sessions.status` documents `'completed'`. Nothing ever writes it. Payouts key off `starts_at` + `duration_mins` + 72h, not this status, so launch can survive without it. Reviews and dispute windows were supposed to key off it.

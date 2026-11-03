@@ -110,8 +110,7 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
       supabase
         .from('reviews')
         .select('booking_id')
-        .eq('reviewer_id', userId)
-        .eq('role', 'guest'),
+        .eq('reviewer_id', userId),
     ])
 
     if (bookingsResult.error) {

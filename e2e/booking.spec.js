@@ -218,6 +218,7 @@ test.describe('listing detail', () => {
       listings: [LATTE_ART],
       sessions: [OPEN_SESSION],
       reviews: [{ id: 'r-this', rating: 5 }],
+      'rpc/host_rating': [{ average: 5, review_count: 1 }],
       'rpc/reviews_for_listing': [
         {
           id: 'r-this',

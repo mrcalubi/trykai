@@ -7210,6 +7210,103 @@ body.lightbox-open {
   width: 100%;
 }
 
+.review-form__private {
+  display: grid;
+  gap: 8px;
+}
+
+.review-form__private-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.review-form__private-optional {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.review-form__private-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.host-review-form__title {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--navy);
+}
+
+.hosting-reviews {
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.hosting-reviews__list {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hosting-reviews__item {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.hosting-reviews__item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.hosting-reviews__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hosting-reviews__name {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.hosting-reviews__meta,
+.hosting-reviews__close {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.hosting-reviews__nudge {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--navy);
+}
+
+.hosting-reviews__done {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--success);
+}
+
 .star-display {
   display: inline-flex;
   gap: 2px;

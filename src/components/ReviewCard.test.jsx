@@ -54,6 +54,12 @@ describe('ReviewCard', () => {
     expect(screen.getByLabelText('4 out of 5 stars')).toBeInTheDocument()
   })
 
+  it('hides stars on a host review of a guest', () => {
+    render(<ReviewCard review={makeReview({ rating: 5, comment: 'Lovely guest' })} hideRating />)
+    expect(screen.queryByLabelText(/out of 5 stars/)).not.toBeInTheDocument()
+    expect(screen.getByText('Lovely guest')).toBeInTheDocument()
+  })
+
   it('fills exactly as many stars as the rating', () => {
     const { container } = renderReview({ rating: 3 })
     expect(container.querySelectorAll('.star-display__filled')).toHaveLength(3)

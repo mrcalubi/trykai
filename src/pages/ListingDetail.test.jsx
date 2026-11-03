@@ -83,22 +83,40 @@ function givenSessions(sessions) {
   })
 }
 
+let listingReviewRows = []
+let hostRatingRow = { average: null, review_count: 0 }
+
 function givenReviews(reviews) {
+  listingReviewRows = reviews ?? []
+  const previous = supabase.rpc.getMockImplementation()
   supabase.rpc.mockImplementation(async (name, args) => {
     if (name === 'reviews_for_listing') {
       const listingId = args?.p_listing_id
-      const rows = (reviews ?? []).filter((review) => {
+      const rows = listingReviewRows.filter((review) => {
         const reviewListingId = review.bookings?.sessions?.listing_id
         return reviewListingId == null || reviewListingId === listingId
       })
       return { data: rows, error: null }
     }
+    if (name === 'host_rating') {
+      return hostRatingRow.review_count
+        ? { data: [hostRatingRow], error: null }
+        : { data: [], error: null }
+    }
+    if (typeof previous === 'function') return previous(name, args)
     return { data: null, error: null }
   })
 }
 
 function givenHostReviews(reviews) {
-  supabase.__on('reviews', 'select', { data: reviews, error: null })
+  const list = reviews ?? []
+  if (!list.length) {
+    hostRatingRow = { average: null, review_count: 0 }
+  } else {
+    const sum = list.reduce((total, row) => total + Number(row.rating || 0), 0)
+    hostRatingRow = { average: sum / list.length, review_count: list.length }
+  }
+  givenReviews(listingReviewRows)
 }
 
 function givenSignedIn(session = makeAuthSession()) {
@@ -131,6 +149,8 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  listingReviewRows = []
+  hostRatingRow = { average: null, review_count: 0 }
   supabase.__reset()
   vi.mocked(Sentry.captureException).mockClear()
   stripe.instance.confirmPayment.mockReset()
@@ -526,20 +546,8 @@ describe('ListingDetail content', () => {
 
     await screen.findByRole('heading', { name: 'Learn latte art with me', level: 1 })
     expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_listing', { p_listing_id: 'listing-1' })
-    const hostRatingCall = supabase
-      .__calls('reviews', 'select')
-      .find((call) => call.filters.some((filter) => filter.column === 'reviewee_id'))
-    expect(hostRatingCall.filters).toEqual(
-      expect.arrayContaining([
-        { method: 'eq', column: 'reviewee_id', value: 'host-1' },
-        { method: 'eq', column: 'role', value: 'guest' },
-      ])
-    )
-    expect(hostRatingCall.filters).not.toContainEqual({
-      method: 'eq',
-      column: 'bookings.sessions.listing_id',
-      value: 'listing-1',
-    })
+    expect(supabase.rpc).toHaveBeenCalledWith('host_rating', { p_host_id: 'host-1' })
+    expect(supabase.__calls('reviews', 'select')).toEqual([])
   })
 
   it('still shows listing reviews to a signed-out visitor', async () => {

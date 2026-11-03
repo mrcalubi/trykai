@@ -51,6 +51,7 @@ import {
   shortDay,
 } from '../lib/profileV2'
 import { formatSessionTime } from '../lib/sessionDate'
+import { reviewClosedOnLabel, reviewIsPublic } from '../lib/twoWayReviews'
 import { profileReportSubject, reportMailto } from '../lib/reportMailto'
 import { SHARE_NOTES, shareOrCopy } from '../lib/share'
 import OverflowMenu from '../components/ui/OverflowMenu'
@@ -406,6 +407,8 @@ export default function Profile() {
   const [stats, setStats] = useState(null)
   const [ratings, setRatings] = useState({})
   const [reviews, setReviews] = useState([])
+  const [fromHosts, setFromHosts] = useState([])
+  const [writtenReviews, setWrittenReviews] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [viewerId, setViewerId] = useState(null)
@@ -463,6 +466,8 @@ export default function Profile() {
       setStats(null)
       setRatings({})
       setReviews([])
+      setFromHosts([])
+      setWrittenReviews([])
       setShareNote('')
 
       const { data: userData, error: userError } = await loadProfileRow(id)
@@ -492,7 +497,7 @@ export default function Profile() {
       const viewingOwn = isOwner && viewParam !== 'public'
       const now = Date.now()
 
-      const [listingsResult, reviewsResult, heldResult, foundingResult, statsResult] =
+      const [listingsResult, reviewsResult, fromHostsResult, heldResult, foundingResult, statsResult] =
         await Promise.all([
           supabase
             .from('listings')
@@ -502,6 +507,7 @@ export default function Profile() {
             .eq('review_status', 'approved')
             .order('created_at', { ascending: false }),
           supabase.rpc('reviews_for_host', { p_host_id: id }),
+          supabase.rpc('reviews_for_guest', { p_guest_id: id }),
           userData.is_host
             ? supabase.rpc('host_sessions_held', { p_host_id: id })
             : Promise.resolve({ data: 0, error: null }),
@@ -535,7 +541,20 @@ export default function Profile() {
       }
 
       if (!reviewsResult.error) {
-        setReviews(await attachReviewerIds(reviewsResult.data ?? []))
+        setReviews(reviewsResult.data ?? [])
+      }
+      if (!fromHostsResult.error) {
+        setFromHosts((fromHostsResult.data ?? []).map(hostReviewAsCard))
+      }
+      if (viewingOwn) {
+        const { data: mine } = await supabase
+          .from('reviews')
+          .select(
+            'id, role, comment, rating, created_at, revealed_at, reveal_after, bookings(sessions(listings(title)))',
+          )
+          .eq('reviewer_id', id)
+          .order('created_at', { ascending: false })
+        setWrittenReviews(mine ?? [])
       }
 
       setSessionsHeld(heldResult.error ? 0 : sessionsHeldCount(heldResult.data))
@@ -634,7 +653,11 @@ export default function Profile() {
       ? []
       : comingUpSessions(openSessions, { now: nowMs, days: COMING_UP_DAYS })
   const medals = isHost
-    ? hostMedals({ sessionsHeld, reviews: hostReviews })
+    ? hostMedals({
+        sessionsHeld,
+        reviews: hostReviews,
+        guestsReviewed: stats?.guestsReviewed,
+      })
     : guestMedals(stats ?? {})
   // Milestones are for the owner; guests see the featured review (design v2).
   const showMedals = isOwn && (isHost || Boolean(stats))
@@ -898,8 +921,14 @@ export default function Profile() {
               aria-label="Reviews"
               hidden={activeTab !== 'reviews'}
             >
-              <ReviewsHeading reviews={hostReviews} />
-              <ReviewsList reviews={hostReviews} viewerId={viewerId} />
+              {isHost ? (
+                <>
+                  <ReviewsHeading reviews={hostReviews} />
+                  <ReviewsList reviews={hostReviews} viewerId={viewerId} />
+                </>
+              ) : null}
+              <FromHostsSection reviews={fromHosts} viewerId={viewerId} heading="About you" />
+              <WrittenReviewsSection reviews={writtenReviews} nowMs={nowMs} />
             </section>
           ) : null}
         </>
@@ -920,22 +949,66 @@ export default function Profile() {
               <ReviewsList reviews={hostReviews} viewerId={viewerId} />
             </section>
           ) : null}
+          <FromHostsSection reviews={fromHosts} viewerId={viewerId} />
         </>
       )}
     </div>
   )
 }
 
-async function attachReviewerIds(reviews) {
-  if (!reviews.length) return reviews
-  const { data } = await supabase
-    .from('reviews')
-    .select('id, reviewer_id')
-    .in('id', reviews.map((review) => review.id))
-  if (!data?.length) return reviews
-  const byId = new Map(data.map((row) => [row.id, row.reviewer_id]))
-  return reviews.map((review) => ({
-    ...review,
-    reviewer_id: review.reviewer_id ?? byId.get(review.id) ?? null,
-  }))
+function hostReviewAsCard(row) {
+  return {
+    id: row.id,
+    comment: row.comment,
+    created_at: row.created_at,
+    listing_title: row.listing_title,
+    reviewer_id: row.host_id,
+    users: {
+      full_name: row.host_display_name,
+      avatar_url: row.host_avatar_url,
+    },
+  }
+}
+
+function FromHostsSection({ reviews, viewerId, heading }) {
+  if (!reviews?.length) return null
+  const count = reviews.length
+  return (
+    <section className="profile-section" aria-label={heading || 'From hosts'}>
+      <h2 className="profile-section__title">
+        {heading || 'From hosts'} ({count})
+      </h2>
+      <div className="reviews-list profile-reviews">
+        {reviews.map((review) => (
+          <ReviewCard key={review.id} review={review} viewerId={viewerId} hideRating />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function WrittenReviewsSection({ reviews, nowMs }) {
+  if (!reviews?.length) return null
+  return (
+    <section className="profile-section" aria-label="By you">
+      <h2 className="profile-section__title">By you</h2>
+      <div className="reviews-list profile-reviews">
+        {reviews.map((review) => {
+          const listingTitle = review.bookings?.sessions?.listings?.title
+          const pending = !reviewIsPublic(review, nowMs)
+          return (
+            <div key={review.id}>
+              <ReviewCard
+                review={{ ...review, listing_title: listingTitle }}
+                hideRating={review.role === 'host'}
+              />
+              {pending ? (
+                <p className="hint">Live on {reviewClosedOnLabel(review.reveal_after, nowMs)}</p>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
 }

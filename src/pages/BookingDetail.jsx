@@ -54,6 +54,7 @@ import BioPreview from '../components/BioPreview'
 import ReviewForm from '../components/ReviewForm'
 import VerifiedBadge from '../components/VerifiedBadge'
 import HostRating from '../components/HostRating'
+import { firstRow, hostRatingFromRpc, reviewClosedOnLabel } from '../lib/twoWayReviews'
 
 const BOOKING_SELECT = `
   id,
@@ -233,8 +234,9 @@ export default function BookingDetail() {
   const [error, setError] = useState('')
   const [notGuest, setNotGuest] = useState(false)
   const [bookingAddons, setBookingAddons] = useState([])
-  const [hostReviews, setHostReviews] = useState([])
+  const [hostRating, setHostRating] = useState({ average: null, reviewCount: 0 })
   const [alreadyReviewed, setAlreadyReviewed] = useState(false)
+  const [reviewState, setReviewState] = useState(null)
   const [upcomingCount, setUpcomingCount] = useState(0)
   const [bringChecked, setBringChecked] = useState([])
   const [note, setNote] = useState('')
@@ -296,18 +298,26 @@ export default function BookingDetail() {
     }
 
     if (hostId) {
-      const { data: reviews } = await supabase.from('reviews').select('rating').eq('reviewee_id', hostId)
-      setHostReviews(reviews ?? [])
+      const { data: ratingRows, error: ratingError } = await supabase.rpc('host_rating', {
+        p_host_id: hostId,
+      })
+      setHostRating(hostRatingFromRpc(ratingRows, ratingError))
     }
 
-    const { data: mine } = await supabase
-      .from('reviews')
-      .select('booking_id')
-      .eq('reviewer_id', userId)
-      .eq('booking_id', data.id)
-      .eq('role', 'guest')
-      .maybeSingle()
-    setAlreadyReviewed(Boolean(mine?.booking_id))
+    const { data: stateRows } = await supabase.rpc('my_review_state', { p_booking_id: data.id })
+    const state = firstRow(stateRows)
+    setReviewState(state)
+    if (state) {
+      setAlreadyReviewed(Boolean(state.i_reviewed))
+    } else {
+      const { data: mine } = await supabase
+        .from('reviews')
+        .select('booking_id')
+        .eq('reviewer_id', userId)
+        .eq('booking_id', data.id)
+        .maybeSingle()
+      setAlreadyReviewed(Boolean(mine?.booking_id))
+    }
 
     if (listingId) {
       const { data: open } = await supabase
@@ -443,7 +453,11 @@ export default function BookingDetail() {
   const ended = sessionHasEnded(sessionForReview(session), nowMs)
   const dayOf = isBookingDayOf(startsAt, durationMins, nowMs)
   const cancelled = booking.status === 'cancelled'
-  const canReview = guestBookingActions(booking, { alreadyReviewed, now: new Date(nowMs) }).review
+  const canReview = reviewState
+    ? Boolean(reviewState.can_review)
+    : guestBookingActions(booking, { alreadyReviewed, now: new Date(nowMs) }).review
+  const waitingToReveal = Boolean(reviewState?.i_reviewed && !reviewState?.my_review_public)
+  const revealOn = reviewState?.reveal_after || reviewState?.deadline
   const canCancel = guestBookingActions(booking, { now: new Date(nowMs) }).cancel
   const blockReason = rescheduleBlockReason(booking, nowMs)
   const canManage = booking.status === 'confirmed' && !ended
@@ -604,7 +618,7 @@ export default function BookingDetail() {
         <div>
           <p className="booking-host__name">{hostName ? `Your host, ${hostName}` : 'Your host'}</p>
           {host?.is_id_verified ? <VerifiedBadge /> : null}
-          <HostRating reviews={hostReviews} />
+          <HostRating average={hostRating.average} reviewCount={hostRating.reviewCount} />
         </div>
       </div>
       <BioPreview bio={host?.bio} lines={2} />
@@ -735,13 +749,31 @@ export default function BookingDetail() {
             </section>
           ) : null}
 
-          {ended && !cancelled ? (
+          {ended && !cancelled && (canReview || waitingToReveal || alreadyReviewed) ? (
             <section className="booking-card booking-review" id="review">
               <h2 className="booking-card__title">How was it with {hostLabel}?</h2>
-              {alreadyReviewed ? (
+              {canReview ? (
+                <ReviewForm
+                  booking={booking}
+                  userId={userId}
+                  closedOn={reviewClosedOnLabel(revealOn)}
+                  onSubmitted={() => {
+                    setAlreadyReviewed(true)
+                    setReviewState((current) => ({
+                      ...(current ?? {}),
+                      can_review: false,
+                      i_reviewed: true,
+                      my_review_public: false,
+                    }))
+                  }}
+                />
+              ) : waitingToReveal ? (
+                <p className="hint">
+                  Thanks for your review. It goes live when {hostLabel} reviews you too, or on{' '}
+                  {reviewClosedOnLabel(revealOn)}, whichever comes first.
+                </p>
+              ) : alreadyReviewed ? (
                 <p className="hint">Review submitted</p>
-              ) : canReview ? (
-                <ReviewForm booking={booking} userId={userId} onSubmitted={() => setAlreadyReviewed(true)} />
               ) : null}
               {listing?.id ? (
                 <div className="booking-again">

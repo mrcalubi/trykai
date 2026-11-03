@@ -36,6 +36,7 @@ const FUNCTIONS = [
   'release-payout',
   'report-booking-problem',
   'reschedule-booking',
+  'review-emails',
   'send-reminders',
   'singpass-callback',
   'singpass-start',
