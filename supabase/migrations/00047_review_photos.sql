@@ -30,6 +30,13 @@ begin
     new.photo_paths := '{}';
   end if;
 
+  -- Only check paths when they change. Any other update (a future
+  -- anonymisation of reviewer_id, an admin fix) must not fail because an
+  -- object was removed out of order.
+  if tg_op = 'UPDATE' and new.photo_paths is not distinct from old.photo_paths then
+    return new;
+  end if;
+
   foreach photo_path in array new.photo_paths
   loop
     if photo_path is null

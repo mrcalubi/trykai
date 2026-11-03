@@ -32,7 +32,7 @@ describe('ReviewForm', () => {
     )
   })
 
-  it('saves a rating-only review with an empty photo_paths array', async () => {
+  it('saves a rating-only review without sending photo_paths', async () => {
     const onSubmitted = vi.fn()
     const { user } = renderWithRouter(
       <ReviewForm booking={booking} userId={USER_ID} onSubmitted={onSubmitted} />,
@@ -50,7 +50,6 @@ describe('ReviewForm', () => {
       rating: 5,
       comment: null,
       role: 'guest',
-      photo_paths: [],
     })
     expect(onSubmitted).toHaveBeenCalled()
     expect(supabase.__bucket('review-photos').upload).not.toHaveBeenCalled()

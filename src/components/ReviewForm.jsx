@@ -61,15 +61,18 @@ export default function ReviewForm({
     setLoading(true)
     try {
       const photoPaths = photos.length > 0 ? await uploadReviewPhotos(photos, userId, supabase.storage) : []
-      const { error: insertError } = await supabase.from('reviews').insert({
+      const row = {
         booking_id: booking.id,
         reviewer_id: userId,
         reviewee_id: hostId,
         rating,
         comment: comment.trim() || null,
         role: 'guest',
-        photo_paths: photoPaths,
-      })
+      }
+      // Send photo_paths only when there are photos, so a text review still
+      // saves if this code ever reaches a database without 00047.
+      if (photoPaths.length > 0) row.photo_paths = photoPaths
+      const { error: insertError } = await supabase.from('reviews').insert(row)
       if (insertError) {
         setError(insertError.message)
         return

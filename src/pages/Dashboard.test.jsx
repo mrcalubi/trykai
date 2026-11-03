@@ -2429,7 +2429,6 @@ describe('Dashboard reviews', () => {
       rating: 4,
       comment: 'Great session',
       role: 'guest',
-      photo_paths: [],
     })
   })
 

@@ -33,6 +33,9 @@ describe('00047 review photos', () => {
     expect(migration).toMatch(/bucket_id = 'review-photos'/)
     expect(migration).toMatch(/name = photo_path/)
     expect(migration).toMatch(/before insert or update on public\.reviews/)
+    expect(migration).toMatch(
+      /tg_op = 'UPDATE' and new\.photo_paths is not distinct from old\.photo_paths then\s*return new;/,
+    )
   })
 
   it('creates a public jpeg/webp bucket capped at 3 MB with insert-only own-folder policy', () => {
