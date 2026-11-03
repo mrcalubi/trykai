@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
+import * as Sentry from '@sentry/react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { supabase } from '../lib/supabase'
+import PayNowQrPanel from '../components/PayNowQrPanel'
 import ReviewCard from '../components/ReviewCard'
 import HostRating from '../components/HostRating'
 import BioPreview from '../components/BioPreview'
@@ -49,6 +51,14 @@ import { formatDuration } from '../lib/duration'
 import { edgeFunctionErrorMessage, isPayNowTooFarAheadError } from '../lib/edgeFunctionError'
 import { isLowSpots, spotsLabel } from '../lib/listingSpots'
 import { checkoutCanLeaveForWebhook } from '../lib/paymentReturn'
+import {
+  CONFIRM_PAYNOW_PAYMENT_DATA,
+  CONFIRM_PAYNOW_PAYMENT_OPTIONS,
+  PAYNOW_NEXT_STEP,
+  PAYNOW_PHONE_HINT,
+  PAYNOW_QR_MISSING,
+  paynowDisplayQr,
+} from '../lib/paynowQr'
 import { publicName } from '../lib/publicName'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { listingReportSubject, reportMailto } from '../lib/reportMailto'
@@ -113,18 +123,77 @@ async function attachReviewerIds(reviews) {
   }))
 }
 
-function CheckoutForm({ totalAmount, bookingId, onSuccess, onPaymentFailed }) {
+function CheckoutForm({
+  totalAmount,
+  bookingId,
+  clientSecret,
+  rail,
+  onSuccess,
+  onPaymentFailed,
+  onPayNowDismiss,
+}) {
   const stripe = useStripe()
   const elements = useElements()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [paynowQr, setPaynowQr] = useState(null)
+  const [paynowIntent, setPaynowIntent] = useState(null)
+
+  function dismissPayNow() {
+    onPaymentFailed?.()
+    onPayNowDismiss?.()
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!stripe || !elements) return
+    if (!stripe) return
+    if (rail !== 'paynow' && !elements) return
 
     setError('')
     setLoading(true)
+
+    if (rail === 'paynow') {
+      const { error: confirmError, paymentIntent } = await stripe.confirmPayNowPayment(
+        clientSecret,
+        CONFIRM_PAYNOW_PAYMENT_DATA,
+        CONFIRM_PAYNOW_PAYMENT_OPTIONS,
+      )
+
+      if (confirmError || !paymentIntent) {
+        setLoading(false)
+        setError(confirmError?.message || 'Payment was not completed. You have not been charged.')
+        if (paymentIntent?.status === 'canceled') onPaymentFailed?.()
+        return
+      }
+
+      if (checkoutCanLeaveForWebhook(paymentIntent.status)) {
+        onSuccess(paymentIntent.status)
+        return
+      }
+
+      if (paymentIntent.status === 'canceled') {
+        setLoading(false)
+        setError('Payment was not completed. You have not been charged.')
+        onPaymentFailed?.()
+        return
+      }
+
+      const qr = paynowDisplayQr(paymentIntent)
+      if (!qr) {
+        setLoading(false)
+        setError(PAYNOW_QR_MISSING)
+        Sentry.captureException(new Error('paynow_qr_missing'), {
+          tags: { area: 'paynow-qr' },
+          extra: { reason: 'missing_next_action', status: paymentIntent.status },
+        })
+        return
+      }
+
+      setPaynowIntent(paymentIntent)
+      setPaynowQr(qr)
+      setLoading(false)
+      return
+    }
 
     const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
       elements,
@@ -146,6 +215,21 @@ function CheckoutForm({ totalAmount, bookingId, onSuccess, onPaymentFailed }) {
     onSuccess(paymentIntent.status)
   }
 
+  if (paynowQr) {
+    return (
+      <PayNowQrPanel
+        qr={paynowQr}
+        paymentIntent={paynowIntent}
+        totalAmount={totalAmount}
+        clientSecret={clientSecret}
+        stripe={stripe}
+        onSuccess={onSuccess}
+        onPaymentFailed={dismissPayNow}
+        onDismiss={dismissPayNow}
+      />
+    )
+  }
+
   return (
     <div className="payment-form-wrap">
       {loading ? (
@@ -165,11 +249,11 @@ function CheckoutForm({ totalAmount, bookingId, onSuccess, onPaymentFailed }) {
         <p className="payment-form__total">
           Total: <FormattedPrice cents={totalAmount} />
         </p>
-        <PaymentElement />
+        {rail === 'paynow' ? <p className="payment-form__paynow">{PAYNOW_NEXT_STEP}</p> : <PaymentElement />}
         {error && <p className="error-message">{error}</p>}
         <div className="payment-form__actions">
           <button type="submit" disabled={!stripe || loading} className="btn btn--primary">
-            Pay <FormattedPrice cents={totalAmount} />
+            {rail === 'paynow' ? 'Show PayNow QR' : <>Pay <FormattedPrice cents={totalAmount} /></>}
           </button>
           <p className="payment-form__secure">Payments are processed securely by Stripe.</p>
         </div>
@@ -464,6 +548,12 @@ export default function ListingDetail() {
     setPaymentError('')
     setPayNowBlockedByServer(false)
     void abandonUnpaidCheckout(unpaidId)
+  }
+
+  function dismissPayNowCheckout() {
+    setClientSecret(null)
+    setBookingId(null)
+    setTotalAmount(null)
   }
 
   function showMonth(monthKey) {
@@ -920,7 +1010,9 @@ export default function ListingDetail() {
                 </button>
                 {paynowBlocked ? (
                   <p className="payment-rails__hint">{PAYNOW_TOO_FAR_AHEAD_MESSAGE}</p>
-                ) : null}
+                ) : (
+                  <p className="payment-rails__hint">{PAYNOW_PHONE_HINT}</p>
+                )}
                 <button
                   type="button"
                   role="radio"
@@ -1014,8 +1106,11 @@ export default function ListingDetail() {
               <CheckoutForm
                 totalAmount={totalAmount}
                 bookingId={bookingId}
+                clientSecret={clientSecret}
+                rail={displayRail}
                 onSuccess={handlePaymentSuccess}
                 onPaymentFailed={() => void abandonUnpaidCheckout(bookingId)}
+                onPayNowDismiss={dismissPayNowCheckout}
               />
             </Elements>
           )}

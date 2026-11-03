@@ -101,7 +101,7 @@ export async function stubStripe(page) {
     route.fulfill({
       status: 200,
       contentType: 'application/javascript',
-      body: 'window.Stripe = function () { return { elements: function () { return {} } } }',
+      body: 'window.Stripe = function () { return { elements: function () { return {} }, confirmPayNowPayment: function () { return Promise.resolve({ error: null, paymentIntent: { status: "requires_action" } }) }, retrievePaymentIntent: function () { return Promise.resolve({ error: null, paymentIntent: { status: "requires_action" } }) } } }',
     })
   )
 }
