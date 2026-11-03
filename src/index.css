@@ -10698,3 +10698,10 @@ body:has(.edit-profile__bar) .site-footer {
   padding-top: 16px;
   border-top: 1px solid var(--border);
 }
+
+/* Space the open host review form from the guest row above it. */
+.hosting-reviews .host-review-form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}

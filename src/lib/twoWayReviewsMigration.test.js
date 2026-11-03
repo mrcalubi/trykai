@@ -148,4 +148,15 @@ describe('two_way_reviews_check.sql', () => {
     expect(checkSql).toMatch(/reviews_for_guest must never return rating/)
     expect(checkSql).toMatch(/anon should not select reviews after 00049/)
   })
+  it('runs the featured-review guard as definer so 00049 cannot break it', () => {
+    expect(migration).toMatch(
+      /create or replace function public\.guard_featured_review\(\)\s*returns trigger\s*language plpgsql\s*security definer/,
+    )
+  })
+
+  it('gives a stranger no review state for someone else\'s booking', () => {
+    const body = migration.slice(migration.indexOf('function public.my_review_state'))
+    expect(body).toMatch(/Not the guest or the host: return nothing/)
+    expect(body.slice(0, body.indexOf('$$;'))).not.toMatch(/can_review := false;/)
+  })
 })

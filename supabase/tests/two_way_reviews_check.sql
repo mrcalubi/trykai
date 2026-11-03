@@ -180,6 +180,25 @@ begin
       and policyname = 'Anyone can view reviews'
   );
 
+  -- A host can feature a public guest review of themselves. Runs as the host
+  -- so it also proves the guard works once 00049 hides other people's rows.
+  update public.reviews set revealed_at = now() where id = v_guest_review;
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claims', json_build_object('sub', v_host::text, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_host::text, true);
+  update public.users set featured_review_id = v_guest_review where id = v_host;
+  if not found then
+    raise exception 'host could not feature their own public guest review';
+  end if;
+
+  -- A stranger gets no review state for someone else's booking.
+  perform set_config('request.jwt.claims', json_build_object('sub', v_stranger::text, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_stranger::text, true);
+  if exists (select 1 from public.my_review_state(v_booking)) then
+    raise exception 'my_review_state must return nothing to a stranger';
+  end if;
+  execute 'set local role postgres';
+
   if v_locked then
     execute 'set local role anon';
     begin

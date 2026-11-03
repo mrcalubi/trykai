@@ -559,13 +559,7 @@ begin
       and r.role = 'guest'
       and r.reviewee_id = v_host_id;
   else
-    can_review := false;
-    deadline := v_deadline;
-    i_reviewed := false;
-    my_review_public := false;
-    other_side_reviewed := false;
-    reveal_after := null;
-    return next;
+    -- Not the guest or the host: return nothing, not even the deadline.
     return;
   end if;
 
@@ -731,9 +725,12 @@ comment on function public.my_profile_stats() is
 revoke all on function public.my_profile_stats() from public, anon;
 grant execute on function public.my_profile_stats() to authenticated;
 
+-- Security definer: after 00049 a host cannot read guests' review rows, so
+-- running as the host would reject every featured pick.
 create or replace function public.guard_featured_review()
 returns trigger
 language plpgsql
+security definer
 set search_path = public
 as $$
 begin
