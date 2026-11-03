@@ -78,7 +78,7 @@ export default function HostReviewForm({ row, onSubmitted, onCancel }) {
         Your words show on {guestName}&apos;s profile. Stars stay private.
       </p>
       <ReviewPrivateNote
-        id={`review-private-note-${row.booking_id}`}
+        id={`review-private-note-${row.booking_id}-${row.guest_id}`}
         value={privateNote}
         onChange={setPrivateNote}
       />
@@ -100,7 +100,9 @@ export function HostReviewsDueList({ rows, now }) {
   const [doneIds, setDoneIds] = useState(() => new Set())
   const [nowMs] = useState(() => Date.now())
   const at = now ?? nowMs
-  const pending = (rows ?? []).filter((row) => !row.host_reviewed && !doneIds.has(row.booking_id))
+  // A booking can list the booker and friends who took a seat, so key by person.
+  const keyOf = (row) => `${row.booking_id}:${row.guest_id}`
+  const pending = (rows ?? []).filter((row) => !row.host_reviewed && !doneIds.has(keyOf(row)))
   const count = pending.length
 
   if (!rows?.length) return null
@@ -113,13 +115,17 @@ export function HostReviewsDueList({ rows, now }) {
       <ul className="hosting-reviews__list">
         {(rows ?? []).map((row) => {
           const guestName = row.guest_display_name?.trim() || 'Guest'
-          const done = row.host_reviewed || doneIds.has(row.booking_id)
+          const key = keyOf(row)
+          const done = row.host_reviewed || doneIds.has(key)
           const days = daysLeftUntil(row.deadline, at)
           return (
-            <li key={row.booking_id} className="hosting-reviews__item">
+            <li key={key} className="hosting-reviews__item">
               <div className="hosting-reviews__row">
                 <div>
-                  <p className="hosting-reviews__name">{guestName}</p>
+                  <p className="hosting-reviews__name">
+                    {guestName}
+                    {row.booked_by ? <span className="hosting-reviews__with"> · with {row.booked_by}</span> : null}
+                  </p>
                   <p className="hosting-reviews__meta">
                     {row.listing_title}
                     {row.starts_at ? (
@@ -141,18 +147,18 @@ export function HostReviewsDueList({ rows, now }) {
                   <button
                     type="button"
                     className="btn btn--small"
-                    onClick={() => setOpenId((current) => (current === row.booking_id ? null : row.booking_id))}
+                    onClick={() => setOpenId((current) => (current === key ? null : key))}
                   >
                     Review
                   </button>
                 )}
               </div>
-              {openId === row.booking_id && !done ? (
+              {openId === key && !done ? (
                 <HostReviewForm
                   row={row}
                   onCancel={() => setOpenId(null)}
                   onSubmitted={() => {
-                    setDoneIds((current) => new Set(current).add(row.booking_id))
+                    setDoneIds((current) => new Set(current).add(key))
                     setOpenId(null)
                   }}
                 />

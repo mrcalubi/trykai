@@ -460,6 +460,7 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00046` (booking cutoff and arrival) | Not applied | Not applied | After `00045`. Caleb applies. Cutoff, How to find me, day-of number, `booking_host_contact`, `listing_arrival_instructions`; replaces `my_account` and `reschedule_booking`. |
 | `00047` (review photos) | Not applied | Not applied | **Apply on staging before merging the review-photos PR.** After `00046`. Caleb applies. `reviews.photo_paths`, public insert-only `review-photos` bucket, `reviews_for_listing` / `reviews_for_host` return `photo_paths`. |
 | `00048` (two-way reviews) | Not applied | Not applied | **Apply on staging, then production, BEFORE merging the two-way-reviews release.** After `00047`. Additive: reveal columns, `post_review`, `review_notes`, public readers. Does not revoke `reviews` grants. Then run `supabase/tests/two_way_reviews_check.sql` in the staging SQL Editor (begin/rollback). |
+| `00050` (who's coming) | Not applied | Not applied | **Apply on staging, then production, BEFORE merging the who's-coming release.** After `00049` on staging; on production it needs `00048` (not `00049`). Additive: `booking_guests`, `booking_join_codes`, join/claim/leave RPCs, friends added to address and day-of number reads, host reviews of friends. Then run `supabase/tests/booking_companions_check.sql` in the staging SQL Editor (begin/rollback). |
 | `00049` (lock reviews) | Not applied | Not applied | **Apply ONLY after the two-way-reviews release is live on production.** Staging first, test, then production. Drops public SELECT/INSERT on `reviews`; authenticated sees own rows only. |
 
 Earlier migrations are assumed applied on both, since these build on them.
@@ -1021,6 +1022,18 @@ limit 50;
 ```
 
 After applying `00048` on staging, run `supabase/tests/two_way_reviews_check.sql` in the SQL Editor (it wraps itself in `begin` … `rollback`). The last block is skipped until `00049` is applied.
+
+**Who's coming (00050).** After applying it on staging, run `supabase/tests/booking_companions_check.sql` the same way. "ROLLBACK" with no error means every check passed. To see who took a seat on a booking:
+
+```sql
+select bg.joined_at, u.display_name, u.email
+from public.booking_guests bg
+join public.users u on u.id = bg.user_id
+where bg.booking_id = '<booking id>'
+order by bg.joined_at;
+```
+
+To take a seat away by hand (the booker can do this themselves before the session): `delete from public.booking_guests where booking_id = '<booking id>' and user_id = '<user id>';`
 
 Emailed complaints still follow every step below. Safety reports have no time limit and never go through the in-app form.
 
