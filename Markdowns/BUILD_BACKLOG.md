@@ -124,7 +124,7 @@ Still to do:
 
 ### P0.8 — Real email delivery — DONE 14 September
 **Flow:** anything happens → the relevant person is told
-**Today:** from-address is `TryKai <no-reply@trykai.sg>` in `_shared/email.ts`. trykai.sg is verified in Resend.
+**Today:** from-address is `TryKai <hello@trykai.sg>` in `_shared/email.ts` (no-reply until 3 November). trykai.sg is verified in Resend.
 
 `notify-verification-pending` requires `NOTIFY_FUNCTION_SECRET` (`x-notify-secret` or Bearer). `notify-verification-result` is gone; result emails come from `admin-verifications` and `stripe-webhook`. `release-payout` and `admin-cancel-booking` already require a secret; `stripe-webhook` verifies `Stripe-Signature`.
 

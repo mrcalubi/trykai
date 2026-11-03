@@ -517,6 +517,28 @@ describe('ListingDetail content', () => {
     expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_listing', { p_listing_id: 'listing-1' })
   })
 
+  it('shows review photos from photo_paths and a quiet Report link', async () => {
+    givenListing()
+    givenReviews([
+      makeReview({
+        photo_paths: ['user-1/a.jpg'],
+        users: { full_name: 'Arun' },
+      }),
+    ])
+    renderPage()
+
+    const thumb = await screen.findByRole('button', { name: 'View review photo 1 of 1' })
+    expect(thumb.querySelector('img')).toHaveAttribute(
+      'src',
+      'https://cdn.test/review-photos/user-1/a.jpg',
+    )
+    expect(screen.getByRole('link', { name: 'Report' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('review-1'),
+    )
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+  })
+
   it('hides reviews whose booking belongs to another listing', async () => {
     givenListing()
     givenReviews([
@@ -1036,6 +1058,40 @@ describe('ListingDetail booking', () => {
     expect(screen.getByRole('radio', { name: /PayNow/ })).not.toHaveTextContent('Save 3%')
   })
 
+  it('tells PayNow guests to screenshot the QR only on the payment step', async () => {
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 4947 },
+      error: null,
+    })
+    const { user } = renderPage()
+    const hint = "On your phone? If saving the QR doesn't work, take a screenshot of it instead."
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(paynowRail()).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByText(hint)).not.toBeInTheDocument()
+
+    await user.click(continueToPayment())
+    expect(await screen.findByText(hint)).toBeInTheDocument()
+  })
+
+  it('does not show the PayNow screenshot note when paying by card', async () => {
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 5100 },
+      error: null,
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(screen.getByRole('radio', { name: /^Card/ }))
+    await user.click(continueToPayment())
+
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
+    expect(await screen.findByText(/^Total:/)).toBeInTheDocument()
+    expect(screen.queryByText(/take a screenshot of it instead/)).not.toBeInTheDocument()
+  })
+
   it('disables PayNow when the session is more than 80 days away', async () => {
     givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(81 * 24) })])
     givenSignedIn()
@@ -1048,6 +1104,7 @@ describe('ListingDetail booking', () => {
     expect(
       screen.getByText('PayNow is available for sessions within 80 days. Please pay by card.')
     ).toBeInTheDocument()
+    expect(screen.queryByText(/take a screenshot of it instead/)).not.toBeInTheDocument()
     expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$51')
     expect(paynow).toHaveTextContent('$51')
     expect(paynow).not.toHaveTextContent('$49.47')

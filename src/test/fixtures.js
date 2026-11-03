@@ -93,6 +93,7 @@ export function makeReview(overrides = {}) {
     rating: 5,
     comment: 'Wonderful host.',
     created_at: '2026-03-14T02:00:00.000Z',
+    photo_paths: [],
     users: { full_name: 'Guest' },
     ...overrides,
   }

@@ -353,6 +353,44 @@ describe('BookingDetail', () => {
     vi.useRealTimers()
   })
 
+  it('scrolls to the review when opened from Leave a review', async () => {
+    const scrollIntoView = vi.fn()
+    const original = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = scrollIntoView
+    try {
+      givenBooking(
+        detailBooking({
+          sessions: { ...detailBooking().sessions, starts_at: hoursFromNow(-5) },
+        }),
+      )
+      renderDetail(`/bookings/${BOOKING_ID}#review`)
+      const heading = await screen.findByRole('heading', { name: 'How was it with Mei Ling?' })
+      expect(heading.closest('section')).toHaveAttribute('id', 'review')
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+      expect(scrollIntoView.mock.instances[0]).toBe(heading.closest('section'))
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original
+    }
+  })
+
+  it('does not scroll without the review anchor', async () => {
+    const scrollIntoView = vi.fn()
+    const original = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = scrollIntoView
+    try {
+      givenBooking(
+        detailBooking({
+          sessions: { ...detailBooking().sessions, starts_at: hoursFromNow(-5) },
+        }),
+      )
+      renderDetail()
+      await screen.findByRole('heading', { name: 'How was it with Mei Ling?' })
+      expect(scrollIntoView).not.toHaveBeenCalled()
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original
+    }
+  })
+
   it('asks for a review after the session and keeps buttons short', async () => {
     givenBooking(
       detailBooking({
@@ -364,7 +402,13 @@ describe('BookingDetail', () => {
     )
     renderDetail()
     expect(await screen.findByRole('heading', { name: 'How was it with Mei Ling?' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Leave a review' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Post review' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Add photos')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Add up to 3 photos of what you made. Only photos you took, and ask before including anyone else.',
+      ),
+    ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'See dates' })).toHaveAttribute('href', '/listings/listing-1')
     expect(screen.queryByRole('link', { name: 'Go again' })).not.toBeInTheDocument()
     // One report entry point only: the help line, not a second one in this card.

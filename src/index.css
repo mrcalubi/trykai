@@ -382,6 +382,22 @@ a {
   z-index: 200;
 }
 
+/* In-app browsers (Telegram, Instagram) can show page content above the
+   viewport, under their own collapsing toolbar. The fixed nav sits at the
+   viewport top, so photos scrolled past showed through above it. This band
+   fills that area with the page colour. In normal browsers it sits off
+   screen above the viewport and is never seen. */
+.ui-topnav-shell::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  height: 240px;
+  background: var(--cream);
+  pointer-events: none;
+}
+
 .ui-topnav-shell--compact {
   --ui-topnav-current-height: 52px;
 }
@@ -4171,6 +4187,10 @@ body.lightbox-open {
   color: var(--navy);
 }
 
+.featured-review .review-photos {
+  margin-top: 0;
+}
+
 .featured-review__by {
   font-size: 13px;
   color: var(--muted);
@@ -5794,6 +5814,13 @@ body.lightbox-open {
   gap: 16px;
 }
 
+.payment-form__hint {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 .payment-form__total {
   display: flex;
   justify-content: space-between;
@@ -6990,6 +7017,122 @@ body.lightbox-open {
   color: var(--text);
 }
 
+.review-card__report {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: underline;
+}
+
+.review-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-photos__tile {
+  display: block;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 10px;
+  background: var(--sand);
+  cursor: pointer;
+}
+
+.review-photos__tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.review-form {
+  gap: 14px;
+}
+
+.review-form__photos {
+  margin: 0;
+}
+
+.review-form__tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.review-form__tile,
+.review-form__add {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--sand);
+}
+
+.review-form__tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.review-form__remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--navy) 80%, transparent);
+  color: var(--cream);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.review-form__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--border-strong);
+  background: var(--cream);
+  color: var(--muted);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.review-form__add:hover,
+.review-form__add:focus-within {
+  border-color: var(--navy);
+  color: var(--navy);
+}
+
+.review-form__consent {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.review-form__submit {
+  width: 100%;
+}
+
 .star-display {
   display: inline-flex;
   gap: 2px;
@@ -7017,7 +7160,8 @@ body.lightbox-open {
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--border);
+  /* Empty stars are outlines (☆) in --muted so they read as tappable, not disabled. */
+  color: var(--muted);
   transition: color 0.1s ease, transform 0.1s ease;
 }
 
@@ -10367,4 +10511,16 @@ body:has(.edit-profile__bar) .site-footer {
   margin: 8px 0 0;
   font-size: 14px;
   color: var(--muted);
+}
+
+/* /bookings/:id#review lands below the sticky header. */
+.booking-review {
+  scroll-margin-top: 88px;
+}
+
+/* Separate "Post review" from the go-again block below it. */
+.booking-review .booking-again {
+  margin: 20px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }

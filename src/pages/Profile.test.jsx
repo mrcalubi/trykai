@@ -1301,6 +1301,26 @@ describe('Profile card layout', () => {
     )
   })
 
+  it('shows featured review photos from photo_paths', async () => {
+    givenRpcs({
+      hostReviews: [
+        makeReview({
+          rating: 5,
+          comment: 'New five',
+          created_at: '2026-05-01T00:00:00Z',
+          photo_paths: ['user-1/a.jpg'],
+        }),
+      ],
+    })
+    renderPage()
+
+    const featured = await screen.findByRole('region', { name: 'What guests say' })
+    expect(within(featured).getByRole('button', { name: 'View review photo 1 of 1' }).querySelector('img')).toHaveAttribute(
+      'src',
+      'https://cdn.test/review-photos/user-1/a.jpg',
+    )
+  })
+
   it('shows a Coming up strip of open sessions in the next 30 days on the public profile', async () => {
     givenListings([makeListing({ id: 'listing-9', title: 'Latte art', area: 'Bedok' })])
     givenSessions([
@@ -1462,7 +1482,7 @@ describe('Profile card layout', () => {
     expect(rows).toHaveLength(2)
     expect(rows[0].querySelector('.date-chip--green')).toBeInTheDocument()
     expect(rows[1].querySelector('.date-chip--muted')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Leave a review' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Leave a review' })).toBeInTheDocument()
     const calendar = screen.getByRole('region', { name: 'Your bookings calendar' })
     expect(calendar).toHaveTextContent('1 upcoming')
     expect(calendar).toHaveTextContent('Upcoming')

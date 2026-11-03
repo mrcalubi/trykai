@@ -58,7 +58,7 @@ Week 13 of the original plan. Read this snapshot first. HANDOVER.md has the full
 - `Navbar.jsx` is deleted. `SiteNav` mounts `TopNav` once in `App.jsx`. Signed-in hamburger is Browse, Host a session (verified) / Become a host (not yet verified), Verification review for admins. Avatar goes to your own profile.
 - Browse uses the kit `Card` and shows the card all-in price. Input is live on Settings and Login. Button is live on Settings. SelectableCard is still `/style-guide` only.
 - Guest bookings and host tools live as tabs on your own `/u/:id`. `/bookings` and `/hosting` redirect there. `/settings` is the account page. `/dashboard` redirects.
-- trykai.sg is verified in Resend. From-address is `TryKai <no-reply@trykai.sg>`. `notify-verification-pending` is secret-gated. `notify-verification-result` is gone. Staging booking confirmation emails confirmed arriving.
+- trykai.sg is verified in Resend. From-address is `TryKai <hello@trykai.sg>` (was `no-reply@` until 3 November), so replies from guests and hosts land in the hello@ inbox. Supabase Auth emails (signup code, password reset) still send as `no-reply@trykai.sg`; they never ask for a reply. `notify-verification-pending` is secret-gated. `notify-verification-result` is gone. Staging booking confirmation emails confirmed arriving.
 - `cancel-booking` emails the guest the refund amount (including $0) and the host only on a guest cancel. `/bookings` and `/hosting` invoke that function.
 - StyleGuide category PNGs and `public/trykai.png` are in the repo.
 - Edge Functions: `create-payment-intent`, `stripe-webhook`, `create-connect-account`, `create-account-link`, `cancel-booking`, `admin-cancel-booking`, `admin-dispute-booking`, `admin-verifications`, `create-identity-session`, `notify-verification-pending`, `purge-verification-docs`, `release-payout`.
@@ -458,6 +458,7 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00044` (reschedule) | Applied (first version, with the foreign key) | Not applied | After `00043`. Caleb applies. Columns plus `reschedule_booking`. Deploy `reschedule-booking`. |
 | `00045` (drop reschedule FK) | Not applied | Not applied | Right after `00044`, both environments. Drops the second bookings → sessions key that made every bookings/sessions embed ambiguous (PGRST201). No-op where 00044 is the fixed version. |
 | `00046` (booking cutoff and arrival) | Not applied | Not applied | After `00045`. Caleb applies. Cutoff, How to find me, day-of number, `booking_host_contact`, `listing_arrival_instructions`; replaces `my_account` and `reschedule_booking`. |
+| `00047` (review photos) | Not applied | Not applied | **Apply on staging before merging the review-photos PR.** After `00046`. Caleb applies. `reviews.photo_paths`, public insert-only `review-photos` bucket, `reviews_for_listing` / `reviews_for_host` return `photo_paths`. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
@@ -990,6 +991,14 @@ Most complaints now arrive from the guest's booking page (`report-booking-proble
 - Photos: **Storage → complaint-evidence →** `<booking id>/<complaint id>/`. They are deleted 180 days after the report by `purge-verification-docs` (same daily run); the text stays.
 - One report per booking. Anything the guest adds comes by email.
 - Skip step 1 for these; go to step 2.
+
+## Review photos
+
+Public bucket **review-photos**. Guests can attach up to 3 photos to a review. The client cannot replace or delete them (insert-only; reviews are not editable). A Report mailto to hello@trykai.sg includes the review id.
+
+**To take a photo down:** in Table Editor, edit `reviews.photo_paths` first and remove that path from the array (leave the rest). Then delete the object in **Storage → review-photos**. Paths first, then the object: the insert/update trigger requires every remaining path to still exist.
+
+**Orphaned uploads** from a failed review insert (the photo went up, the row did not) are public but unreferenced. Harmless. Clear by hand in Storage when you notice them. There is no client list, so browse the reviewer's folder in the dashboard.
 
 Emailed complaints still follow every step below. Safety reports have no time limit and never go through the in-app form.
 

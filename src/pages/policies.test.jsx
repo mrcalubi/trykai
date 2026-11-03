@@ -318,4 +318,13 @@ describe('Privacy Policy page', () => {
       ),
     ).toBeInTheDocument()
   })
+
+  it('says review photos are public', () => {
+    expect(screen.getByText(/Reviews and review photos/)).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        /the reviews you receive as a Host, and any photos attached to those\s+reviews are visible to anyone/,
+      ),
+    ).toBeInTheDocument()
+  })
 })

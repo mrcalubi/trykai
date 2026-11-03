@@ -3,7 +3,6 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
-import StarPicker from '../components/StarPicker'
 import Button from '../components/ui/Button'
 import PageLoader from '../components/PageLoader'
 import {
@@ -58,11 +57,6 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
   const [settledBooking, setSettledBooking] = useState(null)
 
   const [reviewedBookingIds, setReviewedBookingIds] = useState(new Set())
-  const [activeReviewBookingId, setActiveReviewBookingId] = useState(null)
-  const [reviewRating, setReviewRating] = useState(0)
-  const [reviewComment, setReviewComment] = useState('')
-  const [reviewError, setReviewError] = useState('')
-  const [reviewLoading, setReviewLoading] = useState(false)
 
   const [confirmCancelBookingId, setConfirmCancelBookingId] = useState(null)
   const [cancelLoading, setCancelLoading] = useState(false)
@@ -340,64 +334,6 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
     })
   }
 
-  function canLeaveReview(booking) {
-    return actionsFor(booking).review
-  }
-
-  function openReviewForm(bookingId) {
-    setActiveReviewBookingId(bookingId)
-    setReviewRating(0)
-    setReviewComment('')
-    setReviewError('')
-  }
-
-  function closeReviewForm() {
-    setActiveReviewBookingId(null)
-    setReviewError('')
-  }
-
-  async function handleSubmitReview(e, booking) {
-    e.preventDefault()
-    setReviewError('')
-
-    if (reviewRating < 1 || reviewRating > 5) {
-      setReviewError('Please select a star rating.')
-      return
-    }
-
-    if (!canLeaveReview(booking)) {
-      setReviewError('You can only review a confirmed booking after the session ends.')
-      return
-    }
-
-    const hostId = booking.sessions?.listings?.host_id
-    if (!hostId) {
-      setReviewError('Could not find host for this booking.')
-      return
-    }
-
-    setReviewLoading(true)
-
-    const { error: insertError } = await supabase.from('reviews').insert({
-      booking_id: booking.id,
-      reviewer_id: userId,
-      reviewee_id: hostId,
-      rating: reviewRating,
-      comment: reviewComment.trim() || null,
-      role: 'guest',
-    })
-
-    setReviewLoading(false)
-
-    if (insertError) {
-      setReviewError(insertError.message)
-      return
-    }
-
-    setReviewedBookingIds((prev) => new Set([...prev, booking.id]))
-    closeReviewForm()
-  }
-
   async function invokeAuthed(name, body) {
     const {
       data: { session },
@@ -469,15 +405,13 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
             <span className={`badge badge--${booking.status}`}>
               {booking.status}
             </span>
-            {actions.review && activeReviewBookingId !== booking.id && (
-              <Button
-                type="button"
-                variant="secondary"
-                className="btn--small"
-                onClick={() => openReviewForm(booking.id)}
+            {actions.review && (
+              <Link
+                to={`/bookings/${booking.id}#review`}
+                className="ui-button ui-button--secondary btn--small"
               >
                 Leave a review
-              </Button>
+              </Link>
             )}
             {actions.cancel && confirmCancelBookingId !== booking.id && (
               <button
@@ -521,45 +455,6 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
             </div>
           )}
 
-          {activeReviewBookingId === booking.id && (
-            <form
-              onSubmit={(e) => handleSubmitReview(e, booking)}
-              className="dashboard-card__form form"
-            >
-              <label className="label">
-                Rating
-                <StarPicker value={reviewRating} onChange={setReviewRating} />
-              </label>
-              <label className="label">
-                Comment
-                <textarea
-                  value={reviewComment}
-                  onChange={(e) => setReviewComment(e.target.value)}
-                  placeholder="Share your experience…"
-                  rows={3}
-                  className="input input--textarea"
-                />
-              </label>
-              {reviewError && <p className="error-message">{reviewError}</p>}
-              <div className="button-row">
-                <Button
-                  type="submit"
-                  variant="primary"
-                  loading={reviewLoading}
-                  loadingLabel="Submitting"
-                >
-                  Submit review
-                </Button>
-                <button
-                  type="button"
-                  onClick={closeReviewForm}
-                  className="btn btn--ghost"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
         </div>
       </div>
     )

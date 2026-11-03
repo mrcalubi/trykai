@@ -8,7 +8,7 @@ import {
   snapshotImageFiles,
   uploadListingPhotos,
 } from './listingPhotos'
-import { HEIC_READ_ERROR } from './heicImage'
+import { HEIC_READ_ERROR, HEIC_UPDATED_ERROR } from './heicImage'
 
 vi.mock('./compressImage', () => ({
   compressImage: vi.fn(async (file) => file),
@@ -81,6 +81,16 @@ describe('listingPhotos', () => {
 
     expect(photos).toHaveLength(0)
     expect(error.message).toBe(HEIC_READ_ERROR)
+  })
+
+  it('asks the host to refresh when the HEIC converter chunk is missing', async () => {
+    const heic = new File(['h'], 'shot.heic', { type: 'image/heic' })
+    compressImage.mockRejectedValueOnce(new Error(HEIC_UPDATED_ERROR))
+
+    const { photos, error } = await filesToPhotos([heic], 5)
+
+    expect(photos).toHaveLength(0)
+    expect(error.message).toBe(HEIC_UPDATED_ERROR)
   })
 
   it('keeps a JPEG when a sibling HEIC cannot be read', async () => {
