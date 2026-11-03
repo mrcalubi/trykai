@@ -1,14 +1,21 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReviewCard from './ReviewCard'
 import { makeReview } from '../test/fixtures'
+import { supabase } from '../lib/supabase'
+
+vi.mock('../lib/supabase')
 
 function renderReview(overrides) {
   return render(<ReviewCard review={makeReview(overrides)} />)
 }
 
 describe('ReviewCard', () => {
+  beforeEach(() => {
+    supabase.__reset()
+  })
+
   it('shows the reviewer display name from the RPC jsonb and their initial', () => {
     renderReview({ users: { full_name: 'Latte Queen' } })
     expect(screen.getByText('Latte Queen')).toBeInTheDocument()
@@ -96,5 +103,32 @@ describe('ReviewCard', () => {
     // 17:00 UTC is 01:00 the following morning in Asia/Singapore.
     renderReview({ created_at: '2026-03-14T17:00:00.000Z' })
     expect(screen.getByText(/15 Mar 2026/)).toBeInTheDocument()
+  })
+
+  it('shows thumbnails from photo_paths, opens the lightbox, and hides a broken image', async () => {
+    const user = userEvent.setup()
+    renderReview({
+      photo_paths: ['user-1/a.jpg', 'user-1/b.jpg'],
+      users: { full_name: 'Arun' },
+    })
+
+    const first = screen.getByRole('button', { name: 'View review photo 1 of 2' })
+    expect(first.querySelector('img')).toHaveAttribute(
+      'src',
+      'https://cdn.test/review-photos/user-1/a.jpg',
+    )
+    expect(screen.getByRole('link', { name: 'Report' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('review-1'),
+    )
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+
+    await user.click(first)
+    expect(screen.getByRole('dialog', { name: "Arun's review photos" })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+
+    fireEvent.error(screen.getByRole('button', { name: 'View review photo 2 of 2' }).querySelector('img'))
+    expect(screen.queryByRole('button', { name: 'View review photo 2 of 2' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View review photo 1 of 2' })).toBeInTheDocument()
   })
 })

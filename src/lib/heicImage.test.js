@@ -5,11 +5,14 @@ vi.mock('@sentry/react', () => ({ captureException: vi.fn() }))
 
 import {
   HEIC_READ_ERROR,
+  HEIC_UPDATED_ERROR,
   convertHeicIfNeeded,
   convertHeicToJpeg,
   heicLoader,
   isHeicFile,
+  isHeicPickerError,
   isHeicReadError,
+  isHeicUpdatedError,
   isImageFile,
 } from './heicImage'
 
@@ -62,7 +65,10 @@ describe('heicImage', () => {
     vi.spyOn(heicLoader, 'importConverter').mockRejectedValue(cause)
     vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    await expect(convertHeicToJpeg(heic)).rejects.toThrow(HEIC_READ_ERROR)
+    await expect(convertHeicToJpeg(heic)).rejects.toThrow(HEIC_UPDATED_ERROR)
+    expect(isHeicUpdatedError(new Error(HEIC_UPDATED_ERROR))).toBe(true)
+    expect(isHeicPickerError(new Error(HEIC_UPDATED_ERROR))).toBe(true)
+    expect(isHeicReadError(new Error(HEIC_UPDATED_ERROR))).toBe(false)
     expect(Sentry.captureException).toHaveBeenCalledWith(
       cause,
       expect.objectContaining({ tags: { area: 'heic-convert' } }),

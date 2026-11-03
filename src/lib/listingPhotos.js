@@ -1,5 +1,5 @@
 import { compressImage } from './compressImage'
-import { HEIC_READ_ERROR, isHeicFile, isHeicReadError, isImageFile } from './heicImage'
+import { HEIC_READ_ERROR, isHeicFile, isHeicPickerError, isImageFile } from './heicImage'
 
 /** Hosts can add this many listing photos. The desktop mosaic still shows cover + 4. */
 export const MAX_PHOTOS = 8
@@ -31,7 +31,7 @@ export async function filesToPhotos(fileList, remaining) {
     try {
       compressed = await compressImage(file)
     } catch (caught) {
-      if (isHeicReadError(caught)) {
+      if (isHeicPickerError(caught)) {
         error = caught
         continue
       }

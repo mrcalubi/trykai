@@ -2,7 +2,7 @@ export default function Privacy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Privacy Policy</h1>
-      <p className="policy-page__updated">Last updated: 31 October 2026</p>
+      <p className="policy-page__updated">Last updated: 2 November 2026</p>
 
       <p>
         This policy explains how TryKai collects, uses, shares and protects your
@@ -59,9 +59,12 @@ export default function Privacy() {
               <td>To process bookings, refunds and payouts</td>
             </tr>
             <tr>
-              <td>Reviews</td>
-              <td>When you leave one</td>
-              <td>Shown publicly on the Host&apos;s listing and profile</td>
+              <td>Reviews and review photos</td>
+              <td>When you leave a review</td>
+              <td>
+                Shown publicly on the Host&apos;s listing and profile. Review
+                photos are public
+              </td>
             </tr>
             <tr>
               <td>Your name, date of birth and mobile number as held by Singpass, and a Singpass identifier for your TryKai account</td>
@@ -90,8 +93,9 @@ export default function Privacy() {
 
       <h2>3. What is public</h2>
       <p>
-        Your display name, profile photo, ID verified badge, listings and the
-        reviews you receive as a Host are visible to anyone. Your full name,
+        Your display name, profile photo, ID verified badge, listings, the
+        reviews you receive as a Host, and any photos attached to those
+        reviews are visible to anyone. Your full name,
         email, phone number and bookings are not public. A Host&apos;s full
         address is shown only to guests with a confirmed booking for that
         listing. If a Host turns on a day-of contact number, confirmed guests

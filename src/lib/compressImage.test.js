@@ -66,6 +66,14 @@ describe('compressImage', () => {
     restore()
   })
 
+  it('throws in strict mode instead of returning the original file', async () => {
+    const file = imageFile()
+    const restore = stubImage({ fail: true })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(compressImage(file, { strict: true })).rejects.toThrow('Could not read the photo')
+    restore()
+  })
+
   it('encodes a large image as JPEG 0.82 and shrinks the long edge to 1600', async () => {
     const file = imageFile('latte.png')
     const restore = stubImage({ width: 4032, height: 3024 })

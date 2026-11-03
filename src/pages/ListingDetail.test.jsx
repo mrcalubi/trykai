@@ -517,6 +517,28 @@ describe('ListingDetail content', () => {
     expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_listing', { p_listing_id: 'listing-1' })
   })
 
+  it('shows review photos from photo_paths and a quiet Report link', async () => {
+    givenListing()
+    givenReviews([
+      makeReview({
+        photo_paths: ['user-1/a.jpg'],
+        users: { full_name: 'Arun' },
+      }),
+    ])
+    renderPage()
+
+    const thumb = await screen.findByRole('button', { name: 'View review photo 1 of 1' })
+    expect(thumb.querySelector('img')).toHaveAttribute(
+      'src',
+      'https://cdn.test/review-photos/user-1/a.jpg',
+    )
+    expect(screen.getByRole('link', { name: 'Report' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('review-1'),
+    )
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+  })
+
   it('hides reviews whose booking belongs to another listing', async () => {
     givenListing()
     givenReviews([

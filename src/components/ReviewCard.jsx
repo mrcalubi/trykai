@@ -2,6 +2,7 @@ import { publicName } from '../lib/publicName'
 import { reportMailto, reviewReportSubject } from '../lib/reportMailto'
 import Avatar from './ui/Avatar'
 import OverflowMenu from './ui/OverflowMenu'
+import ReviewPhotoThumbs from './ReviewPhotoThumbs'
 
 function formatReviewDate(iso) {
   return new Intl.DateTimeFormat('en-SG', {
@@ -29,6 +30,8 @@ export default function ReviewCard({ review, listingTitle, viewerId }) {
   const name = displayName || 'Guest'
   const listing = listingTitle || review.listing_title || 'listing'
   const isOwnReview = Boolean(viewerId && review.reviewer_id && viewerId === review.reviewer_id)
+  const photoPaths = Array.isArray(review.photo_paths) ? review.photo_paths.filter(Boolean) : []
+  const hasPhotos = photoPaths.length > 0
   const reportHref = reportMailto({
     subject: reviewReportSubject(listing),
     url: typeof window === 'undefined' ? '' : window.location.href,
@@ -54,7 +57,7 @@ export default function ReviewCard({ review, listingTitle, viewerId }) {
             <span className="review-card__date">{formatReviewDate(review.created_at)}</span>
           </div>
         </div>
-        {!isOwnReview ? (
+        {!isOwnReview && !hasPhotos ? (
           <OverflowMenu
             label="More actions"
             icon="⋮"
@@ -64,6 +67,12 @@ export default function ReviewCard({ review, listingTitle, viewerId }) {
         ) : null}
       </div>
       {review.comment && <p className="review-card__comment">{review.comment}</p>}
+      <ReviewPhotoThumbs paths={photoPaths} title={`${name}'s review`} />
+      {!isOwnReview && hasPhotos ? (
+        <a className="review-card__report" href={reportHref}>
+          Report
+        </a>
+      ) : null}
     </div>
   )
 }
