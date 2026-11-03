@@ -1058,16 +1058,38 @@ describe('ListingDetail booking', () => {
     expect(screen.getByRole('radio', { name: /PayNow/ })).not.toHaveTextContent('Save 3%')
   })
 
-  it('tells phone guests to screenshot the PayNow QR if saving fails', async () => {
-    givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(72) })])
+  it('tells PayNow guests to screenshot the QR only on the payment step', async () => {
     givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 4947 },
+      error: null,
+    })
+    const { user } = renderPage()
+    const hint = "On your phone? If saving the QR doesn't work, take a screenshot of it instead."
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(paynowRail()).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByText(hint)).not.toBeInTheDocument()
+
+    await user.click(continueToPayment())
+    expect(await screen.findByText(hint)).toBeInTheDocument()
+  })
+
+  it('does not show the PayNow screenshot note when paying by card', async () => {
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 5100 },
+      error: null,
+    })
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(screen.getByRole('radio', { name: /^Card/ }))
+    await user.click(continueToPayment())
 
-    expect(
-      screen.getByText("On your phone? If saving the QR doesn't work, take a screenshot of it instead."),
-    ).toBeInTheDocument()
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
+    expect(await screen.findByText(/^Total:/)).toBeInTheDocument()
+    expect(screen.queryByText(/take a screenshot of it instead/)).not.toBeInTheDocument()
   })
 
   it('disables PayNow when the session is more than 80 days away', async () => {

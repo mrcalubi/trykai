@@ -114,10 +114,11 @@ async function attachReviewerIds(reviews) {
 }
 
 // Stripe's PayNow pop-up has a "Save image" button that can fail on iPhone
-// Safari (3 Nov 2026). Its pop-up can't be changed, so say it before paying.
+// Safari (3 Nov 2026). Its pop-up can't be changed, so say it on the payment
+// step, after the guest has chosen PayNow (not on the busier checkout page).
 const PAYNOW_SCREENSHOT_HINT = "On your phone? If saving the QR doesn't work, take a screenshot of it instead."
 
-function CheckoutForm({ totalAmount, bookingId, onSuccess, onPaymentFailed }) {
+function CheckoutForm({ totalAmount, bookingId, rail, onSuccess, onPaymentFailed }) {
   const stripe = useStripe()
   const elements = useElements()
   const [error, setError] = useState('')
@@ -170,6 +171,7 @@ function CheckoutForm({ totalAmount, bookingId, onSuccess, onPaymentFailed }) {
           Total: <FormattedPrice cents={totalAmount} />
         </p>
         <PaymentElement />
+        {rail === 'paynow' ? <p className="payment-form__hint">{PAYNOW_SCREENSHOT_HINT}</p> : null}
         {error && <p className="error-message">{error}</p>}
         <div className="payment-form__actions">
           <button type="submit" disabled={!stripe || loading} className="btn btn--primary">
@@ -924,9 +926,7 @@ export default function ListingDetail() {
                 </button>
                 {paynowBlocked ? (
                   <p className="payment-rails__hint">{PAYNOW_TOO_FAR_AHEAD_MESSAGE}</p>
-                ) : (
-                  <p className="payment-rails__hint">{PAYNOW_SCREENSHOT_HINT}</p>
-                )}
+                ) : null}
                 <button
                   type="button"
                   role="radio"
@@ -1020,6 +1020,7 @@ export default function ListingDetail() {
               <CheckoutForm
                 totalAmount={totalAmount}
                 bookingId={bookingId}
+                rail={checkoutRail}
                 onSuccess={handlePaymentSuccess}
                 onPaymentFailed={() => void abandonUnpaidCheckout(bookingId)}
               />
