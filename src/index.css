@@ -5814,13 +5814,6 @@ body.lightbox-open {
   gap: 16px;
 }
 
-.payment-form__paynow {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-
 .payment-form__total {
   display: flex;
   justify-content: space-between;
@@ -5851,82 +5844,6 @@ body.lightbox-open {
   color: var(--muted);
 }
 
-.paynow-qr {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  text-align: center;
-}
-
-.paynow-qr__title {
-  margin: 0;
-  font-family: var(--sans);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-h);
-}
-
-.paynow-qr__image {
-  width: 240px;
-  height: 240px;
-  display: block;
-  background: var(--surface);
-}
-
-.paynow-qr__steps {
-  margin: 0;
-  padding: 0 0 0 1.2em;
-  text-align: left;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--text);
-}
-
-.paynow-qr__expires {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-
-.paynow-qr__actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
-
-.paynow-qr__actions .btn--primary {
-  width: 100%;
-  min-height: 54px;
-}
-
-.paynow-qr__open {
-  font-size: 14px;
-  color: var(--navy);
-  text-underline-offset: 2px;
-}
-
-.paynow-qr__cancel {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  color: var(--muted);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
-.paynow-qr__cancel:hover,
-.paynow-qr__cancel:focus-visible {
-  color: var(--text-h);
-}
-
 /* Phones and tablets: checkout takes the whole screen, with the pay button
    pinned to the bottom. */
 @media (max-width: 1023px) {
@@ -5955,8 +5872,7 @@ body.lightbox-open {
   }
 
   .checkout .payment-form-wrap,
-  .checkout .payment-form,
-  .checkout .paynow-qr {
+  .checkout .payment-form {
     flex: 1;
   }
 

@@ -475,7 +475,6 @@ Merging `staging` into `main` so production runs the current tree. Owner: Rui He
 **After the merge:**
 - [x] Live Stripe "Connected accounts" webhook destination for `account.updated`, and `STRIPE_CONNECT_WEBHOOK_SECRET` on production (see Connected accounts webhook below). Done 25 October: `account.updated` only, snapshot payload, and `STRIPE_CONNECT_WEBHOOK_SECRET` set on production.
 - [ ] One real card booking on production, then refund it
-- [ ] One real PayNow booking on production on an iPhone: Save QR, scan from Photos, confirm the booking, then refund it
 - [ ] Production cron `pg_net` timeout raised to about 30 seconds (the hourly `release-payout` call)
 - [ ] Production end to end test without real checkout, then on a phone
 
