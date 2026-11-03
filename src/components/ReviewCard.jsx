@@ -25,7 +25,7 @@ function StarDisplay({ rating }) {
   )
 }
 
-export default function ReviewCard({ review, listingTitle, viewerId }) {
+export default function ReviewCard({ review, listingTitle, viewerId, hideRating = false }) {
   const displayName = publicName({ display_name: review.users?.full_name })
   const name = displayName || 'Guest'
   const listing = listingTitle || review.listing_title || 'listing'
@@ -53,7 +53,7 @@ export default function ReviewCard({ review, listingTitle, viewerId }) {
             <p className="review-card__listing">{review.listing_title}</p>
           ) : null}
           <div className="review-card__meta">
-            <StarDisplay rating={review.rating} />
+            {hideRating ? null : <StarDisplay rating={review.rating} />}
             <span className="review-card__date">{formatReviewDate(review.created_at)}</span>
           </div>
         </div>

@@ -62,6 +62,7 @@ import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
 import { usePageTitle } from '../lib/pageTitle'
 import { MOSAIC_VISIBLE_PHOTOS } from '../lib/listingPhotos'
+import { hostRatingFromRpc } from '../lib/twoWayReviews'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -97,20 +98,6 @@ function visibleAreaLabel(revealedAddress, area) {
   if (typeof revealedAddress === 'string' && revealedAddress.trim()) return revealedAddress.trim()
   if (typeof area === 'string' && area.trim()) return area.trim()
   return ''
-}
-
-async function attachReviewerIds(reviews) {
-  if (!reviews.length) return reviews
-  const { data } = await supabase
-    .from('reviews')
-    .select('id, reviewer_id')
-    .in('id', reviews.map((review) => review.id))
-  if (!data?.length) return reviews
-  const byId = new Map(data.map((row) => [row.id, row.reviewer_id]))
-  return reviews.map((review) => ({
-    ...review,
-    reviewer_id: review.reviewer_id ?? byId.get(review.id) ?? null,
-  }))
 }
 
 // Stripe's PayNow pop-up has a "Save image" button that can fail on iPhone
@@ -200,7 +187,7 @@ export default function ListingDetail() {
   const [monthError, setMonthError] = useState(null)
   const requestedMonths = useRef(new Set())
   const [reviews, setReviews] = useState([])
-  const [hostReviews, setHostReviews] = useState([])
+  const [hostRating, setHostRating] = useState({ average: null, reviewCount: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -307,16 +294,14 @@ export default function ListingDetail() {
           })
       }
 
-      const [firstSessionResult, lastSessionResult, reviewsResult, hostReviewsResult, authResult] =
+      const [firstSessionResult, lastSessionResult, reviewsResult, hostRatingResult, authResult] =
         await Promise.all([
           upcomingSessions(id, 'starts_at').order('starts_at', { ascending: true }).limit(1),
           upcomingSessions(id, 'starts_at').order('starts_at', { ascending: false }).limit(1),
           supabase.rpc('reviews_for_listing', { p_listing_id: id }),
-          supabase
-            .from('reviews')
-            .select('rating')
-            .eq('reviewee_id', listingData.host_id)
-            .eq('role', 'guest'),
+          listingData.host_id
+            ? supabase.rpc('host_rating', { p_host_id: listingData.host_id })
+            : Promise.resolve({ data: null, error: null }),
           supabase.auth.getSession(),
         ])
 
@@ -339,12 +324,10 @@ export default function ListingDetail() {
       }
 
       if (!reviewsResult.error) {
-        setReviews(await attachReviewerIds(reviewsResult.data ?? []))
+        setReviews(reviewsResult.data ?? [])
       }
 
-      if (!hostReviewsResult.error) {
-        setHostReviews(hostReviewsResult.data ?? [])
-      }
+      setHostRating(hostRatingFromRpc(hostRatingResult.data, hostRatingResult.error))
 
       const userId = authResult.data?.session?.user?.id
       setViewerId(userId ?? null)
@@ -1173,7 +1156,7 @@ export default function ListingDetail() {
                   )}
                 </p>
                 {hostVerified ? <VerifiedBadge /> : null}
-                <HostRating reviews={hostReviews} />
+                <HostRating average={hostRating.average} reviewCount={hostRating.reviewCount} />
               </div>
             </div>
             {typeof host?.bio === 'string' && host.bio.trim() ? (
