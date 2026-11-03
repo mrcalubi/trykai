@@ -812,7 +812,7 @@ describe('sendResendEmail', () => {
     expect(init.method).toBe('POST')
     expect(init.headers.Authorization).toBe('Bearer re_test')
     expect(JSON.parse(init.body)).toMatchObject({
-      from: 'TryKai <no-reply@trykai.sg>',
+      from: 'TryKai <hello@trykai.sg>',
       to: 'host@trykai.sg',
       subject: 'New booking',
     })
@@ -830,7 +830,7 @@ describe('sendResendEmail', () => {
       replyTo: 'hello@trykai.sg',
     })
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
-      from: 'TryKai <no-reply@trykai.sg>',
+      from: 'TryKai <hello@trykai.sg>',
       to: 'guest@trykai.sg',
       reply_to: 'hello@trykai.sg',
     })
@@ -1053,7 +1053,7 @@ describe('cancellation emails', () => {
 
     expect(fetchMock).toHaveBeenCalledOnce()
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
-      from: 'TryKai <no-reply@trykai.sg>',
+      from: 'TryKai <hello@trykai.sg>',
       to: 'guest@trykai.sg',
       subject: 'Mei Ling had to cancel Latte art',
       reply_to: 'hello@trykai.sg',
@@ -1218,7 +1218,7 @@ describe('host session cancelled email', () => {
 
     expect(fetchMock).toHaveBeenCalledOnce()
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
-      from: 'TryKai <no-reply@trykai.sg>',
+      from: 'TryKai <hello@trykai.sg>',
       to: 'host@trykai.sg',
       subject: 'You cancelled Latte art',
     })
