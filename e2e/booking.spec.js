@@ -516,6 +516,7 @@ test.describe('booking reviews', () => {
   const endedBooking = {
     id: 'booking-past',
     status: 'confirmed',
+    guest_id: SIGNED_IN_USER.id,
     session_id: 'session-past',
     guests_count: 1,
     total_amount: 4500,
@@ -536,7 +537,7 @@ test.describe('booking reviews', () => {
 
     const actions = page.locator('.booking-card__actions')
     const badge = actions.locator('.badge')
-    const reviewButton = actions.getByRole('button', { name: 'Leave a review' })
+    const reviewButton = actions.getByRole('link', { name: 'Leave a review' })
 
     await expect(reviewButton).toHaveClass(/ui-button--secondary/)
     await expect(badge).toHaveText('confirmed')
@@ -553,7 +554,8 @@ test.describe('booking reviews', () => {
   test('fills every star up to the one under the pointer', async ({ page }) => {
     await signInAndOpenBookings(page, { bookings: [endedBooking] })
 
-    await page.getByRole('button', { name: 'Leave a review' }).click()
+    await page.getByRole('link', { name: 'Leave a review' }).click()
+    await expect(page).toHaveURL(/\/bookings\/booking-past#review$/)
     await page.getByRole('button', { name: '4 stars' }).hover()
 
     await expect(page.locator('.star-picker__btn--active')).toHaveCount(4)

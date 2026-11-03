@@ -40,7 +40,7 @@ describe('ReviewForm', () => {
 
     expect(screen.getByText(REVIEW_PHOTO_CONSENT)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '5 stars' }))
-    await user.click(screen.getByRole('button', { name: 'Leave a review' }))
+    await user.click(screen.getByRole('button', { name: 'Post review' }))
 
     await waitFor(() => expect(supabase.__calls('reviews', 'insert')).toHaveLength(1))
     expect(supabase.__lastCall('reviews', 'insert').payload).toEqual({
@@ -59,10 +59,10 @@ describe('ReviewForm', () => {
     const { user } = renderWithRouter(<ReviewForm booking={booking} userId={USER_ID} />)
 
     await user.click(screen.getByRole('button', { name: '4 stars' }))
-    await user.upload(screen.getByLabelText('Photos'), [jpeg('a.jpg'), jpeg('b.jpg'), jpeg('c.jpg')])
+    await user.upload(screen.getByLabelText('Add photos'), [jpeg('a.jpg'), jpeg('b.jpg'), jpeg('c.jpg')])
     await waitFor(() => expect(screen.getAllByRole('button', { name: /Remove / })).toHaveLength(3))
-    expect(screen.queryByLabelText('Photos')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Leave a review' }))
+    expect(screen.queryByLabelText('Add photos')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Post review' }))
 
     await waitFor(() => expect(supabase.__calls('reviews', 'insert')).toHaveLength(1))
     expect(supabase.__bucket('review-photos').upload).toHaveBeenCalledTimes(3)
@@ -84,9 +84,9 @@ describe('ReviewForm', () => {
 
     await user.click(screen.getByRole('button', { name: '5 stars' }))
     await user.type(screen.getByLabelText('Comment'), 'Great session')
-    await user.upload(screen.getByLabelText('Photos'), jpeg('latte.jpg'))
+    await user.upload(screen.getByLabelText('Add photos'), jpeg('latte.jpg'))
     await waitFor(() => expect(screen.getByRole('button', { name: /Remove / })).toBeInTheDocument())
-    await user.click(screen.getByRole('button', { name: 'Leave a review' }))
+    await user.click(screen.getByRole('button', { name: 'Post review' }))
 
     expect(await screen.findByText(/latte\.jpg.+didn't upload/)).toBeInTheDocument()
     expect(screen.getByLabelText('Comment')).toHaveValue('Great session')
@@ -98,12 +98,12 @@ describe('ReviewForm', () => {
     const { user } = renderWithRouter(<ReviewForm booking={booking} userId={USER_ID} />)
 
     await user.upload(
-      screen.getByLabelText('Photos'),
+      screen.getByLabelText('Add photos'),
       new File(['h'], 'shot.heic', { type: 'image/heic' }),
     )
 
     expect(await screen.findByText(HEIC_READ_ERROR)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Leave a review' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Post review' })).toBeInTheDocument()
   })
 
   it('asks the guest to refresh when the HEIC chunk failed to load', async () => {
@@ -111,7 +111,7 @@ describe('ReviewForm', () => {
     const { user } = renderWithRouter(<ReviewForm booking={booking} userId={USER_ID} />)
 
     await user.upload(
-      screen.getByLabelText('Photos'),
+      screen.getByLabelText('Add photos'),
       new File(['h'], 'shot.heic', { type: 'image/heic' }),
     )
 
@@ -125,7 +125,7 @@ describe('ReviewForm', () => {
     const { user } = renderWithRouter(<ReviewForm booking={booking} userId={USER_ID} />)
 
     await user.type(screen.getByLabelText('Comment'), 'Great session')
-    await user.upload(screen.getByLabelText('Photos'), jpeg())
+    await user.upload(screen.getByLabelText('Add photos'), jpeg())
 
     expect(await screen.findByText(REVIEW_PHOTO_TOO_LARGE)).toBeInTheDocument()
     expect(screen.getByLabelText('Comment')).toHaveValue('Great session')
@@ -135,11 +135,56 @@ describe('ReviewForm', () => {
   it('lets the guest remove a photo before submit', async () => {
     const { user } = renderWithRouter(<ReviewForm booking={booking} userId={USER_ID} />)
 
-    await user.upload(screen.getByLabelText('Photos'), jpeg('latte.jpg'))
+    await user.upload(screen.getByLabelText('Add photos'), jpeg('latte.jpg'))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Remove latte.jpg' })).toBeInTheDocument())
     await user.click(screen.getByRole('button', { name: 'Remove latte.jpg' }))
 
     expect(screen.queryByRole('button', { name: /Remove / })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Photos')).toBeInTheDocument()
+    expect(screen.getByLabelText('Add photos')).toBeInTheDocument()
+  })
+  it('shows empty stars as outlines until one is picked', async () => {
+    const { user } = renderWithRouter(<ReviewForm booking={booking} userId={USER_ID} />)
+    expect(screen.getByRole('button', { name: '3 stars' })).toHaveTextContent('☆')
+    await user.click(screen.getByRole('button', { name: '3 stars' }))
+    expect(screen.getByRole('button', { name: '3 stars' })).toHaveTextContent('★')
+    expect(screen.getByRole('button', { name: '4 stars' })).toHaveTextContent('☆')
+  })
+
+  it('requires a star rating', async () => {
+    const { user } = renderWithRouter(<ReviewForm booking={booking} userId={USER_ID} />)
+    await user.click(screen.getByRole('button', { name: 'Post review' }))
+    expect(await screen.findByText('Please select a star rating.')).toBeInTheDocument()
+    expect(supabase.__calls('reviews', 'insert')).toHaveLength(0)
+  })
+
+  it('refuses a booking with no host on record', async () => {
+    const { user } = renderWithRouter(
+      <ReviewForm booking={{ id: 'booking-past', sessions: { listings: {} } }} userId={USER_ID} />,
+    )
+    await user.click(screen.getByRole('button', { name: '5 stars' }))
+    await user.click(screen.getByRole('button', { name: 'Post review' }))
+    expect(await screen.findByText('Could not find host for this booking.')).toBeInTheDocument()
+    expect(supabase.__calls('reviews', 'insert')).toHaveLength(0)
+  })
+
+  it('says plainly when the booking was already reviewed', async () => {
+    supabase.__on('reviews', 'insert', {
+      error: {
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "reviews_booking_id_role_key"',
+      },
+    })
+    const { user } = renderWithRouter(<ReviewForm booking={booking} userId={USER_ID} />)
+    await user.click(screen.getByRole('button', { name: '5 stars' }))
+    await user.click(screen.getByRole('button', { name: 'Post review' }))
+    expect(await screen.findByText("You've already reviewed this booking.")).toBeInTheDocument()
+  })
+
+  it('shows any other insert error as it came back', async () => {
+    supabase.__on('reviews', 'insert', { error: { message: 'new row violates row-level security policy' } })
+    const { user } = renderWithRouter(<ReviewForm booking={booking} userId={USER_ID} />)
+    await user.click(screen.getByRole('button', { name: '5 stars' }))
+    await user.click(screen.getByRole('button', { name: 'Post review' }))
+    expect(await screen.findByText('new row violates row-level security policy')).toBeInTheDocument()
   })
 })

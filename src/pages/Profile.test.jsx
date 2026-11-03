@@ -1482,7 +1482,7 @@ describe('Profile card layout', () => {
     expect(rows).toHaveLength(2)
     expect(rows[0].querySelector('.date-chip--green')).toBeInTheDocument()
     expect(rows[1].querySelector('.date-chip--muted')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Leave a review' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Leave a review' })).toBeInTheDocument()
     const calendar = screen.getByRole('region', { name: 'Your bookings calendar' })
     expect(calendar).toHaveTextContent('1 upcoming')
     expect(calendar).toHaveTextContent('Upcoming')

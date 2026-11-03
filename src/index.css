@@ -7031,8 +7031,12 @@ body.lightbox-open {
   object-fit: cover;
 }
 
+.review-form {
+  gap: 14px;
+}
+
 .review-form__photos {
-  margin: 0 0 16px;
+  margin: 0;
 }
 
 .review-form__tiles {
@@ -7045,8 +7049,8 @@ body.lightbox-open {
 .review-form__tile,
 .review-form__add {
   position: relative;
-  width: 88px;
-  height: 88px;
+  width: 64px;
+  height: 64px;
   overflow: hidden;
   border-radius: 12px;
   background: var(--sand);
@@ -7079,13 +7083,31 @@ body.lightbox-open {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
-  border: 1px dashed var(--border-strong);
-  color: var(--navy);
-  font-size: 12px;
-  font-weight: 700;
-  text-align: center;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--border-strong);
+  background: var(--cream);
+  color: var(--muted);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1;
   cursor: pointer;
+}
+
+.review-form__add:hover,
+.review-form__add:focus-within {
+  border-color: var(--navy);
+  color: var(--navy);
+}
+
+.review-form__consent {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.review-form__submit {
+  width: 100%;
 }
 
 .star-display {
@@ -7115,7 +7137,8 @@ body.lightbox-open {
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--border);
+  /* Empty stars are outlines (☆) in --muted so they read as tappable, not disabled. */
+  color: var(--muted);
   transition: color 0.1s ease, transform 0.1s ease;
 }
 
@@ -10465,4 +10488,16 @@ body:has(.edit-profile__bar) .site-footer {
   margin: 8px 0 0;
   font-size: 14px;
   color: var(--muted);
+}
+
+/* /bookings/:id#review lands below the sticky header. */
+.booking-review {
+  scroll-margin-top: 88px;
+}
+
+/* Separate "Post review" from the go-again block below it. */
+.booking-review .booking-again {
+  margin: 20px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }

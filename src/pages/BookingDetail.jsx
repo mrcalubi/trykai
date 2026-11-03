@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { formatCents } from '../lib/cancellationPolicy'
@@ -331,6 +331,13 @@ export default function BookingDetail() {
       cancelled = true
     }
   }, [loadBooking])
+
+  // "Leave a review" on the Bookings list links here as /bookings/:id#review.
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (loading || hash !== '#review') return
+    document.getElementById('review')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
+  }, [loading, hash])
 
   async function invokeAuthed(name, body) {
     const {
@@ -729,17 +736,12 @@ export default function BookingDetail() {
           ) : null}
 
           {ended && !cancelled ? (
-            <section className="booking-card">
+            <section className="booking-card booking-review" id="review">
               <h2 className="booking-card__title">How was it with {hostLabel}?</h2>
               {alreadyReviewed ? (
                 <p className="hint">Review submitted</p>
               ) : canReview ? (
-                <ReviewForm
-                  booking={booking}
-                  userId={userId}
-                  submitLabel="Leave a review"
-                  onSubmitted={() => setAlreadyReviewed(true)}
-                />
+                <ReviewForm booking={booking} userId={userId} onSubmitted={() => setAlreadyReviewed(true)} />
               ) : null}
               {listing?.id ? (
                 <div className="booking-again">
