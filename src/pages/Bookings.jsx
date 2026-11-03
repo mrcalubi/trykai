@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import Button from '../components/ui/Button'
-import ReviewForm from '../components/ReviewForm'
 import PageLoader from '../components/PageLoader'
 import {
   awaitingPaidBookingId,
@@ -58,7 +57,6 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
   const [settledBooking, setSettledBooking] = useState(null)
 
   const [reviewedBookingIds, setReviewedBookingIds] = useState(new Set())
-  const [activeReviewBookingId, setActiveReviewBookingId] = useState(null)
 
   const [confirmCancelBookingId, setConfirmCancelBookingId] = useState(null)
   const [cancelLoading, setCancelLoading] = useState(false)
@@ -336,14 +334,6 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
     })
   }
 
-  function openReviewForm(bookingId) {
-    setActiveReviewBookingId(bookingId)
-  }
-
-  function closeReviewForm() {
-    setActiveReviewBookingId(null)
-  }
-
   async function invokeAuthed(name, body) {
     const {
       data: { session },
@@ -415,15 +405,13 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
             <span className={`badge badge--${booking.status}`}>
               {booking.status}
             </span>
-            {actions.review && activeReviewBookingId !== booking.id && (
-              <Button
-                type="button"
-                variant="secondary"
-                className="btn--small"
-                onClick={() => openReviewForm(booking.id)}
+            {actions.review && (
+              <Link
+                to={`/bookings/${booking.id}#review`}
+                className="ui-button ui-button--secondary btn--small"
               >
                 Leave a review
-              </Button>
+              </Link>
             )}
             {actions.cancel && confirmCancelBookingId !== booking.id && (
               <button
@@ -467,19 +455,6 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
             </div>
           )}
 
-          {activeReviewBookingId === booking.id && (
-            <ReviewForm
-              booking={booking}
-              userId={userId}
-              submitLabel="Submit review"
-              className="dashboard-card__form form"
-              onCancel={closeReviewForm}
-              onSubmitted={() => {
-                setReviewedBookingIds((prev) => new Set([...prev, booking.id]))
-                closeReviewForm()
-              }}
-            />
-          )}
         </div>
       </div>
     )

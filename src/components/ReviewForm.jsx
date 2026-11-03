@@ -10,15 +10,16 @@ import {
 import StarPicker from './StarPicker'
 import Button from './ui/Button'
 
-export default function ReviewForm({
-  booking,
-  userId,
-  submitLabel = 'Leave a review',
-  loadingLabel = 'Submitting',
-  onCancel,
-  onSubmitted,
-  className = 'form',
-}) {
+const DUPLICATE_REVIEW = "You've already reviewed this booking."
+
+function reviewInsertMessage(insertError) {
+  if (insertError?.code === '23505' || /reviews_booking_id_role/.test(insertError?.message || '')) {
+    return DUPLICATE_REVIEW
+  }
+  return insertError?.message || "That review didn't save. Try again."
+}
+
+export default function ReviewForm({ booking, userId, onSubmitted, className = 'form review-form' }) {
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
   const [photos, setPhotos] = useState([])
@@ -74,7 +75,7 @@ export default function ReviewForm({
       if (photoPaths.length > 0) row.photo_paths = photoPaths
       const { error: insertError } = await supabase.from('reviews').insert(row)
       if (insertError) {
-        setError(insertError.message)
+        setError(reviewInsertMessage(insertError))
         return
       }
       onSubmitted?.()
@@ -89,20 +90,15 @@ export default function ReviewForm({
 
   return (
     <form onSubmit={handleSubmit} className={className}>
-      <label className="label">
-        Rating
-        <StarPicker value={rating} onChange={setRating} />
-      </label>
-      <label className="label">
-        Comment
-        <textarea
-          value={comment}
-          onChange={(event) => setComment(event.target.value)}
-          placeholder="Share your experience…"
-          rows={3}
-          className="input input--textarea"
-        />
-      </label>
+      <StarPicker value={rating} onChange={setRating} />
+      <textarea
+        value={comment}
+        onChange={(event) => setComment(event.target.value)}
+        placeholder="What did you make? What was the host like?"
+        aria-label="Comment"
+        rows={3}
+        className="input input--textarea"
+      />
       <div className="review-form__photos">
         <div className="review-form__tiles">
           {photos.map((photo) => (
@@ -120,19 +116,19 @@ export default function ReviewForm({
           ))}
           {remaining > 0 ? (
             <label className="review-form__add">
-              Add photos
+              <span aria-hidden="true">+</span>
               <input
                 type="file"
                 accept={IMAGE_ACCEPT}
                 multiple
-                aria-label="Photos"
+                aria-label="Add photos"
                 onChange={handlePhotos}
                 className="visually-hidden"
               />
             </label>
           ) : null}
         </div>
-        <p className="hint">{REVIEW_PHOTO_CONSENT}</p>
+        <p className="review-form__consent">{REVIEW_PHOTO_CONSENT}</p>
         {photoError ? (
           <p className="error-message" role="status">
             {photoError}
@@ -140,16 +136,9 @@ export default function ReviewForm({
         ) : null}
       </div>
       {error ? <p className="error-message">{error}</p> : null}
-      <div className="button-row">
-        <Button type="submit" loading={loading} loadingLabel={loadingLabel}>
-          {submitLabel}
-        </Button>
-        {onCancel ? (
-          <button type="button" onClick={onCancel} className="btn btn--ghost">
-            Cancel
-          </button>
-        ) : null}
-      </div>
+      <Button type="submit" loading={loading} loadingLabel="Posting" className="review-form__submit">
+        Post review
+      </Button>
     </form>
   )
 }

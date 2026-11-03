@@ -20,7 +20,7 @@ export default function StarPicker({ value, onChange }) {
           className={`star-picker__btn${star <= filledThrough ? ' star-picker__btn--active' : ''}`}
           aria-label={`${star} star${star !== 1 ? 's' : ''}`}
         >
-          ★
+          {star <= filledThrough ? '★' : '☆'}
         </button>
       ))}
     </div>
