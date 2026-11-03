@@ -11,8 +11,10 @@ import {
   keenPeopleLine,
 } from './interest.ts'
 
-const RESEND_FROM = 'TryKai <no-reply@trykai.sg>'
 export const GUEST_REPLY_TO = 'hello@trykai.sg'
+// Send from the inbox people can actually reply to. Several emails say
+// "Reply to this email", and hosts reply to booking emails too.
+const RESEND_FROM = `TryKai <${GUEST_REPLY_TO}>`
 const DEFAULT_SITE_URL = 'https://trykai.sg'
 
 /**
