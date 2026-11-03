@@ -1699,7 +1699,9 @@ describe('ListingDetail checkout', () => {
     const { user } = await openPayNowCheckout()
 
     expect(screen.queryByTestId('payment-element')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
+    expect(screen.getByText(/Next, we'll show a QR to scan with your bank app\./)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Pay \$/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show PayNow QR' }))
 
     expect(stripe.instance.confirmPayNowPayment).toHaveBeenCalledWith(
       'cs_test_1',
@@ -1720,7 +1722,7 @@ describe('ListingDetail checkout', () => {
     })
     const { user } = await openPayNowCheckout()
 
-    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
+    await user.click(screen.getByRole('button', { name: 'Show PayNow QR' }))
 
     expect(await screen.findByText(PAYNOW_QR_MISSING)).toBeInTheDocument()
     expect(screen.queryByRole('img', { name: 'PayNow QR code' })).not.toBeInTheDocument()
@@ -1741,7 +1743,7 @@ describe('ListingDetail checkout', () => {
     })
     const { user, currentPath, currentSearch } = await openPayNowCheckout()
 
-    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
+    await user.click(screen.getByRole('button', { name: 'Show PayNow QR' }))
 
     await waitFor(() => expect(currentPath()).toBe('/dashboard'))
     expect(currentSearch()).toBe('?booking=booking-1&payment=succeeded')
@@ -1754,7 +1756,7 @@ describe('ListingDetail checkout', () => {
     })
     const { user } = await openPayNowCheckout()
 
-    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
+    await user.click(screen.getByRole('button', { name: 'Show PayNow QR' }))
 
     expect(await screen.findByText('PayNow is unavailable.')).toBeInTheDocument()
     expect(screen.queryByRole('img', { name: 'PayNow QR code' })).not.toBeInTheDocument()
@@ -1768,7 +1770,7 @@ describe('ListingDetail checkout', () => {
     })
     const { user } = await openPayNowCheckout()
 
-    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
+    await user.click(screen.getByRole('button', { name: 'Show PayNow QR' }))
 
     expect(
       await screen.findByText('Payment was not completed. You have not been charged.'),
@@ -1791,7 +1793,7 @@ describe('ListingDetail checkout', () => {
     })
     const { user } = await openPayNowCheckout()
 
-    await user.click(screen.getByRole('button', { name: /^Pay \$/ }))
+    await user.click(screen.getByRole('button', { name: 'Show PayNow QR' }))
     expect(await screen.findByText('This QR has expired.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Start again' }))
 

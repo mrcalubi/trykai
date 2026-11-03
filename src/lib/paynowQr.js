@@ -12,6 +12,7 @@
 export const PAYNOW_QR_MISSING = "We couldn't load the PayNow QR. Try again or pay by card."
 export const PAYNOW_QR_EXPIRED = 'This QR has expired.'
 export const PAYNOW_QR_SAVE_FALLBACK = 'Long-press the QR to save it.'
+export const PAYNOW_NEXT_STEP = "Next, we'll show a QR to scan with your bank app. Nothing is charged until you pay in your bank app."
 export const PAYNOW_PHONE_HINT =
   'Paying on this phone? Save the QR, then scan it from your photos in your bank app.'
 export const PAYNOW_QR_STEPS = [

@@ -53,12 +53,17 @@ export default function PayNowQrPanel({
   useEffect(() => {
     if (!stripe || !clientSecret || timedOut) return undefined
     let stopped = false
+    // A guest in their bank app or on a weak signal can fail every poll for
+    // minutes. Report the first failure only, not one every 3 seconds.
+    let reportedError = false
 
     async function poll() {
       if (stopped) return
       const { paymentIntent: latest, error } = await stripe.retrievePaymentIntent(clientSecret)
       if (stopped) return
       if (error) {
+        if (reportedError) return
+        reportedError = true
         Sentry.captureException(error instanceof Error ? error : new Error(error.message || 'retrieve_failed'), {
           tags: { area: 'paynow-qr-poll' },
           extra: { reason: error.message || 'retrieve_failed' },

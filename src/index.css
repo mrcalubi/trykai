@@ -5798,6 +5798,13 @@ body.lightbox-open {
   gap: 16px;
 }
 
+.payment-form__paynow {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .payment-form__total {
   display: flex;
   justify-content: space-between;

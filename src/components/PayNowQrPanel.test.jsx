@@ -159,6 +159,23 @@ describe('PayNowQrPanel', () => {
     expect(JSON.stringify(Sentry.captureException.mock.calls[0])).not.toContain(PNG)
   })
 
+  it('reports repeated retrieve failures to Sentry only once', async () => {
+    const retrievePaymentIntent = vi.fn(async () => ({ error: { message: 'network' } }))
+    renderPanel({ stripe: { retrievePaymentIntent } })
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    })
+
+    await waitFor(() => expect(Sentry.captureException).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await waitFor(() => expect(retrievePaymentIntent.mock.calls.length).toBeGreaterThanOrEqual(3))
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+  })
+
   it('shares the QR when the browser allows files', async () => {
     const share = vi.fn(async () => {})
     vi.stubGlobal(

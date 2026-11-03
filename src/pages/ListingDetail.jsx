@@ -54,6 +54,7 @@ import { checkoutCanLeaveForWebhook } from '../lib/paymentReturn'
 import {
   CONFIRM_PAYNOW_PAYMENT_DATA,
   CONFIRM_PAYNOW_PAYMENT_OPTIONS,
+  PAYNOW_NEXT_STEP,
   PAYNOW_PHONE_HINT,
   PAYNOW_QR_MISSING,
   paynowDisplayQr,
@@ -248,11 +249,11 @@ function CheckoutForm({
         <p className="payment-form__total">
           Total: <FormattedPrice cents={totalAmount} />
         </p>
-        {rail === 'paynow' ? null : <PaymentElement />}
+        {rail === 'paynow' ? <p className="payment-form__paynow">{PAYNOW_NEXT_STEP}</p> : <PaymentElement />}
         {error && <p className="error-message">{error}</p>}
         <div className="payment-form__actions">
           <button type="submit" disabled={!stripe || loading} className="btn btn--primary">
-            Pay <FormattedPrice cents={totalAmount} />
+            {rail === 'paynow' ? 'Show PayNow QR' : <>Pay <FormattedPrice cents={totalAmount} /></>}
           </button>
           <p className="payment-form__secure">Payments are processed securely by Stripe.</p>
         </div>
