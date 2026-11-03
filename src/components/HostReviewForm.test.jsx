@@ -159,3 +159,23 @@ describe('HostReviewsDueList', () => {
     expect(screen.getByText('Guest')).toBeInTheDocument()
   })
 })
+
+describe('HostReviewsDueList · friends on a booking', () => {
+  beforeEach(() => {
+    supabase.__reset()
+    supabase.rpc.mockResolvedValue({ data: { review_id: 'r-host' }, error: null })
+  })
+
+  it('lists the booker and a friend on the same booking separately', async () => {
+    const friend = { ...dueRow, guest_id: 'friend-1', guest_display_name: 'Mei Ling', guest_reviewed: false, booked_by: 'Sam' }
+    const { user } = renderWithRouter(<HostReviewsDueList rows={[dueRow, friend]} now={Date.now()} />)
+
+    expect(screen.getByRole('heading', { name: '2 guests to review' })).toBeInTheDocument()
+    expect(screen.getByText(/· with Sam/)).toBeInTheDocument()
+
+    const buttons = screen.getAllByRole('button', { name: 'Review' })
+    await user.click(buttons[1])
+    expect(screen.getByRole('heading', { name: 'How was Mei Ling?' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'How was Sam?' })).not.toBeInTheDocument()
+  })
+})

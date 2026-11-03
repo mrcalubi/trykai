@@ -309,6 +309,35 @@ emailed_at timestamptz    -- review-emails claim
 
 `00048`. Optional private note from `post_review`. RLS on, no policies, no grants to anon or authenticated. `service_role` SELECT and UPDATE. Read in SQL Editor (OPERATIONS.md).
 
+### booking_guests and booking_join_codes (who's coming)
+
+```sql
+-- booking_guests: a friend who took a seat on someone else's booking
+id uuid PK
+booking_id uuid FK → bookings ON DELETE CASCADE
+user_id uuid FK → users ON DELETE CASCADE
+joined_at timestamptz
+unique (booking_id, user_id)
+
+-- booking_join_codes: one link per booking
+booking_id uuid PK FK → bookings ON DELETE CASCADE
+code text unique          -- 20 lowercase hex characters
+created_at timestamptz
+```
+
+`00050`. Both tables have RLS on, no policies and no grants to anon or authenticated; every read and write goes through security-definer RPCs. The code lives in its own table so a host reading their sessions' bookings never sees it. Seats a booker can hand out = `guests_count - 1`.
+
+- `booking_join_link(booking)` booker only, confirmed, `guests_count >= 2`, until 7 days after the session; makes the code once and returns the same one after.
+- `join_preview(code)` anon and authenticated. Returns `state` (`ok`, `full`, `cancelled`, `closed`, `already`, `mine`, `not_found`), booker and host display names, listing title, cover photo, area, start, duration. Never the address, prices or the booking id.
+- `claim_booking_seat(code)` authenticated. Locks the booking row (`for update`) so two friends cannot both take the last seat. Refuses the booker (`mine`), the host, someone already on that session as a guest or friend (`already`), a full booking, a cancelled one, and claims more than 7 days after the session ends. Returns the booking id.
+- `leave_booking_seat(booking)` friend, before the session starts. `remove_booking_companion(booking, user)` booker, before the session starts; also replaces the code so a forwarded link stops working.
+- `booking_companions(booking)` booker, a friend on it, or the listing's host: display name and avatar only.
+- `companion_booking(booking)` a friend's read-only copy of the booking page's select, minus every money field. `my_companion_bookings()` the friend's Bookings list rows, same shape, no money.
+- `listing_address`, `listing_arrival_instructions` and `booking_host_contact` (00025 / 00046 bodies) also answer for a friend on a confirmed booking.
+- `host_session_guests(session_ids)` the host's confirmed bookers and friends per session, for the "Kai, Mei Ling + 1 more" line.
+- Two-way reviews: `post_review` lets the host review a friend on the booking (one review per person, `00048` index); `host_reviews_due` adds friends with `booked_by`; once the booker's pair is in, every review on the booking goes live. Friends never review the host. `my_profile_stats` counts a friend's sessions as attended.
+- Emails (`_shared/companions.ts`): `cancel-booking`, `admin-cancel-booking` and `reschedule-booking` email each friend after the action has succeeded; a failure is logged and never changes the outcome. No amounts.
+
 ### booking_complaints
 
 ```sql

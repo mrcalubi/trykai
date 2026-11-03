@@ -10,6 +10,7 @@ import {
   sendCancellationEmails,
   sendDisputeRefundEmail,
 } from '../_shared/email.ts'
+import { emailCompanionsCancelled } from '../_shared/companions.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
 import { adminCancelEvent, cleanNote, recordMoneyEvent } from '../_shared/money-events.ts'
 
@@ -236,6 +237,15 @@ Deno.serve(async (req) => {
         paymentRail: booking.payment_rail,
         guestsCount: booking.guests_count,
         paymentMethod,
+        siteUrl: Deno.env.get('SITE_URL'),
+      })
+      await emailCompanionsCancelled(admin, {
+        bookingId: booking.id,
+        cancelledByName: 'TryKai',
+        listingTitle: listing?.title || 'your session',
+        sessionDate: session?.starts_at ? formatSessionDate(session.starts_at) : '',
+        listingId: listing?.id,
+        apiKey: Deno.env.get('RESEND_API_KEY'),
         siteUrl: Deno.env.get('SITE_URL'),
       })
     } catch (emailErr) {
