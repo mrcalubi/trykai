@@ -2,41 +2,17 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import * as Sentry from '@sentry/react'
 import ListingDetail from './ListingDetail'
 import BackButton, { BackSlotProvider } from '../components/BackButton'
 import { supabase } from '../lib/supabase'
 import { renderWithRouter } from '../test/render'
 import { hoursFromNow, makeAuthSession, makeListing, makeReview, makeSession } from '../test/fixtures'
 import { monthBounds } from '../lib/sessionCalendar'
-import { PAYNOW_PHONE_HINT, PAYNOW_QR_MISSING } from '../lib/paynowQr'
 
 vi.mock('../lib/supabase')
-vi.mock('@sentry/react', () => ({ captureException: vi.fn() }))
-
-const PAYNOW_PNG = 'https://stripe.test/paynow.png'
-
-function paynowQrIntent(overrides = {}) {
-  return {
-    status: 'requires_action',
-    created: Math.floor(Date.now() / 1000),
-    next_action: {
-      paynow_display_qr_code: {
-        image_url_png: PAYNOW_PNG,
-        image_url_svg: 'https://stripe.test/paynow.svg',
-        hosted_instructions_url: 'https://stripe.test/instructions',
-      },
-    },
-    ...overrides,
-  }
-}
 
 const stripe = vi.hoisted(() => ({
-  instance: {
-    confirmPayment: vi.fn(async () => ({ error: null })),
-    confirmPayNowPayment: vi.fn(async () => ({ error: null })),
-    retrievePaymentIntent: vi.fn(async () => ({ error: null })),
-  },
+  instance: { confirmPayment: vi.fn(async () => ({ error: null })) },
   loadStripe: vi.fn(() => Promise.resolve({})),
 }))
 
@@ -152,21 +128,10 @@ beforeEach(() => {
   listingReviewRows = []
   hostRatingRow = { average: null, review_count: 0 }
   supabase.__reset()
-  vi.mocked(Sentry.captureException).mockClear()
   stripe.instance.confirmPayment.mockReset()
   stripe.instance.confirmPayment.mockResolvedValue({
     error: null,
     paymentIntent: { status: 'succeeded' },
-  })
-  stripe.instance.confirmPayNowPayment.mockReset()
-  stripe.instance.confirmPayNowPayment.mockResolvedValue({
-    error: null,
-    paymentIntent: paynowQrIntent(),
-  })
-  stripe.instance.retrievePaymentIntent.mockReset()
-  stripe.instance.retrievePaymentIntent.mockResolvedValue({
-    error: null,
-    paymentIntent: { status: 'requires_action' },
   })
 })
 
@@ -1069,8 +1034,6 @@ describe('ListingDetail booking', () => {
     expect(paynow).not.toHaveTextContent('Best price')
     expect(paynow).not.toHaveTextContent('·')
     expect(paynow).not.toHaveTextContent('Scan the QR')
-    expect(paynow).not.toHaveTextContent('Paying on this phone?')
-    expect(screen.getByText(PAYNOW_PHONE_HINT)).toBeInTheDocument()
     expect(paynow).toHaveAttribute('aria-checked', 'true')
     expect(paynow).toHaveTextContent('$51')
     expect(paynow).toHaveTextContent('$49.47')
@@ -1103,6 +1066,40 @@ describe('ListingDetail booking', () => {
     expect(screen.getByRole('radio', { name: /PayNow/ })).not.toHaveTextContent('Save 3%')
   })
 
+  it('tells PayNow guests to screenshot the QR only on the payment step', async () => {
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 4947 },
+      error: null,
+    })
+    const { user } = renderPage()
+    const hint = "On your phone? If saving the QR doesn't work, take a screenshot of it instead."
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(paynowRail()).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByText(hint)).not.toBeInTheDocument()
+
+    await user.click(continueToPayment())
+    expect(await screen.findByText(hint)).toBeInTheDocument()
+  })
+
+  it('does not show the PayNow screenshot note when paying by card', async () => {
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 5100 },
+      error: null,
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(screen.getByRole('radio', { name: /^Card/ }))
+    await user.click(continueToPayment())
+
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
+    expect(await screen.findByText(/^Total:/)).toBeInTheDocument()
+    expect(screen.queryByText(/take a screenshot of it instead/)).not.toBeInTheDocument()
+  })
+
   it('disables PayNow when the session is more than 80 days away', async () => {
     givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(81 * 24) })])
     givenSignedIn()
@@ -1115,7 +1112,7 @@ describe('ListingDetail booking', () => {
     expect(
       screen.getByText('PayNow is available for sessions within 80 days. Please pay by card.')
     ).toBeInTheDocument()
-    expect(screen.queryByText(PAYNOW_PHONE_HINT)).not.toBeInTheDocument()
+    expect(screen.queryByText(/take a screenshot of it instead/)).not.toBeInTheDocument()
     expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$51')
     expect(paynow).toHaveTextContent('$51')
     expect(paynow).not.toHaveTextContent('$49.47')
@@ -1685,133 +1682,6 @@ describe('ListingDetail checkout', () => {
 
     expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument()
     expect(stripe.instance.confirmPayment).not.toHaveBeenCalled()
-  })
-
-  async function openPayNowCheckout() {
-    givenListing()
-    givenSessions([makeSession({ id: 'session-7' })])
-    givenSignedIn()
-    supabase.functions.invoke.mockResolvedValue({
-      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 4947 },
-      error: null,
-    })
-    const utils = renderPage()
-    await screen.findByText(/spots left/)
-    await utils.user.click(await screen.findByRole('button', { name: 'Book' }))
-    await utils.user.click(continueToPayment())
-    await screen.findByTestId('stripe-elements')
-    return utils
-  }
-
-  it('shows our PayNow QR from next_action instead of PaymentElement', async () => {
-    const { user } = await openPayNowCheckout()
-
-    expect(screen.queryByTestId('payment-element')).not.toBeInTheDocument()
-    expect(screen.getByText(/Next, we'll show a QR to scan with your bank app\./)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Pay \$/ })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Show PayNow QR' }))
-
-    expect(stripe.instance.confirmPayNowPayment).toHaveBeenCalledWith(
-      'cs_test_1',
-      { payment_method: { billing_details: {} } },
-      { handleActions: false },
-    )
-    expect(stripe.instance.confirmPayment).not.toHaveBeenCalled()
-    const image = await screen.findByRole('img', { name: 'PayNow QR code' })
-    expect(image).toHaveAttribute('src', PAYNOW_PNG)
-    expect(screen.getByRole('heading', { name: /Pay \$49\.47 with PayNow/ })).toBeInTheDocument()
-    expect(screen.queryByTestId('payment-element')).not.toBeInTheDocument()
-  })
-
-  it('shows a retry message and reports to Sentry when the PayNow QR is missing', async () => {
-    stripe.instance.confirmPayNowPayment.mockResolvedValue({
-      error: null,
-      paymentIntent: { status: 'requires_action', next_action: { type: 'paynow_display_qr_code' } },
-    })
-    const { user } = await openPayNowCheckout()
-
-    await user.click(screen.getByRole('button', { name: 'Show PayNow QR' }))
-
-    expect(await screen.findByText(PAYNOW_QR_MISSING)).toBeInTheDocument()
-    expect(screen.queryByRole('img', { name: 'PayNow QR code' })).not.toBeInTheDocument()
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        tags: { area: 'paynow-qr' },
-        extra: { reason: 'missing_next_action', status: 'requires_action' },
-      }),
-    )
-    expect(JSON.stringify(Sentry.captureException.mock.calls[0])).not.toContain('http')
-  })
-
-  it('leaves for the webhook when PayNow confirm already succeeded', async () => {
-    stripe.instance.confirmPayNowPayment.mockResolvedValue({
-      error: null,
-      paymentIntent: { status: 'succeeded' },
-    })
-    const { user, currentPath, currentSearch } = await openPayNowCheckout()
-
-    await user.click(screen.getByRole('button', { name: 'Show PayNow QR' }))
-
-    await waitFor(() => expect(currentPath()).toBe('/dashboard'))
-    expect(currentSearch()).toBe('?booking=booking-1&payment=succeeded')
-    expect(stripe.instance.confirmPayment).not.toHaveBeenCalled()
-  })
-
-  it('shows the PayNow confirm error on the pay form without opening a QR', async () => {
-    stripe.instance.confirmPayNowPayment.mockResolvedValue({
-      error: { message: 'PayNow is unavailable.' },
-    })
-    const { user } = await openPayNowCheckout()
-
-    await user.click(screen.getByRole('button', { name: 'Show PayNow QR' }))
-
-    expect(await screen.findByText('PayNow is unavailable.')).toBeInTheDocument()
-    expect(screen.queryByRole('img', { name: 'PayNow QR code' })).not.toBeInTheDocument()
-    expect(stripe.instance.confirmPayment).not.toHaveBeenCalled()
-  })
-
-  it('abandons the unpaid checkout when PayNow confirm is canceled', async () => {
-    stripe.instance.confirmPayNowPayment.mockResolvedValue({
-      error: null,
-      paymentIntent: { status: 'canceled' },
-    })
-    const { user } = await openPayNowCheckout()
-
-    await user.click(screen.getByRole('button', { name: 'Show PayNow QR' }))
-
-    expect(
-      await screen.findByText('Payment was not completed. You have not been charged.'),
-    ).toBeInTheDocument()
-    expect(screen.queryByRole('img', { name: 'PayNow QR code' })).not.toBeInTheDocument()
-    await waitFor(() =>
-      expect(supabase.functions.invoke).toHaveBeenCalledWith('abandon-checkout', {
-        body: { booking_id: 'booking-1' },
-        headers: { Authorization: 'Bearer test-access-token' },
-      }),
-    )
-  })
-
-  it('Start again after an expired PayNow QR returns the guest to Continue to payment', async () => {
-    stripe.instance.confirmPayNowPayment.mockResolvedValue({
-      error: null,
-      paymentIntent: paynowQrIntent({
-        created: Math.floor(Date.now() / 1000) - 4000,
-      }),
-    })
-    const { user } = await openPayNowCheckout()
-
-    await user.click(screen.getByRole('button', { name: 'Show PayNow QR' }))
-    expect(await screen.findByText('This QR has expired.')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Start again' }))
-
-    expect(await screen.findByRole('button', { name: /Continue to payment/ })).toBeInTheDocument()
-    await waitFor(() =>
-      expect(supabase.functions.invoke).toHaveBeenCalledWith('abandon-checkout', {
-        body: { booking_id: 'booking-1' },
-        headers: { Authorization: 'Bearer test-access-token' },
-      }),
-    )
   })
 })
 
