@@ -122,7 +122,7 @@ begin
   if not exists (select 1 from public.reviews_for_guest(v_guest) g where g.comment like 'Host words%') then
     raise exception 'reviews_for_guest should return the host comment';
   end if;
-  if pg_get_function_result('public.reviews_for_guest(uuid)') like '%rating%' then
+  if pg_get_function_result('public.reviews_for_guest(uuid)'::regprocedure) like '%rating%' then
     raise exception 'reviews_for_guest must never return rating';
   end if;
 
