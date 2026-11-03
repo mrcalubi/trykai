@@ -102,10 +102,20 @@ describe('HostReviewsDueList', () => {
     const { user } = renderWithRouter(<HostReviewsDueList rows={[dueRow]} now={Date.now()} />)
 
     expect(screen.getByRole('heading', { name: '1 guest to review' })).toBeInTheDocument()
-    expect(screen.getByText(/Sam left you a review. Review Sam to see it/)).toBeInTheDocument()
-    expect(screen.getByText(/Reviews close/)).toBeInTheDocument()
+    const status = screen.getByText(/days? left$/)
+    expect(status).toHaveTextContent(/^Reviewed you · \d+ days? left$/)
+    expect(screen.queryByText(/left you a review/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Reviews close/)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Review' }))
     expect(screen.getByRole('heading', { name: 'How was Sam?' })).toBeInTheDocument()
+  })
+
+  it('shows only the days left when the guest has not reviewed yet', () => {
+    renderWithRouter(
+      <HostReviewsDueList rows={[{ ...dueRow, guest_reviewed: false }]} now={Date.now()} />,
+    )
+    expect(screen.getByText(/days? left$/)).toHaveTextContent(/^\d+ days? left$/)
+    expect(screen.queryByText(/Reviewed you/)).not.toBeInTheDocument()
   })
 
   it('marks a row Done after the host posts', async () => {

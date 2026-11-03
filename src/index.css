@@ -7287,16 +7287,24 @@ body.lightbox-open {
 }
 
 .hosting-reviews__meta,
-.hosting-reviews__close {
+.hosting-reviews__status {
   margin: 0;
   font-size: 13px;
   color: var(--muted);
 }
 
+.hosting-reviews__status {
+  margin-top: 4px;
+}
+
+/* Keep "Mon, 2 Nov" on one line when the Review button squeezes the row. */
+.hosting-reviews__date {
+  white-space: nowrap;
+}
+
+/* "Reviewed you" is the one thing worth noticing on the row. */
 .hosting-reviews__nudge {
-  margin: 8px 0 0;
-  font-size: 14px;
-  line-height: 1.45;
+  font-weight: 700;
   color: var(--navy);
 }
 

@@ -122,13 +122,16 @@ export function HostReviewsDueList({ rows, now }) {
                   <p className="hosting-reviews__name">{guestName}</p>
                   <p className="hosting-reviews__meta">
                     {row.listing_title}
-                    {row.starts_at ? ` · ${formatSessionDay(row.starts_at, at)}` : ''}
+                    {row.starts_at ? (
+                      <span className="hosting-reviews__date"> · {formatSessionDay(row.starts_at, at)}</span>
+                    ) : null}
                   </p>
-                  {row.guest_reviewed && !done ? (
-                    <p className="hosting-reviews__nudge">
-                      {guestName} left you a review. Review {guestName} to see it. Both go live
-                      together.
-                      {days > 0 ? ` ${days} ${days === 1 ? 'day' : 'days'} left.` : ''}
+                  {!done && days > 0 ? (
+                    <p className="hosting-reviews__status">
+                      {row.guest_reviewed ? (
+                        <span className="hosting-reviews__nudge">Reviewed you · </span>
+                      ) : null}
+                      {days} {days === 1 ? 'day' : 'days'} left
                     </p>
                   ) : null}
                 </div>
@@ -144,9 +147,6 @@ export function HostReviewsDueList({ rows, now }) {
                   </button>
                 )}
               </div>
-              <p className="hint hosting-reviews__close">
-                Reviews close {reviewClosedOnLabel(row.deadline, at)}, 7 days after the session.
-              </p>
               {openId === row.booking_id && !done ? (
                 <HostReviewForm
                   row={row}

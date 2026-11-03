@@ -1917,7 +1917,7 @@ describe('Hosting reviews due', () => {
     await renderHosting()
 
     expect(screen.getByRole('heading', { name: '1 guest to review' })).toBeInTheDocument()
-    expect(screen.getByText(/Sam left you a review. Review Sam to see it/)).toBeInTheDocument()
+    expect(screen.getByText(/days? left$/)).toHaveTextContent(/^Reviewed you · \d+ days? left$/)
     expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
   })
 })
