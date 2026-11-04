@@ -729,3 +729,36 @@ describe('BookingDetail · who is coming', () => {
     expect(supabase.rpc).not.toHaveBeenCalledWith('booking_companions', expect.anything())
   })
 })
+
+describe('BookingDetail · consistent cards', () => {
+  it('titles Where like every other card', async () => {
+    givenBooking(detailBooking())
+    renderDetail()
+    expect(await screen.findByRole('heading', { name: 'Where', level: 2 })).toHaveClass('booking-card__title')
+    expect(screen.getByRole('heading', { name: 'When', level: 2 })).toHaveClass('booking-card__title')
+  })
+
+  it('offers Add to calendar and the packing list only before the session', async () => {
+    givenBooking(detailBooking())
+    renderDetail()
+    expect(await screen.findByRole('button', { name: 'Add to calendar' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Before you go' })).toBeInTheDocument()
+  })
+
+  it('drops Add to calendar and the packing list after the session', async () => {
+    givenBooking(detailBooking({ sessions: { ...detailBooking().sessions, starts_at: hoursFromNow(-5) } }))
+    renderDetail()
+    expect(await screen.findByRole('heading', { name: 'When' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add to calendar' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Before you go' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Invite a friend' })).toBeInTheDocument()
+  })
+
+  it('drops Add to calendar and the packing list on a cancelled booking', async () => {
+    givenBooking(detailBooking({ status: 'cancelled', refund_amount: 200, stripe_refund_id: 're_1' }))
+    renderDetail()
+    expect(await screen.findByRole('heading', { name: 'When' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add to calendar' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Before you go' })).not.toBeInTheDocument()
+  })
+})
