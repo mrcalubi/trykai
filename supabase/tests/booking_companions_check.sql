@@ -105,11 +105,13 @@ begin
   end;
 
   perform set_config('request.jwt.claims', json_build_object('sub', v_host::text, 'role', 'authenticated')::text, true);
+  select p.state into v_state from public.join_preview(v_code) p;
+  if v_state <> 'host' then raise exception 'host preview should be host, got %', v_state; end if;
   begin
     perform public.claim_booking_seat(v_code);
     raise exception 'host claimed a seat';
   exception when others then
-    if sqlerrm not like '%not_allowed%' then raise; end if;
+    if sqlerrm not like '%host%' then raise; end if;
   end;
 
   perform set_config('request.jwt.claims', json_build_object('sub', v_friend2::text, 'role', 'authenticated')::text, true);

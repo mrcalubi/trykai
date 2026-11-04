@@ -36,6 +36,10 @@ export function joinStateMessage(state, bookerName) {
       return "You're already booked for this session."
     case 'mine':
       return "This is your booking. Send the link to your friends."
+    case 'host':
+      return "You're hosting this session, so you can't take a seat."
+    case 'not_allowed':
+      return "You can't take a seat on this booking."
     case 'not_found':
       return 'This link has expired. Ask for a new one.'
     default:
@@ -45,7 +49,7 @@ export function joinStateMessage(state, bookerName) {
 
 export function claimErrorState(error) {
   const text = String(error?.message || '')
-  for (const state of ['full', 'cancelled', 'closed', 'already', 'mine', 'not_found']) {
+  for (const state of ['full', 'cancelled', 'closed', 'already', 'mine', 'host', 'not_found', 'not_allowed']) {
     if (text.includes(state)) return state
   }
   return 'error'

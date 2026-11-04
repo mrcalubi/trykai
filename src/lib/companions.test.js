@@ -36,6 +36,8 @@ describe('companions helpers', () => {
     expect(joinStateMessage('already')).toBe("You're already booked for this session.")
     expect(joinStateMessage('mine')).toMatch(/your booking/)
     expect(joinStateMessage('not_found')).toMatch(/expired/)
+    expect(joinStateMessage('host')).toMatch(/hosting this session/)
+    expect(joinStateMessage('not_allowed')).toMatch(/can't take a seat/)
     expect(joinStateMessage('something else')).toMatch(/Try again/)
   })
 
@@ -43,6 +45,8 @@ describe('companions helpers', () => {
     expect(claimErrorState({ message: 'full' })).toBe('full')
     expect(claimErrorState({ message: 'ERROR: already' })).toBe('already')
     expect(claimErrorState({ message: 'not_found' })).toBe('not_found')
+    expect(claimErrorState({ message: 'host' })).toBe('host')
+    expect(claimErrorState({ message: 'not_allowed' })).toBe('not_allowed')
     expect(claimErrorState({ message: 'boom' })).toBe('error')
     expect(claimErrorState(null)).toBe('error')
   })
