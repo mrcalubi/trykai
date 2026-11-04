@@ -20,6 +20,7 @@ import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import ListingDetail from './pages/ListingDetail'
+import JoinBooking from './pages/JoinBooking'
 import Profile from './pages/Profile'
 import CreateListing from './pages/CreateListing'
 import EditListing from './pages/EditListing'
@@ -81,6 +82,7 @@ function appRoutes() {
         <Route path="/forgot-password" handle={{ title: 'Forgot password' }} element={<ForgotPassword />} />
         <Route path="/reset-password" handle={{ title: 'Reset password' }} element={<ResetPassword />} />
         <Route path="/listings/:id" element={<ListingDetail />} />
+        <Route path="/join/:code" handle={{ title: 'Join a booking' }} element={<JoinBooking />} />
         <Route path="/u/:id" element={<Profile />} />
         <Route
           path="/create-listing" handle={{ title: 'Create a listing' }}

@@ -64,6 +64,7 @@ import {
   sessionPrepareBoxes,
 } from '../lib/bookingAddons'
 import { HostReviewsDueList } from '../components/HostReviewForm'
+import { groupGuestsBySession, sessionGuestsLine } from '../lib/companions'
 
 function activeBookingsOn(session) {
   // Pending rows are unpaid checkouts, not guests the host has to refund.
@@ -130,6 +131,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   const [isAdmin, setIsAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [reviewsDue, setReviewsDue] = useState([])
+  const [guestsBySession, setGuestsBySession] = useState({})
 
   // The profile's calendar mirrors this tab's sessions. Keep the callback in
   // a ref so a new function each render does not reload the page.
@@ -257,6 +259,18 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
         setHostSessions(upcoming)
         setMonthSessions(monthSessionsToCount(rows, now))
         onSessionsChangeRef.current?.(rows)
+        // Names of bookers and friends who took a seat (00050).
+        const bookedSessionIds = upcoming
+          .filter((session) => (session.bookings ?? []).some((booking) => booking.status === 'confirmed'))
+          .map((session) => session.id)
+        if (bookedSessionIds.length) {
+          const { data: guestRows } = await supabase.rpc('host_session_guests', {
+            p_session_ids: bookedSessionIds,
+          })
+          setGuestsBySession(groupGuestsBySession(Array.isArray(guestRows) ? guestRows : []))
+        } else {
+          setGuestsBySession({})
+        }
         const confirmedIds = upcoming.flatMap((session) =>
           (session.bookings ?? [])
             .filter((booking) => booking.status === 'confirmed')
@@ -952,6 +966,9 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                     onDeleteSession={handleDeleteEmptySession}
                     onKeep={clearSessionConfirms}
                   />
+                  {sessionGuestsLine(guestsBySession[session.id]) ? (
+                    <p className="hosting-guests">{sessionGuestsLine(guestsBySession[session.id])}</p>
+                  ) : null}
                   {prepareBySession[session.id] ? (
                     <div className="hosting-prepare">
                       {prepareBySession[session.id].lines.length > 0 ? (

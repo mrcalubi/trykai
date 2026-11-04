@@ -10636,3 +10636,171 @@ body:has(.edit-profile__bar) .site-footer {
   padding-top: 16px;
   border-top: 1px solid var(--border);
 }
+
+/* Who's coming (00050) */
+.whos-coming__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.whos-coming__count {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.whos-coming__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.whos-coming__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.whos-coming__avatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.whos-coming__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.whos-coming__you {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.whos-coming__row--open .whos-coming__name {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.whos-coming__seat {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 50%;
+  background: var(--cream);
+}
+
+.whos-coming__hint {
+  margin: 8px 0 0;
+}
+
+.booking-pill--booked-by {
+  display: inline-flex;
+  align-self: flex-start;
+  margin: 0 0 8px;
+  background: var(--tint-fitness);
+  color: var(--tint-fitness-ink);
+}
+
+.hosting-guests {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--navy);
+}
+
+.hosting-reviews__with {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* /join/:code */
+.join-page {
+  display: flex;
+  justify-content: center;
+}
+
+.join-card {
+  width: 100%;
+  max-width: 420px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.join-card__cover {
+  aspect-ratio: 4 / 3;
+  background: var(--sand);
+}
+
+.join-card__cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.join-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+}
+
+.join-card__eyebrow {
+  margin: 0;
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--coral-ink);
+}
+
+.join-card__title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.join-card__when,
+.join-card__with {
+  margin: 0;
+  font-size: 15px;
+}
+
+.join-card__with {
+  color: var(--muted);
+}
+
+.join-card__paid {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--success);
+}
+
+.join-card__state {
+  margin: 4px 0 0;
+  font-size: 15px;
+}
+
+.join-card__listing {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.whos-coming .ui-button {
+  width: 100%;
+}

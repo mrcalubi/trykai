@@ -1691,3 +1691,98 @@ function wrapEmail(body: string, siteUrl: string, preheader?: string): string {
 </body>
 </html>`
 }
+
+// ---------------------------------------------------------------------------
+// Who's coming (00050): friends who took a seat hear when the booking moves or
+// is cancelled. Short, no amounts (they did not pay).
+// ---------------------------------------------------------------------------
+
+export type CompanionRecipient = {
+  email?: string | null
+  display_name?: string | null
+  full_name?: string | null
+}
+
+export function companionMovedSubject(listingTitle: string, newSessionDate: string): string {
+  return `Moved: ${listingTitle} is now ${newSessionDate}`
+}
+
+export function companionMovedHtml(options: {
+  companionName?: string | null
+  bookerName: string
+  listingTitle: string
+  newSessionDate: string
+  bookingId: string
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.companionName)}</p>
+    ${emailHeading(`${options.bookerName} moved your booking`)}
+    <p style="margin:0 0 16px;">${escapeHtml(options.listingTitle)} is now on ${escapeHtml(options.newSessionDate)}.</p>
+    ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
+    ${emailSignOff('see-you')}
+    `,
+    siteUrl,
+    `${options.bookerName} moved your booking to ${options.newSessionDate}`,
+  )
+}
+
+export function companionCancelledSubject(listingTitle: string): string {
+  return `Cancelled: ${listingTitle}`
+}
+
+export function companionCancelledHtml(options: {
+  companionName?: string | null
+  /** Who cancelled, as a sentence subject: "Kai", "Nicholas", or "TryKai". */
+  cancelledByName: string
+  listingTitle: string
+  sessionDate: string
+  listingId?: string | null
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const findAnother = options.listingId
+    ? primaryButton(`${siteUrl}/listings/${encodeURIComponent(options.listingId)}`, 'Find another time')
+    : ''
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.companionName)}</p>
+    ${emailHeading(`${options.cancelledByName} cancelled ${options.listingTitle}`)}
+    <p style="margin:0 0 16px;">The session on ${escapeHtml(options.sessionDate)} is off, so your seat is too.</p>
+    ${findAnother}
+    ${emailSignOff('take-care')}
+    `,
+    siteUrl,
+    `${options.listingTitle} on ${options.sessionDate} is cancelled`,
+  )
+}
+
+/** One email per friend. A failure for one never stops the rest. */
+export async function sendCompanionEmails(options: {
+  apiKey: string | undefined
+  recipients: CompanionRecipient[]
+  subject: string
+  html: (companionName: string | null) => string
+  send?: typeof sendResendEmail
+}): Promise<number> {
+  const send = options.send ?? sendResendEmail
+  let sent = 0
+  for (const person of options.recipients ?? []) {
+    if (!person?.email) continue
+    try {
+      await send({
+        apiKey: options.apiKey,
+        to: person.email,
+        subject: options.subject,
+        html: options.html(publicDisplayName(person) || null),
+        replyTo: GUEST_REPLY_TO,
+      })
+      sent += 1
+    } catch (err) {
+      console.error('companion email failed', err instanceof Error ? err.message : err)
+    }
+  }
+  return sent
+}

@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { companionBookingsFromRpc } from '../lib/companions'
+import { publicName } from '../lib/publicName'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import Button from '../components/ui/Button'
@@ -113,10 +115,14 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
         .eq('reviewer_id', userId),
     ])
 
+    // Seats friends took on someone else's booking (00050). No money fields.
+    const { data: companionData } = await supabase.rpc('my_companion_bookings')
+    const companionRows = companionBookingsFromRpc(companionData)
+
     if (bookingsResult.error) {
       setError(PAGE_LOAD_ERROR)
     } else {
-      setBookings(bookingsResult.data)
+      setBookings([...(bookingsResult.data ?? []), ...companionRows])
       const { rows: addonRows } = await loadBookingAddonRows(
         supabase,
         (bookingsResult.data ?? []).map((booking) => booking.id),
@@ -328,6 +334,8 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
   }
 
   function actionsFor(booking) {
+    // Only the booker can cancel, move or review.
+    if (booking.is_companion) return {}
     return guestBookingActions(booking, {
       alreadyReviewed: reviewedBookingIds.has(booking.id),
     })
@@ -399,6 +407,9 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
               </>
             )}
             {movedFromById[booking.id] ? ` · Moved from ${formatSessionDay(movedFromById[booking.id])}` : ''}
+            {booking.is_companion
+              ? ` · Booked by ${publicName({ display_name: booking.booker_display_name }) || 'a friend'}`
+              : ''}
           </p>
           <div className="booking-card__actions">
             <span className={`badge badge--${booking.status}`}>
