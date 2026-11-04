@@ -1,6 +1,6 @@
 # Terms of Service
 
-Last updated: 31 October 2026
+Last updated: 4 November 2026
 
 These terms apply to everyone who uses TryKai. Part 1 applies to all users. Part 2 applies when you host. Part 3 applies when you book.
 
@@ -31,7 +31,7 @@ You must be 18 or older to create an account, host or book. By creating an accou
 - Give accurate information and keep it up to date.
 - Keep your login details private. You are responsible for activity on your account.
 - One person, one account.
-- Your display name, profile photo, verification badge, listings and the reviews you receive as a Host are public. Your full name, email and phone number are not.
+- Your display name, profile photo, verification badge, listings, the reviews you receive as a Host and the written reviews Hosts leave about you as a Guest are public once live. Your full name, email and phone number are not.
 
 ### 5. Acceptable use
 
@@ -50,8 +50,9 @@ You keep ownership of what you upload, such as photos and listing descriptions. 
 
 ### 7. Reviews
 
-- Only a Guest with a confirmed booking can review, and only after the session has ended.
-- One review per booking.
+- Guests and Hosts can review after a confirmed booking, once the session has ended, until 7 days after it ends.
+- A Guest may leave one review per booking. A Host may leave one review per person on a booking.
+- Reviews stay hidden until both sides have posted, or until 7 days after the session ends, whichever comes first.
 - Reviews must be honest and based on your own experience.
 - Do not offer or accept anything in exchange for a review.
 - We do not pre-screen reviews, but we may remove reviews that are abusive, defamatory or fraudulent.

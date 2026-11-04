@@ -5,7 +5,7 @@ export default function Terms() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Terms of Service</h1>
-      <p className="policy-page__updated">Last updated: 31 October 2026</p>
+      <p className="policy-page__updated">Last updated: 4 November 2026</p>
 
       <p>
         These terms apply to everyone who uses TryKai. Part 1 applies to all
@@ -58,8 +58,9 @@ export default function Terms() {
         </li>
         <li>One person, one account.</li>
         <li>
-          Your display name, profile photo, verification badge, listings and the
-          reviews you receive as a Host are public. Your full name, email and
+          Your display name, profile photo, verification badge, listings, the
+          reviews you receive as a Host and the written reviews Hosts leave
+          about you as a Guest are public once live. Your full name, email and
           phone number are not.
         </li>
       </ul>
@@ -92,10 +93,17 @@ export default function Terms() {
       <h3>7. Reviews</h3>
       <ul>
         <li>
-          Only a Guest with a confirmed booking can review, and only after the
-          session has ended.
+          Guests and Hosts can review after a confirmed booking, once the
+          session has ended, until 7 days after it ends.
         </li>
-        <li>One review per booking.</li>
+        <li>
+          A Guest may leave one review per booking. A Host may leave one
+          review per person on a booking.
+        </li>
+        <li>
+          Reviews stay hidden until both sides have posted, or until 7 days
+          after the session ends, whichever comes first.
+        </li>
         <li>Reviews must be honest and based on your own experience.</li>
         <li>Do not offer or accept anything in exchange for a review.</li>
         <li>

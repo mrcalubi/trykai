@@ -323,8 +323,32 @@ describe('Privacy Policy page', () => {
     expect(screen.getByText(/Reviews and review photos/)).toBeInTheDocument()
     expect(
       screen.getByText(
-        /the reviews you receive as a Host, and any photos attached to those\s+reviews are visible to anyone/,
+        /the reviews you receive as a Host \(and any photos attached to those\s+reviews\)/,
       ),
     ).toBeInTheDocument()
+  })
+
+  it('says host reviews of guests are public words, stars and private notes are not', () => {
+    expect(
+      screen.getByText(/the written reviews Hosts leave about you as a Guest are\s+visible to anyone once those reviews are live/),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Star ratings Hosts give\s+Guests are not public; they only count toward your own milestones/)).toBeInTheDocument()
+    expect(screen.getAllByText(/private note/i).length).toBeGreaterThan(0)
+  })
+
+  it("says what a friend on someone else's booking can see", () => {
+    expect(
+      screen.getByText(/If you take a seat on\s+someone else.s booking, the person who booked and the Host can see\s+your display name/),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('Terms of Service · two-way reviews', () => {
+  it('lets hosts review guests within 7 days with a blind reveal', () => {
+    renderWithRouter(<Terms />)
+    expect(screen.getByText(/Guests and Hosts can review after a confirmed booking/)).toBeInTheDocument()
+    expect(screen.getByText(/A Host may leave one\s+review per person on a booking/)).toBeInTheDocument()
+    expect(screen.getByText(/Reviews stay hidden until both sides have posted/)).toBeInTheDocument()
+    expect(screen.queryByText(/Only a Guest with a confirmed booking can review/)).not.toBeInTheDocument()
   })
 })
