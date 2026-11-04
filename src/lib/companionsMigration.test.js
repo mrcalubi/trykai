@@ -31,7 +31,8 @@ describe('00050 booking companions', () => {
   it('locks the booking row while claiming so two friends cannot take the last seat', () => {
     expect(body('claim_booking_seat')).toMatch(/for update of b/)
     expect(body('claim_booking_seat')).toMatch(/raise exception 'full'/)
-    expect(body('claim_booking_seat')).toMatch(/v_uid = v_host_id/)
+    expect(body('claim_booking_seat')).toMatch(/v_uid = v_host_id then\s+raise exception 'host'/)
+    expect(body('join_preview')).toMatch(/state := 'host'/)
   })
 
   it('never gives a friend money fields', () => {

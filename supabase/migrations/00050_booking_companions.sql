@@ -193,7 +193,7 @@ grant execute on function public.remove_booking_companion(uuid, uuid) to authent
 -- Public preview. No address, no prices, no booking id.
 create or replace function public.join_preview(p_code text)
 returns table (
-  state text,             -- 'ok' | 'full' | 'cancelled' | 'closed' | 'already' | 'mine' | 'not_found'
+  state text,             -- 'ok' | 'full' | 'cancelled' | 'closed' | 'already' | 'mine' | 'host' | 'not_found'
   booker_display_name text,
   listing_id uuid,
   listing_title text,
@@ -247,6 +247,8 @@ begin
     state := 'closed';
   elsif v_uid is not null and v_uid = v_booking.guest_id then
     state := 'mine';
+  elsif v_uid is not null and v_uid = v_listing.host_id then
+    state := 'host';
   elsif v_uid is not null and public.is_booking_companion(v_booking.id, v_uid) then
     state := 'already';
   elsif v_uid is not null and (exists (
@@ -318,7 +320,7 @@ begin
     raise exception 'mine';
   end if;
   if v_uid = v_host_id then
-    raise exception 'not_allowed';
+    raise exception 'host';
   end if;
   if public.is_booking_companion(v_booking.id, v_uid) or exists (
     select 1 from public.bookings ob
