@@ -100,6 +100,9 @@ describe('header facts', () => {
       categoriesTried: 0,
       reviewsWritten: 0,
       joinedAt: 'x',
+      hostReviewsReceived: 0,
+      hostFiveStarReceived: 0,
+      guestsReviewed: 0,
     })
   })
 })
@@ -135,12 +138,22 @@ describe('milestones', () => {
     const none = hostMedals()
     expect(none.every((medal) => !medal.earned)).toBe(true)
     const some = hostMedals({ sessionsHeld: 12, reviews: [{ rating: 5 }] })
-    expect(some.map((medal) => medal.earned)).toEqual([true, true, true, false])
+    expect(some.map((medal) => medal.earned)).toEqual([true, true, true, false, false])
+    expect(hostMedals({ guestsReviewed: 10 }).find((medal) => medal.id === 'good-host').earned).toBe(true)
   })
 
   it('earns guest medals, including OG for launch-year joiners', () => {
     const medals = guestMedals({ sessionsAttended: 5, categoriesTried: 3, joinedAt: '2026-10-01T00:00:00Z' })
-    expect(medals.map((medal) => medal.earned)).toEqual([true, true, true, true])
+    expect(medals.map((medal) => medal.earned)).toEqual([true, true, true, true, false, false])
+    expect(
+      guestMedals({ hostReviewsReceived: 1, hostFiveStarReceived: 3 }).map((medal) => medal.id),
+    ).toEqual(expect.arrayContaining(['kind-words', 'host-favourite']))
+    expect(guestMedals({ hostReviewsReceived: 1 }).find((medal) => medal.id === 'kind-words').earned).toBe(
+      true,
+    )
+    expect(
+      guestMedals({ hostFiveStarReceived: 3 }).find((medal) => medal.id === 'host-favourite').earned,
+    ).toBe(true)
     expect(guestMedals({ joinedAt: '2027-02-01T00:00:00Z' })[3].earned).toBe(false)
     expect(guestMedals()[3].earned).toBe(false)
   })

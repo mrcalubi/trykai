@@ -459,6 +459,9 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00045` (drop reschedule FK) | Not applied | Not applied | Right after `00044`, both environments. Drops the second bookings → sessions key that made every bookings/sessions embed ambiguous (PGRST201). No-op where 00044 is the fixed version. |
 | `00046` (booking cutoff and arrival) | Not applied | Not applied | After `00045`. Caleb applies. Cutoff, How to find me, day-of number, `booking_host_contact`, `listing_arrival_instructions`; replaces `my_account` and `reschedule_booking`. |
 | `00047` (review photos) | Not applied | Not applied | **Apply on staging before merging the review-photos PR.** After `00046`. Caleb applies. `reviews.photo_paths`, public insert-only `review-photos` bucket, `reviews_for_listing` / `reviews_for_host` return `photo_paths`. |
+| `00048` (two-way reviews) | Not applied | Not applied | **Apply on staging, then production, BEFORE merging the two-way-reviews release.** After `00047`. Additive: reveal columns, `post_review`, `review_notes`, public readers. Does not revoke `reviews` grants. Then run `supabase/tests/two_way_reviews_check.sql` in the staging SQL Editor (begin/rollback). |
+| `00050` (who's coming) | Not applied | Not applied | **Apply on staging, then production, BEFORE merging the who's-coming release.** After `00049` on staging; on production it needs `00048` (not `00049`). Additive: `booking_guests`, `booking_join_codes`, join/claim/leave RPCs, friends added to address and day-of number reads, host reviews of friends. Then run `supabase/tests/booking_companions_check.sql` in the staging SQL Editor (begin/rollback). |
+| `00049` (lock reviews) | Not applied | Not applied | **Apply ONLY after the two-way-reviews release is live on production.** Staging first, test, then production. Drops public SELECT/INSERT on `reviews`; authenticated sees own rows only. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
@@ -999,6 +1002,38 @@ Public bucket **review-photos**. Guests can attach up to 3 photos to a review. T
 **To take a photo down:** in Table Editor, edit `reviews.photo_paths` first and remove that path from the array (leave the rest). Then delete the object in **Storage → review-photos**. Paths first, then the object: the insert/update trigger requires every remaining path to still exist.
 
 **Orphaned uploads** from a failed review insert (the photo went up, the row did not) are public but unreferenced. Harmless. Clear by hand in Storage when you notice them. There is no client list, so browse the reviewer's folder in the dashboard.
+
+## Private notes on reviews
+
+`review_notes` is TryKai-only (`00048`): RLS on, no client policies, no grants to anon or authenticated. `review-emails` sends each new note to hello@trykai.sg (reply-to the author). In **SQL Editor** (read only, service role / postgres):
+
+```sql
+select n.created_at, n.note, n.emailed_at,
+       n.author_id, u.display_name, u.email,
+       r.role, r.booking_id, l.title
+from public.review_notes n
+join public.users u on u.id = n.author_id
+join public.reviews r on r.id = n.review_id
+join public.bookings b on b.id = n.booking_id
+join public.sessions s on s.id = b.session_id
+join public.listings l on l.id = s.listing_id
+order by n.created_at desc
+limit 50;
+```
+
+After applying `00048` on staging, run `supabase/tests/two_way_reviews_check.sql` in the SQL Editor (it wraps itself in `begin` … `rollback`). The last block is skipped until `00049` is applied.
+
+**Who's coming (00050).** After applying it on staging, run `supabase/tests/booking_companions_check.sql` the same way. "ROLLBACK" with no error means every check passed. To see who took a seat on a booking:
+
+```sql
+select bg.joined_at, u.display_name, u.email
+from public.booking_guests bg
+join public.users u on u.id = bg.user_id
+where bg.booking_id = '<booking id>'
+order by bg.joined_at;
+```
+
+To take a seat away by hand (the booker can do this themselves before the session): `delete from public.booking_guests where booking_id = '<booking id>' and user_id = '<user id>';`
 
 Emailed complaints still follow every step below. Safety reports have no time limit and never go through the in-app form.
 

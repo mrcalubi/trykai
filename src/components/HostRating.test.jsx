@@ -6,9 +6,7 @@ import HostRating from './HostRating'
 
 describe('HostRating', () => {
   it('puts a star in --star before the average and review count', () => {
-    const { container } = render(
-      <HostRating reviews={[{ rating: 5 }, { rating: 3 }, { rating: 1 }]} />
-    )
+    const { container } = render(<HostRating average={3} reviewCount={3} />)
 
     expect(container.querySelector('.detail-host__rating').textContent.replace(/\s+/g, ' ').trim()).toBe(
       '★ 3.0 · 3 reviews'
@@ -18,16 +16,16 @@ describe('HostRating', () => {
   })
 
   it('uses the singular when there is one review', () => {
-    const { container } = render(<HostRating reviews={[{ rating: 5 }]} />)
+    const { container } = render(<HostRating average={5} reviewCount={1} />)
     expect(container.querySelector('.detail-host__rating').textContent.replace(/\s+/g, ' ').trim()).toBe(
       '★ 5.0 · 1 review'
     )
   })
 
   it('renders nothing when the host has no reviews', () => {
-    const { container, rerender } = render(<HostRating reviews={[]} />)
+    const { container, rerender } = render(<HostRating average={null} reviewCount={0} />)
     expect(container.querySelector('.detail-host__rating')).not.toBeInTheDocument()
-    rerender(<HostRating reviews={null} />)
+    rerender(<HostRating average={4.5} reviewCount={0} />)
     expect(container.querySelector('.detail-host__rating')).not.toBeInTheDocument()
   })
 

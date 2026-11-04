@@ -580,6 +580,12 @@ verify_jwt = false
 import_map = "./functions/listing-submitted/deno.json"
 entrypoint = "./functions/listing-submitted/index.ts"
 
+[functions.review-emails]
+enabled = true
+verify_jwt = false
+import_map = "./functions/review-emails/deno.json"
+entrypoint = "./functions/review-emails/index.ts"
+
 [functions.admin-listings]
 enabled = true
 verify_jwt = false

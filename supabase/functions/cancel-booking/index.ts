@@ -15,6 +15,7 @@ import {
   sendCancellationEmails,
   sendHostSessionCancelledEmail,
 } from '../_shared/email.ts'
+import { emailCompanionsCancelled } from '../_shared/companions.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
@@ -191,6 +192,20 @@ async function notifyCancellation(
         options.hostPayoutAmount ?? 0,
         options.refundAmount,
       ),
+      siteUrl: Deno.env.get('SITE_URL'),
+    })
+    // Friends who took a seat (00050). A guest cancel names the booker; a host
+    // cancel names the host.
+    await emailCompanionsCancelled(admin, {
+      bookingId: options.bookingId,
+      cancelledByName:
+        options.cancelledBy === 'guest'
+          ? publicDisplayName(guestResult.data) || 'The person who booked'
+          : publicDisplayName(hostResult.data) || 'Your host',
+      listingTitle: options.listingTitle || 'your session',
+      sessionDate: options.sessionStartsAt ? formatSessionDate(options.sessionStartsAt) : '',
+      listingId: options.listingId,
+      apiKey: Deno.env.get('RESEND_API_KEY'),
       siteUrl: Deno.env.get('SITE_URL'),
     })
   } catch (err) {

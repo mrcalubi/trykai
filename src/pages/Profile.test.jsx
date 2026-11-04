@@ -44,11 +44,13 @@ function givenBookings(bookings) {
 
 function givenRpcs({
   hostReviews = [],
+  guestReviews = [],
   listingRatings = [],
   account,
   sessionsHeld = 0,
   founding = false,
   stats = null,
+  reviewsDue = [],
 } = {}) {
   const fallbackAccount = lastProfile
     ? {
@@ -64,6 +66,8 @@ function givenRpcs({
     : null
   supabase.rpc.mockImplementation(async (name) => {
     if (name === 'reviews_for_host') return { data: hostReviews, error: null }
+    if (name === 'reviews_for_guest') return { data: guestReviews, error: null }
+    if (name === 'host_reviews_due') return { data: reviewsDue, error: null }
     if (name === 'listing_ratings') return { data: listingRatings, error: null }
     if (name === 'host_sessions_held') return { data: sessionsHeld, error: null }
     if (name === 'host_is_founding') return { data: founding, error: null }
@@ -319,13 +323,7 @@ describe('Profile public content', () => {
 
     await screen.findAllByText('Wonderful host.')
     expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_host', { p_host_id: HOST_ID })
-    expect(supabase.__calls('reviews', 'select')).toEqual([
-      expect.objectContaining({
-        filters: expect.arrayContaining([
-          expect.objectContaining({ method: 'in', column: 'id' }),
-        ]),
-      }),
-    ])
+    expect(supabase.rpc).toHaveBeenCalledWith('reviews_for_guest', { p_guest_id: HOST_ID })
     expect(supabase.__calls('bookings', 'select')).toHaveLength(0)
   })
 
@@ -343,6 +341,76 @@ describe('Profile public content', () => {
     expect(await within(reviews).findByText('Great class')).toBeInTheDocument()
     expect(within(reviews).getByText('Learn latte art with me')).toBeInTheDocument()
     expect(within(reviews).getByText('Arun')).toBeInTheDocument()
+  })
+
+  it('shows From hosts as words only, newest first, and hides the section when there are none', async () => {
+    givenHost({ display_name: 'Jamie', is_host: false })
+    givenRpcs({
+      guestReviews: [
+        {
+          id: 'hr-old',
+          comment: 'Came last month',
+          created_at: '2026-09-01T00:00:00Z',
+          listing_title: 'Pasta',
+          host_id: 'host-2',
+          host_display_name: 'Priya',
+        },
+        {
+          id: 'hr-new',
+          comment: 'Lovely guest',
+          created_at: '2026-10-01T00:00:00Z',
+          listing_title: 'Latte art',
+          host_id: HOST_ID,
+          host_display_name: 'Mei',
+          rating: 5,
+        },
+      ],
+    })
+    renderPage()
+
+    const section = await screen.findByRole('region', { name: 'From hosts' })
+    expect(within(section).getByText('From hosts (2)')).toBeInTheDocument()
+    expect(within(section).getByText('Lovely guest')).toBeInTheDocument()
+    expect(within(section).queryByLabelText(/out of 5 stars/)).not.toBeInTheDocument()
+  })
+
+  it('splits the owner Reviews tab into About you and By you, and tags a pending review', async () => {
+    givenSignedIn(HOST_ID)
+    givenRpcs({
+      guestReviews: [
+        {
+          id: 'about',
+          comment: 'Kind in the kitchen',
+          created_at: '2026-10-01T00:00:00Z',
+          listing_title: 'Latte art',
+          host_id: 'host-9',
+          host_display_name: 'Arun',
+        },
+      ],
+    })
+    supabase.__on('reviews', 'select', {
+      data: [
+        {
+          id: 'written',
+          role: 'guest',
+          comment: 'Great class',
+          rating: 5,
+          created_at: '2026-11-01T00:00:00Z',
+          revealed_at: null,
+          reveal_after: '2026-11-10T04:00:00.000Z',
+          bookings: { sessions: { listings: { title: 'Latte art' } } },
+        },
+      ],
+      error: null,
+    })
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('link', { name: 'Reviews' }))
+
+    const about = await screen.findByRole('region', { name: 'About you' })
+    expect(within(about).getByText('Kind in the kitchen')).toBeInTheDocument()
+    const written = screen.getByRole('region', { name: 'By you' })
+    expect(within(written).getByText('Great class')).toBeInTheDocument()
+    expect(within(written).getByText(/Live on /)).toBeInTheDocument()
   })
 
   it('lists active listings with the browse card', async () => {
@@ -1201,7 +1269,7 @@ describe('Profile card layout', () => {
     )
     expect(screen.getByText('Hosts in Bishan')).toBeInTheDocument()
     const medals = [...document.querySelectorAll('.medal')]
-    expect(medals).toHaveLength(4)
+    expect(medals).toHaveLength(5)
     expect(medals.every((medal) => medal.classList.contains('medal--locked'))).toBe(true)
     expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument()
   })
@@ -1216,6 +1284,9 @@ describe('Profile card layout', () => {
     expect(screen.getByText(/10 sessions/, { selector: '.medal__label' })).toHaveTextContent('(earned)')
     expect(screen.getByText(/First 5-star/, { selector: '.medal__label' })).toHaveTextContent('(earned)')
     expect(screen.getByText(/50 sessions/, { selector: '.medal__label' })).toHaveTextContent(
+      '(not yet earned)',
+    )
+    expect(screen.getByText(/Good host/, { selector: '.medal__label' })).toHaveTextContent(
       '(not yet earned)',
     )
     expect(screen.getByText('38 more sessions to unlock 50 sessions.')).toBeInTheDocument()
@@ -1434,6 +1505,8 @@ describe('Profile card layout', () => {
     expect(screen.getByText('Exploring TryKai since October 2026')).toBeInTheDocument()
     expect(screen.getByText(/Explorer/, { selector: '.medal__label' })).toHaveTextContent('(earned)')
     expect(screen.getByText(/TryKai OG/, { selector: '.medal__label' })).toHaveTextContent('(earned)')
+    expect(screen.getByText(/First kind words/, { selector: '.medal__label' })).toBeInTheDocument()
+    expect(screen.getByText(/Host favourite/, { selector: '.medal__label' })).toBeInTheDocument()
     expect(screen.getByText('2 more sessions to unlock 5 sessions.')).toBeInTheDocument()
     expect(screen.queryByText('New host')).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Featured review' })).not.toBeInTheDocument()

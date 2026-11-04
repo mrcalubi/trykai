@@ -1,12 +1,13 @@
-function formatHostRatingCopy(reviews) {
-  if (!reviews?.length) return null
-  const average = (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
-  const count = reviews.length
-  return `${average} · ${count} ${count === 1 ? 'review' : 'reviews'}`
+function formatHostRatingCopy(average, reviewCount) {
+  const count = Math.max(0, Number(reviewCount) || 0)
+  if (!count) return null
+  const value = Number(average)
+  if (!Number.isFinite(value)) return null
+  return `${value.toFixed(1)} · ${count} ${count === 1 ? 'review' : 'reviews'}`
 }
 
-export default function HostRating({ reviews }) {
-  const copy = formatHostRatingCopy(reviews)
+export default function HostRating({ average, reviewCount }) {
+  const copy = formatHostRatingCopy(average, reviewCount)
   if (!copy) return null
 
   return (

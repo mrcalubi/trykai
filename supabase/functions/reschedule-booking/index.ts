@@ -6,6 +6,7 @@ import {
   publicDisplayName,
   sendRescheduleEmails,
 } from '../_shared/email.ts'
+import { emailCompanionsMoved } from '../_shared/companions.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
 
 function adminClient() {
@@ -105,6 +106,14 @@ Deno.serve(async (req) => {
       newSessionDate: newStartsAt ? formatSessionDate(newStartsAt) : '',
       bookingId: booking.id,
       addons: addons ?? [],
+      siteUrl: Deno.env.get('SITE_URL'),
+    })
+    await emailCompanionsMoved(admin, {
+      bookingId: booking.id,
+      bookerName: guestName || 'The person who booked',
+      listingTitle: typeof listing?.title === 'string' ? listing.title : 'your session',
+      newSessionDate: newStartsAt ? formatSessionDate(newStartsAt) : '',
+      apiKey: Deno.env.get('RESEND_API_KEY'),
       siteUrl: Deno.env.get('SITE_URL'),
     })
 

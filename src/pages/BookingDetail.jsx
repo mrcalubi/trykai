@@ -54,6 +54,10 @@ import BioPreview from '../components/BioPreview'
 import ReviewForm from '../components/ReviewForm'
 import VerifiedBadge from '../components/VerifiedBadge'
 import HostRating from '../components/HostRating'
+import { firstRow, hostRatingFromRpc, reviewClosedOnLabel } from '../lib/twoWayReviews'
+import { companionSeats } from '../lib/companions'
+import { sessionEndAt } from '../lib/reviewGate'
+import WhosComing from '../components/WhosComing'
 
 const BOOKING_SELECT = `
   id,
@@ -233,8 +237,9 @@ export default function BookingDetail() {
   const [error, setError] = useState('')
   const [notGuest, setNotGuest] = useState(false)
   const [bookingAddons, setBookingAddons] = useState([])
-  const [hostReviews, setHostReviews] = useState([])
+  const [hostRating, setHostRating] = useState({ average: null, reviewCount: 0 })
   const [alreadyReviewed, setAlreadyReviewed] = useState(false)
+  const [reviewState, setReviewState] = useState(null)
   const [upcomingCount, setUpcomingCount] = useState(0)
   const [bringChecked, setBringChecked] = useState([])
   const [note, setNote] = useState('')
@@ -247,6 +252,10 @@ export default function BookingDetail() {
   const [cancelLoading, setCancelLoading] = useState(false)
   const [cancelError, setCancelError] = useState('')
   const [nowMs] = useState(() => Date.now())
+  const [companions, setCompanions] = useState([])
+  const [bookerName, setBookerName] = useState('')
+  const [leaving, setLeaving] = useState(false)
+  const [leaveError, setLeaveError] = useState('')
 
   const loadBooking = useCallback(async () => {
     const run = (columns) =>
@@ -264,18 +273,40 @@ export default function BookingDetail() {
       setLoading(false)
       return
     }
+    let companionView = false
     if (!data || data.guest_id !== userId) {
-      setNotGuest(true)
-      setBooking(null)
-      setLoading(false)
-      return
+      // A friend who took a seat (00050): a read-only copy without prices.
+      const { data: shared } = await supabase.rpc('companion_booking', { p_booking_id: bookingId })
+      if (!shared || typeof shared !== 'object' || !shared.id) {
+        setNotGuest(true)
+        setBooking(null)
+        setLoading(false)
+        return
+      }
+      data = shared
+      companionView = true
     }
 
     setBooking(data)
     setNotGuest(false)
     setBringChecked(readBringChecks(data.id))
-    const { rows } = await loadBookingAddonRows(supabase, [data.id])
-    setBookingAddons(rows)
+    if (companionView) {
+      setBookingAddons([])
+    } else {
+      const { rows } = await loadBookingAddonRows(supabase, [data.id])
+      setBookingAddons(rows)
+    }
+
+    if (companionSeats(data.guests_count) > 0) {
+      const { data: people } = await supabase.rpc('booking_companions', { p_booking_id: data.id })
+      setCompanions(Array.isArray(people) ? people : [])
+    } else {
+      setCompanions([])
+    }
+    if (!companionView) {
+      const { data: me } = await supabase.from('users').select('display_name').eq('id', userId).maybeSingle()
+      setBookerName(me?.display_name || '')
+    }
 
     const listing = data.sessions?.listings
     const listingId = listing?.id
@@ -296,18 +327,30 @@ export default function BookingDetail() {
     }
 
     if (hostId) {
-      const { data: reviews } = await supabase.from('reviews').select('rating').eq('reviewee_id', hostId)
-      setHostReviews(reviews ?? [])
+      const { data: ratingRows, error: ratingError } = await supabase.rpc('host_rating', {
+        p_host_id: hostId,
+      })
+      setHostRating(hostRatingFromRpc(ratingRows, ratingError))
     }
 
-    const { data: mine } = await supabase
-      .from('reviews')
-      .select('booking_id')
-      .eq('reviewer_id', userId)
-      .eq('booking_id', data.id)
-      .eq('role', 'guest')
-      .maybeSingle()
-    setAlreadyReviewed(Boolean(mine?.booking_id))
+    const { data: stateRows } = companionView
+      ? { data: null }
+      : await supabase.rpc('my_review_state', { p_booking_id: data.id })
+    const state = firstRow(stateRows)
+    setReviewState(state)
+    if (companionView) {
+      setAlreadyReviewed(false)
+    } else if (state) {
+      setAlreadyReviewed(Boolean(state.i_reviewed))
+    } else {
+      const { data: mine } = await supabase
+        .from('reviews')
+        .select('booking_id')
+        .eq('reviewer_id', userId)
+        .eq('booking_id', data.id)
+        .maybeSingle()
+      setAlreadyReviewed(Boolean(mine?.booking_id))
+    }
 
     if (listingId) {
       const { data: open } = await supabase
@@ -443,7 +486,20 @@ export default function BookingDetail() {
   const ended = sessionHasEnded(sessionForReview(session), nowMs)
   const dayOf = isBookingDayOf(startsAt, durationMins, nowMs)
   const cancelled = booking.status === 'cancelled'
-  const canReview = guestBookingActions(booking, { alreadyReviewed, now: new Date(nowMs) }).review
+  const isCompanion = Boolean(booking.is_companion)
+  const bookedBy = publicName({ display_name: booking.booker_display_name }) || 'the person who booked'
+  const sessionEnd = sessionEndAt(sessionForReview(session))
+  const seatsOpenForClaims =
+    !isCompanion &&
+    booking.status === 'confirmed' &&
+    companionSeats(booking.guests_count) > 0 &&
+    (!sessionEnd || nowMs < sessionEnd.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const beforeStart = startsAt ? nowMs < new Date(startsAt).getTime() : false
+  const canReview = reviewState
+    ? Boolean(reviewState.can_review)
+    : guestBookingActions(booking, { alreadyReviewed, now: new Date(nowMs) }).review
+  const waitingToReveal = Boolean(reviewState?.i_reviewed && !reviewState?.my_review_public)
+  const revealOn = reviewState?.reveal_after || reviewState?.deadline
   const canCancel = guestBookingActions(booking, { now: new Date(nowMs) }).cancel
   const blockReason = rescheduleBlockReason(booking, nowMs)
   const canManage = booking.status === 'confirmed' && !ended
@@ -604,7 +660,7 @@ export default function BookingDetail() {
         <div>
           <p className="booking-host__name">{hostName ? `Your host, ${hostName}` : 'Your host'}</p>
           {host?.is_id_verified ? <VerifiedBadge /> : null}
-          <HostRating reviews={hostReviews} />
+          <HostRating average={hostRating.average} reviewCount={hostRating.reviewCount} />
         </div>
       </div>
       <BioPreview bio={host?.bio} lines={2} />
@@ -614,7 +670,31 @@ export default function BookingDetail() {
     </section>
   ) : null
 
-  const manageRow = canManage ? (
+  async function leaveBooking() {
+    setLeaving(true)
+    setLeaveError('')
+    const { error: leaveFailed } = await supabase.rpc('leave_booking_seat', { p_booking_id: booking.id })
+    setLeaving(false)
+    if (leaveFailed) {
+      setLeaveError("Couldn't leave this booking. Try again.")
+      return
+    }
+    window.location.assign('/bookings')
+  }
+
+  const companionHelp = isCompanion ? (
+    <div className="booking-help">
+      <p className="booking-help__line">Need to change something? Ask {bookedBy}, who booked it.</p>
+      {beforeStart && !cancelled ? (
+        <button type="button" className="booking-action__link" disabled={leaving} onClick={leaveBooking}>
+          Leave this booking
+        </button>
+      ) : null}
+      {leaveError ? <p className="error-message">{leaveError}</p> : null}
+    </div>
+  ) : null
+
+  const manageRow = canManage && !isCompanion ? (
     <button type="button" className="booking-manage" onClick={openSheet}>
       <span className="booking-manage__copy">
         <span className="booking-manage__title">Manage booking</span>
@@ -624,7 +704,7 @@ export default function BookingDetail() {
     </button>
   ) : null
 
-  const helpLine = cancelled ? null : (
+  const helpLine = cancelled || isCompanion ? null : (
     <div className="booking-help">
       {canReport ? (
         <p className="booking-help__line">Something wrong with this booking?</p>
@@ -709,6 +789,7 @@ export default function BookingDetail() {
           ) : (
             <h1 className="booking-detail__title">{listing?.title || 'Unknown listing'}</h1>
           )}
+          {isCompanion ? <span className="booking-pill booking-pill--booked-by">Booked by {bookedBy}</span> : null}
           <p className="booking-page__with">{withHostLine(hostLabel, listing?.area, booking.guests_count)}</p>
 
           {dayOf && !cancelled ? (
@@ -717,7 +798,18 @@ export default function BookingDetail() {
             </div>
           ) : null}
 
-          {cancelled ? (
+          {cancelled && isCompanion ? (
+            <section className="booking-card">
+              <h2 className="booking-card__title">{bookedBy} cancelled this booking</h2>
+              {listing?.id ? (
+                <Link to={`/listings/${listing.id}`} className="ui-button ui-button--primary booking-page__wrap-btn">
+                  Find another time
+                </Link>
+              ) : null}
+            </section>
+          ) : null}
+
+          {cancelled && !isCompanion ? (
             <section className="booking-card">
               <h2 className="booking-card__title">
                 {Number(booking.refund_amount) > 0
@@ -735,13 +827,31 @@ export default function BookingDetail() {
             </section>
           ) : null}
 
-          {ended && !cancelled ? (
+          {ended && !cancelled && !isCompanion && (canReview || waitingToReveal || alreadyReviewed) ? (
             <section className="booking-card booking-review" id="review">
               <h2 className="booking-card__title">How was it with {hostLabel}?</h2>
-              {alreadyReviewed ? (
+              {canReview ? (
+                <ReviewForm
+                  booking={booking}
+                  userId={userId}
+                  closedOn={reviewClosedOnLabel(revealOn)}
+                  onSubmitted={() => {
+                    setAlreadyReviewed(true)
+                    setReviewState((current) => ({
+                      ...(current ?? {}),
+                      can_review: false,
+                      i_reviewed: true,
+                      my_review_public: false,
+                    }))
+                  }}
+                />
+              ) : waitingToReveal ? (
+                <p className="hint">
+                  Thanks for your review. It goes live when {hostLabel} reviews you too, or on{' '}
+                  {reviewClosedOnLabel(revealOn)}, whichever comes first.
+                </p>
+              ) : alreadyReviewed ? (
                 <p className="hint">Review submitted</p>
-              ) : canReview ? (
-                <ReviewForm booking={booking} userId={userId} onSubmitted={() => setAlreadyReviewed(true)} />
               ) : null}
               {listing?.id ? (
                 <div className="booking-again">
@@ -759,14 +869,24 @@ export default function BookingDetail() {
           ) : null}
 
           {whenCard}
+          {seatsOpenForClaims ? (
+            <WhosComing
+              booking={booking}
+              bookerName={bookerName}
+              companions={companions}
+              canRemove={beforeStart}
+              onChanged={() => void loadBooking()}
+            />
+          ) : null}
           {whereCard}
           {packingCard}
         </div>
         <div className="booking-page__side">
           {hostCard}
-          {receiptCard}
+          {isCompanion ? null : receiptCard}
           {manageRow}
           {helpLine}
+          {companionHelp}
         </div>
       </div>
 

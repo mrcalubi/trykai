@@ -122,6 +122,9 @@ export function profileStatsFromRpc(data, error) {
     categoriesTried: count(row.categories_tried),
     reviewsWritten: count(row.reviews_written),
     joinedAt: row.joined_at ?? null,
+    hostReviewsReceived: count(row.host_reviews_received),
+    hostFiveStarReceived: count(row.host_five_star_received),
+    guestsReviewed: count(row.guests_reviewed),
   }
 }
 
@@ -165,7 +168,7 @@ export function clip(text, max = 120) {
 /* Milestones                                                               */
 /* ------------------------------------------------------------------------ */
 
-export function hostMedals({ sessionsHeld = 0, reviews = [] } = {}) {
+export function hostMedals({ sessionsHeld = 0, reviews = [], guestsReviewed = 0 } = {}) {
   const held = Number(sessionsHeld) || 0
   const fiveStar = (reviews ?? []).some((review) => Number(review.rating) === 5)
   return [
@@ -173,13 +176,26 @@ export function hostMedals({ sessionsHeld = 0, reviews = [] } = {}) {
     { id: 'ten', label: '10 sessions', mark: '10', scheme: 'blue', earned: held >= 10, goal: 10 },
     { id: 'five-star', label: 'First 5-star', mark: 'star', scheme: 'green', earned: fiveStar },
     { id: 'fifty', label: '50 sessions', mark: '50', scheme: 'coral', earned: held >= 50, goal: 50 },
+    {
+      id: 'good-host',
+      label: 'Good host',
+      mark: '10',
+      scheme: 'green',
+      earned: (Number(guestsReviewed) || 0) >= 10,
+    },
   ]
 }
 
 /** Joined in TryKai's launch year. */
 export const OG_CUTOFF = '2027-01-01T00:00:00+08:00'
 
-export function guestMedals({ sessionsAttended = 0, categoriesTried = 0, joinedAt = null } = {}) {
+export function guestMedals({
+  sessionsAttended = 0,
+  categoriesTried = 0,
+  joinedAt = null,
+  hostReviewsReceived = 0,
+  hostFiveStarReceived = 0,
+} = {}) {
   const attended = Number(sessionsAttended) || 0
   const og = Boolean(joinedAt) && new Date(joinedAt) < new Date(OG_CUTOFF)
   return [
@@ -193,6 +209,20 @@ export function guestMedals({ sessionsAttended = 0, categoriesTried = 0, joinedA
     },
     { id: 'five', label: '5 sessions', mark: '5', scheme: 'green', earned: attended >= 5, goal: 5 },
     { id: 'og', label: 'TryKai OG', mark: 'OG', scheme: 'coral', earned: og },
+    {
+      id: 'kind-words',
+      label: 'First kind words',
+      mark: '1',
+      scheme: 'green',
+      earned: (Number(hostReviewsReceived) || 0) >= 1,
+    },
+    {
+      id: 'host-favourite',
+      label: 'Host favourite',
+      mark: '3',
+      scheme: 'coral',
+      earned: (Number(hostFiveStarReceived) || 0) >= 3,
+    },
   ]
 }
 

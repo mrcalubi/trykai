@@ -74,11 +74,13 @@ function givenBooking(booking) {
   supabase.__on('bookings', 'select', { data: booking, error: null })
 }
 
-function givenAddress(address, { arrival = null, phone = null } = {}) {
+function givenAddress(address, { arrival = null, phone = null, reviewState = null, hostRating = null } = {}) {
   supabase.rpc.mockImplementation(async (name) => {
     if (name === 'listing_address') return { data: address, error: null }
     if (name === 'listing_arrival_instructions') return { data: arrival, error: null }
     if (name === 'booking_host_contact') return { data: phone, error: null }
+    if (name === 'my_review_state') return { data: reviewState, error: null }
+    if (name === 'host_rating') return { data: hostRating, error: null }
     return { data: null, error: null }
   })
 }
@@ -416,6 +418,35 @@ describe('BookingDetail', () => {
     expect(screen.queryByRole('button', { name: /Find another time with/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Manage booking/ })).not.toBeInTheDocument()
     expect(screen.getByText(/Something wrong with this booking/)).toBeInTheDocument()
+    expect(screen.getByText('Anything TryKai should know?')).toBeInTheDocument()
+  })
+
+  it('thanks the guest while the review is waiting to go live', async () => {
+    givenAddress('12 Club Street, Singapore 069410', {
+      reviewState: [
+        {
+          can_review: false,
+          i_reviewed: true,
+          my_review_public: false,
+          other_side_reviewed: false,
+          reveal_after: '2026-11-10T12:00:00.000Z',
+          deadline: '2026-11-10T12:00:00.000Z',
+        },
+      ],
+    })
+    givenBooking(
+      detailBooking({
+        sessions: {
+          ...detailBooking().sessions,
+          starts_at: hoursFromNow(-5),
+        },
+      }),
+    )
+    renderDetail()
+    expect(
+      await screen.findByText(/Thanks for your review. It goes live when Mei Ling reviews you too/),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Post review' })).not.toBeInTheDocument()
   })
 
   it('shows the refund on a cancelled booking', async () => {
@@ -580,5 +611,121 @@ describe('Report a problem', () => {
     expect(await screen.findByText(/on its way back/)).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Email hello@trykai.sg' })).not.toBeInTheDocument()
     expect(supabase.__calls('booking_complaints', 'select')).toHaveLength(0)
+  })
+})
+
+describe('BookingDetail · who is coming', () => {
+  function companionView(overrides = {}) {
+    const { total_amount, platform_fee, payment_rail, ...rest } = detailBooking()
+    void total_amount
+    void platform_fee
+    void payment_rail
+    return {
+      ...rest,
+      guest_id: undefined,
+      is_companion: true,
+      booker_display_name: 'Kai',
+      ...overrides,
+    }
+  }
+
+  function givenRpc(handlers) {
+    supabase.rpc.mockImplementation(async (name, args) => {
+      if (name in handlers) return handlers[name](args)
+      if (name === 'listing_address') return { data: '12 Club Street, Singapore 069410', error: null }
+      return { data: null, error: null }
+    })
+  }
+
+  it('shows a friend a read-only booking with no prices or manage options', async () => {
+    givenBooking(null)
+    givenRpc({ companion_booking: () => ({ data: companionView(), error: null }) })
+    renderDetail()
+
+    expect(await screen.findByText('Booked by Kai')).toBeInTheDocument()
+    expect(screen.getByText('12 Club Street, Singapore 069410')).toBeInTheDocument()
+    expect(screen.getByText('Need to change something? Ask Kai, who booked it.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Leave this booking' })).toBeInTheDocument()
+    expect(screen.queryByText('Total paid')).not.toBeInTheDocument()
+    expect(screen.queryByText('Manage booking')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: "Who's coming" })).not.toBeInTheDocument()
+    expect(supabase.rpc).not.toHaveBeenCalledWith('my_review_state', expect.anything())
+  })
+
+  it('lets a friend leave before the session', async () => {
+    const assign = vi.fn()
+    const original = window.location
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...original, assign } })
+    try {
+      givenBooking(null)
+      givenRpc({
+        companion_booking: () => ({ data: companionView(), error: null }),
+        leave_booking_seat: () => ({ data: null, error: null }),
+      })
+      const { user } = renderDetail()
+
+      await user.click(await screen.findByRole('button', { name: 'Leave this booking' }))
+
+      await waitFor(() => expect(assign).toHaveBeenCalledWith('/bookings'))
+      expect(supabase.rpc).toHaveBeenCalledWith('leave_booking_seat', { p_booking_id: BOOKING_ID })
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: original })
+    }
+  })
+
+  it('shows an error when leaving fails', async () => {
+    givenBooking(null)
+    givenRpc({
+      companion_booking: () => ({ data: companionView(), error: null }),
+      leave_booking_seat: () => ({ data: null, error: { message: 'started' } }),
+    })
+    const { user } = renderDetail()
+
+    await user.click(await screen.findByRole('button', { name: 'Leave this booking' }))
+
+    expect(await screen.findByText("Couldn't leave this booking. Try again.")).toBeInTheDocument()
+  })
+
+  it('tells a friend when the booker cancelled', async () => {
+    givenBooking(null)
+    givenRpc({ companion_booking: () => ({ data: companionView({ status: 'cancelled' }), error: null }) })
+    renderDetail()
+
+    expect(await screen.findByRole('heading', { name: 'Kai cancelled this booking' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Leave this booking' })).not.toBeInTheDocument()
+  })
+
+  it('sends someone who is neither the guest nor a friend back to bookings', async () => {
+    givenBooking(null)
+    givenRpc({ companion_booking: () => ({ data: null, error: null }) })
+    renderDetail()
+
+    expect(await screen.findByText('bookings home')).toBeInTheDocument()
+  })
+
+  it("shows the booker who's coming on a group booking", async () => {
+    givenBooking(detailBooking({ guests_count: 3 }))
+    givenRpc({
+      booking_companions: () => ({
+        data: [{ user_id: 'friend-1', display_name: 'Sam', avatar_url: null }],
+        error: null,
+      }),
+    })
+    renderDetail()
+
+    expect(await screen.findByRole('heading', { name: "Who's coming" })).toBeInTheDocument()
+    expect(screen.getByText('2 of 3 seats')).toBeInTheDocument()
+    expect(screen.getByText('Sam')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send your friends their seat' })).toBeInTheDocument()
+  })
+
+  it('has no Who is coming card on a booking for one', async () => {
+    givenBooking(detailBooking({ guests_count: 1 }))
+    givenRpc({})
+    renderDetail()
+
+    expect(await screen.findByRole('heading', { name: 'When' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: "Who's coming" })).not.toBeInTheDocument()
+    expect(supabase.rpc).not.toHaveBeenCalledWith('booking_companions', expect.anything())
   })
 })

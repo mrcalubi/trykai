@@ -54,6 +54,9 @@ function givenData({
   payoutsEnabled = true,
   verificationStatus = 'approved',
   interest = [],
+  reviewsDue = [],
+  companionBookings = [],
+  sessionGuests = [],
 } = {}) {
   supabase.__on('listings', 'select', { data: listings, error: null })
   supabase.__on('bookings', 'select', (call) =>
@@ -75,6 +78,15 @@ function givenData({
   givenRpc(async (name, args) => {
     if (name === 'host_listing_interest') {
       return { data: interest, error: null }
+    }
+    if (name === 'host_reviews_due') {
+      return { data: reviewsDue, error: null }
+    }
+    if (name === 'my_companion_bookings') {
+      return { data: companionBookings, error: null }
+    }
+    if (name === 'host_session_guests') {
+      return { data: sessionGuests, error: null }
     }
     if (previousRpc) return previousRpc(name, args)
     return { data: null, error: null }
@@ -1893,6 +1905,31 @@ describe('Hosting draft listing', () => {
   })
 })
 
+describe('Hosting reviews due', () => {
+  it('lists guests to review after the session', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      reviewsDue: [
+        {
+          booking_id: 'booking-1',
+          guest_id: 'guest-1',
+          guest_display_name: 'Sam',
+          listing_title: 'Latte art',
+          starts_at: hoursFromNow(-24),
+          deadline: hoursFromNow(24 * 5),
+          host_reviewed: false,
+          guest_reviewed: true,
+        },
+      ],
+    })
+    await renderHosting()
+
+    expect(screen.getByRole('heading', { name: '1 guest to review' })).toBeInTheDocument()
+    expect(screen.getByText(/days? left$/)).toHaveTextContent(/^Reviewed you · \d+ days? left$/)
+    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
+  })
+})
+
 describe('Hosting without photo tips', () => {
   it('leaves the photo tips to the listing forms', async () => {
     givenData({ listings: [makeMyListing()] })
@@ -2356,6 +2393,24 @@ describe('Dashboard reviews', () => {
     expect(screen.getByRole('link', { name: 'Leave a review' })).toBeInTheDocument()
   })
 
+  it('does not invite a review after the 7-day window', async () => {
+    givenData({
+      bookings: [
+        makeBooking({
+          id: 'booking-old',
+          sessions: {
+            starts_at: hoursFromNow(-8 * 24),
+            duration_mins: 90,
+            listings: { title: 'Latte art', host_id: HOST_ID },
+          },
+        }),
+      ],
+    })
+    await renderBookings()
+
+    expect(screen.queryByRole('link', { name: 'Leave a review' })).not.toBeInTheDocument()
+  })
+
   it('does not invite a review on a pending booking', async () => {
     givenData({ bookings: [makeBooking({ ...pastBooking(), status: 'pending' })] })
     await renderBookings()
@@ -2581,5 +2636,53 @@ describe('Dashboard post-payment status', () => {
     expect(screen.getByText('No bookings yet.')).toBeInTheDocument()
     expect(screen.queryByText('test review bug')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Dashboard · who is coming', () => {
+  it("lists a friend's seat as booked by someone else, with no actions", async () => {
+    givenData({
+      companionBookings: [
+        {
+          id: 'booking-friend',
+          status: 'confirmed',
+          session_id: 's-friend',
+          guests_count: 3,
+          is_companion: true,
+          booker_display_name: 'Kai',
+          sessions: {
+            starts_at: hoursFromNow(48),
+            duration_mins: 90,
+            listings: { id: 'listing-9', title: 'Flower arranging', host_id: HOST_ID, duration_mins: 90 },
+          },
+        },
+      ],
+    })
+    await renderBookings()
+
+    expect(await screen.findByText(/Booked by Kai/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Flower arranging' })).toHaveAttribute('href', '/bookings/booking-friend')
+    expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Leave a review' })).not.toBeInTheDocument()
+  })
+
+  it('names who is coming on an upcoming session for the host', async () => {
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({
+          id: 's-group',
+          bookings: [{ id: 'b-group', status: 'confirmed', guests_count: 3, total_amount: 9000 }],
+        }),
+      ],
+      sessionGuests: [
+        { session_id: 's-group', booking_id: 'b-group', user_id: 'g1', display_name: 'Kai', is_companion: false, guests_count: 3 },
+        { session_id: 's-group', booking_id: 'b-group', user_id: 'g2', display_name: 'Mei Ling', is_companion: true, guests_count: null },
+      ],
+    })
+    await renderHosting()
+
+    expect(await within(sectionFor('Upcoming bookings')).findByText('Kai, Mei Ling + 1 more')).toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('host_session_guests', { p_session_ids: ['s-group'] })
   })
 })

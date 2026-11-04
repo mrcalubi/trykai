@@ -39,4 +39,17 @@ describe('canLeaveGuestReview', () => {
   it('allows one guest review after a confirmed session has ended', () => {
     expect(canLeaveGuestReview(endedConfirmedBooking())).toBe(true)
   })
+
+  it('closes the window 7 days after the session ends', () => {
+    expect(
+      canLeaveGuestReview({
+        id: 'booking-old',
+        status: 'confirmed',
+        sessions: {
+          starts_at: hoursFromNow(-8 * 24),
+          duration_mins: 90,
+        },
+      }),
+    ).toBe(false)
+  })
 })

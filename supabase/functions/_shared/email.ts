@@ -882,6 +882,80 @@ export function listingChangesHtml(options: {
   )
 }
 
+export function reviewNudgeHostSubject(guestName: string, listingTitle: string): string {
+  return `${guestName} reviewed ${listingTitle}`
+}
+
+export function reviewNudgeHostHtml(options: {
+  siteUrl: string
+  hostName?: string | null
+  hostId: string
+  guestName: string
+  listingTitle: string
+  deadline: string
+}): string {
+  const base = emailSiteUrl(options.siteUrl)
+  const guest = options.guestName.trim() || 'your guest'
+  const hostingHref = `${base}/u/${encodeURIComponent(options.hostId)}?tab=hosting`
+  return wrapEmail(
+    `${emailHeading(reviewNudgeHostSubject(guest, options.listingTitle))}
+    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    <p style="margin:0 0 16px;">Review ${escapeHtml(guest)} by ${escapeHtml(options.deadline)} to see what they said. Both reviews go live together.</p>
+    ${primaryButton(hostingHref, `Review ${guest}`)}
+    ${emailSignOff('see-you')}`,
+    base,
+  )
+}
+
+export function reviewNudgeGuestSubject(hostName: string): string {
+  return `${hostName} reviewed you`
+}
+
+export function reviewNudgeGuestHtml(options: {
+  siteUrl: string
+  guestName?: string | null
+  hostName: string
+  bookingId: string
+  deadline: string
+}): string {
+  const base = emailSiteUrl(options.siteUrl)
+  const host = options.hostName.trim() || 'your host'
+  return wrapEmail(
+    `${emailHeading(reviewNudgeGuestSubject(host))}
+    <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
+    <p style="margin:0 0 16px;">Leave your review by ${escapeHtml(options.deadline)} to see it.</p>
+    ${primaryButton(`${base}/bookings/${encodeURIComponent(options.bookingId)}#review`, 'Leave your review')}
+    ${emailSignOff('see-you')}`,
+    base,
+  )
+}
+
+export function reviewPrivateNoteOpsSubject(): string {
+  return 'Private note on a review'
+}
+
+export function reviewPrivateNoteOpsHtml(options: {
+  siteUrl: string
+  bookingReference: string
+  listingTitle: string
+  authorName: string
+  authorRole: string
+  note: string
+}): string {
+  const base = emailSiteUrl(options.siteUrl)
+  return wrapEmail(
+    `${emailHeading('Private note on a review')}
+    ${detailRows([
+      ['Booking', escapeHtml(options.bookingReference)],
+      ['Listing', escapeHtml(options.listingTitle)],
+      ['From', `${escapeHtml(options.authorName)} (${escapeHtml(options.authorRole)})`],
+    ])}
+    <p style="margin:0 0 8px;font-size:14px;color:${EMAIL_COLORS.muted};">Note</p>
+    <p style="margin:0;padding:12px 16px;background:${EMAIL_COLORS.cream};border-radius:12px;white-space:pre-wrap;">${escapeHtml(options.note)}</p>`,
+    base,
+  )
+}
+
 export function verificationApprovedHtml(options: { hostName?: string | null }): string {
   const name = (options.hostName || '').trim()
   const greeting = name ? `You're verified, ${name}!` : "You're verified!"
@@ -1616,4 +1690,99 @@ function wrapEmail(body: string, siteUrl: string, preheader?: string): string {
   </table>
 </body>
 </html>`
+}
+
+// ---------------------------------------------------------------------------
+// Who's coming (00050): friends who took a seat hear when the booking moves or
+// is cancelled. Short, no amounts (they did not pay).
+// ---------------------------------------------------------------------------
+
+export type CompanionRecipient = {
+  email?: string | null
+  display_name?: string | null
+  full_name?: string | null
+}
+
+export function companionMovedSubject(listingTitle: string, newSessionDate: string): string {
+  return `Moved: ${listingTitle} is now ${newSessionDate}`
+}
+
+export function companionMovedHtml(options: {
+  companionName?: string | null
+  bookerName: string
+  listingTitle: string
+  newSessionDate: string
+  bookingId: string
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.companionName)}</p>
+    ${emailHeading(`${options.bookerName} moved your booking`)}
+    <p style="margin:0 0 16px;">${escapeHtml(options.listingTitle)} is now on ${escapeHtml(options.newSessionDate)}.</p>
+    ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
+    ${emailSignOff('see-you')}
+    `,
+    siteUrl,
+    `${options.bookerName} moved your booking to ${options.newSessionDate}`,
+  )
+}
+
+export function companionCancelledSubject(listingTitle: string): string {
+  return `Cancelled: ${listingTitle}`
+}
+
+export function companionCancelledHtml(options: {
+  companionName?: string | null
+  /** Who cancelled, as a sentence subject: "Kai", "Nicholas", or "TryKai". */
+  cancelledByName: string
+  listingTitle: string
+  sessionDate: string
+  listingId?: string | null
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const findAnother = options.listingId
+    ? primaryButton(`${siteUrl}/listings/${encodeURIComponent(options.listingId)}`, 'Find another time')
+    : ''
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.companionName)}</p>
+    ${emailHeading(`${options.cancelledByName} cancelled ${options.listingTitle}`)}
+    <p style="margin:0 0 16px;">The session on ${escapeHtml(options.sessionDate)} is off, so your seat is too.</p>
+    ${findAnother}
+    ${emailSignOff('take-care')}
+    `,
+    siteUrl,
+    `${options.listingTitle} on ${options.sessionDate} is cancelled`,
+  )
+}
+
+/** One email per friend. A failure for one never stops the rest. */
+export async function sendCompanionEmails(options: {
+  apiKey: string | undefined
+  recipients: CompanionRecipient[]
+  subject: string
+  html: (companionName: string | null) => string
+  send?: typeof sendResendEmail
+}): Promise<number> {
+  const send = options.send ?? sendResendEmail
+  let sent = 0
+  for (const person of options.recipients ?? []) {
+    if (!person?.email) continue
+    try {
+      await send({
+        apiKey: options.apiKey,
+        to: person.email,
+        subject: options.subject,
+        html: options.html(publicDisplayName(person) || null),
+        replyTo: GUEST_REPLY_TO,
+      })
+      sent += 1
+    } catch (err) {
+      console.error('companion email failed', err instanceof Error ? err.message : err)
+    }
+  }
+  return sent
 }

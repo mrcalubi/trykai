@@ -1,4 +1,5 @@
 const FALLBACK_SESSION_MINS = 120
+export const REVIEW_WINDOW_DAYS = 7
 
 export function sessionEndAt(session) {
   const startsAt = session?.starts_at
@@ -25,12 +26,22 @@ export function sessionHasEnded(session, now = new Date()) {
   return endsAt < now
 }
 
+export function reviewDeadlineAt(session) {
+  const endsAt = sessionEndAt(session)
+  if (!endsAt) return null
+  return new Date(endsAt.getTime() + REVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+}
+
 /**
- * Same product rule as `guest_can_leave_review` in 00011, plus the UI
- * fallback when duration_mins is missing (`starts_at` + 2 hours).
+ * Same product rule as `post_review` / `guest_can_leave_review`: confirmed,
+ * session ended, still inside the 7-day window. The Bookings list uses this
+ * so "Leave a review" matches `my_review_state.can_review`.
  */
 export function canLeaveGuestReview(booking, { alreadyReviewed = false, now = new Date() } = {}) {
   if (!booking || alreadyReviewed) return false
   if (booking.status !== 'confirmed') return false
-  return sessionHasEnded(booking.sessions, now)
+  if (!sessionHasEnded(booking.sessions, now)) return false
+  const deadline = reviewDeadlineAt(booking.sessions)
+  if (!deadline) return false
+  return now < deadline
 }
