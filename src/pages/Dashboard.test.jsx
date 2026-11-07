@@ -1947,7 +1947,7 @@ describe('Dashboard payout setup', () => {
 
     const setup = sectionFor('Get ready for guests')
     expect(within(setup).getByText('Set up payouts')).toBeInTheDocument()
-    expect(within(setup).getByText('Stripe needs your bank details to pay you.')).toBeInTheDocument()
+    expect(within(setup).getByText('No Stripe account needed. About 5 minutes: your phone, NRIC and bank details.')).toBeInTheDocument()
     expect(within(setup).getByRole('button', { name: 'Set up payouts' })).toHaveTextContent('Set up')
   })
 
