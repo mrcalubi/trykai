@@ -89,6 +89,16 @@ describe('JoinBooking', () => {
     expect(supabase.rpc).toHaveBeenCalledWith('claim_booking_seat', { p_code: CODE })
   })
 
+  it('explains a claim refused for any other reason instead of "Try again"', async () => {
+    givenSignedIn()
+    givenPreview(preview(), { claim: { data: null, error: { message: 'not_allowed' } } })
+    const { user } = renderJoin()
+
+    await user.click(await screen.findByRole('button', { name: 'Take my seat' }))
+
+    expect(await screen.findByText("You can't take a seat on this booking.")).toBeInTheDocument()
+  })
+
   it('explains a claim that fails because the seats filled up meanwhile', async () => {
     givenSignedIn()
     givenPreview(preview(), { claim: { data: null, error: { message: 'full' } } })
@@ -106,6 +116,7 @@ describe('JoinBooking', () => {
     ['cancelled', 'This booking was cancelled.'],
     ['closed', 'This session has finished.'],
     ['already', "You're already booked for this session."],
+    ['host', "You're hosting this session, so you can't take a seat."],
   ])('shows the %s state instead of the button', async (state, line) => {
     givenPreview(preview({ state }))
     renderJoin()

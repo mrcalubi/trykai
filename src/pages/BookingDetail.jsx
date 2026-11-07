@@ -564,7 +564,7 @@ export default function BookingDetail() {
         <p>Date TBC</p>
       )}
       <div className="booking-card__btns">
-        {calendar ? (
+        {calendar && !ended && !cancelled ? (
           <BookingMenu
             label="Add to calendar"
             items={[
@@ -584,15 +584,8 @@ export default function BookingDetail() {
 
   const whereCard = address ? (
     <section className="booking-card booking-where">
-      <div className="booking-where__head">
-        <span className="booking-where__pin" aria-hidden="true">
-          <Icon name="pin" size={18} />
-        </span>
-        <div>
-          <h2 className="eyebrow">Where</h2>
-          <p className="booking-where__address">{address}</p>
-        </div>
-      </div>
+      <h2 className="booking-card__title">Where</h2>
+      <p className="booking-where__address">{address}</p>
       {arrivalInstructions ? (
         <div className="booking-where__find">
           <p className="booking-where__find-label">How to find it</p>
@@ -617,7 +610,7 @@ export default function BookingDetail() {
   ) : null
 
   const packingCard =
-    bring.length > 0 || provided.length > 0 || addonNote ? (
+    !ended && !cancelled && (bring.length > 0 || provided.length > 0 || addonNote) ? (
       <section className="booking-card">
         <h2 className="booking-card__title">Before you go</h2>
         {bring.length > 0 ? (

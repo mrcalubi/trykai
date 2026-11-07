@@ -2,7 +2,7 @@ export default function Privacy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Privacy Policy</h1>
-      <p className="policy-page__updated">Last updated: 2 November 2026</p>
+      <p className="policy-page__updated">Last updated: 4 November 2026</p>
 
       <p>
         This policy explains how TryKai collects, uses, shares and protects your
@@ -62,8 +62,13 @@ export default function Privacy() {
               <td>Reviews and review photos</td>
               <td>When you leave a review</td>
               <td>
-                Shown publicly on the Host&apos;s listing and profile. Review
-                photos are public
+                A Guest&apos;s review of a Host (including photos) is shown
+                publicly on the Host&apos;s listing and profile once it is live.
+                A Host&apos;s written review of a Guest is shown publicly on the
+                Guest&apos;s profile once it is live. The Host&apos;s star rating
+                of a Guest is not shown publicly; it only counts toward that
+                Guest&apos;s own milestones. An optional private note on a
+                review is seen only by TryKai
               </td>
             </tr>
             <tr>
@@ -94,9 +99,15 @@ export default function Privacy() {
       <h2>3. What is public</h2>
       <p>
         Your display name, profile photo, ID verified badge, listings, the
-        reviews you receive as a Host, and any photos attached to those
-        reviews are visible to anyone. Your full name,
-        email, phone number and bookings are not public. A Host&apos;s full
+        reviews you receive as a Host (and any photos attached to those
+        reviews), and the written reviews Hosts leave about you as a Guest are
+        visible to anyone once those reviews are live. Star ratings Hosts give
+        Guests are not public; they only count toward your own milestones.
+        Private notes on reviews are seen only by TryKai. Your full name,
+        email, phone number and bookings are not public. If you take a seat on
+        someone else&apos;s booking, the person who booked and the Host can see
+        your display name, and you can see the address, arrival directions and
+        day-of contact number as that booking&apos;s guests can. A Host&apos;s full
         address is shown only to guests with a confirmed booking for that
         listing. If a Host turns on a day-of contact number, confirmed guests
         of that session can see it from 24 hours before until the session ends,

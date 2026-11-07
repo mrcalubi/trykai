@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2 November 2026
+Last updated: 4 November 2026
 
 This policy explains how TryKai collects, uses, shares and protects your personal data, in line with Singapore's Personal Data Protection Act 2012 (PDPA).
 
@@ -20,7 +20,7 @@ Contact our Data Protection Officer for any question about your data or to exerc
 | Profile photo | If you add one | Shown on your profile, listings and reviews |
 | Listing details, photos, general area, full address | When you create a listing | To show your listing. Your full address is only shared with guests who have a confirmed booking |
 | Booking and payment records | When you book or are booked | To process bookings, refunds and payouts |
-| Reviews and review photos | When you leave a review | Shown publicly on the Host's listing and profile. Review photos are public |
+| Reviews and review photos | When you leave a review | A Guest's review of a Host (including photos) is shown publicly on the Host's listing and profile once it is live. A Host's written review of a Guest is shown publicly on the Guest's profile once it is live. The Host's star rating of a Guest is not shown publicly; it only counts toward that Guest's own milestones. An optional private note on a review is seen only by TryKai |
 | Identity verification result | Before you host | To confirm Hosts are real, identifiable people |
 | Your name, date of birth and mobile number as held by Singpass, and a Singpass identifier for your TryKai account | When you verify to host with Singpass | To confirm Hosts are real, identifiable adults, that one person has one host account, and to reach Hosts about their sessions |
 | ID document and selfie | When you verify to host by upload | Same as above |
@@ -30,7 +30,7 @@ We do not collect your full card details. Stripe handles them.
 
 ## 3. What is public
 
-Your display name, profile photo, ID verified badge, listings, the reviews you receive as a Host, and any photos attached to those reviews are visible to anyone. Your full name, email, phone number and bookings are not public. A Host's full address is shown only to guests with a confirmed booking for that listing. If a Host turns on a day-of contact number, confirmed guests of that session can see it from 24 hours before until the session ends, only to find the Host or sort last-minute logistics.
+Your display name, profile photo, ID verified badge, listings, the reviews you receive as a Host (and any photos attached to those reviews), and the written reviews Hosts leave about you as a Guest are visible to anyone once those reviews are live. Star ratings Hosts give Guests are not public; they only count toward your own milestones. Private notes on reviews are seen only by TryKai. Your full name, email, phone number and bookings are not public. If you take a seat on someone else's booking, the person who booked and the Host can see your display name, and you can see the address, arrival directions and day-of contact number as that booking's guests can. A Host's full address is shown only to guests with a confirmed booking for that listing. If a Host turns on a day-of contact number, confirmed guests of that session can see it from 24 hours before until the session ends, only to find the Host or sort last-minute logistics.
 
 ## 4. Identity verification
 
