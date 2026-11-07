@@ -460,6 +460,7 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00046` (booking cutoff and arrival) | Not applied | Not applied | After `00045`. Caleb applies. Cutoff, How to find me, day-of number, `booking_host_contact`, `listing_arrival_instructions`; replaces `my_account` and `reschedule_booking`. |
 | `00047` (review photos) | Not applied | Not applied | **Apply on staging before merging the review-photos PR.** After `00046`. Caleb applies. `reviews.photo_paths`, public insert-only `review-photos` bucket, `reviews_for_listing` / `reviews_for_host` return `photo_paths`. |
 | `00048` (two-way reviews) | Not applied | Not applied | **Apply on staging, then production, BEFORE merging the two-way-reviews release.** After `00047`. Additive: reveal columns, `post_review`, `review_notes`, public readers. Does not revoke `reviews` grants. Then run `supabase/tests/two_way_reviews_check.sql` in the staging SQL Editor (begin/rollback). |
+| `00051` (review reminders) | Not applied | Not applied | **Apply on staging, then production, before merging the release.** Needs `00048` and `00050`. Additive: four claim columns and `claim_review_reminders()`. No new secrets (rides on the `00037` hourly job). Then run `supabase/tests/review_reminders_check.sql` in the staging SQL Editor (begin/rollback, sends nothing). If the release is merged first, `send-reminders` skips review emails and keeps sending session reminders. |
 | `00050` (who's coming) | Not applied | Not applied | **Apply on staging, then production, BEFORE merging the who's-coming release.** After `00049` on staging; on production it needs `00048` (not `00049`). Additive: `booking_guests`, `booking_join_codes`, join/claim/leave RPCs, friends added to address and day-of number reads, host reviews of friends. Then run `supabase/tests/booking_companions_check.sql` in the staging SQL Editor (begin/rollback). |
 | `00049` (lock reviews) | Not applied | Not applied | **Apply ONLY after the two-way-reviews release is live on production.** Staging first, test, then production. Drops public SELECT/INSERT on `reviews`; authenticated sees own rows only. |
 
@@ -950,6 +951,20 @@ limit 10;
 ```
 
 ---
+
+
+**Review prompts and reminders (`00051`).** The same hourly run also emails guests and hosts after a session ends: about 2 hours after, then a reminder from day 5 if they still have not reviewed (reviews close on day 7). Hosts get one email per session listing everyone they have not reviewed, friends who took a seat included. Nothing to set up beyond applying `00051`. To see what has gone out:
+
+```sql
+select b.id, b.review_prompt_sent_at, b.review_nudge_sent_at,
+       s.host_review_prompt_sent_at, s.host_review_nudge_sent_at
+from public.bookings b
+join public.sessions s on s.id = b.session_id
+where s.starts_at > now() - interval '10 days'
+order by s.starts_at desc;
+```
+
+The Edge Function log line `send-reminders {...}` includes `review_emails_sent`, `review_emails_failed` and `review_reminders_skipped` (true means `00051` is not applied).
 
 # Guest dispute refund
 
