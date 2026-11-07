@@ -1,6 +1,8 @@
 // Hourly cron (00037). Guest and host reminders for sessions that start
 // in 2–24 hours. Claim the sent_at column first so two runs cannot
 // double-send. Protected the same way as release-payout.
+// Also sends review prompts and reminders after sessions end (00051,
+// _shared/reviewReminders.ts); a failure there never stops session reminders.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { asRecord, hasValidSecret, jsonResponse, textResponse } from '../_shared/http.ts'
@@ -20,6 +22,7 @@ import {
   groupBookingsBySession,
   reminderWindowIso,
 } from '../_shared/reminders.ts'
+import { sendReviewReminders, type ReviewReminderSummary } from '../_shared/reviewReminders.ts'
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -67,6 +70,17 @@ Deno.serve(async (req) => {
     const sentAt = new Date(nowMs).toISOString()
     const { windowStart, windowEnd, confirmedBefore } = reminderWindowIso(nowMs)
 
+    let reviewSummary: ReviewReminderSummary = {
+      review_emails_sent: 0,
+      review_emails_failed: 0,
+      review_reminders_skipped: false,
+    }
+    try {
+      reviewSummary = await sendReviewReminders(admin, { apiKey, siteUrl, cap: REMINDER_EMAIL_CAP })
+    } catch (err) {
+      console.error('send-reminders: review reminders failed', errorMessage(err))
+    }
+
     const summary = {
       guests_scanned: 0,
       guests_sent: 0,
@@ -74,8 +88,9 @@ Deno.serve(async (req) => {
       hosts_sent: 0,
       skipped: 0,
       failed: 0,
+      ...reviewSummary,
     }
-    let emailsLeft = REMINDER_EMAIL_CAP
+    let emailsLeft = REMINDER_EMAIL_CAP - reviewSummary.review_emails_sent
 
     let { data: windowSessions, error: sessionError } = await admin
       .from('sessions')

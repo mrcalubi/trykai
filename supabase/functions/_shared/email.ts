@@ -1786,3 +1786,79 @@ export async function sendCompanionEmails(options: {
   }
   return sent
 }
+
+// ---------------------------------------------------------------------------
+// Review prompts and reminders (00051). Sent by the hourly send-reminders
+// job: about 2 hours after a session ends, and a reminder from day 5 (reviews
+// close on day 7). Short, one button.
+// ---------------------------------------------------------------------------
+
+export function reviewPromptGuestSubject(listingTitle: string, reminder: boolean): string {
+  return reminder ? `2 days left to review ${listingTitle}` : `How was ${listingTitle}?`
+}
+
+export function reviewPromptGuestHtml(options: {
+  guestName?: string | null
+  hostName?: string | null
+  listingTitle: string
+  deadline: string
+  bookingId: string
+  reminder: boolean
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const host = (options.hostName || '').trim() || 'your host'
+  const heading = options.reminder ? `Your review closes ${options.deadline}` : `How was it with ${host}?`
+  const line = options.reminder
+    ? `${escapeHtml(host)} is waiting to hear how ${escapeHtml(options.listingTitle)} went.`
+    : `Leave a review by ${escapeHtml(options.deadline)}. It helps ${escapeHtml(host)} and the next guest.`
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
+    ${emailHeading(heading)}
+    <p style="margin:0 0 16px;">${line}</p>
+    ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}#review`, 'Leave a review')}
+    ${emailSignOff('take-care')}
+    `,
+    siteUrl,
+    options.reminder ? `Reviews for ${options.listingTitle} close ${options.deadline}` : `Leave ${host} a review`,
+  )
+}
+
+export function reviewPromptHostSubject(listingTitle: string, reminder: boolean): string {
+  return reminder ? '2 days left to review your guests' : `Review your guests from ${listingTitle}`
+}
+
+export function reviewPromptHostHtml(options: {
+  hostName?: string | null
+  listingTitle: string
+  people: string[]
+  deadline: string
+  reminder: boolean
+  siteUrl?: string
+}): string {
+  const siteUrl = emailSiteUrl(options.siteUrl)
+  const names = (options.people ?? []).map((name) => String(name || '').trim()).filter(Boolean)
+  const list = names.length
+    ? `<ul style="margin:0 0 16px;padding-left:20px;">${names
+        .map((name) => `<li style="margin:0 0 4px;">${escapeHtml(name)}</li>`)
+        .join('')}</ul>`
+    : ''
+  const heading = options.reminder ? `Reviews close ${options.deadline}` : 'How were your guests?'
+  const line = options.reminder
+    ? `Still to review from ${escapeHtml(options.listingTitle)}:`
+    : `From ${escapeHtml(options.listingTitle)}. Your words show on their profiles; stars stay private.`
+  return wrapEmail(
+    `
+    <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
+    ${emailHeading(heading)}
+    <p style="margin:0 0 12px;">${line}</p>
+    ${list}
+    ${options.reminder ? '' : `<p style="margin:0 0 16px;">Reviews close ${escapeHtml(options.deadline)}.</p>`}
+    ${primaryButton(`${siteUrl}/hosting`, names.length === 1 ? 'Review your guest' : 'Review your guests')}
+    ${emailSignOff('take-care')}
+    `,
+    siteUrl,
+    options.reminder ? `Reviews for ${options.listingTitle} close ${options.deadline}` : `Review your guests from ${options.listingTitle}`,
+  )
+}
