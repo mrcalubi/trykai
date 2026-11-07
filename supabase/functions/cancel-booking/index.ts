@@ -9,6 +9,7 @@ import {
 } from '../_shared/booking.ts'
 import {
   bookingReference,
+  formatReminderSessionDate,
   formatSessionDate,
   publicDisplayName,
   resolvePaymentMethod,
@@ -16,6 +17,7 @@ import {
   sendHostSessionCancelledEmail,
 } from '../_shared/email.ts'
 import { emailCompanionsCancelled } from '../_shared/companions.ts'
+import { notifyUserTelegram, telegramGuestCancelled } from '../_shared/telegram.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
@@ -208,6 +210,16 @@ async function notifyCancellation(
       apiKey: Deno.env.get('RESEND_API_KEY'),
       siteUrl: Deno.env.get('SITE_URL'),
     })
+    // The host made a host cancel themselves, so only a guest cancel goes to
+    // Telegram (00052). Never throws.
+    if (options.cancelledBy === 'guest') {
+      await notifyUserTelegram(admin, options.hostId, telegramGuestCancelled({
+        guestName: publicDisplayName(guestResult.data) || 'A guest',
+        listingTitle: options.listingTitle || 'your session',
+        when: options.sessionStartsAt ? formatReminderSessionDate(options.sessionStartsAt) : '',
+        siteUrl: Deno.env.get('SITE_URL'),
+      }))
+    }
   } catch (err) {
     console.error('cancel-booking: email failed', err)
   }

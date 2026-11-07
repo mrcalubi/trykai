@@ -92,6 +92,54 @@ describe('review-emails rules', () => {
     expect(claimOtherParty).toHaveBeenCalledTimes(1)
   })
 
+  it('copies the host email to Telegram, and a Telegram error changes nothing', async () => {
+    const notifyHost = vi.fn(async () => {
+      throw new Error('telegram down')
+    })
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const result = await sendReviewFollowUpEmails({
+      callerId: 'guest-1',
+      review,
+      otherReviewed: false,
+      privateNote: null,
+      ...people,
+      listingTitle: 'Latte art',
+      claimOtherParty: async () => true,
+      claimNote: async () => true,
+      sendEmail: vi.fn(async () => {}),
+      notifyHost,
+      siteUrl: 'https://trykai.sg',
+      apiKey: 're_test',
+      now: Date.parse('2026-11-01T00:00:00Z'),
+    })
+    expect(result).toEqual({ otherParty: true, privateNote: false })
+    expect(notifyHost).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringMatching(/^Sam reviewed Latte art\. Review Sam by .+ to see it\.$/),
+      url: 'https://trykai.sg/hosting',
+    }))
+    errorSpy.mockRestore()
+  })
+
+  it('does not message the host on Telegram after a host review', async () => {
+    const notifyHost = vi.fn(async () => {})
+    await sendReviewFollowUpEmails({
+      callerId: 'host-1',
+      review: { ...review, reviewer_id: 'host-1', reviewee_id: 'guest-1', role: 'host' },
+      otherReviewed: false,
+      privateNote: null,
+      ...people,
+      listingTitle: 'Latte art',
+      claimOtherParty: async () => true,
+      claimNote: async () => true,
+      sendEmail: vi.fn(async () => {}),
+      notifyHost,
+      siteUrl: 'https://trykai.sg',
+      apiKey: 're_test',
+      now: Date.parse('2026-11-01T00:00:00Z'),
+    })
+    expect(notifyHost).not.toHaveBeenCalled()
+  })
+
   it('emails the guest after a host review and forwards an escaped private note', async () => {
     const sendEmail = vi.fn(async () => {})
     const result = await sendReviewFollowUpEmails({

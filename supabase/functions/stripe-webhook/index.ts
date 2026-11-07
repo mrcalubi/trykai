@@ -12,6 +12,7 @@ import {
   bookingReference,
   cardDetailsFromCharge,
   formatDuration,
+  formatReminderSessionDate,
   formatSessionDate,
   GUEST_REPLY_TO,
   paymentMethodFromIntent,
@@ -21,6 +22,7 @@ import {
   verificationRejectedHtml,
 } from '../_shared/email.ts'
 import { identityEventOutcome } from '../_shared/verification.ts'
+import { notifyUserTelegram, telegramNewBooking } from '../_shared/telegram.ts'
 import {
   asRecord,
   chargeIdFromPaymentIntent,
@@ -271,6 +273,17 @@ async function confirmSucceededPayment(paymentIntent: {
       guestFirstName: (guestName || 'A guest').trim().split(/\s+/).filter(Boolean)[0] || 'A guest',
     }),
   })
+
+  // Backup to email for hosts who connected Telegram (00052). Never throws.
+  if (typeof hostId === 'string') {
+    await notifyUserTelegram(admin, hostId, telegramNewBooking({
+      guestName: guestName || 'A guest',
+      listingTitle,
+      when: session?.starts_at ? formatReminderSessionDate(session.starts_at) : '',
+      guestsCount: booking.guests_count,
+      siteUrl,
+    }))
+  }
 }
 
 async function cancelPendingPayment(paymentIntent: { id: string; metadata?: Record<string, string> }) {
