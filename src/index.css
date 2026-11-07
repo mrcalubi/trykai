@@ -8534,6 +8534,16 @@ body:has(.edit-profile__bar) .site-footer {
   color: var(--text);
 }
 
+.settings-hint--error {
+  color: var(--error);
+}
+
+.settings-telegram__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .settings-group {
   display: flex;
   flex-direction: column;
