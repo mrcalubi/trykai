@@ -8702,14 +8702,16 @@ body:has(.edit-profile__bar) .site-footer {
 
 .booking-page__grid {
   display: grid;
-  gap: 20px;
+  /* Cards space themselves (16px). A row gap here doubled the space where the
+     main column meets the side column on phones. */
+  gap: 0;
 }
 
 @media (min-width: 1024px) {
   .booking-page__grid {
     grid-template-columns: minmax(0, 1fr) 340px;
     align-items: start;
-    gap: 32px;
+    column-gap: 32px;
   }
 }
 
@@ -8841,6 +8843,21 @@ body:has(.edit-profile__bar) .site-footer {
   flex: 1 1 148px;
 }
 
+/* Add to calendar and Get directions sit in a wrapper for their menu; the
+   button fills it so both buttons in a row are the same width. */
+.booking-card__btns .booking-menu > .ui-button {
+  width: 100%;
+}
+
+/* A note under buttons, or a button under a note, gets breathing room. */
+.booking-card > .hint {
+  margin: 10px 0 0;
+}
+
+.booking-card > .hint + .ui-button {
+  margin-top: 12px;
+}
+
 .booking-menu {
   position: relative;
 }
@@ -8884,27 +8901,6 @@ body:has(.edit-profile__bar) .site-footer {
   background: var(--navy-light);
 }
 
-.booking-where__head {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.booking-where__pin {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--coral-soft);
-  color: var(--coral-ink);
-}
-
-.booking-where .eyebrow {
-  margin: 0 0 4px;
-}
-
 .booking-where__address {
   margin: 0;
   font-weight: 700;
@@ -8919,11 +8915,10 @@ body:has(.edit-profile__bar) .site-footer {
 }
 
 .booking-where__find-label {
+  /* Same as the other sub-labels on the page ("Bring", "Provided"). */
   margin: 0 0 4px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--muted);
 }
 
@@ -9067,8 +9062,16 @@ body:has(.edit-profile__bar) .site-footer {
   border-top: 0;
 }
 
-.booking-help__line {
+.booking-help__line,
+.booking-help .hint {
+  /* "Need help" and "Safety concern" read as one block, same size. */
   margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.booking-help .hint {
+  margin-top: 6px;
 }
 
 .booking-help .report-problem > .ui-button {
@@ -10702,7 +10705,7 @@ body:has(.edit-profile__bar) .site-footer {
 }
 
 .whos-coming__hint {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
 }
 
 .booking-pill--booked-by {
