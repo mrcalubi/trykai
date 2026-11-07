@@ -792,7 +792,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
           ? payoutPendingCopy
           : payoutSetupIncomplete
             ? "Your payout setup isn't finished yet."
-            : 'Stripe needs your bank details to pay you.',
+            : 'No Stripe account needed. About 5 minutes: your phone, NRIC and bank details.',
       action:
         payoutPendingCopy ? null : (
           <button
