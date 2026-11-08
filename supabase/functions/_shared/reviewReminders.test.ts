@@ -141,6 +141,34 @@ describe('sendReviewReminders', () => {
     errorSpy.mockRestore()
   })
 
+  it('copies host prompts to Telegram after the email, never guest ones', async () => {
+    const admin = adminReturning([
+      row(),
+      row({ kind: 'host_prompt', booking_id: null, people: ['Kai'] }),
+      row({ kind: 'host_nudge', booking_id: null, people: ['Kai'] }),
+    ])
+    const send = vi.fn(async () => {})
+    const onHostSent = vi.fn(async () => {})
+    await sendReviewReminders(admin, { apiKey: 'k', cap: 10, send, onHostSent })
+    expect(onHostSent.mock.calls.map((call) => (call as unknown as [ReviewReminderRow])[0].kind)).toEqual(['host_prompt', 'host_nudge'])
+  })
+
+  it('skips Telegram when the host email failed, and survives a Telegram error', async () => {
+    const admin = adminReturning([
+      row({ kind: 'host_prompt', booking_id: null, people: ['Kai'] }),
+      row({ kind: 'host_nudge', booking_id: null, people: ['Kai'] }),
+    ])
+    const send = vi.fn().mockRejectedValueOnce(new Error('bounce')).mockResolvedValueOnce(undefined)
+    const onHostSent = vi.fn(async () => {
+      throw new Error('telegram down')
+    })
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const summary = await sendReviewReminders(admin, { apiKey: 'k', cap: 10, send, onHostSent })
+    expect(onHostSent).toHaveBeenCalledTimes(1)
+    expect(summary).toMatchObject({ review_emails_sent: 1, review_emails_failed: 1 })
+    errorSpy.mockRestore()
+  })
+
   it('skips quietly before 00051 is applied', async () => {
     const admin = adminReturning(null, {
       code: 'PGRST202',
@@ -182,5 +210,13 @@ describe('send-reminders wiring', () => {
     expect(reviewAt).toBeLessThan(sessionsAt)
     expect(source.slice(source.lastIndexOf('try {', reviewAt), reviewAt)).toMatch(/try \{\s*reviewSummary =/)
     expect(source).toMatch(/let emailsLeft = REMINDER_EMAIL_CAP - reviewSummary\.review_emails_sent/)
+  })
+
+  it('copies host session reminders and review prompts to Telegram (00052)', () => {
+    expect(source).toMatch(/onHostSent: async \(row\) =>/)
+    expect(source).toMatch(/notifyUserTelegram\(admin, hostId, telegramReviewPrompt\(/)
+    const hostSent = source.indexOf('summary.hosts_sent += 1')
+    expect(source.indexOf('telegramSessionReminder({', hostSent)).toBeGreaterThan(hostSent)
+    expect((source.match(/listings!inner \(\s*host_id,/g) ?? []).length).toBe(2)
   })
 })

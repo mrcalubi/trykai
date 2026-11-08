@@ -2,11 +2,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { rescheduleErrorMessage } from '../_shared/booking.ts'
 import {
   addonPrepareLine,
+  formatReminderSessionDate,
   formatSessionDate,
   publicDisplayName,
   sendRescheduleEmails,
 } from '../_shared/email.ts'
 import { emailCompanionsMoved } from '../_shared/companions.ts'
+import { notifyUserTelegram, telegramBookingMoved } from '../_shared/telegram.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
 
 function adminClient() {
@@ -116,6 +118,14 @@ Deno.serve(async (req) => {
       apiKey: Deno.env.get('RESEND_API_KEY'),
       siteUrl: Deno.env.get('SITE_URL'),
     })
+    // 00052. Never throws.
+    const hostId = listing?.host_id
+    await notifyUserTelegram(admin, typeof hostId === 'string' ? hostId : null, telegramBookingMoved({
+      guestName: guestName || 'A guest',
+      listingTitle: typeof listing?.title === 'string' ? listing.title : 'your session',
+      newWhen: newStartsAt ? formatReminderSessionDate(newStartsAt) : '',
+      siteUrl: Deno.env.get('SITE_URL'),
+    }))
 
     return jsonResponse({
       ok: true,

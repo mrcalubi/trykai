@@ -41,6 +41,8 @@ const FUNCTIONS = [
   'singpass-callback',
   'singpass-start',
   'stripe-webhook',
+  'telegram-link',
+  'telegram-webhook',
 ]
 
 describe('this repo', () => {

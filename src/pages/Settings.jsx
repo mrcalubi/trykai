@@ -9,6 +9,7 @@ import PageLoader from '../components/PageLoader'
 import Avatar from '../components/ui/Avatar'
 import PhotoCropDialog from '../components/PhotoCropDialog'
 import ProfilePhotoFlow from '../components/ProfilePhotoFlow'
+import TelegramConnect from '../components/TelegramConnect'
 import { ProfileBanner, SocialGlyph } from '../components/profile/ProfileBits'
 import { firstAccountRow, notifyAccountUpdated } from '../lib/myAccount'
 import { hasAvatarPhoto, uploadBannerFile } from '../lib/avatarPhoto'
@@ -789,6 +790,8 @@ export default function Settings() {
                 </Link>
               </div>
             </section>
+
+            {isHost ? <TelegramConnect /> : null}
           </aside>
         </div>
 

@@ -9,12 +9,15 @@ import { asRecord, hasValidSecret, jsonResponse, textResponse } from '../_shared
 import {
   formatDuration,
   formatReminderSessionDate,
+  formatSessionDay,
+  formatSessionTime,
   GUEST_REPLY_TO,
   guestSessionReminderHtml,
   guestSessionReminderSubject,
   hostSessionReminderHtml,
   hostSessionReminderSubject,
   publicDisplayName,
+  reminderWhen,
   sendResendEmail,
 } from '../_shared/email.ts'
 import {
@@ -23,6 +26,11 @@ import {
   reminderWindowIso,
 } from '../_shared/reminders.ts'
 import { sendReviewReminders, type ReviewReminderSummary } from '../_shared/reviewReminders.ts'
+import {
+  notifyUserTelegram,
+  telegramReviewPrompt,
+  telegramSessionReminder,
+} from '../_shared/telegram.ts'
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -76,7 +84,28 @@ Deno.serve(async (req) => {
       review_reminders_skipped: false,
     }
     try {
-      reviewSummary = await sendReviewReminders(admin, { apiKey, siteUrl, cap: REMINDER_EMAIL_CAP })
+      reviewSummary = await sendReviewReminders(admin, {
+        apiKey,
+        siteUrl,
+        cap: REMINDER_EMAIL_CAP,
+        // Host review prompts also go to Telegram (00052).
+        onHostSent: async (row) => {
+          const { data: sessionRow } = await admin
+            .from('sessions')
+            .select('listings ( host_id )')
+            .eq('id', row.session_id)
+            .maybeSingle()
+          const hostId = asRecord(asRecord(sessionRow)?.listings)?.host_id
+          if (typeof hostId !== 'string' || !row.deadline) return
+          await notifyUserTelegram(admin, hostId, telegramReviewPrompt({
+            listingTitle: row.listing_title || 'your session',
+            names: Array.isArray(row.people) ? row.people : [],
+            deadline: formatSessionDay(row.deadline),
+            reminder: row.kind === 'host_nudge',
+            siteUrl,
+          }))
+        },
+      })
     } catch (err) {
       console.error('send-reminders: review reminders failed', errorMessage(err))
     }
@@ -101,6 +130,7 @@ Deno.serve(async (req) => {
         duration_mins,
         host_reminder_sent_at,
         listings!inner (
+          host_id,
           title,
           full_address,
           arrival_instructions,
@@ -128,6 +158,7 @@ Deno.serve(async (req) => {
         duration_mins,
         host_reminder_sent_at,
         listings!inner (
+          host_id,
           title,
           full_address,
           whats_provided,
@@ -340,6 +371,17 @@ Deno.serve(async (req) => {
       })
       summary.hosts_sent += 1
       emailsLeft -= 1
+      // 00052. Never throws.
+      const hostId = listing?.host_id
+      if (typeof hostId === 'string') {
+        await notifyUserTelegram(admin, hostId, telegramSessionReminder({
+          dayWord: reminderWhen(startsAt, sentAt),
+          listingTitle: title,
+          time: formatSessionTime(startsAt),
+          guestsCount: group.totalGuests,
+          siteUrl,
+        }))
+      }
     }
 
     console.log('send-reminders', JSON.stringify(summary))
