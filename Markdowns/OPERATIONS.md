@@ -967,7 +967,7 @@ The Edge Function log line `send-reminders {...}` includes `review_emails_sent`,
 
 # Day One guests and bring a friend
 
-**Day One:** the first 50 people with a confirmed seat before 1 December 2026 (Singapore time) get a numbered "Day One #N" badge on their profile for good. Booking it or taking a friend's seat both count. The banner on browse, listing and profile pages announces it with a countdown and switches to "Only N spots left" below 20. It disappears at launch.
+**Day One:** the first 50 people with a confirmed seat before 1 December 2026 (Singapore time) get a numbered "Day One #N" badge on their profile for good. Booking it or taking a friend's seat both count. The banner on browse, listing and profile pages rotates between "Be one of our first 50 guests" (with a days-left chip) and "Bring a friend, skip their booking fee"; tapping it shows the details. Below 20 spots it says "Only N Day One spots left". It disappears at launch.
 
 Who has a number (production SQL rules apply):
 

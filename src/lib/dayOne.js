@@ -11,6 +11,8 @@ export const DAY_ONE_LIMIT = 50
 export const DAY_ONE_ENDS_AT = '2026-12-01T00:00:00+08:00'
 /** Below this the banner shows the live count; above it a count looks empty. */
 export const DAY_ONE_SHOW_COUNT_BELOW = 20
+/** How long each banner message stays before the next one. */
+export const BANNER_ROTATE_MS = 5000
 
 /** { spotsLeft, endsAt } or null when 00053 is not applied or offline. */
 export async function dayOneStatus() {
@@ -61,20 +63,61 @@ export function daysLeftLabel(days) {
   return `${days} days left`
 }
 
-/** Banner wording, or null when it should not show (after launch). */
+/**
+ * Banner content, or null after launch. One short line at a time; the banner
+ * rotates through `messages`. `short` is the phone wording (fits 360px with
+ * the countdown chip). `details` is the explainer shown when the bar is tapped.
+ */
 export function launchBannerCopy({ spotsLeft, endsAt = DAY_ONE_ENDS_AT, now = Date.now() }) {
   const days = daysUntil(endsAt, now)
   if (days <= 0) return null
-  const friends = 'Friends you bring skip the booking fee.'
-  let headline
-  if (typeof spotsLeft === 'number' && spotsLeft <= 0) {
-    headline = `All ${DAY_ONE_LIMIT} Day One spots are taken.`
-  } else if (typeof spotsLeft === 'number' && spotsLeft < DAY_ONE_SHOW_COUNT_BELOW) {
-    headline = `Only ${spotsLeft} Day One ${spotsLeft === 1 ? 'spot' : 'spots'} left: book before 1 Dec for a numbered badge.`
-  } else {
-    headline = `Soft launch: the first ${DAY_ONE_LIMIT} guests get a numbered Day One badge for good.`
+  const countdown = daysLeftLabel(days)
+  const known = typeof spotsLeft === 'number'
+  const messages = []
+  if (!known || spotsLeft > 0) {
+    const low = known && spotsLeft < DAY_ONE_SHOW_COUNT_BELOW
+    const spots = `${spotsLeft} ${spotsLeft === 1 ? 'spot' : 'spots'}`
+    messages.push({
+      key: 'day-one',
+      icon: 'star',
+      text: low ? `Only ${spotsLeft} Day One ${spotsLeft === 1 ? 'spot' : 'spots'} left` : `Be one of our first ${DAY_ONE_LIMIT} guests`,
+      short: low ? `Only ${spots} left` : `Be one of our first ${DAY_ONE_LIMIT}`,
+      chip: countdown,
+    })
   }
-  return { headline, friends, countdown: daysLeftLabel(days) }
+  messages.push({
+    key: 'friends',
+    icon: 'users',
+    text: 'Bring a friend, skip their booking fee',
+    short: 'Bring a friend, skip their fee',
+    chip: '',
+  })
+
+  // Explainer lines as parts so the page can bold or highlight words.
+  const dayOneDetail =
+    known && spotsLeft <= 0
+      ? [{ text: `All ${DAY_ONE_LIMIT} ` }, { text: 'Day One', highlight: true }, { text: ' badges are taken. Thank you!' }]
+      : [
+          { text: 'The ' },
+          { text: `first ${DAY_ONE_LIMIT} guests`, strong: true },
+          { text: ' to book before 1 Dec get a limited ' },
+          { text: 'Day One', highlight: true },
+          { text: ` badge on their profile.${known ? ` ${spotsLeft} ${spotsLeft === 1 ? 'spot' : 'spots'} left.` : ''}` },
+        ]
+  return {
+    messages,
+    countdown,
+    details: [
+      { key: 'day-one', parts: dayOneDetail },
+      {
+        key: 'friends',
+        parts: [
+          { text: 'Bring a friend:', strong: true },
+          { text: " book 2 or more seats and your friends' seats have no booking fee." },
+        ],
+      },
+    ],
+  }
 }
 
 /** Guest-facing pages only: browse, listings and profiles. */

@@ -12,6 +12,7 @@ import {
 vi.mock('./supabase')
 
 const ENDS = '2026-12-01T00:00:00+08:00'
+const joined = (detail) => detail.parts.map((part) => part.text).join('')
 const sgt = (text) => Date.parse(`${text}+08:00`)
 
 describe('Day One helpers', () => {
@@ -30,19 +31,34 @@ describe('Day One helpers', () => {
     expect(daysLeftLabel(0)).toBe('')
   })
 
-  it('words the banner without an empty-looking count', () => {
+  it('words the banner as short rotating lines without an empty-looking count', () => {
     const now = sgt('2026-11-08T12:00:00')
-    expect(launchBannerCopy({ spotsLeft: 47, endsAt: ENDS, now })).toEqual({
-      headline: 'Soft launch: the first 50 guests get a numbered Day One badge for good.',
-      friends: 'Friends you bring skip the booking fee.',
-      countdown: '23 days left',
-    })
-    expect(launchBannerCopy({ spotsLeft: undefined, endsAt: ENDS, now }).headline).toMatch(/^Soft launch/)
-    expect(launchBannerCopy({ spotsLeft: 14, endsAt: ENDS, now }).headline).toBe(
-      'Only 14 Day One spots left: book before 1 Dec for a numbered badge.',
+    const copy = launchBannerCopy({ spotsLeft: 47, endsAt: ENDS, now })
+    expect(copy.messages).toEqual([
+      { key: 'day-one', icon: 'star', text: 'Be one of our first 50 guests', short: 'Be one of our first 50', chip: '23 days left' },
+      { key: 'friends', icon: 'users', text: 'Bring a friend, skip their booking fee', short: 'Bring a friend, skip their fee', chip: '' },
+    ])
+    for (const message of copy.messages) {
+      expect(message.text.length).toBeLessThanOrEqual(40)
+      expect(message.short.length).toBeLessThanOrEqual(30)
+    }
+    expect(joined(copy.details[0])).toBe(
+      'The first 50 guests to book before 1 Dec get a limited Day One badge on their profile. 47 spots left.',
     )
-    expect(launchBannerCopy({ spotsLeft: 1, endsAt: ENDS, now }).headline).toMatch(/Only 1 Day One spot left/)
-    expect(launchBannerCopy({ spotsLeft: 0, endsAt: ENDS, now }).headline).toBe('All 50 Day One spots are taken.')
+    expect(copy.details[0].parts).toContainEqual({ text: 'first 50 guests', strong: true })
+    expect(copy.details[0].parts).toContainEqual({ text: 'Day One', highlight: true })
+    expect(joined(copy.details[1])).toMatch(/^Bring a friend: book 2 or more seats.*no booking fee\.$/)
+    expect(joined(launchBannerCopy({ spotsLeft: undefined, endsAt: ENDS, now }).details[0])).not.toMatch(/left/)
+    expect(launchBannerCopy({ spotsLeft: 14, endsAt: ENDS, now }).messages[0]).toMatchObject({
+      text: 'Only 14 Day One spots left',
+      short: 'Only 14 spots left',
+    })
+    expect(launchBannerCopy({ spotsLeft: 1, endsAt: ENDS, now }).messages[0].short).toBe('Only 1 spot left')
+    expect(launchBannerCopy({ spotsLeft: 1, endsAt: ENDS, now }).messages[0].text).toBe('Only 1 Day One spot left')
+    expect(joined(launchBannerCopy({ spotsLeft: 1, endsAt: ENDS, now }).details[0])).toMatch(/1 spot left\.$/)
+    const full = launchBannerCopy({ spotsLeft: 0, endsAt: ENDS, now })
+    expect(full.messages.map((m) => m.key)).toEqual(['friends'])
+    expect(joined(full.details[0])).toBe('All 50 Day One badges are taken. Thank you!')
     expect(launchBannerCopy({ spotsLeft: 10, endsAt: ENDS, now: sgt('2026-12-01T09:00:00') })).toBeNull()
   })
 
