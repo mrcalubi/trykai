@@ -72,10 +72,10 @@ describe('pricing.js matches booking.ts', () => {
         const lesson = discountedLessonCents(price, count)
         expect(lesson).toBe(bookingLessonCents(price, count))
         expect(guestFacingPriceCents(price, count)).toBe(
-          calculateGuestCharge(lesson, 'card').totalAmount,
+          calculateGuestCharge(lesson, 'card', count).totalAmount,
         )
         expect(paynowPriceCents(price, count)).toBe(
-          calculateGuestCharge(lesson, 'paynow').totalAmount,
+          calculateGuestCharge(lesson, 'paynow', count).totalAmount,
         )
       }
     }
@@ -84,17 +84,17 @@ describe('pricing.js matches booking.ts', () => {
   it('agrees when group pricing is off', () => {
     expect(discountedLessonCents(2500, 4, false)).toBe(10000)
     expect(guestFacingPriceCents(2500, 4, false)).toBe(
-      calculateGuestCharge(10000, 'card').totalAmount,
+      calculateGuestCharge(10000, 'card', 4).totalAmount,
     )
     expect(paynowPriceCents(2500, 4, false)).toBe(
-      calculateGuestCharge(10000, 'paynow').totalAmount,
+      calculateGuestCharge(10000, 'paynow', 4).totalAmount,
     )
   })
 
   it('labels the live all-in price per person', () => {
     expect(groupPriceLabel(2500, 1)).toBe('$28 per person')
-    expect(groupPriceLabel(2500, 2)).toBe('$27 each · 5% group discount')
-    expect(groupPriceLabel(2500, 4, false)).toBe('$28 each')
+    expect(groupPriceLabel(2500, 2)).toBe('$25.50 each · 5% group discount')
+    expect(groupPriceLabel(2500, 4, false)).toBe('$25.75 each')
     expect(groupPriceLabel(135800, 1)).toBe('$1,521 per person')
     expect(discountedPerPersonCents(2500, 4)).toBe(2125)
   })

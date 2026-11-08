@@ -11,6 +11,7 @@ import {
 } from 'react-router-dom'
 import { pageTitle } from './lib/pageTitle'
 import SiteNav from './components/SiteNav'
+import LaunchBanner from './components/LaunchBanner'
 import BackButton, { BackSlotProvider } from './components/BackButton'
 import Footer from './components/Footer'
 import RequireAuth from './components/RequireAuth'
@@ -62,6 +63,7 @@ function AppLayout() {
     <>
       <ScrollRestoration />
       <SiteNav />
+      <LaunchBanner />
       <BackSlotProvider>
         <BackButton />
         <Outlet />

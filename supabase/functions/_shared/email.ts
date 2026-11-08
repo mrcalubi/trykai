@@ -341,8 +341,9 @@ export type ReceiptRow = { label: string; amountCents: number | null }
 
 /**
  * Guest-facing receipt. The advertised all-in card price is the unit price so
- * a booking fee never appears as its own row. Group discount (already inside
- * the unit price) and PayNow saving are the only reductions.
+ * a booking fee never appears as its own row. Group discount and the friends'
+ * seats having no booking fee (both already inside the unit price) are noted;
+ * PayNow saving is the only line with an amount taken off.
  *
  * `addsUp` is false when the rows would not sum to what the guest actually
  * paid (an older booking, a price edited after booking). The email then shows
@@ -364,8 +365,8 @@ export function receiptRows(options: {
     guestsCount,
     groupPricing,
   )
-  const cardListTotal = calculateGuestCharge(listLesson, 'card').totalAmount
-  const cardDiscountedTotal = calculateGuestCharge(discountedLesson, 'card').totalAmount
+  const cardListTotal = calculateGuestCharge(listLesson, 'card', guestsCount).totalAmount
+  const cardDiscountedTotal = calculateGuestCharge(discountedLesson, 'card', guestsCount).totalAmount
   const perPerson = Math.round(cardDiscountedTotal / guestsCount)
   const rate = groupDiscountRate(guestsCount, groupPricing)
   const addons = (options.addons ?? []).filter((row) => row.quantity > 0)
@@ -378,6 +379,12 @@ export function receiptRows(options: {
   ]
   if (rate > 0 && cardListTotal > cardDiscountedTotal) {
     rows.push({ label: `Group discount (${Math.round(rate * 100)}%)`, amountCents: null })
+  }
+  if (guestsCount > 1) {
+    rows.push({
+      label: 'Bring-a-friend saving',
+      amountCents: null,
+    })
   }
   for (const addon of addons) {
     rows.push({

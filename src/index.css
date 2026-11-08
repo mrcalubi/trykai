@@ -10817,3 +10817,142 @@ body:has(.edit-profile__bar) .site-footer {
 .whos-coming .ui-button {
   width: 100%;
 }
+
+/* Soft-launch banner (LaunchBanner): Day One badge and bring-a-friend. Sits in
+   the page flow under the fixed nav, on browse, listing and profile pages. */
+.launch-banner {
+  background: var(--navy);
+  color: var(--cream);
+}
+
+.launch-banner__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 10px var(--gutter);
+}
+
+.launch-banner__text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--cream);
+}
+
+.launch-banner__headline {
+  font-weight: 700;
+}
+
+.launch-banner__side {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.launch-banner__countdown {
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--navy);
+  background: var(--coral-soft);
+  border-radius: 999px;
+}
+
+.launch-banner__link {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--cream);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.launch-banner__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--cream);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.launch-banner__close:hover,
+.launch-banner__close:focus-visible {
+  background: rgba(244, 241, 234, 0.14);
+}
+
+@media (max-width: 640px) {
+  .launch-banner__inner {
+    flex-wrap: wrap;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .launch-banner__text {
+    flex: 1 1 calc(100% - 44px);
+    font-size: 13px;
+  }
+
+  .launch-banner__side {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .launch-banner__close {
+    position: absolute;
+    right: var(--gutter);
+  }
+
+  .launch-banner {
+    position: relative;
+  }
+}
+
+/* Day One profile pill */
+.profile-pill--day-one {
+  color: var(--cream);
+  background: var(--navy);
+}
+
+/* Bring a friend: listing booking card and checkout */
+.bring-friend {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--success);
+  background: var(--success-bg);
+  border-radius: 12px;
+}
+
+.bring-friend strong {
+  font-weight: 800;
+}
+
+.bring-friend__icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.guest-stepper__saving {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--success);
+}

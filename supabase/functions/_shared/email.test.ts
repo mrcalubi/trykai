@@ -159,7 +159,7 @@ function guestReceipt(overrides = {}) {
     pricePerPersonCents: 2500,
     groupPricing: true,
     paymentRail: 'paynow',
-    totalPaidCents: 9408,
+    totalPaidCents: 8624,
     paymentMethod: 'PayNow',
     sessionStartsAt: SESSION_STARTS,
     durationMins: 90,
@@ -362,9 +362,9 @@ describe('receiptPriceLines', () => {
       guestsCount: 4,
       groupPricing: true,
       paymentRail: 'card',
-      totalPaidCents: 9600,
+      totalPaidCents: 8800,
     })
-    expect(lines[0]).toBe('$24 per person × 4 guests')
+    expect(lines[0]).toBe('$22 per person × 4 guests')
     expect(lines).toContain('Group discount (15%)')
     expect(lines.join('\n')).not.toMatch(/−\$16|booking fee|platform fee/i)
   })
@@ -389,10 +389,11 @@ describe('receiptPriceLines', () => {
       guestsCount: 4,
       groupPricing: true,
       paymentRail: 'paynow',
-      totalPaidCents: 9408,
+      totalPaidCents: 8624,
     })
-    expect(lines).toContain('PayNow saving (2%) $1.92')
-    expect(lines).toContain('Total paid $94.08')
+    expect(lines).toContain('PayNow saving (2%) $1.76')
+    expect(lines).toContain('Bring-a-friend saving')
+    expect(lines).toContain('Total paid $86.24')
   })
 
   it('omits the group discount when the listing does not offer it', () => {
@@ -559,10 +560,11 @@ describe('booking confirmation emails', () => {
     expect(hasDetail(html, 'Guests', '4 guests')).toBe(true)
     expect(hasDetail(html, "What&#39;s provided", 'Apron, Coffee beans')).toBe(true)
     expect(receiptCells(html)).toEqual([
-      ['$24 per person × 4 guests', '$96'],
+      ['$22 per person × 4 guests', '$88'],
       ['Group discount (15%)', 'Included'],
-      ['PayNow saving (2%)', '−$1.92'],
-      ['Total paid', '$94.08'],
+      ['Bring-a-friend saving', 'Included'],
+      ['PayNow saving (2%)', '−$1.76'],
+      ['Total paid', '$86.24'],
     ])
     expect(html).not.toContain('−$16')
     expect(html).toContain('Paid with PayNow')
@@ -1423,12 +1425,12 @@ describe('branded receipt', () => {
 
   it('reports whether the receipt rows add up', () => {
     const base = { pricePerPersonCents: 2500, guestsCount: 4, groupPricing: true }
-    expect(receiptRows({ ...base, paymentRail: 'card', totalPaidCents: 9600 }).addsUp).toBe(true)
-    expect(receiptRows({ ...base, paymentRail: 'paynow', totalPaidCents: 9408 }).addsUp).toBe(true)
+    expect(receiptRows({ ...base, paymentRail: 'card', totalPaidCents: 8800 }).addsUp).toBe(true)
+    expect(receiptRows({ ...base, paymentRail: 'paynow', totalPaidCents: 8624 }).addsUp).toBe(true)
     expect(receiptRows({ ...base, paymentRail: 'card', totalPaidCents: 9120 }).addsUp).toBe(false)
-    const { rows } = receiptRows({ ...base, paymentRail: 'paynow', totalPaidCents: 9408 })
+    const { rows } = receiptRows({ ...base, paymentRail: 'paynow', totalPaidCents: 8624 })
     const sum = rows.reduce((total, row) => total + (row.amountCents ?? 0), 0)
-    expect(sum).toBe(9408)
+    expect(sum).toBe(8624)
   })
 
   it('includes add-on rows in the sum', () => {
@@ -1437,7 +1439,7 @@ describe('branded receipt', () => {
       guestsCount: 2,
       groupPricing: true,
       paymentRail: 'card',
-      totalPaidCents: 9900,
+      totalPaidCents: 9600,
       addons: [
         { name: 'Premium blooms', quantity: 1, unitGuestCents: 1700 },
         { name: 'Gift wrap', quantity: 2, unitGuestCents: 900 },
@@ -1452,7 +1454,7 @@ describe('branded receipt', () => {
       guestsCount: 2,
       groupPricing: true,
       paymentRail: 'paynow',
-      totalPaidCents: 9702,
+      totalPaidCents: 9408,
       addons: [
         { name: 'Premium blooms', quantity: 1, unitGuestCents: 1700 },
         { name: 'Gift wrap', quantity: 2, unitGuestCents: 900 },
@@ -1460,7 +1462,7 @@ describe('branded receipt', () => {
     })
     expect(paynow.addsUp).toBe(true)
     const sum = paynow.rows.reduce((total, row) => total + (row.amountCents ?? 0), 0)
-    expect(sum).toBe(9702)
+    expect(sum).toBe(9408)
   })
 
   it('has the brand frame: production logo, wordmark, cream page, inbox preview', () => {

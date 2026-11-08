@@ -67,8 +67,34 @@ function ShieldGlyph() {
   )
 }
 
-export function ProfilePill({ kind, small = false }) {
+function SunriseGlyph() {
+  return (
+    <svg className="profile-pill__glyph" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 17a7 7 0 0 1 14 0z" fill="#EC8873" />
+      <path
+        d="M12 3v3M4.2 8.2l2 2M19.8 8.2l-2 2M2 17h20M7 21h10"
+        fill="none"
+        stroke="#F4F1EA"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+export function ProfilePill({ kind, small = false, number = null }) {
   const size = small ? ' profile-pill--small' : ''
+  if (kind === 'dayOne') {
+    return (
+      <span
+        className={`profile-pill profile-pill--day-one${size}`}
+        title={`One of TryKai's first 50 guests`}
+      >
+        <SunriseGlyph />
+        {number ? `Day One #${number}` : 'Day One'}
+      </span>
+    )
+  }
   if (kind === 'founding') {
     return (
       <span className={`profile-pill profile-pill--founding${size}`}>
