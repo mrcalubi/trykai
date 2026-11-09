@@ -30,6 +30,9 @@
     />
     <meta name="twitter:image" content="https://www.trykai.sg/trykai.png" />
     <!-- link-preview:end -->
+    <!-- Open the connection to Supabase while the app's JavaScript downloads,
+         so the first listings request does not pay for DNS and TLS. -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
