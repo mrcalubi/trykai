@@ -1,3 +1,5 @@
+import { guestFacingPriceCents } from '../lib/pricing'
+import { formatCents } from '../lib/cancellationPolicy'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { screen, within } from '@testing-library/react'
@@ -576,14 +578,23 @@ describe('Home filters', () => {
 })
 
 describe('Home hero', () => {
-  it('states a typical price instead of the payment rails', async () => {
-    givenListings([LATTE])
+  it('states the lowest live price instead of the payment rails', async () => {
+    givenListings([LATTE, BOXING])
     renderWithRouter(<Home />)
     await screen.findByText('Latte art')
 
     const chips = document.querySelector('.trust-list')
-    expect(within(chips).getByText('Most sessions under S$30')).toBeInTheDocument()
+    const cheapest = Math.min(guestFacingPriceCents(LATTE.price_per_person), guestFacingPriceCents(BOXING.price_per_person))
+    expect(within(chips).getByText(`Sessions from ${formatCents(cheapest)}`)).toBeInTheDocument()
+    expect(within(chips).queryByText(/Most sessions under/)).not.toBeInTheDocument()
     expect(within(chips).queryByText('Pay by PayNow or Card')).not.toBeInTheDocument()
+  })
+
+  it('falls back to a plain chip before any listing loads', async () => {
+    givenListings([])
+    renderWithRouter(<Home />)
+    const chips = document.querySelector('.trust-list')
+    expect(within(chips).getByText('Small-group sessions')).toBeInTheDocument()
   })
 
   it('keeps the desktop hero short enough for the first cards', () => {

@@ -275,16 +275,17 @@ function HostStats({ isOwn, reviews, sessionsHeld, stats, nextSession }) {
   )
 }
 
-function GuestStats({ stats }) {
+function GuestStats({ stats, title = '', note = true }) {
   if (!stats) return null
   return (
     <div className="profile-stats">
-      <div className="stat-grid stat-grid--3" data-testid="profile-stats">
+      {title ? <p className="eyebrow profile-stats__title">{title}</p> : null}
+      <div className="stat-grid stat-grid--3" data-testid={title ? 'profile-guest-stats' : 'profile-stats'}>
         <StatCard tone="blue" icon="ticket" value={stats.sessionsAttended} label="Sessions attended" />
         <StatCard tone="coral" icon="compass" value={stats.categoriesTried} label="Things tried" />
         <StatCard tone="green" icon="pen" value={stats.reviewsWritten} label="Reviews written" />
       </div>
-      <PrivateNote />
+      {note ? <PrivateNote /> : null}
     </div>
   )
 }
@@ -819,6 +820,10 @@ export default function Profile() {
               />
             ) : isOwn ? (
               <GuestStats stats={stats} />
+            ) : null}
+            {/* A guest who becomes a host keeps their guest side (only they see it). */}
+            {isHost && isOwn && stats?.sessionsAttended > 0 ? (
+              <GuestStats stats={stats} title="As a guest" note={false} />
             ) : null}
             {about || isOwn ? (
               <div className="profile-about">

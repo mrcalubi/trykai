@@ -382,22 +382,6 @@ a {
   z-index: 200;
 }
 
-/* In-app browsers (Telegram, Instagram) can show page content above the
-   viewport, under their own collapsing toolbar. The fixed nav sits at the
-   viewport top, so photos scrolled past showed through above it. This band
-   fills that area with the page colour. In normal browsers it sits off
-   screen above the viewport and is never seen. */
-.ui-topnav-shell::before {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: 100%;
-  left: 0;
-  height: 240px;
-  background: var(--cream);
-  pointer-events: none;
-}
-
 .ui-topnav-shell--compact {
   --ui-topnav-current-height: 52px;
 }
@@ -11042,4 +11026,9 @@ body:has(.edit-profile__bar) .site-footer {
   font-size: 13px;
   font-weight: 700;
   color: var(--success);
+}
+
+/* "As a guest" row on a host's own profile */
+.profile-stats__title {
+  margin: 0 0 8px;
 }
