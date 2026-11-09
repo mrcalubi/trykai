@@ -92,7 +92,8 @@ test.describe('browsing listings', () => {
 
     await expect(page.getByRole('button', { name: 'Fitness', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Music', exact: true })).toHaveCount(0)
-    await expect(page.getByText('Most sessions under S$30')).toBeAttached()
+    // LATTE_ART S$45 → S$51 all in, BOXING S$30 → S$34: the chip shows the lowest.
+    await expect(page.getByText('Sessions from $34')).toBeAttached()
   })
 
   test('on a phone, a half category tab peeks so the row reads as swipeable', async ({ page }, testInfo) => {
