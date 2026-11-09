@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import HamburgerMenu from './HamburgerMenu'
 import Avatar from './Avatar'
 
 const SCROLL_THRESHOLD = 48
+/** Phones only: hide the bar while scrolling down, bring it back on any scroll up. */
+const HIDE_MEDIA = '(max-width: 767px)'
+const HIDE_AFTER = 120
+const SCROLL_JITTER = 6
 
 function MenuIcon() {
   return (
@@ -67,17 +71,44 @@ export default function TopNav({
 }) {
   const location = useLocation()
   const [compact, setCompact] = useState(false)
+  // The location key the bar was hidden on, so a new page always starts with it showing.
+  const [hiddenOn, setHiddenOn] = useState(null)
+  const locationKey = useRef(location.key)
+  const [focusInside, setFocusInside] = useState(false)
   const [openedAt, setOpenedAt] = useState(null)
   const menuOpen = openedAt === location.key
+  // In Telegram's and other in-app browsers the page shows through their
+  // see-through header above our bar; tucking the bar away while reading
+  // makes that strip read as normal scrolling. Never while the menu is open
+  // or the keyboard is in the bar.
+  const hidden = hiddenOn === location.key && !menuOpen && !focusInside
 
   useEffect(() => {
-    function updateCompact() {
-      setCompact(window.scrollY > SCROLL_THRESHOLD)
+    locationKey.current = location.key
+  }, [location.key])
+
+  useEffect(() => {
+    const phone = typeof window.matchMedia === 'function' ? window.matchMedia(HIDE_MEDIA) : null
+    let lastY = window.scrollY
+
+    function onScroll() {
+      const y = window.scrollY
+      setCompact(y > SCROLL_THRESHOLD)
+      if (!phone?.matches || y <= HIDE_AFTER) {
+        setHiddenOn(null)
+      } else if (y - lastY > SCROLL_JITTER) {
+        setHiddenOn(locationKey.current)
+      } else if (lastY - y > SCROLL_JITTER) {
+        setHiddenOn(null)
+      } else {
+        return
+      }
+      lastY = y
     }
 
-    updateCompact()
-    window.addEventListener('scroll', updateCompact, { passive: true })
-    return () => window.removeEventListener('scroll', updateCompact)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
   useEffect(() => {
@@ -103,6 +134,7 @@ export default function TopNav({
   const shellClasses = [
     'ui-topnav-shell',
     compact ? 'ui-topnav-shell--compact' : '',
+    hidden ? 'ui-topnav-shell--hidden' : '',
     menuOpen ? 'ui-topnav-shell--menu-open' : '',
     className,
   ]
@@ -118,7 +150,13 @@ export default function TopNav({
 
   return (
     <>
-      <div className={shellClasses}>
+      <div
+        className={shellClasses}
+        onFocus={() => setFocusInside(true)}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setFocusInside(false)
+        }}
+      >
         <header className={barClasses}>
           <Link
             to="/"

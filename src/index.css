@@ -382,20 +382,16 @@ a {
   z-index: 200;
 }
 
-/* In-app browsers (Telegram, Instagram) can show page content above the
-   viewport, under their own collapsing toolbar. The fixed nav sits at the
-   viewport top, so photos scrolled past showed through above it. This band
-   fills that area with the page colour. In normal browsers it sits off
-   screen above the viewport and is never seen. */
-.ui-topnav-shell::before {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: 100%;
-  left: 0;
-  height: 240px;
-  background: var(--cream);
-  pointer-events: none;
+/* Phones: the bar slides up while scrolling down and comes back on any
+   scroll up (TopNav). In Telegram's and other in-app browsers, their
+   see-through header shows the page above our bar; with the bar tucked away
+   that strip just reads as the page scrolling. */
+.ui-topnav-shell {
+  transition: transform 0.25s ease;
+}
+
+.ui-topnav-shell--hidden {
+  transform: translateY(-100%);
 }
 
 .ui-topnav-shell--compact {
@@ -592,6 +588,7 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ui-topnav-shell,
   .ui-topnav,
   .ui-topnav-spacer,
   .ui-topnav__mark,

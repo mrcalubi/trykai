@@ -166,4 +166,81 @@ describe('TopNav', () => {
     })
     expect(bar).not.toHaveClass('ui-topnav--compact')
   })
+
+  describe('on phones', () => {
+    function scrollTo(y) {
+      act(() => {
+        Object.defineProperty(window, 'scrollY', { configurable: true, value: y })
+        window.dispatchEvent(new Event('scroll'))
+      })
+    }
+
+    function withPhone(matches = true) {
+      const original = window.matchMedia
+      window.matchMedia = vi.fn(() => ({ matches }))
+      return () => {
+        window.matchMedia = original
+      }
+    }
+
+    it('slides away while scrolling down and comes back on any scroll up', () => {
+      const restore = withPhone()
+      scrollTo(0)
+      renderTopNav()
+      const shell = screen.getByRole('banner').parentElement
+
+      scrollTo(100)
+      expect(shell).not.toHaveClass('ui-topnav-shell--hidden')
+      scrollTo(400)
+      expect(shell).toHaveClass('ui-topnav-shell--hidden')
+      scrollTo(403)
+      expect(shell).toHaveClass('ui-topnav-shell--hidden')
+      scrollTo(380)
+      expect(shell).not.toHaveClass('ui-topnav-shell--hidden')
+      scrollTo(600)
+      expect(shell).toHaveClass('ui-topnav-shell--hidden')
+      scrollTo(60)
+      expect(shell).not.toHaveClass('ui-topnav-shell--hidden')
+      restore()
+      scrollTo(0)
+    })
+
+    it('stays put while the menu is open or the keyboard is in the bar', async () => {
+      const restore = withPhone()
+      scrollTo(0)
+      renderTopNav()
+      const shell = screen.getByRole('banner').parentElement
+      scrollTo(500)
+      expect(shell).toHaveClass('ui-topnav-shell--hidden')
+
+      act(() => {
+        screen.getByRole('button', { name: 'Open menu' }).focus()
+      })
+      expect(shell).not.toHaveClass('ui-topnav-shell--hidden')
+      act(() => {
+        screen.getByRole('button', { name: 'Open menu' }).blur()
+      })
+      expect(shell).toHaveClass('ui-topnav-shell--hidden')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+      act(() => {
+        document.activeElement.blur()
+      })
+      expect(shell).not.toHaveClass('ui-topnav-shell--hidden')
+      restore()
+      scrollTo(0)
+    })
+
+    it('never hides on wider screens', () => {
+      const restore = withPhone(false)
+      scrollTo(0)
+      renderTopNav()
+      const shell = screen.getByRole('banner').parentElement
+      scrollTo(500)
+      scrollTo(900)
+      expect(shell).not.toHaveClass('ui-topnav-shell--hidden')
+      restore()
+      scrollTo(0)
+    })
+  })
 })
