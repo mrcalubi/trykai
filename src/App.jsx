@@ -40,6 +40,7 @@ import CancellationPolicy from './pages/CancellationPolicy'
 import DisputePolicy from './pages/DisputePolicy'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
+import Unsubscribe from './pages/Unsubscribe'
 import StyleGuide from './pages/StyleGuide'
 import NotFound from './pages/NotFound'
 import RouteError from './components/RouteError'
@@ -194,6 +195,7 @@ function appRoutes() {
         <Route path="/dispute-policy" handle={{ title: 'Dispute Policy' }} element={<DisputePolicy />} />
         <Route path="/terms" handle={{ title: 'Terms of Service' }} element={<Terms />} />
         <Route path="/privacy" handle={{ title: 'Privacy Policy' }} element={<Privacy />} />
+        <Route path="/unsubscribe" handle={{ title: 'Unsubscribe' }} element={<Unsubscribe />} />
         <Route path="/style-guide" handle={{ title: 'Component preview' }} element={<StyleGuide />} />
         <Route path="*" handle={{ title: 'Page not found' }} element={<NotFound />} />
       </Route>

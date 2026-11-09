@@ -2,7 +2,7 @@ export default function Privacy() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Privacy Policy</h1>
-      <p className="policy-page__updated">Last updated: 4 November 2026</p>
+      <p className="policy-page__updated">Last updated: 9 November 2026</p>
 
       <p>
         This policy explains how TryKai collects, uses, shares and protects your
@@ -85,6 +85,16 @@ export default function Privacy() {
               <td>ID document and selfie</td>
               <td>When you verify to host by upload</td>
               <td>Same as above</td>
+            </tr>
+            <tr>
+              <td>Your choice about offer emails</td>
+              <td>Signup, or later in Settings</td>
+              <td>
+                To email you new sessions and offers, at most once a week, only
+                if you agreed. Every such email has a one-tap unsubscribe link,
+                and you can turn them off in Settings at any time. Booking
+                emails and reminders are not affected
+              </td>
             </tr>
             <tr>
               <td>Basic usage data (pages viewed, device type)</td>

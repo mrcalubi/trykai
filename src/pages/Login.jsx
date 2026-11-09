@@ -26,6 +26,7 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [marketingOptIn, setMarketingOptIn] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -133,7 +134,12 @@ export default function Login() {
       email,
       password,
       options: {
-        data: { full_name: name, display_name: handle, terms_accepted: true },
+        data: {
+          full_name: name,
+          display_name: handle,
+          terms_accepted: true,
+          marketing_opt_in: marketingOptIn,
+        },
         emailRedirectTo: confirmRedirectUrl(),
       },
     })
@@ -347,6 +353,17 @@ export default function Login() {
             minLength={6}
             autoComplete={isSignup ? 'new-password' : 'current-password'}
           />
+
+          {isSignup && (
+            <label className="checkbox-label checkbox-label--agree">
+              <input
+                type="checkbox"
+                checked={marketingOptIn}
+                onChange={(e) => setMarketingOptIn(e.target.checked)}
+              />
+              <span>Send me new sessions and offers (at most once a week)</span>
+            </label>
+          )}
 
           {isSignup && (
             <label className="checkbox-label checkbox-label--agree">
