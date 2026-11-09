@@ -2,7 +2,7 @@ import { guestFacingPriceCents } from '../lib/pricing'
 import { formatCents } from '../lib/cancellationPolicy'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import { Link, Route } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Home from './Home'
@@ -574,6 +574,27 @@ describe('Home filters', () => {
     await user.click(screen.getByRole('link', { name: 'TryKai home' }))
     expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
     expect(await screen.findByRole('heading', { name: 'Boxing basics' })).toBeInTheDocument()
+  })
+})
+
+describe('Home loading', () => {
+  it('shows the cards without waiting for ratings, then fills the rating in', async () => {
+    givenListings([LATTE])
+    let resolveRatings
+    supabase.rpc.mockImplementation((name) =>
+      name === 'listing_ratings'
+        ? new Promise((resolve) => {
+            resolveRatings = resolve
+          })
+        : Promise.resolve({ data: [], error: null }),
+    )
+    renderWithRouter(<Home />)
+    expect(await screen.findByText('Latte art')).toBeInTheDocument()
+    expect(resolveRatings).toBeTypeOf('function')
+    await act(async () => {
+      resolveRatings({ data: [{ listing_id: LATTE.id, average: 4.8, review_count: 5 }], error: null })
+    })
+    expect(await screen.findByText(/4\.8/)).toBeInTheDocument()
   })
 })
 

@@ -136,6 +136,8 @@ export default function Home() {
   const categoryFilter = filtersForHome(searchParams, navigationType).category
 
   useEffect(() => {
+    let cancelled = false
+
     async function fetchListings() {
       const { data, error: fetchError } = await withIssuedAtRetry(() =>
         supabase
@@ -168,6 +170,7 @@ export default function Home() {
           .order('created_at', { ascending: false })
       )
 
+      if (cancelled) return
       if (fetchError) {
         if (!readBrowseCache()) {
           setError(PAGE_LOAD_ERROR)
@@ -180,28 +183,33 @@ export default function Home() {
       }
 
       const rows = sortListingsForBrowse(listingsForGuestBrowse(data ?? []))
+      // Show the cards (and start their photos) now. Ratings and keen counts
+      // fill in a round trip later instead of holding the whole page back.
+      setListings(rows)
+      setLoading(false)
+
       const listingIds = rows.map((listing) => listing.id)
       const noDateIds = rows.filter((listing) => !nextSessionLabel(listing)).map((listing) => listing.id)
-      let ratingRows = []
-      let keenRows = []
-      if (listingIds.length > 0) {
-        const [ratingResult, keenResult] = await Promise.all([
-          supabase.rpc('listing_ratings', { listing_ids: listingIds }),
-          noDateIds.length > 0
-            ? supabase.rpc('listing_keen_counts', { p_listing_ids: noDateIds })
-            : Promise.resolve({ data: [] }),
-        ])
-        ratingRows = ratingResult.data ?? []
-        keenRows = keenResult.data ?? []
+      if (listingIds.length === 0) {
+        setRatings({})
+        setKeenCounts({})
+        return
       }
-
-      setListings(rows)
-      setRatings(ratingsByListingId(ratingRows))
-      setKeenCounts(keenCountsById(keenRows))
-      setLoading(false)
+      const [ratingResult, keenResult] = await Promise.all([
+        supabase.rpc('listing_ratings', { listing_ids: listingIds }),
+        noDateIds.length > 0
+          ? supabase.rpc('listing_keen_counts', { p_listing_ids: noDateIds })
+          : Promise.resolve({ data: [] }),
+      ])
+      if (cancelled) return
+      setRatings(ratingsByListingId(ratingResult.data ?? []))
+      setKeenCounts(keenCountsById(keenResult.data ?? []))
     }
 
     fetchListings()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
