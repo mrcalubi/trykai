@@ -461,6 +461,7 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00050` (who's coming) | Applied | Applied | Production 7 November. `supabase/tests/booking_companions_check.sql` passed. |
 | `00051` (review reminders) | Applied | Applied | Staging and production 7 November, after #259 merged. `supabase/tests/review_reminders_check.sql` passed on staging. |
 | `00052` (Telegram host updates) | Not applied | Not applied | **Apply on staging, then production, before merging the release.** Additive: `users.telegram_chat_id`, `users.telegram_linked_at`, `telegram_link_codes`, `my_telegram()`. Then run `supabase/tests/telegram_check.sql` (begin/rollback). Nothing is sent until the Telegram secrets are set (OPERATIONS.md, Telegram host updates); until then Settings shows no Telegram card. |
+| `00053` (Day One guests) | Not applied | Not applied | **Apply on staging, then production, before merging the release.** Needs `00050`. Additive: `day_one_guests`, two triggers (bookings confirmed, seat claimed), `day_one_number()` and `day_one_status()` for the profile badge and banner. The backfill numbers everyone with a confirmed seat so far, oldest first. Then run `supabase/tests/day_one_check.sql` (begin/rollback). Without it the banner and badge simply do not show. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
@@ -963,6 +964,23 @@ order by s.starts_at desc;
 ```
 
 The Edge Function log line `send-reminders {...}` includes `review_emails_sent`, `review_emails_failed` and `review_reminders_skipped` (true means `00051` is not applied).
+
+# Day One guests and bring a friend
+
+**Day One:** the first 50 people with a confirmed seat before 1 December 2026 (Singapore time) get a numbered "Day One #N" badge on their profile for good. Booking it or taking a friend's seat both count. The banner on browse, listing and profile pages rotates between "Be one of our first 50 guests" (with a days-left chip) and "Bring a friend, skip their booking fee"; tapping it shows the details. Below 20 spots it says "Only N Day One spots left". It disappears at launch.
+
+Who has a number (production SQL rules apply):
+
+```sql
+select d.number, u.display_name, d.created_at
+from public.day_one_guests d
+join public.users u on u.id = d.user_id
+order by d.number;
+```
+
+To take a number back (a founder or a test account): delete that row. Nobody else's number changes; the freed number goes to the next guest who books. Do it before launch week so the spot is not wasted.
+
+**Bring a friend:** a booking pays the booking fee once, for the first seat. Friends' seats have none. Nothing to switch on; it applies to every new booking. On a big group paying by card TryKai can make nothing or lose up to about S$3 to Stripe (DECISIONS.md, 8 November 2026).
 
 # Telegram host updates
 

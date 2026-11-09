@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  bookTogetherSavingCents,
+  seatBookingFeeCents,
   CARD_FEE_FLOOR_CENTS,
   CARD_FEE_RATE,
   HOST_FEE_FREE_BOOKINGS,
@@ -345,7 +347,10 @@ describe('prepareBooking', () => {
       ok: true,
       guestsCount: 2,
       paymentRail: 'card',
-      ...calculateGuestCharge(discountedLessonCents(2500, 2), 'card'),
+      // 2 × S$23.75 (5% group discount) + one booking fee (12% of one seat)
+      lessonAmount: 4750,
+      totalAmount: 5100,
+      platformFee: 350,
     })
   })
 
@@ -360,7 +365,10 @@ describe('prepareBooking', () => {
       ok: true,
       guestsCount: 4,
       paymentRail: 'card',
-      ...calculateGuestCharge(10000, 'card'),
+      // 4 × S$25, one booking fee of S$3 for the first seat only
+      lessonAmount: 10000,
+      totalAmount: 10300,
+      platformFee: 300,
     })
   })
 
@@ -1000,5 +1008,47 @@ describe('prepareCheckoutAddons', () => {
         priorConfirmedCount: 0,
       }).hostPayoutAmount,
     ).toBe(4500)
+  })
+})
+
+describe('bring a friend: one booking fee per booking', () => {
+  it('charges the booking fee on the first seat only', () => {
+    expect(seatBookingFeeCents(1500)).toBe(250)
+    expect(seatBookingFeeCents(5000)).toBe(600)
+    // 3 × S$15: S$45 + S$2.50 = S$47.50, rounded up to S$48
+    expect(calculateGuestCharge(4500, 'card', 3)).toEqual({ lessonAmount: 4500, totalAmount: 4800, platformFee: 300 })
+    // one seat is unchanged
+    expect(calculateGuestCharge(1500, 'card', 1)).toEqual(calculateGuestCharge(1500, 'card'))
+    expect(calculateGuestCharge(1500, 'card', 0)).toEqual(calculateGuestCharge(1500, 'card'))
+  })
+
+  it('never lets the PayNow discount reach the host\'s money', () => {
+    // 10 × S$15: S$152.50 → S$153; 2% off would be S$149.94, below the S$150 lesson
+    const paynow = calculateGuestCharge(15000, 'paynow', 10)
+    expect(paynow.totalAmount).toBe(15000)
+    expect(paynow.platformFee).toBe(0)
+    const withAddons = calculateBookingCharge({
+      lessonCents: 15000,
+      addons: [{ hostUnitCents: 500, quantity: 10 }],
+      rail: 'paynow',
+      seats: 10,
+    })
+    expect(withAddons.totalAmount).toBeGreaterThanOrEqual(15000 + withAddons.addonsAmount)
+    expect(withAddons.platformFee).toBeGreaterThanOrEqual(0)
+  })
+
+  it('passes seats through calculateBookingCharge', () => {
+    const together = calculateBookingCharge({ lessonCents: 3000, rail: 'card', seats: 2 })
+    expect(together.totalAmount).toBe(3300)
+    expect(calculateBookingCharge({ lessonCents: 3000, rail: 'card' }).totalAmount).toBe(3400)
+  })
+
+  it('works out what booking together saves', () => {
+    // alone: S$18 each = S$36. Together: 2 × S$14.25 (5% off) + S$2.50 = S$31
+    expect(bookTogetherSavingCents(1500, 2, true)).toBe(500)
+    // no group discount: S$36 vs S$32.50 → S$33
+    expect(bookTogetherSavingCents(1500, 2, false)).toBe(300)
+    expect(bookTogetherSavingCents(1500, 1, true)).toBe(0)
+    expect(bookTogetherSavingCents(1500, Number.NaN, true)).toBe(0)
   })
 })

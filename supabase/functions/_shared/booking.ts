@@ -144,24 +144,59 @@ export function addonGuestUnitCents(hostCents: number): number {
 }
 
 /**
- * Card path: 12% of the lesson with a S$2.50 floor, then the all-in total is
- * rounded UP to the next whole dollar. PayNow takes `paynowDiscountRate` off
- * that same all-in total. `platformFee` is always `totalAmount - lessonAmount`
- * so cancellation maths that treat the lesson as `total - platform_fee` stay
- * correct.
+ * Booking fee for one seat: 12% of that seat's lesson price, S$2.50 floor.
+ * Bring a friend (DECISIONS.md, 8 November 2026): a booking pays this once,
+ * for the first seat, whatever the number of guests. Friends' seats carry no
+ * booking fee.
+ */
+export function seatBookingFeeCents(seatLessonCents: number): number {
+  return Math.max(Math.round(seatLessonCents * CARD_FEE_RATE), CARD_FEE_FLOOR_CENTS)
+}
+
+/**
+ * How much a group saves by booking together instead of each person booking
+ * alone at the one-seat price: the friends' booking fees plus any group
+ * discount, card prices. 0 for one guest.
+ */
+export function bookTogetherSavingCents(
+  pricePerPerson: number,
+  guestsCount: number,
+  groupPricing = true,
+): number {
+  const guests = Math.max(1, Math.floor(Number(guestsCount) || 1))
+  if (guests === 1) return 0
+  const alone = calculateGuestCharge(pricePerPerson, 'card').totalAmount * guests
+  const together = calculateGuestCharge(
+    discountedLessonCents(pricePerPerson, guests, groupPricing),
+    'card',
+    guests,
+  ).totalAmount
+  return Math.max(0, alone - together)
+}
+
+/**
+ * Card path: the booking fee for one seat (above) on top of the whole
+ * lesson, then the all-in total is rounded UP to the next whole dollar.
+ * `seats` is the number of guests in `lessonCents` (1 for a single seat, the
+ * default). PayNow takes `paynowDiscountRate` off that same all-in total but
+ * never below the lesson, so the discount can only come out of TryKai's fee.
+ * `platformFee` is always `totalAmount - lessonAmount` so cancellation maths
+ * that treat the lesson as `total - platform_fee` stay correct.
  */
 export function calculateGuestCharge(
   lessonCents: number,
   rail: PaymentRail = 'card',
+  seats = 1,
 ): GuestCharge {
-  const cardFee = Math.max(
-    Math.round(lessonCents * CARD_FEE_RATE),
-    CARD_FEE_FLOOR_CENTS,
-  )
+  const seatCount = Math.max(1, Math.floor(Number(seats) || 1))
+  const cardFee = seatBookingFeeCents(Math.round(lessonCents / seatCount))
   const cardTotal = roundUpToDollar(lessonCents + cardFee)
 
   if (rail === 'paynow') {
-    const totalAmount = Math.round(cardTotal * (1 - paynowDiscountRate(cardTotal)))
+    const totalAmount = Math.max(
+      Math.round(cardTotal * (1 - paynowDiscountRate(cardTotal))),
+      lessonCents,
+    )
     return {
       lessonAmount: lessonCents,
       totalAmount,
@@ -202,7 +237,7 @@ export type BookingCharge = GuestCharge & {
 }
 
 /**
- * Lesson card total stays as today (12%, S$2.50 floor, round up). Add-ons
+ * Lesson card total as calculateGuestCharge (one booking fee, round up). Add-ons
  * sit on top at their own 12% (no floor). PayNow discounts the combined
  * card total. Hosts keep every add-on dollar; the platform fee is
  * total − lesson − addons.
@@ -211,9 +246,11 @@ export function calculateBookingCharge(options: {
   lessonCents: number
   addons?: BookingAddonLine[]
   rail: PaymentRail
+  /** Guests in `lessonCents`. The booking fee is charged on one seat only. */
+  seats?: number
 }): BookingCharge {
   const addons = options.addons ?? []
-  const lesson = calculateGuestCharge(options.lessonCents, 'card')
+  const lesson = calculateGuestCharge(options.lessonCents, 'card', options.seats ?? 1)
   const cardLessonTotal = lesson.totalAmount
   const addonsGuestCents = addons.reduce(
     (sum, line) => sum + addonGuestUnitCents(line.hostUnitCents) * line.quantity,
@@ -224,10 +261,14 @@ export function calculateBookingCharge(options: {
     0,
   )
   const cardTotal = cardLessonTotal + addonsGuestCents
+  // PayNow never discounts into the host's money (lesson and add-ons).
   const totalAmount =
     options.rail === 'card'
       ? cardTotal
-      : Math.round(cardTotal * (1 - paynowDiscountRate(cardTotal)))
+      : Math.max(
+          Math.round(cardTotal * (1 - paynowDiscountRate(cardTotal))),
+          options.lessonCents + addonsAmount,
+        )
   return {
     lessonAmount: options.lessonCents,
     addonsAmount,
@@ -543,7 +584,7 @@ export function prepareBooking(
 
   const groupPricing = session.listings?.group_pricing !== false
   const lessonAmount = discountedLessonCents(pricePerPerson, guestsCount, groupPricing)
-  const charge = calculateGuestCharge(lessonAmount, paymentRail)
+  const charge = calculateGuestCharge(lessonAmount, paymentRail, guestsCount)
 
   return {
     ok: true,

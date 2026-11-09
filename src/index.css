@@ -10817,3 +10817,229 @@ body:has(.edit-profile__bar) .site-footer {
 .whos-coming .ui-button {
   width: 100%;
 }
+
+/* Soft-launch banner (LaunchBanner): one short line under the fixed nav,
+   rotating between Day One and bring-a-friend. Deep coral with white text
+   (5.7:1). Browse, listing and profile pages only. */
+.launch-banner {
+  color: #FFFFFF;
+  background: var(--coral-ink);
+}
+
+.launch-banner__bar {
+  display: flex;
+  align-items: center;
+  max-width: var(--page-max);
+  min-height: 44px;
+  margin: 0 auto;
+  padding: 0 calc(var(--gutter) - 8px) 0 var(--gutter);
+}
+
+.launch-banner__main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.launch-banner__message {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  animation: launch-banner-in 0.35s ease;
+}
+
+.launch-banner__text {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.launch-banner__chip {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--coral-ink);
+  background: #FFFFFF;
+  border-radius: 999px;
+}
+
+.launch-banner__dots {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.launch-banner__dots i {
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 50%;
+  opacity: 0.4;
+}
+
+.launch-banner__dots i.is-on {
+  opacity: 1;
+}
+
+.launch-banner__chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.launch-banner__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.launch-banner__close {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: 2px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.launch-banner__main:focus-visible,
+.launch-banner__close:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 2px;
+}
+
+.launch-banner__close:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.launch-banner__details {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 2px var(--gutter) 14px;
+}
+
+.launch-banner__details p {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #FFFFFF;
+}
+
+.launch-banner__highlight {
+  padding: 1px 8px;
+  font-weight: 800;
+  color: var(--coral-ink);
+  background: #FFFFFF;
+  border-radius: 999px;
+}
+
+.launch-banner__details-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-bottom: 0;
+  opacity: 0.95;
+}
+
+.launch-banner__link {
+  font-weight: 700;
+  color: #FFFFFF;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.launch-banner__text--short {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .launch-banner__text {
+    font-size: 13px;
+  }
+
+  .launch-banner__text--long,
+  .launch-banner__dots {
+    display: none;
+  }
+
+  .launch-banner__text--short {
+    display: inline;
+  }
+
+  .launch-banner__main {
+    gap: 8px;
+  }
+}
+
+@keyframes launch-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-banner__message {
+    animation: none;
+  }
+}
+
+/* Day One profile pill */
+.profile-pill--day-one {
+  color: var(--cream);
+  background: var(--navy);
+}
+
+/* Bring a friend: listing booking card and checkout */
+.bring-friend {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--success);
+  background: var(--success-bg);
+  border-radius: 12px;
+}
+
+.bring-friend strong {
+  font-weight: 800;
+}
+
+.bring-friend__icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.guest-stepper__saving {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--success);
+}

@@ -1309,6 +1309,23 @@ describe('Profile card layout', () => {
     expect(screen.queryByText('Founding host')).not.toBeInTheDocument()
   })
 
+  it('shows a Day One number when the guest has one', async () => {
+    givenRpcs({})
+    const base = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation(async (name, args) =>
+      name === 'day_one_number' ? { data: 7, error: null } : base(name, args),
+    )
+    const { unmount } = renderPage()
+    expect(await screen.findByText('Day One #7')).toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('day_one_number', { p_user_id: HOST_ID })
+    unmount()
+
+    givenRpcs({})
+    renderPage()
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(screen.queryByText(/Day One/)).not.toBeInTheDocument()
+  })
+
   it('paints the chosen banner colour, or the uploaded photo', async () => {
     givenHost({ banner_preset: 'coral' })
     const { unmount } = renderPage()
