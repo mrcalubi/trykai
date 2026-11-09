@@ -240,6 +240,14 @@ export function listingPageBody(listing, { pageUrl, origin, sessions = [], ratin
   return `<main><article>${parts.join('')}</article></main>`
 }
 
+function validFrom(session, listing) {
+  for (const value of [session?.created_at, listing?.created_at]) {
+    const time = Date.parse(value ?? '')
+    if (Number.isFinite(time)) return new Date(time).toISOString()
+  }
+  return null
+}
+
 /**
  * schema.org JSON-LD: the listing as a Service, and each upcoming session as
  * an Event with its own price and availability. Only public facts: the place
@@ -317,6 +325,8 @@ export function listingStructuredData(listing, { pageUrl, origin, sessions = [],
           priceCurrency: 'SGD',
           url: pageUrl,
           availability: full ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+          // When booking opened: the session's creation, else the listing's.
+          ...(validFrom(session, listing) ? { validFrom: validFrom(session, listing) } : {}),
         },
       }
     })
