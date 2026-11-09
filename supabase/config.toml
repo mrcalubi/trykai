@@ -591,3 +591,18 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/admin-listings/deno.json"
 entrypoint = "./functions/admin-listings/index.ts"
+
+# verify_jwt is false because the function checks the caller's JWT itself.
+[functions.telegram-link]
+enabled = true
+verify_jwt = false
+import_map = "./functions/telegram-link/deno.json"
+entrypoint = "./functions/telegram-link/index.ts"
+
+# verify_jwt is false because Telegram cannot send a JWT; the function checks
+# the X-Telegram-Bot-Api-Secret-Token header against TELEGRAM_WEBHOOK_SECRET.
+[functions.telegram-webhook]
+enabled = true
+verify_jwt = false
+import_map = "./functions/telegram-webhook/deno.json"
+entrypoint = "./functions/telegram-webhook/index.ts"

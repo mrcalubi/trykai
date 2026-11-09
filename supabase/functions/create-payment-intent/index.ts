@@ -166,6 +166,7 @@ Deno.serve(async (req) => {
       lessonCents: lessonAmount,
       addons: prepared.lines,
       rail: paymentRail,
+      seats: guestsCount,
     })
     const { totalAmount, platformFee, addonsAmount } = charge
     const addonNote = parseAddonNote(addon_note)

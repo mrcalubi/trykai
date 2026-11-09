@@ -24,6 +24,7 @@ import {
 } from '../lib/sessionCalendar'
 import {
   addonGuestUnitCents,
+  bookTogetherSavingCents,
   calculateBookingCharge,
   discountedLessonCents,
   groupPriceLabel,
@@ -58,6 +59,7 @@ import { BackRowActions } from '../components/BackButton'
 import ViewableAvatar from '../components/ViewableAvatar'
 import Button from '../components/ui/Button'
 import Icon from '../components/ui/Icon'
+import { formatCents } from '../lib/cancellationPolicy'
 import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
 import { usePageTitle } from '../lib/pageTitle'
@@ -560,6 +562,7 @@ export default function ListingDetail() {
       ),
       addons: pickedAddonLines(listingAddons, addonQuantities),
       rail: paymentRail,
+      seats: guestsCount,
     }).totalAmount
 
     setCheckoutRail(paymentRail)
@@ -639,11 +642,13 @@ export default function ListingDetail() {
     lessonCents,
     addons: pickedAddons,
     rail: 'card',
+    seats: guestsCount,
   })
   const paynowCharge = calculateBookingCharge({
     lessonCents,
     addons: pickedAddons,
     rail: 'paynow',
+    seats: guestsCount,
   })
   const cardPrice = checkoutSessionId
     ? cardCharge.totalAmount
@@ -684,6 +689,14 @@ export default function ListingDetail() {
         Math.min(checkoutSession.spots_remaining, MAX_GUESTS_PER_BOOKING),
       )
     : ''
+  // Bring a friend (DECISIONS.md, 8 November 2026): friends' seats skip the
+  // booking fee. Card prices, against everyone booking alone.
+  const friendSavingCents = bookTogetherSavingCents(listing.price_per_person, 2, groupPricing)
+  const togetherSavingCents = bookTogetherSavingCents(listing.price_per_person, guestsCount, groupPricing)
+  const maxBookable = checkoutSession
+    ? Math.min(checkoutSession.spots_remaining, MAX_GUESTS_PER_BOOKING)
+    : Math.min(Number(listing.max_guests) || MAX_GUESTS_PER_BOOKING, MAX_GUESTS_PER_BOOKING)
+  const canBringFriend = maxBookable > 1 && friendSavingCents > 0
 
   function renderDaySessions() {
     if (!monthSessions) {
@@ -843,7 +856,20 @@ export default function ListingDetail() {
                   <p className="guest-stepper__price">
                     {groupPriceLabel(listing.price_per_person, guestsCount, groupPricing, displayRail)}
                   </p>
-                  {nextHint ? (
+                  {guestsCount > 1 && togetherSavingCents > 0 ? (
+                    <p className="guest-stepper__saving">
+                      You save {formatCents(togetherSavingCents)} by booking together
+                    </p>
+                  ) : null}
+                  {guestsCount === 1 && canBringFriend ? (
+                    <button
+                      type="button"
+                      className="guest-stepper__hint"
+                      onClick={() => changeGuests(2)}
+                    >
+                      Add a friend and save {formatCents(friendSavingCents)}
+                    </button>
+                  ) : nextHint ? (
                     <button
                       type="button"
                       className="guest-stepper__hint"
@@ -1238,6 +1264,15 @@ export default function ListingDetail() {
               <FormattedPrice cents={checkoutPrice} />
               {!checkoutSessionId && <span className="detail-booking-card__unit"> / person</span>}
             </p>
+            {!checkoutSessionId && publicSessionRange && canBringFriend && !isOwnListing && (
+              <p className="bring-friend">
+                <Icon name="users" size={16} strokeWidth={2} className="bring-friend__icon" />
+                <span>
+                  <strong>Bring a friend, save {formatCents(friendSavingCents)}.</strong> Their seat skips
+                  the booking fee.
+                </span>
+              </p>
+            )}
             {!checkoutSessionId && publicSessionRange && (
               <p className="detail-booking-card__note">Pick a date, then a time</p>
             )}

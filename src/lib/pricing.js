@@ -8,6 +8,7 @@
 
 import {
   addonGuestUnitCents,
+  bookTogetherSavingCents,
   calculateBookingCharge,
   calculateGuestCharge,
   discountedLessonCents,
@@ -27,6 +28,7 @@ import { formatCents } from './cancellationPolicy'
 
 export {
   addonGuestUnitCents,
+  bookTogetherSavingCents,
   calculateBookingCharge,
   discountedLessonCents,
   discountedPerPersonCents,
@@ -48,6 +50,7 @@ export function guestFacingPriceCents(
   return calculateGuestCharge(
     discountedLessonCents(pricePerPersonCents, guestsCount, groupPricing),
     'card',
+    guestsCount,
   ).totalAmount
 }
 
@@ -67,6 +70,7 @@ export function paynowPriceCents(
   return calculateGuestCharge(
     discountedLessonCents(pricePerPersonCents, guestsCount, groupPricing),
     'paynow',
+    guestsCount,
   ).totalAmount
 }
 
@@ -86,6 +90,7 @@ export function checkoutPriceCents(
     lessonCents: discountedLessonCents(pricePerPersonCents, guestsCount, groupPricing),
     addons,
     rail,
+    seats: guestsCount,
   }).totalAmount
 }
 

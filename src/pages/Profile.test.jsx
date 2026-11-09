@@ -1235,6 +1235,35 @@ describe('Profile card layout', () => {
     expect(supabase.rpc).not.toHaveBeenCalledWith('my_profile_stats')
   })
 
+  it('keeps a host\'s guest side on their own profile once they have attended a session', async () => {
+    givenSignedIn(HOST_ID)
+    givenRpcs({
+      hostReviews: [makeReview({ rating: 5 })],
+      sessionsHeld: 2,
+      stats: { ...HOST_STATS, sessions_attended: 7, categories_tried: 3, reviews_written: 4 },
+    })
+    const { unmount } = renderPage()
+    const guestSide = await screen.findByTestId('profile-guest-stats')
+    expect(screen.getByText('As a guest')).toBeInTheDocument()
+    expect(guestSide).toHaveTextContent('7')
+    expect(guestSide).toHaveTextContent('Sessions attended')
+    expect(screen.getAllByText('Only you see these')).toHaveLength(1)
+    unmount()
+
+    givenRpcs({ hostReviews: [makeReview({ rating: 5 })], sessionsHeld: 2, stats: HOST_STATS })
+    renderPage()
+    await screen.findByTestId('profile-stats')
+    expect(screen.queryByTestId('profile-guest-stats')).not.toBeInTheDocument()
+  })
+
+  it('never shows the guest side to other people', async () => {
+    givenSignedIn(OTHER_ID)
+    givenRpcs({ hostReviews: [], sessionsHeld: 2, stats: { ...HOST_STATS, sessions_attended: 7 } })
+    renderPage()
+    await screen.findByTestId('profile-stats')
+    expect(screen.queryByText('As a guest')).not.toBeInTheDocument()
+  })
+
   it('fills a new host profile with placeholders that point at the next step', async () => {
     givenSignedIn(HOST_ID)
     givenHost({ display_name: 'Priya' })
@@ -1307,6 +1336,23 @@ describe('Profile card layout', () => {
     renderPage()
     await screen.findByRole('heading', { name: 'Mei', level: 1 })
     expect(screen.queryByText('Founding host')).not.toBeInTheDocument()
+  })
+
+  it('shows a Day One number when the guest has one', async () => {
+    givenRpcs({})
+    const base = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation(async (name, args) =>
+      name === 'day_one_number' ? { data: 7, error: null } : base(name, args),
+    )
+    const { unmount } = renderPage()
+    expect(await screen.findByText('Day One #7')).toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('day_one_number', { p_user_id: HOST_ID })
+    unmount()
+
+    givenRpcs({})
+    renderPage()
+    await screen.findByRole('heading', { name: 'Mei', level: 1 })
+    expect(screen.queryByText(/Day One/)).not.toBeInTheDocument()
   })
 
   it('paints the chosen banner colour, or the uploaded photo', async () => {

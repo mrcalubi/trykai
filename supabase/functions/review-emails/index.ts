@@ -15,6 +15,7 @@ import {
   type ReviewNoteRow,
   type ReviewPerson,
 } from '../_shared/reviewEmails.ts'
+import { notifyUserTelegram } from '../_shared/telegram.ts'
 
 type UserRow = ReviewPerson
 
@@ -114,6 +115,7 @@ Deno.serve(async (req) => {
       siteUrl: Deno.env.get('SITE_URL') ?? 'https://trykai.sg',
       apiKey: Deno.env.get('RESEND_API_KEY'),
       opsEmail: Deno.env.get('ADMIN_NOTIFY_EMAIL') || 'hello@trykai.sg',
+      notifyHost: (message) => notifyUserTelegram(admin, hostId, message),
       claimOtherParty: async () => {
         const { data: claimed } = await admin
           .from('reviews')

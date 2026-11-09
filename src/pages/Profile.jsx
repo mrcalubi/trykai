@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { dayOneNumber } from '../lib/dayOne'
 import { AuthedUserContext } from '../lib/authedUser'
 import { publicName } from '../lib/publicName'
 import { usePageTitle } from '../lib/pageTitle'
@@ -274,16 +275,17 @@ function HostStats({ isOwn, reviews, sessionsHeld, stats, nextSession }) {
   )
 }
 
-function GuestStats({ stats }) {
+function GuestStats({ stats, title = '', note = true }) {
   if (!stats) return null
   return (
     <div className="profile-stats">
-      <div className="stat-grid stat-grid--3" data-testid="profile-stats">
+      {title ? <p className="eyebrow profile-stats__title">{title}</p> : null}
+      <div className="stat-grid stat-grid--3" data-testid={title ? 'profile-guest-stats' : 'profile-stats'}>
         <StatCard tone="blue" icon="ticket" value={stats.sessionsAttended} label="Sessions attended" />
         <StatCard tone="coral" icon="compass" value={stats.categoriesTried} label="Things tried" />
         <StatCard tone="green" icon="pen" value={stats.reviewsWritten} label="Reviews written" />
       </div>
-      <PrivateNote />
+      {note ? <PrivateNote /> : null}
     </div>
   )
 }
@@ -404,6 +406,7 @@ export default function Profile() {
   const [openSessions, setOpenSessions] = useState([])
   const [sessionsHeld, setSessionsHeld] = useState(0)
   const [founding, setFounding] = useState(false)
+  const [dayOne, setDayOne] = useState(null)
   const [stats, setStats] = useState(null)
   const [ratings, setRatings] = useState({})
   const [reviews, setReviews] = useState([])
@@ -497,7 +500,7 @@ export default function Profile() {
       const viewingOwn = isOwner && viewParam !== 'public'
       const now = Date.now()
 
-      const [listingsResult, reviewsResult, fromHostsResult, heldResult, foundingResult, statsResult] =
+      const [listingsResult, reviewsResult, fromHostsResult, heldResult, foundingResult, statsResult, dayOneResult] =
         await Promise.all([
           supabase
             .from('listings')
@@ -517,6 +520,7 @@ export default function Profile() {
           viewingOwn
             ? supabase.rpc('my_profile_stats')
             : Promise.resolve({ data: null, error: null }),
+          dayOneNumber(id),
         ])
 
       let listingRows = []
@@ -559,6 +563,7 @@ export default function Profile() {
 
       setSessionsHeld(heldResult.error ? 0 : sessionsHeldCount(heldResult.data))
       setFounding(!foundingResult.error && rpcBoolean(foundingResult.data))
+      setDayOne(dayOneResult)
       setStats(profileStatsFromRpc(statsResult.data, statsResult.error))
 
       const listingIds = listingRows.map((listing) => listing.id)
@@ -765,6 +770,7 @@ export default function Profile() {
             <div className="profile-header__name-row">
               <h1 className="profile-header__name">{givenName}</h1>
               {founding ? <ProfilePill kind="founding" /> : null}
+              {dayOne ? <ProfilePill kind="dayOne" number={dayOne} /> : null}
               {verified ? <ProfilePill kind="verified" /> : null}
               {isNewHost ? <ProfilePill kind="new" /> : null}
             </div>
@@ -814,6 +820,10 @@ export default function Profile() {
               />
             ) : isOwn ? (
               <GuestStats stats={stats} />
+            ) : null}
+            {/* A guest who becomes a host keeps their guest side (only they see it). */}
+            {isHost && isOwn && stats?.sessionsAttended > 0 ? (
+              <GuestStats stats={stats} title="As a guest" note={false} />
             ) : null}
             {about || isOwn ? (
               <div className="profile-about">

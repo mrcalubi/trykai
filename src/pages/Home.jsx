@@ -8,7 +8,8 @@ import Icon from '../components/ui/Icon'
 import { categoryIconName } from '../components/ui/categoryIcon'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { browseFlag, keenCountsById } from '../lib/keen'
-import { formatGuestFacingPrice } from '../lib/pricing'
+import { formatGuestFacingPrice, guestFacingPriceCents } from '../lib/pricing'
+import { formatCents } from '../lib/cancellationPolicy'
 import { listingsForGuestBrowse, sortListingsForBrowse } from '../lib/listingSort'
 import { filterNarrows, locationLabel, showLocationFilter, showNewFlags, visibleCategories } from '../lib/browseUi'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
@@ -30,11 +31,22 @@ const QUICK_FILTERS = [
   { id: 'budget', label: 'Under $30', matches: isBudgetFriendly },
 ]
 
-const TRUST_POINTS = [
-  { icon: 'shield', label: 'ID-verified hosts' },
-  { icon: 'wallet', label: 'Most sessions under S$30' },
-  { icon: 'pin', label: 'Exact address after booking' },
-]
+/**
+ * The price chip is worked out from the listings on the page, so it is always
+ * true ("Most sessions under S$30" stopped being true with 3 of 6 listings).
+ */
+function trustPoints(listings) {
+  const prices = (listings ?? [])
+    .map((listing) => Number(listing.price_per_person))
+    .filter((cents) => Number.isFinite(cents) && cents > 0)
+    .map((cents) => guestFacingPriceCents(cents))
+  const from = prices.length ? Math.min(...prices) : null
+  return [
+    { icon: 'shield', label: 'ID-verified hosts' },
+    { icon: 'wallet', label: from ? `Sessions from ${formatCents(from)}` : 'Small-group sessions' },
+    { icon: 'pin', label: 'Exact address after booking' },
+  ]
+}
 
 const STEPS = [
   {
@@ -321,7 +333,7 @@ export default function Home() {
               Solo, with friends, or on a date. Your next hobby awaits.
             </p>
             <ul className="trust-list" aria-label="Why book on TryKai">
-              {TRUST_POINTS.map((point) => (
+              {trustPoints(listings).map((point) => (
                 <li key={point.label} className="trust-list__item">
                   <Icon name={point.icon} size={18} />
                   {point.label}

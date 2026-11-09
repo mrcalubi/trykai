@@ -1060,8 +1060,8 @@ describe('ListingDetail booking', () => {
     await user.click(await screen.findByRole('button', { name: 'Book' }))
     expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('Save 3%')
 
-    await user.click(screen.getByRole('button', { name: 'Add 1 more for 5% off' }))
-    expect(screen.getByRole('radio', { name: /^Card/ })).toHaveTextContent('$96')
+    await user.click(screen.getByRole('button', { name: 'Add a friend and save $11' }))
+    expect(screen.getByRole('radio', { name: /^Card/ })).toHaveTextContent('$91')
     expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('Save 2%')
     expect(screen.getByRole('radio', { name: /PayNow/ })).not.toHaveTextContent('Save 3%')
   })
@@ -1441,21 +1441,31 @@ describe('ListingDetail booking', () => {
     await user.click(cardRail())
 
     expect(screen.getByText('$28 per person')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add 1 more for 5% off' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add a friend and save $5' })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /^Card/ })).toHaveTextContent('$28')
 
-    await user.click(screen.getByRole('button', { name: 'Add 1 more for 5% off' }))
-    expect(screen.getByText('$27 each · 5% group discount')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add a friend and save $5' }))
+    expect(screen.getByText('$25.50 each · 5% group discount')).toBeInTheDocument()
+    expect(screen.getByText('You save $5 by booking together')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add 1 more for 10% off' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Add 1 more for 10% off' }))
     await user.click(screen.getByRole('button', { name: 'Add 1 more for 15% off' }))
 
-    expect(screen.getByText('$24 each · 15% group discount')).toBeInTheDocument()
+    expect(screen.getByText('$22 each · 15% group discount')).toBeInTheDocument()
+    expect(screen.getByText('You save $24 by booking together')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Add 1 more/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: /^Card/ })).toHaveTextContent('$96')
-    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('$96')
-    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('$94.08')
+    expect(screen.getByRole('radio', { name: /^Card/ })).toHaveTextContent('$88')
+    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('$88')
+    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('$86.24')
+  })
+
+  it('tells guests a friend saves before they pick a session', async () => {
+    givenListing(makeListing({ price_per_person: 1500 }))
+    givenSessions([makeSession({ id: 'session-7', spots_remaining: 4 })])
+    renderPage()
+    expect(await screen.findByText('Bring a friend, save $5.')).toBeInTheDocument()
+    expect(screen.getByText(/Their seat skips/)).toBeInTheDocument()
   })
 
   it('sends the chosen guest count to create-payment-intent', async () => {
@@ -1463,7 +1473,7 @@ describe('ListingDetail booking', () => {
     givenSessions([makeSession({ id: 'session-7', starts_at: hoursFromNow(72), spots_remaining: 3 })])
     givenSignedIn()
     supabase.functions.invoke.mockResolvedValue({
-      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 9600 },
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 9100 },
       error: null,
     })
     const { user } = renderPage()

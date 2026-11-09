@@ -92,7 +92,14 @@ export function reviewReminderEmail(
 
 export async function sendReviewReminders(
   admin: RpcClient,
-  options: { apiKey: string | undefined; siteUrl?: string; cap: number; send?: typeof sendResendEmail },
+  options: {
+    apiKey: string | undefined
+    siteUrl?: string
+    cap: number
+    send?: typeof sendResendEmail
+    /** Host Telegram copy (00052), called after a host email. Must not throw. */
+    onHostSent?: (row: ReviewReminderRow) => Promise<unknown>
+  },
 ): Promise<ReviewReminderSummary> {
   const summary: ReviewReminderSummary = {
     review_emails_sent: 0,
@@ -123,6 +130,14 @@ export async function sendReviewReminders(
     } catch (err) {
       summary.review_emails_failed += 1
       console.error('review reminder failed', row.kind, err instanceof Error ? err.message : err)
+      continue
+    }
+    if (options.onHostSent && (row.kind === 'host_prompt' || row.kind === 'host_nudge')) {
+      try {
+        await options.onHostSent(row)
+      } catch (err) {
+        console.error('review reminder telegram failed', err instanceof Error ? err.message : err)
+      }
     }
   }
   return summary

@@ -69,7 +69,10 @@ checks(migration, what, applied) as (
     ('00049', 'reviews locked (own rows only)',
       exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'reviews' and policyname = 'Reviewers can read their own reviews')
       and not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'reviews' and policyname = 'Anyone can view reviews')),
-    ('00050', 'booking_guests table', to_regclass('public.booking_guests') is not null)
+    ('00050', 'booking_guests table', to_regclass('public.booking_guests') is not null),
+    ('00051', 'claim_review_reminders()', exists (select 1 from f where name = 'claim_review_reminders')),
+    ('00052', 'telegram_link_codes table', to_regclass('public.telegram_link_codes') is not null),
+    ('00053', 'day_one_guests table', to_regclass('public.day_one_guests') is not null)
 )
 select migration, case when applied then 'applied' else 'MISSING' end as status, what
 from checks

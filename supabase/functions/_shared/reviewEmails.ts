@@ -11,6 +11,7 @@ import {
   reviewPrivateNoteOpsSubject,
   sendResendEmail,
 } from './email.ts'
+import { telegramGuestReviewed, type TelegramMessage } from './telegram.ts'
 
 export type ReviewEmailRow = {
   id: string
@@ -67,6 +68,8 @@ export async function sendReviewFollowUpEmails(options: {
   claimOtherParty: () => Promise<boolean>
   claimNote: (noteId: string) => Promise<boolean>
   sendEmail?: typeof sendResendEmail
+  /** Telegram copy of the host nudge (00052). Errors are swallowed. */
+  notifyHost?: (message: TelegramMessage) => Promise<unknown>
   siteUrl: string
   apiKey: string | undefined
   opsEmail?: string
@@ -108,6 +111,18 @@ export async function sendReviewFollowUpEmails(options: {
             deadline,
           }),
         })
+        if (options.notifyHost) {
+          try {
+            await options.notifyHost(telegramGuestReviewed({
+              guestName,
+              listingTitle: options.listingTitle,
+              deadline,
+              siteUrl: options.siteUrl,
+            }))
+          } catch (err) {
+            console.error('review telegram failed', err instanceof Error ? err.message : err)
+          }
+        }
       } else {
         await send({
           apiKey: options.apiKey,

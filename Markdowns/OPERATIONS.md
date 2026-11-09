@@ -455,14 +455,13 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00040` (host_sessions_held) | Applied | Applied | Apply on staging, then production, before merging the profile card layout. After `00039`. |
 | `00042` (listing add-ons) | Applied | Applied | Host editor. Apply before `00043`. |
 | `00043` (booking add-ons) | Applied | Applied | After `00042`. Payouts are unchanged: add-ons ride inside `host_payout_amount`. |
-| `00044` (reschedule) | Applied (first version, with the foreign key) | Not applied | After `00043`. Caleb applies. Columns plus `reschedule_booking`. Deploy `reschedule-booking`. |
-| `00045` (drop reschedule FK) | Not applied | Not applied | Right after `00044`, both environments. Drops the second bookings → sessions key that made every bookings/sessions embed ambiguous (PGRST201). No-op where 00044 is the fixed version. |
-| `00046` (booking cutoff and arrival) | Not applied | Not applied | After `00045`. Caleb applies. Cutoff, How to find me, day-of number, `booking_host_contact`, `listing_arrival_instructions`; replaces `my_account` and `reschedule_booking`. |
-| `00047` (review photos) | Not applied | Not applied | **Apply on staging before merging the review-photos PR.** After `00046`. Caleb applies. `reviews.photo_paths`, public insert-only `review-photos` bucket, `reviews_for_listing` / `reviews_for_host` return `photo_paths`. |
-| `00048` (two-way reviews) | Not applied | Not applied | **Apply on staging, then production, BEFORE merging the two-way-reviews release.** After `00047`. Additive: reveal columns, `post_review`, `review_notes`, public readers. Does not revoke `reviews` grants. Then run `supabase/tests/two_way_reviews_check.sql` in the staging SQL Editor (begin/rollback). |
-| `00051` (review reminders) | Not applied | Not applied | **Apply on staging, then production, before merging the release.** Needs `00048` and `00050`. Additive: four claim columns and `claim_review_reminders()`. No new secrets (rides on the `00037` hourly job). Then run `supabase/tests/review_reminders_check.sql` in the staging SQL Editor (begin/rollback, sends nothing). If the release is merged first, `send-reminders` skips review emails and keeps sending session reminders. |
-| `00050` (who's coming) | Not applied | Not applied | **Apply on staging, then production, BEFORE merging the who's-coming release.** After `00049` on staging; on production it needs `00048` (not `00049`). Additive: `booking_guests`, `booking_join_codes`, join/claim/leave RPCs, friends added to address and day-of number reads, host reviews of friends. Then run `supabase/tests/booking_companions_check.sql` in the staging SQL Editor (begin/rollback). |
-| `00049` (lock reviews) | Not applied | Not applied | **Apply ONLY after the two-way-reviews release is live on production.** Staging first, test, then production. Drops public SELECT/INSERT on `reviews`; authenticated sees own rows only. |
+| `00044` to `00047` | Applied | Applied | Applied with the late-October releases. |
+| `00048` (two-way reviews) | Applied | Applied | Production 7 November (the release had been merged first, so production was broken from 4 to 7 November). `supabase/tests/two_way_reviews_check.sql` passed. |
+| `00049` (lock reviews) | Applied | Applied | Production 7 November, after `00048` and `00050`. |
+| `00050` (who's coming) | Applied | Applied | Production 7 November. `supabase/tests/booking_companions_check.sql` passed. |
+| `00051` (review reminders) | Applied | Applied | Staging and production 7 November, after #259 merged. `supabase/tests/review_reminders_check.sql` passed on staging. |
+| `00052` (Telegram host updates) | Not applied | Not applied | **Apply on staging, then production, before merging the release.** Additive: `users.telegram_chat_id`, `users.telegram_linked_at`, `telegram_link_codes`, `my_telegram()`. Then run `supabase/tests/telegram_check.sql` (begin/rollback). Nothing is sent until the Telegram secrets are set (OPERATIONS.md, Telegram host updates); until then Settings shows no Telegram card. |
+| `00053` (Day One guests) | Not applied | Not applied | **Apply on staging, then production, before merging the release.** Needs `00050`. Additive: `day_one_guests`, two triggers (bookings confirmed, seat claimed), `day_one_number()` and `day_one_status()` for the profile badge and banner. The backfill numbers everyone with a confirmed seat so far, oldest first. Then run `supabase/tests/day_one_check.sql` (begin/rollback). Without it the banner and badge simply do not show. |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
@@ -965,6 +964,70 @@ order by s.starts_at desc;
 ```
 
 The Edge Function log line `send-reminders {...}` includes `review_emails_sent`, `review_emails_failed` and `review_reminders_skipped` (true means `00051` is not applied).
+
+# Day One guests and bring a friend
+
+**Day One:** the first 50 people with a confirmed seat before 1 December 2026 (Singapore time) get a numbered "Day One #N" badge on their profile for good. Booking it or taking a friend's seat both count. The banner on browse, listing and profile pages rotates between "Be one of our first 50 guests" (with a days-left chip) and "Bring a friend, skip their booking fee"; tapping it shows the details. Below 20 spots it says "Only N Day One spots left". It disappears at launch.
+
+Who has a number (production SQL rules apply):
+
+```sql
+select d.number, u.display_name, d.created_at
+from public.day_one_guests d
+join public.users u on u.id = d.user_id
+order by d.number;
+```
+
+To take a number back (a founder or a test account): delete that row. Nobody else's number changes; the freed number goes to the next guest who books. Do it before launch week so the spot is not wasted.
+
+**Bring a friend:** a booking pays the booking fee once, for the first seat. Friends' seats have none. Nothing to switch on; it applies to every new booking. On a big group paying by card TryKai can make nothing or lose up to about S$3 to Stripe (DECISIONS.md, 8 November 2026).
+
+# Telegram host updates
+
+Hosts can connect Telegram in **Settings → Telegram updates**. After that, these host emails also arrive as a short Telegram message with an **Open Hosting** button: new booking, guest cancelled, guest moved a booking, session reminder, "review your guests" (and the day-5 reminder), and "a guest reviewed you". Email stays the record. A Telegram failure never changes a booking, cancel or reminder; it is only logged.
+
+Each project needs its **own bot** (Telegram allows one webhook per bot), so make two: one for staging, one for production. Secrets stay with you; never paste the bot token in chat.
+
+## One-time setup (per project)
+
+1. In Telegram, open **@BotFather**, send `/newbot`. Name it (staging: "TryKai Staging", production: "TryKai"). Username must end in `bot`, for example `TryKaiStagingBot` and `TryKaiBot`. BotFather replies with the **token**.
+2. Optional but nice: `/setdescription` ("Host updates from TryKai") and `/setuserpic` (the Kai logo).
+3. Make a webhook secret: any random string of letters, digits, `_` or `-`, 32 or more characters. For example run `openssl rand -hex 32` in Terminal.
+4. Supabase (check the project ref in the URL) → **Edge Functions → Secrets**, add:
+   - `TELEGRAM_BOT_TOKEN`: the token from step 1
+   - `TELEGRAM_BOT_USERNAME`: the username without `@`
+   - `TELEGRAM_WEBHOOK_SECRET`: the string from step 3
+5. Point the bot at the webhook. Paste this in your browser address bar with your values filled in (staging ref `hzgybclfvpuxkmytdoos`, production ref `dqqlwofluvhikebtjune`):
+
+```
+https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<REF>.supabase.co/functions/v1/telegram-webhook&secret_token=<SECRET>&allowed_updates=["message"]
+```
+
+   It should answer `{"ok":true,"result":true,"description":"Webhook was set"}`. Clear the browser history entry afterwards, since the address contains the token.
+6. Check: `https://api.telegram.org/bot<TOKEN>/getWebhookInfo` shows the URL, `pending_update_count` 0 and no `last_error_message`.
+
+## Test it
+
+1. Sign in as a host on that environment → **Settings**. The **Telegram updates** card appears once `00052` is applied and the secrets are set.
+2. Tap **Connect Telegram** → Telegram opens → tap **Start**. The bot replies "Connected." Back in Settings the card says "Connected."
+3. Make a test booking on one of your listings (staging, test card). The Telegram message arrives right after the host email.
+4. In Telegram send `/stop`: the bot replies that updates are off, and Settings shows Connect again. **Disconnect** in Settings does the same.
+
+## If something is off
+
+- **No card in Settings:** `00052` not applied, or `TELEGRAM_BOT_TOKEN` / `TELEGRAM_BOT_USERNAME` missing.
+- **Bot does not reply to Start:** run `getWebhookInfo`. `last_error_message` "Wrong response from the webhook: 401" means `TELEGRAM_WEBHOOK_SECRET` and the `secret_token` in step 5 differ: set the webhook again with the same secret. Logs: Edge Functions → `telegram-webhook`.
+- **"That link has expired":** links last 30 minutes. Reload Settings and tap Connect again.
+- **A host stopped getting messages:** if they block the bot, Telegram refuses the next message and TryKai forgets their chat. They reconnect in Settings.
+
+Who is connected (production SQL rules apply):
+
+```sql
+select id, display_name, telegram_linked_at
+from public.users
+where telegram_chat_id is not null
+order by telegram_linked_at desc;
+```
 
 # Guest dispute refund
 
