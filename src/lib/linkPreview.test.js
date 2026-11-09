@@ -306,6 +306,26 @@ describe('listingStructuredData', () => {
     expect(events[1].offers.availability).toBe('https://schema.org/SoldOut')
   })
 
+  it('says when booking opened (Google asks for offers.validFrom)', () => {
+    const withDates = listingStructuredData(
+      { ...fullListing, created_at: '2026-10-20T02:00:00Z' },
+      {
+        ...page,
+        sessions: [
+          { starts_at: '2027-03-20T06:00:00Z', spots_remaining: 2, created_at: '2026-11-01T03:00:00Z' },
+          { starts_at: '2027-03-27T06:00:00Z', spots_remaining: 2 },
+          { starts_at: '2027-04-03T06:00:00Z', spots_remaining: 2, created_at: 'nonsense' },
+        ],
+      },
+    )
+    const [, first, second, third] = withDates['@graph']
+    expect(first.offers.validFrom).toBe('2026-11-01T03:00:00.000Z')
+    expect(second.offers.validFrom).toBe('2026-10-20T02:00:00.000Z')
+    expect(third.offers.validFrom).toBe('2026-10-20T02:00:00.000Z')
+    const none = listingStructuredData(fullListing, { ...page, sessions: [{ starts_at: '2027-03-20T06:00:00Z', spots_remaining: 1 }] })
+    expect(none['@graph'][1].offers).not.toHaveProperty('validFrom')
+  })
+
   it('leaves out what a bare listing does not have', () => {
     const bare = listingStructuredData({ ...listing, area: null }, { pageUrl: PAGE_URL, origin: ORIGIN })
     expect(bare['@graph']).toHaveLength(1)
