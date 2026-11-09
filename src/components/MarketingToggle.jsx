@@ -42,7 +42,7 @@ export default function MarketingToggle() {
           onChange={(event) => change(event.target.checked)}
         />
         <span className="toggle-card__copy">
-          <span className="toggle-card__title">Send me new sessions and offers (at most once a week)</span>
+          <span className="toggle-card__title">Allow TryKai to email me new sessions and offers (at most once a week)</span>
         </span>
       </label>
       {status ? (

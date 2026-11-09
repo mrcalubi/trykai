@@ -361,7 +361,7 @@ export default function Login() {
                 checked={marketingOptIn}
                 onChange={(e) => setMarketingOptIn(e.target.checked)}
               />
-              <span>Send me new sessions and offers (at most once a week)</span>
+              <span>Allow TryKai to email me new sessions and offers (at most once a week)</span>
             </label>
           )}
 

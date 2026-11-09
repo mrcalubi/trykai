@@ -1,7 +1,7 @@
 -- Marketing email consent and one-tap unsubscribe (DECISIONS.md, 9 November 2026).
 --
--- Sign-up has two boxes: an optional, unticked "Send me new sessions and
--- offers (at most once a week)" above the required Terms box. The choice
+-- Sign-up has two boxes: an optional, unticked "Allow TryKai to email me new
+-- sessions and offers (at most once a week)" above the required Terms box. The choice
 -- arrives in the sign-up metadata as marketing_opt_in. Settings can change it
 -- later, and every marketing email links to /unsubscribe?t=<token>, which
 -- works without signing in.
