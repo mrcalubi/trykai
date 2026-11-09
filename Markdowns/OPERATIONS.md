@@ -462,6 +462,7 @@ A manual dump gives a restore point from the minute before a risky change, newer
 | `00051` (review reminders) | Applied | Applied | Staging and production 7 November, after #259 merged. `supabase/tests/review_reminders_check.sql` passed on staging. |
 | `00052` (Telegram host updates) | Not applied | Not applied | **Apply on staging, then production, before merging the release.** Additive: `users.telegram_chat_id`, `users.telegram_linked_at`, `telegram_link_codes`, `my_telegram()`. Then run `supabase/tests/telegram_check.sql` (begin/rollback). Nothing is sent until the Telegram secrets are set (OPERATIONS.md, Telegram host updates); until then Settings shows no Telegram card. |
 | `00053` (Day One guests) | Not applied | Not applied | **Apply on staging, then production, before merging the release.** Needs `00050`. Additive: `day_one_guests`, two triggers (bookings confirmed, seat claimed), `day_one_number()` and `day_one_status()` for the profile badge and banner. The backfill numbers everyone with a confirmed seat so far, oldest first. Then run `supabase/tests/day_one_check.sql` (begin/rollback). Without it the banner and badge simply do not show. |
+| `00054` (marketing consent) | Not applied | Not applied | **Apply on staging, then production, before merging the release.** Adds the marketing columns on `users`, opts in every existing account (source `existing_account`), records the sign-up box in `handle_new_user`, and adds `my_marketing_opt_in`, `set_marketing_opt_in`, `unsubscribe_marketing`. Then run `supabase/tests/marketing_consent_check.sql` (begin/rollback). |
 
 Earlier migrations are assumed applied on both, since these build on them.
 
@@ -981,6 +982,36 @@ order by d.number;
 To take a number back (a founder or a test account): delete that row. Nobody else's number changes; the freed number goes to the next guest who books. Do it before launch week so the spot is not wasted.
 
 **Bring a friend:** a booking pays the booking fee once, for the first seat. Friends' seats have none. Nothing to switch on; it applies to every new booking. On a big group paying by card TryKai can make nothing or lose up to about S$3 to Stripe (DECISIONS.md, 8 November 2026).
+
+# Marketing emails
+
+Who may get marketing email (new sessions, offers, launch news): `users.marketing_opt_in = true`. People choose at sign-up (optional box above the Terms box) or in Settings; accounts that existed before 9 November 2026 were opted in (`marketing_opt_in_source = 'existing_account'`). Booking emails, reminders and review prompts are not marketing and always go out.
+
+Rules for every marketing email:
+- **At most one a week per person.** Only send to people whose `marketing_last_sent_at` is empty or older than 7 days, then set it to now.
+- **One-tap unsubscribe link in every email:** `https://www.trykai.sg/unsubscribe?t=<marketing_token>`. It works without signing in.
+- Never send to anyone with `marketing_opt_in = false`.
+
+Who can be emailed this week, with their personal unsubscribe link (production SQL rules apply):
+
+```sql
+select u.email, coalesce(u.display_name, u.full_name) as name,
+       'https://www.trykai.sg/unsubscribe?t=' || u.marketing_token as unsubscribe_url
+from public.users u
+where u.marketing_opt_in
+  and (u.marketing_last_sent_at is null or u.marketing_last_sent_at < now() - interval '7 days')
+order by u.created_at;
+```
+
+After sending, mark them (same filter, so nobody is marked who was not sent):
+
+```sql
+update public.users set marketing_last_sent_at = now()
+where marketing_opt_in
+  and (marketing_last_sent_at is null or marketing_last_sent_at < now() - interval '7 days');
+```
+
+There is no sending tool in the app yet. Until there is, send from Resend or your email client to the list above, one email per person so each gets their own unsubscribe link.
 
 # Telegram host updates
 

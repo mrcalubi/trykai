@@ -17,6 +17,7 @@ Disallow: /logout
 Disallow: /reset-password
 Disallow: /settings
 Disallow: /style-guide
+Disallow: /unsubscribe
 Disallow: /verify-identity
 
 Sitemap: https://www.trykai.sg/sitemap.xml

@@ -10,6 +10,7 @@ import Avatar from '../components/ui/Avatar'
 import PhotoCropDialog from '../components/PhotoCropDialog'
 import ProfilePhotoFlow from '../components/ProfilePhotoFlow'
 import TelegramConnect from '../components/TelegramConnect'
+import MarketingToggle from '../components/MarketingToggle'
 import { ProfileBanner, SocialGlyph } from '../components/profile/ProfileBits'
 import { firstAccountRow, notifyAccountUpdated } from '../lib/myAccount'
 import { hasAvatarPhoto, uploadBannerFile } from '../lib/avatarPhoto'
@@ -776,6 +777,8 @@ export default function Settings() {
                   <a href="mailto:hello@trykai.sg">hello@trykai.sg</a>.
                 </p>
               </div>
+
+              <MarketingToggle />
 
               <p className="settings-delete__copy">
                 Account deletion is not available in the app yet. To delete your account, email{' '}

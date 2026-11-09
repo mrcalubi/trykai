@@ -11032,3 +11032,15 @@ body:has(.edit-profile__bar) .site-footer {
 .profile-stats__title {
   margin: 0 0 8px;
 }
+
+/* Settings: marketing email choice (MarketingToggle) */
+.settings-marketing {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* /unsubscribe */
+.unsubscribe-page p {
+  max-width: 460px;
+}

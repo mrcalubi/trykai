@@ -203,11 +203,28 @@ describe('Signing up', () => {
       email: 'mei@example.com',
       password: 'hunter22',
       options: {
-        data: { full_name: 'Mei Ling', display_name: 'Mei', terms_accepted: true },
+        data: { full_name: 'Mei Ling', display_name: 'Mei', terms_accepted: true, marketing_opt_in: false },
         emailRedirectTo: `${window.location.origin}/`,
       },
     })
     expect(supabase.__calls('users', 'insert')).toHaveLength(0)
+  })
+
+  it('offers marketing email as a separate, unticked, optional box above the Terms box', async () => {
+    givenSignupSucceeds()
+    const { user } = renderLogin()
+    await switchToSignup(user)
+    const marketing = screen.getByRole('checkbox', { name: /new sessions and offers/ })
+    const terms = screen.getByRole('checkbox', { name: /18 or older/ })
+    expect(marketing).not.toBeChecked()
+    expect(marketing).not.toBeRequired()
+    expect(marketing.compareDocumentPosition(terms) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await fillSignup(user, { name: 'Mei Ling', displayName: 'Mei', email: 'mei@example.com' })
+    await user.click(marketing)
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+    await waitFor(() => expect(supabase.auth.signUp).toHaveBeenCalledTimes(1))
+    expect(supabase.auth.signUp.mock.calls[0][0].options.data.marketing_opt_in).toBe(true)
   })
 
   it('requires a full name before calling signup', async () => {
