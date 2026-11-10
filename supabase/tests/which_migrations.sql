@@ -73,7 +73,8 @@ checks(migration, what, applied) as (
     ('00051', 'claim_review_reminders()', exists (select 1 from f where name = 'claim_review_reminders')),
     ('00052', 'telegram_link_codes table', to_regclass('public.telegram_link_codes') is not null),
     ('00053', 'day_one_guests table', to_regclass('public.day_one_guests') is not null),
-    ('00054', 'users.marketing_opt_in', exists (select 1 from c where table_name = 'users' and column_name = 'marketing_opt_in'))
+    ('00054', 'users.marketing_opt_in', exists (select 1 from c where table_name = 'users' and column_name = 'marketing_opt_in')),
+    ('00055', 'review_replies table', to_regclass('public.review_replies') is not null)
 )
 select migration, case when applied then 'applied' else 'MISSING' end as status, what
 from checks

@@ -3441,7 +3441,8 @@ body.lightbox-open {
 .featured-review__text,
 .coming-up__title,
 .featured-choice__text,
-.edit-preview__name {
+.edit-preview__name,
+.review-reply__body {
   overflow-wrap: break-word;
 }
 
@@ -7008,6 +7009,67 @@ body.lightbox-open {
   font-weight: 600;
   color: var(--muted);
   text-decoration: underline;
+}
+
+/* Host reply under a guest review (00055). Indented with a rule so it reads
+   as an answer to the review above, not a second review. */
+.review-reply {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--border-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--cream);
+}
+
+.review-reply__label {
+  display: block;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.review-reply__body {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-line;
+}
+
+.review-reply--form .input--textarea {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.review-reply__hint {
+  margin: 6px 0 0;
+}
+
+.review-reply__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 10px;
+}
+
+.review-reply__actions .link-button {
+  font-size: 13px;
+}
+
+.review-reply__confirm {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.review-reply__start {
+  margin-top: 12px;
+}
+
+.review-reply__start .link-button {
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .review-photos {
