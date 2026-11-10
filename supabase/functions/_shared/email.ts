@@ -1624,10 +1624,17 @@ function shiftHours(date: Date, hours: number): string {
   return new Date(date.getTime() + hours * 60 * 60 * 1000).toISOString()
 }
 
-/** Hidden inbox preview text. Padded so clients do not pull body text in after it. */
+/**
+ * Hidden inbox preview text. Inboxes show about 100 to 150 characters of
+ * preview; the padding fills the rest with near-invisible characters so the
+ * body ("TryKai. Hi …") is not pulled in after it. 40 pairs was too short:
+ * Gmail showed a run of spaces and then the body text.
+ */
+export const PREHEADER_PADDING = '&#847;&zwnj;&nbsp;'.repeat(160)
+
 function preheaderHtml(text?: string): string {
   if (!text) return ''
-  return `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${escapeHtml(text)}${'&nbsp;&zwnj;'.repeat(40)}</div>`
+  return `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${escapeHtml(text)}${PREHEADER_PADDING}</div>`
 }
 
 /**
