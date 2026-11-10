@@ -3,6 +3,7 @@ import { reportMailto, reviewReportSubject } from '../lib/reportMailto'
 import Avatar from './ui/Avatar'
 import OverflowMenu from './ui/OverflowMenu'
 import ReviewPhotoThumbs from './ReviewPhotoThumbs'
+import ReviewReply from './ReviewReply'
 
 function formatReviewDate(iso) {
   return new Intl.DateTimeFormat('en-SG', {
@@ -25,7 +26,15 @@ function StarDisplay({ rating }) {
   )
 }
 
-export default function ReviewCard({ review, listingTitle, viewerId, hideRating = false }) {
+export default function ReviewCard({
+  review,
+  listingTitle,
+  viewerId,
+  hideRating = false,
+  canReply = false,
+  hostName,
+  onReplyChange,
+}) {
   const displayName = publicName({ display_name: review.users?.full_name })
   const name = displayName || 'Guest'
   const listing = listingTitle || review.listing_title || 'listing'
@@ -73,6 +82,7 @@ export default function ReviewCard({ review, listingTitle, viewerId, hideRating 
           Report
         </a>
       ) : null}
+      <ReviewReply review={review} canReply={canReply} hostName={hostName} onChange={onReplyChange} />
     </div>
   )
 }
