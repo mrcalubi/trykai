@@ -775,6 +775,40 @@ describe('Dashboard add session', () => {
     expect(args).not.toHaveProperty('duration_mins')
   })
 
+  it('sends the chosen session type and shows it on the session row', async () => {
+    supabase.__on('listing_session_types', 'select', {
+      data: [
+        { id: 't1', listing_id: 'listing-1', name: 'Hand-tied bouquet', description: '', photo_url: null, position: 0, is_active: true },
+        { id: 't2', listing_id: 'listing-1', name: 'Table centrepiece', description: '', photo_url: null, position: 1, is_active: true },
+      ],
+      error: null,
+    })
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        {
+          id: 'session-typed',
+          listing_id: 'listing-1',
+          starts_at: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+          duration_mins: 90,
+          status: 'open',
+          type_id: 't2',
+          bookings: [],
+        },
+      ],
+    })
+    const { user } = await renderHosting()
+    expect(await screen.findByText('Table centrepiece')).toBeInTheDocument()
+    await openSessionForm(user)
+    await user.click(screen.getByRole('radio', { name: 'Hand-tied bouquet' }))
+    await fillSession(user)
+    await reviewAndCreate(user)
+
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalled())
+    const [, args] = supabase.rpc.mock.calls.find(([name]) => name === 'add_listing_session')
+    expect(args.p_type_id).toBe('t1')
+  })
+
   it('offers the same times on another listing, with that listing\'s spots', async () => {
     givenData({
       listings: [makeMyListing(), makeMyListing({ id: 'listing-2', title: 'Pottery', max_guests: 6 })],

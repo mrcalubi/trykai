@@ -132,6 +132,7 @@ export default function AddSessionsForm({
   listing,
   existingSessions,
   otherListings = [],
+  sessionTypes = [],
   onCancel,
   onCreated,
 }) {
@@ -163,6 +164,10 @@ export default function AddSessionsForm({
     return (restored?.alsoListingIds ?? []).filter((id) => otherIds.has(id))
   })
   const [focusDateKey, setFocusDateKey] = useState(null)
+  // Session types (00056): one type for the whole batch. One type is picked
+  // for the host; with more, they choose.
+  const [typeId, setTypeId] = useState(() => (sessionTypes.length === 1 ? sessionTypes[0].id : null))
+  const chosenType = sessionTypes.find((type) => type.id === typeId) ?? null
   const dateRowRefs = useRef({})
 
   const monthIndex = monthKeys.indexOf(monthKey)
@@ -351,6 +356,11 @@ export default function AddSessionsForm({
     setError('')
     setPreview(null)
 
+    if (sessionTypes.length > 0 && !chosenType) {
+      setError('Pick a session type for these dates.')
+      return
+    }
+
     if (perDateTimes) {
       const missing = selectedDateKeys.filter((key) => filledTimes(timesByDate[key]).length === 0)
       if (missing.length > 0) {
@@ -418,6 +428,7 @@ export default function AddSessionsForm({
       duration,
       usesListingDuration,
       alsoListingIds,
+      typeId: chosenType?.id ?? null,
     })
     setSaving(false)
     if (result?.error) {
@@ -427,6 +438,33 @@ export default function AddSessionsForm({
 
   return (
     <form onSubmit={review} className="dashboard-card__form form add-sessions">
+      {sessionTypes.length > 0 ? (
+        <fieldset className="add-sessions__types">
+          <legend className="add-sessions__legend">Session type</legend>
+          <div className="choice-chips">
+            {sessionTypes.map((type) => (
+              <label
+                key={type.id}
+                className={`choice-chip${typeId === type.id ? ' choice-chip--on' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name={`session-type-${listing.id}`}
+                  checked={typeId === type.id}
+                  onChange={() => {
+                    setTypeId(type.id)
+                    setPreview(null)
+                  }}
+                  className="visually-hidden"
+                />
+                {type.name}
+              </label>
+            ))}
+          </div>
+          <p className="hint">Every date you add now gets this type. Add the other type in a second go.</p>
+        </fieldset>
+      ) : null}
+
       <fieldset className="add-sessions__quickfill">
         <legend className="add-sessions__legend">Quick fill</legend>
         <p className="hint">
@@ -610,6 +648,7 @@ export default function AddSessionsForm({
           <p className="add-sessions__preview-title">
             This creates {preview.accepted.length}{' '}
             {preview.accepted.length === 1 ? 'session' : 'sessions'}
+            {chosenType ? ` of ${chosenType.name}` : ''}
             {alsoListingIds.length > 0
               ? ` on each of ${alsoListingIds.length + 1} listings`
               : ''}

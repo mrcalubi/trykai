@@ -58,6 +58,7 @@ import { firstRow, hostRatingFromRpc, reviewClosedOnLabel } from '../lib/twoWayR
 import { companionSeats } from '../lib/companions'
 import { sessionEndAt } from '../lib/reviewGate'
 import WhosComing from '../components/WhosComing'
+import { isMissingSessionTypes, sessionTypeNamesById } from '../lib/sessionTypes'
 
 const BOOKING_SELECT = `
   id,
@@ -77,6 +78,7 @@ const BOOKING_SELECT = `
     id,
     starts_at,
     duration_mins,
+    type_id,
     listings (
       id,
       title,
@@ -256,6 +258,7 @@ export default function BookingDetail() {
   const [bookerName, setBookerName] = useState('')
   const [leaving, setLeaving] = useState(false)
   const [leaveError, setLeaveError] = useState('')
+  const [typeName, setTypeName] = useState('')
 
   const loadBooking = useCallback(async () => {
     const run = (columns) =>
@@ -263,7 +266,12 @@ export default function BookingDetail() {
         supabase.from('bookings').select(columns).eq('id', bookingId).maybeSingle(),
       )
     let { data, error: loadError } = await run(BOOKING_SELECT)
-    if (loadError && (isMissingRescheduleColumn(loadError) || /is_id_verified|42703|PGRST204/i.test(loadError.message ?? ''))) {
+    if (
+      loadError &&
+      (isMissingRescheduleColumn(loadError) ||
+        isMissingSessionTypes(loadError) ||
+        /is_id_verified|42703|PGRST204/i.test(loadError.message ?? ''))
+    ) {
       ;({ data, error: loadError } = await run(BOOKING_SELECT_FALLBACK))
     }
 
@@ -289,6 +297,8 @@ export default function BookingDetail() {
 
     setBooking(data)
     setNotGuest(false)
+    const typeId = data.sessions?.type_id
+    setTypeName(typeId ? ((await sessionTypeNamesById(supabase, [typeId]))[typeId] ?? '') : '')
     setBringChecked(readBringChecks(data.id))
     if (companionView) {
       setBookingAddons([])
@@ -782,6 +792,7 @@ export default function BookingDetail() {
           ) : (
             <h1 className="booking-detail__title">{listing?.title || 'Unknown listing'}</h1>
           )}
+          {typeName ? <p className="session-card__type booking-page__type">{typeName}</p> : null}
           {isCompanion ? <span className="booking-pill booking-pill--booked-by">Booked by {bookedBy}</span> : null}
           <p className="booking-page__with">{withHostLine(hostLabel, listing?.area, booking.guests_count)}</p>
 
