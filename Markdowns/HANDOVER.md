@@ -1,6 +1,6 @@
 # TryKai: Handover
 
-*Written 3 November 2026 against `staging` at #246 (two-way reviews), with `main` at #245. Supersedes the 1 November handover. Read this first if you are Cursor, a new Claude chat, or anyone picking up the code.*
+*Written 10 November 2026 against `staging` at #269, with `main` at #270 and #271 (host replies to reviews) open. Supersedes the 3 November handover. Read this first if you are Cursor, a new Claude chat, or anyone picking up the code.*
 
 ---
 
@@ -8,7 +8,9 @@
 
 Peer to peer skill and experience marketplace for Singapore. Individuals list short, in person sessions teaching a skill. Most sessions are S$15 to S$30 (S$10 to S$40 is guidance; the database caps a listing at S$500 as a typo guard). Guests browse, book and pay through the platform. Runs as a website, not an app.
 
-Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. **Hosts so far:** the first host (23 October), **Nicholas** (flower arranging, late October, `is_founding_host` set on production) and **Aakash** (DJ Basics). Most of the 28 October to 1 November work came from Nicholas's feedback. **First real booking: 2 November**, Caleb and Airica on Aakash's DJ class, paid by PayNow on production.
+Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. **Hosts so far:** the first host (23 October), **Nicholas** (flower arranging, late October, `is_founding_host` set on production) and **Aakash** (DJ Basics). Most of the 28 October to 1 November work came from Nicholas's feedback. **First real booking: 2 November**, Caleb and Airica on Aakash's DJ class, paid by PayNow on production. **First booking from outside the team: 8 November**, Yano on the flower class (before Day One existed; no make-good offered, a personal thank-you instead). **Pris** onboards on 13 November. Craft Fest booths (8 November) are in the Management Sheet, Host outreach tab, not yet messaged.
+
+**Hard launch: 1 December 2026.** Until then it is a soft launch: listings are priced lower, and the launch banner runs Day One and bring-a-friend. The founders work to weekly deliverables. The founders' agreement is not signed (too much still uncertain); the tentative split is a third each after all loans are repaid, with half of profit reinvested. Moving the production database from Mumbai to Singapore is planned for the last week of November.
 
 **Team.** Caleb, CEO and product, carries all legal and financial liability. Rui Heng Leong, engineer, 8 hours a week. Aakash Chidambaram, marketing, growth, host recruitment. TryKai's own earnings go to the business account (Aspire); how they reach the founders is set by the founders' agreement.
 
@@ -16,14 +18,14 @@ Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. **Hosts so far:**
 
 ## Source of truth
 
-**The repo's `Markdowns/` folder is current.** Claude Project copies are synced from it and may lag (synced 3 November). One fact, one home. When two docs disagree, say so rather than picking one. For any change, read the matching section of `ENGINEERING.md` (how it works), `DECISIONS.md` (why, newest entries at the bottom of the log) and `OPERATIONS.md` (what someone has to do by hand, and the migration table).
+**The repo's `Markdowns/` folder is current.** Claude Project copies are synced from it and may lag (synced 10 November). One fact, one home. When two docs disagree, say so rather than picking one. For any change, read the matching section of `ENGINEERING.md` (how it works), `DECISIONS.md` (why, newest entries at the bottom of the log) and `OPERATIONS.md` (what someone has to do by hand, and the migration table).
 
 ---
 
 ## How the work is done now
 
 - **Normally Cursor builds** and Claude (Claude Code in the TryKai Project) writes Cursor prompts, reviews every PR (migration and money paths line by line), fixes small things directly on the PR branch, resolves merge conflicts, and opens the `staging` → `main` release PRs.
-- **3 November: Cursor hit its monthly limit.** Until it resets, Claude builds too. Caleb decided against a separate reviewer agent (cost). So on Claude-built PRs: Claude does a separate line-by-line pass of migrations and money paths after building, ships a staging check script (`supabase/tests/*.sql`, runs inside `begin … rollback`) with every migration, attaches screenshots for anything on screen, lists what was not verified in the PR, and asks Caleb to look **before** merging when a real phone or real Stripe matters.
+- **Since 3 November Cursor is out of credits, so Claude builds.** Caleb decided against a separate reviewer agent (cost). So on Claude-built PRs: Claude does a separate line-by-line pass of migrations and money paths after building, ships a staging check script (`supabase/tests/*.sql`, runs inside `begin … rollback`) with every migration, attaches screenshots for anything on screen, lists what was not verified in the PR, and asks Caleb to look **before** merging when a real phone or real Stripe matters.
 - **Design happens on the canvas first.** Design artifact "TryKai profile card layout" (https://claude.ai/artifact/JS7ACYVJxdeND4idRJcpCU), pages: Profile v2, Add-ons, Booking page, Two-way reviews, Who's coming. Cursor cannot see the canvas, so prompts describe it in words and Claude checks the result with screenshots or Caleb checks on staging.
 - Branch from `staging`, one scope per branch, `npm run verify` and `npm run test:e2e`, PR into `staging`. **Caleb merges.** Nobody pushes to `staging` or `main` directly.
 - Cursor prompt pattern: branch name, numbered scope, a Docs section (DECISIONS, ENGINEERING, OPERATIONS), a Tests section ("keep the coverage floors"), and "Report the PR link and any unmapped items".
@@ -47,6 +49,27 @@ CI runs lint, unit tests (floors: statements 92%, branches 87%), Playwright, bui
 
 ---
 
+## Shipped 4 to 10 November
+
+Details and reasons are in DECISIONS.md under the same dates. All of it is on production unless marked.
+
+- **Two-way reviews on production** (#246, `00048`, `00049`, 7 November). The release went out before `00048`, so trykai.sg review posting and listing ratings were broken from 4 to 7 November (operational rule 3, again).
+- **Who's coming** (#249, `00050`): friends take a seat on a group booking from one link, get a read-only booking page, count on their profile and can be reviewed by the host.
+- **Review prompts and reminders** (#258, `00051`): the hourly `send-reminders` job asks both sides to review after a session and nudges on day 5. `which_migrations.sql` (#250) tells you which migrations a database has.
+- **Booking page cards match** (#254), host join state and payout wording fixes (#253, #257).
+- **Telegram host updates** (#260, `00052`): a host connects Telegram once in Settings; booking, cancel, move, reminder and review emails also arrive as one Telegram line. Two bots (staging and production), each with its own webhook. Caleb set both up on 9 November.
+- **Bring a friend** (#261): a booking pays the booking fee once, on one seat, however many guests. The listing card, checkout and receipt spell out the saving.
+- **Day One guests** (#261, `00053`): the first 50 people with a confirmed seat before 1 December get a numbered Day One badge on their profile for good. The database hands out numbers (lowest free number, so a deleted row is reused).
+- **Launch banner**: deep coral bar under the nav on home, listings and profiles. It rotates "Be one of our first 50" (with days left) and "Bring a friend, skip their fee"; tap for details. Shorter wording on phones. Gone after launch.
+- **Home and profile** (#263): the home chip reads "Sessions from $X"; a host's own profile also shows their guest side. The 3 November Telegram band was removed: no page can paint over Telegram's own see-through header, so that strip is accepted (#262 declined).
+- **Faster home** (#265): listings render before ratings, and the browser connects to Supabase early. Measured on trykai.sg: first visit about 2.3 s (about 1 s of it is a cold listings request), repeat visit about 0.6 s. Mumbai adds about 100 ms to every call from Singapore, which is why the database move is planned.
+- **Google rich results fix** (#267): event offers carry `validFrom`. Caleb clicks Validate fix in Search Console once #270 is live.
+- **Marketing email consent** (#268, `00054`): an optional, unticked "Allow TryKai to email me new sessions and offers (at most once a week)" box above the required Terms box. Existing accounts were opted in (Caleb's call). Settings toggle, one-tap `/unsubscribe` link, and `marketing_last_sent_at` for a once-a-week limit. No sending tool yet: OPERATIONS, Marketing emails has the export query.
+- **Email preview text** (#269): the hidden preheader is padded so Gmail no longer shows "TryKai..." indented after the logo. The confirm-signup template in the Supabase dashboard only changes if Caleb repastes it.
+- **Host replies to reviews** (#271, `00055`): open, see "In flight".
+
+**Outside the code.** Google Search Console verified for trykai.sg on Caleb's Google account (DNS TXT record at Vodien; keep it), sitemap submitted, 8 pages indexed by 9 November. Bing Webmaster Tools imported from Google. The Management Sheet has three outreach tabs: Guests (who reached out to whom and the stage), Outreach summary (weekly counts against targets), Host outreach (Craft Fest booths and Pris).
+
 ## Shipped 2 to 3 November
 
 Details and reasons are in DECISIONS.md under the same dates.
@@ -54,9 +77,9 @@ Details and reasons are in DECISIONS.md under the same dates.
 - **Review photos** (#239, `00047`): guests attach up to 3 photos to a review. `reviews.photo_paths` stores storage object paths, not URLs; public `review-photos` bucket is insert-only in the caller's folder, 3 MB, JPEG and WebP. Thumbnails and lightbox on listing, profile and featured review; quiet Report link. The "TryKai just updated. Refresh the page" HEIC message actually shipped here (the 1 November handover said it already had).
 - **Review form matches the canvas** (#240): "Leave a review" on the Bookings list opens `/bookings/:id#review`; outlined empty stars; one "Post review" button.
 - **Emails send from `hello@trykai.sg`** (#241), so replies from guests and hosts reach the team. Supabase Auth emails stay `no-reply@`.
-- **Telegram in-app browser** (#242): a cream band above the fixed nav so scrolled photos do not show through above it.
+- **Telegram in-app browser** (#242): a cream band above the fixed nav. Removed 9 November (#263): it could not cover Telegram's own header.
 - **PayNow stays on Stripe's pop-up** (#243 reverted by #244). An own QR panel was built and tested on iPhone: worse (extra tap, and Save QR could not use the share sheet because Stripe's QR image host blocks our fetch, so it opened the bare PNG on qr.stripe.com). Only a short "take a screenshot" line on the PayNow payment step remains; Stripe's pop-up already gives similar advice.
-- **Two-way reviews** (#246, `00048`, `00049`): on staging, not production. See "In flight".
+- **Two-way reviews** (#246, `00048`, `00049`): reached production 7 November, see above.
 
 ## Shipped 26 October to 1 November
 
@@ -84,6 +107,7 @@ Details and reasons are in DECISIONS.md under the same dates.
 | | Rule | Code |
 |---|---|---|
 | Guest price | Host price + 12% (S$2.50 floor), rounded up to the dollar; group discount 5/10/15/20% on the lesson only | `booking.ts`, `pricing.js` |
+| Booking fee on groups | Charged once per booking, on one seat's price (bring a friend, 8 November). PayNow total never drops below lesson + add-ons | `seatBookingFeeCents`, `calculateGuestCharge` |
 | PayNow | Sliding 5/4/3/2% off the whole card total, add-ons included | `paynowDiscountRate` |
 | Add-ons | `ceil(host price × 1.12)` per unit; host keeps the host price | `calculateBookingCharge` |
 | Host fee | 10% of the **lesson only**, after the host's first 3 confirmed bookings; founding hosts never | `hostPayoutBreakdown` |
@@ -94,16 +118,13 @@ Details and reasons are in DECISIONS.md under the same dates.
 
 ---
 
-## State on 3 November
+## State on 10 November
 
-**Migrations.** `00001` to `00047` are on **staging and production** (`00047` was the prerequisite for release #245; confirm it is on production if in doubt). `00048` two-way reviews and `00049` lock reviews are on **staging only**. A test fails if two migrations share a number.
+**Migrations.** `00001` to `00054` are on **staging and production** (`00054` went on production with release #270; run `supabase/tests/which_migrations.sql` if in doubt). `00055` (host replies) is in #271, not applied anywhere yet. A test fails if two migrations share a number.
 
-**Production.** `main` has everything to #245 (review photos, review form, hello@ sender, in-app nav band, PayNow note). Stripe live: Connected accounts webhook done (25 October), platform payout schedule **Manual** (set 1 November), payout cron running hourly.
+**Production.** `main` has everything to #269 (release #270, 10 November). Stripe live: Connected accounts webhook done (25 October), platform payout schedule **Manual** (set 1 November), payout cron running hourly. The "canceled" payments in Stripe up to 9 November were team tests (Caleb and Rui Heng on 28 October, Rui Heng's PayNow expiry on 9 November), not lost guests. Telegram: both bots live, production webhook points at production (it was briefly set to the staging URL on 9 November and fixed).
 
-**Staging ahead of production:** #246 two-way reviews. The next `staging` → `main` release carries it, so it is held until:
-1. Caleb runs `supabase/tests/two_way_reviews_check.sql` on staging (no errors) and tests both sides on trykai.vercel.app.
-2. Caleb approves the Terms §7 and privacy wording drafted in #246's description (with Claude's tweak: a host's star rating of a guest "is not shown publicly; it only counts toward your own milestones"), and the shorter guest waiting line "Thanks! Live when {host} reviews you, or on {date}." (KIV as of 3 November.)
-3. Production order: backup, `00048`, merge the release, **then** `00049`. `00049` before the release would break listing ratings and review submit on trykai.sg.
+**Caleb, after #270:** click Validate fix in Search Console (Events, `validFrom`). Optionally repaste `supabase/templates/confirm-signup.html` into Supabase Auth email templates on both projects.
 
 **Manual payouts, how to.** Host money moves automatically. TryKai's own share waits in the Stripe balance until someone clicks Balances → Pay out. Before paying out, run on production:
 ```sql
@@ -117,16 +138,15 @@ Safe to pay out = Stripe Available minus `owed_to_hosts_sgd` minus about S$50 bu
 
 ## In flight
 
-**Two-way reviews** (#246, on staging). Hosts review guests; both reviews stay hidden until both post or 7 days after the session ends (blind reveal). Guests now also have a 7-day window. A host gives stars + a written review; the guest's stars are never shown (TryKai and milestones only); the words are public on the guest's profile under "From hosts". Both sides get an optional private note "Anything TryKai should know?" that only TryKai sees (`review_notes`, emailed to hello@). One guest review per booking; **one host review per person on a booking** (ready for companions). All writes go through `post_review`; reads go through RPCs that only return public reviews. New milestones: First kind words, Host favourite (guests), Good host (hosts). `review-emails` Edge Function nudges the other side and forwards private notes.
-
-**Who's coming** (designed on the canvas page "Who's coming", being built by Claude). Group bookings get seats for friends: the booker sends one link, a friend signs in and takes a seat, gets a read-only booking page (directions, day-of number, no prices, no cancel or move), the session counts on their profile and milestones, and the host can review them. Only the booker reviews the host. One link per booking; Remove frees the seat and makes a new link. Claims stay open until 7 days after the session.
+**Host replies to reviews** (#271, `00055`). A host posts one public reply (up to 600 characters) under each guest review once it is public, and can edit or delete it. Shown under the review on the listing page and the host's profile. Guests cannot answer back. No email to the guest yet. Order: `00055` and `supabase/tests/review_replies_check.sql` on staging, merge, then production with the next release.
 
 ## Next work
 
-1. Two-way reviews to production (see "State on 3 November").
-2. Who's coming: PR from Claude, then staging check script, then Caleb tests with two accounts.
-3. Founders' agreement, card booking test, insurance (see Carried). Only Caleb can do these.
-4. More host feedback as it comes. BUILD_BACKLOG.md for everything else.
+1. Host replies to reviews: merge #271, then release.
+2. **Session types v1** (Claude, next): a listing can offer several types (name, short description, photo), all at the listing's price for now.
+3. **Database move, Mumbai to Singapore** (last week of November). Rehearse on staging first, back up, pause bookings, go or no-go check, pause the Mumbai crons, keep Mumbai untouched for 2 weeks as the way back. Singpass needs no change (its redirect goes to trykai.sg and the JWKS is pasted). A runbook and a bookings pause switch are still to be written.
+4. Parked until Caleb picks them up: Craft Fest host messages (drafts written), a Telegram admin feed and host commands, a minimum group size per listing (for a host who needs at least 6), and a tool to send the weekly marketing email.
+5. Founders' agreement, card booking test, insurance (see Carried). Only Caleb can do these.
 
 ---
 
@@ -134,7 +154,7 @@ Safe to pay out = Stripe Available minus `owed_to_hosts_sgd` minus about S$50 bu
 
 - Whether the two September test cancellations were refunded on Stripe
 - Insurance quote
-- Founders' agreement unsigned
+- Founders' agreement unsigned (deliberately, 8 November; tentative split noted above)
 - Safety response protocol drafted, not ratified
 - Account deletion needs an anonymisation design (Rui Heng). Manual via contact us until then
 - One real card booking on production, then refund it (OPERATIONS checklist). PayNow is proven on production (2 November); card is the last payment path never run with real money
@@ -160,3 +180,5 @@ These cost real hours. Treat them as rules.
 13. **A lock-down migration ships separately from the code that stops needing the old access.** Two-way reviews: `00048` adds RPCs and changes nothing old; `00049` revokes table reads only after the new code is live. Any trigger or guard that reads a table you are locking must be `security definer` (the featured-review guard nearly broke this way).
 14. **Anything built on a third party's UI or files (Stripe, Telegram, iOS share sheet) is tested on a real phone before merge, not after.** #243 passed every test and was still worse in Caleb's hand.
 15. **Cursor branches from whatever `staging` was when it started.** If a revert lands meanwhile, the merge conflicts; keep `staging`'s side for the reverted part.
+16. **Each Telegram bot's webhook must point at its own environment.** After `setWebhook`, run `getWebhookInfo` and check the URL contains the right project ref. A production bot pointed at staging silently sends nothing real.
+17. **Rerun e2e after changing any visible wording.** A new "email me" checkbox made `getByLabel('Email')` match two fields (#268). Unit tests passed; Playwright caught it in CI.
