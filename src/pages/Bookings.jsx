@@ -25,6 +25,7 @@ import { DateChip, TabCalendar } from '../components/profile/ProfileSections'
 import { singaporeDateKey } from '../lib/sessionCalendar'
 import { addonLineLabel, loadBookingAddonRows } from '../lib/bookingAddons'
 import { isMissingRescheduleColumn } from '../lib/bookingPage'
+import { isMissingSessionTypes, sessionTypeNamesById } from '../lib/sessionTypes'
 
 const POLL_ATTEMPTS = 20
 const POLL_INTERVAL_MS = 2000
@@ -45,6 +46,7 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
   const userId = useAuthedUserId()
 
   const [bookings, setBookings] = useState([])
+  const [typeNames, setTypeNames] = useState({})
   const [bookingAddonsById, setBookingAddonsById] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -84,6 +86,7 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
             starts_at,
             duration_mins,
             spots_remaining,
+            type_id,
             listings (
               id,
               title,
@@ -92,14 +95,16 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
             )
           )
         `
-    const bookingsSelectFallback = bookingsSelect.replace(
-      /\s*rescheduled_at,\s*rescheduled_from_session_id,/,
-      '',
-    )
+    const bookingsSelectFallback = bookingsSelect
+      .replace(/\s*rescheduled_at,\s*rescheduled_from_session_id,/, '')
+      .replace(/\s*type_id,/, '')
     let bookingsResult = await withIssuedAtRetry(() =>
       supabase.from('bookings').select(bookingsSelect).eq('guest_id', userId).order('created_at', { ascending: false }),
     )
-    if (bookingsResult.error && isMissingRescheduleColumn(bookingsResult.error)) {
+    if (
+      bookingsResult.error &&
+      (isMissingRescheduleColumn(bookingsResult.error) || isMissingSessionTypes(bookingsResult.error))
+    ) {
       bookingsResult = await withIssuedAtRetry(() =>
         supabase
           .from('bookings')
@@ -123,6 +128,10 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
       setError(PAGE_LOAD_ERROR)
     } else {
       setBookings([...(bookingsResult.data ?? []), ...companionRows])
+      sessionTypeNamesById(
+        supabase,
+        (bookingsResult.data ?? []).map((booking) => booking.sessions?.type_id),
+      ).then(setTypeNames)
       const { rows: addonRows } = await loadBookingAddonRows(
         supabase,
         (bookingsResult.data ?? []).map((booking) => booking.id),
@@ -387,6 +396,9 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
               {booking.sessions?.listings?.title || 'Unknown listing'}
             </Link>
           </p>
+          {typeNames[booking.sessions?.type_id] ? (
+            <p className="session-card__type">{typeNames[booking.sessions.type_id]}</p>
+          ) : null}
           <p className="dashboard-card__meta">
             {booking.sessions?.starts_at
               ? formatSessionDateTime(booking.sessions.starts_at)

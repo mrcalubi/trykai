@@ -301,3 +301,50 @@ describe('AddSessionsForm keeps its draft', () => {
     expect(screen.queryAllByRole('button', { pressed: true })).toHaveLength(0)
   })
 })
+
+describe('AddSessionsForm session types', () => {
+  const TYPES = [
+    { id: 't1', name: 'Hand-tied bouquet' },
+    { id: 't2', name: 'Table centrepiece' },
+  ]
+
+  async function fillOneDate(user) {
+    await selectCalendarDate(user, dateKeyFromToday(1))
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '10:00' } })
+  }
+
+  it('shows no type picker for a listing without types', () => {
+    renderForm()
+    expect(screen.queryByRole('group', { name: 'Session type' })).not.toBeInTheDocument()
+  })
+
+  it('asks for a type, then sends it with the batch', async () => {
+    const { user, onCreated } = renderForm({ sessionTypes: TYPES })
+    await fillOneDate(user)
+    await user.click(screen.getByRole('button', { name: 'Review sessions' }))
+    expect(screen.getByText('Pick a session type for these dates.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('radio', { name: 'Table centrepiece' }))
+    await user.click(screen.getByRole('button', { name: 'Review sessions' }))
+    expect(screen.getByText('This creates 1 session of Table centrepiece.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Create sessions' }))
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ typeId: 't2' }))
+  })
+
+  it('picks the only type for the host', async () => {
+    const { user, onCreated } = renderForm({ sessionTypes: [TYPES[0]] })
+    expect(screen.getByRole('radio', { name: 'Hand-tied bouquet' })).toBeChecked()
+    await fillOneDate(user)
+    await user.click(screen.getByRole('button', { name: 'Review sessions' }))
+    await user.click(screen.getByRole('button', { name: 'Create sessions' }))
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ typeId: 't1' }))
+  })
+
+  it('sends no type for a listing without types', async () => {
+    const { user, onCreated } = renderForm()
+    await fillOneDate(user)
+    await user.click(screen.getByRole('button', { name: 'Review sessions' }))
+    await user.click(screen.getByRole('button', { name: 'Create sessions' }))
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ typeId: null }))
+  })
+})

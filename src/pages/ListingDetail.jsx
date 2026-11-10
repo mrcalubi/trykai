@@ -36,6 +36,7 @@ import {
   paynowDiscountRate,
 } from '../lib/pricing'
 import { loadPublicListingAddons } from '../lib/listingAddons'
+import { isMissingSessionTypes, loadPublicSessionTypes, sessionsOfType } from '../lib/sessionTypes'
 import {
   addonLineLabel,
   checkoutAddonPayload,
@@ -212,6 +213,8 @@ export default function ListingDetail() {
   const [bookingInView, setBookingInView] = useState(false)
   const [shareNote, setShareNote] = useState('')
   const [listingAddons, setListingAddons] = useState([])
+  const [sessionTypes, setSessionTypes] = useState({ active: [], byId: {} })
+  const [typeFilter, setTypeFilter] = useState(null)
   const [addonsAvailable, setAddonsAvailable] = useState(false)
   const [addonQuantities, setAddonQuantities] = useState({})
   const [addonNote, setAddonNote] = useState('')
@@ -282,6 +285,8 @@ export default function ListingDetail() {
       const addonsResult = await loadPublicListingAddons(supabase, listingData.id)
       setListingAddons(addonsResult.addons)
       setAddonsAvailable(addonsResult.available)
+      setTypeFilter(null)
+      loadPublicSessionTypes(supabase, listingData.id).then(setSessionTypes)
 
       // `is_id_verified` arrives with migration 00023; before that the column
       // is missing and the badge simply stays hidden.
@@ -359,12 +364,20 @@ export default function ListingDetail() {
 
     async function fetchMonth() {
       const { startIso, endIso } = monthBounds(visibleMonth)
-      const { data, error: fetchError } = await withIssuedAtRetry(() =>
-        upcomingSessions(id, 'id, starts_at, duration_mins, spots_remaining')
-          .gte('starts_at', startIso)
-          .lt('starts_at', endIso)
-          .order('starts_at', { ascending: true })
+      const monthQuery = (columns) =>
+        withIssuedAtRetry(() =>
+          upcomingSessions(id, columns)
+            .gte('starts_at', startIso)
+            .lt('starts_at', endIso)
+            .order('starts_at', { ascending: true })
+        )
+      // type_id arrives with 00056; before that, read without it.
+      let { data, error: fetchError } = await monthQuery(
+        'id, starts_at, duration_mins, spots_remaining, type_id'
       )
+      if (fetchError && isMissingSessionTypes(fetchError)) {
+        ;({ data, error: fetchError } = await monthQuery('id, starts_at, duration_mins, spots_remaining'))
+      }
 
       if (fetchError) {
         requestedMonths.current.delete(cacheKey)
@@ -663,7 +676,11 @@ export default function ListingDetail() {
 
   const monthCacheKey = visibleMonth ? `${id}:${visibleMonth}` : null
   const monthSessions = monthCacheKey ? sessionsByMonth[monthCacheKey] : undefined
-  const sessionsByDay = monthSessions ? groupSessionsByDay(monthSessions, visibleMonth) : {}
+  const activeTypes = sessionTypes.active
+  const filterType = activeTypes.find((type) => type.id === typeFilter) ?? null
+  const sessionsByDay = monthSessions
+    ? groupSessionsByDay(sessionsOfType(monthSessions, filterType?.id), visibleMonth)
+    : {}
   const countsByDay = Object.fromEntries(
     Object.entries(sessionsByDay).map(([dateKey, daySessions]) => [dateKey, daySessions.length])
   )
@@ -672,6 +689,7 @@ export default function ListingDetail() {
     : (Object.keys(sessionsByDay).sort()[0] ?? null)
   const daySessions = activeDateKey ? sessionsByDay[activeDateKey] : []
   const checkoutSession = daySessions.find((session) => session.id === checkoutSessionId) ?? null
+  const checkoutTypeName = sessionTypes.byId[checkoutSession?.type_id]?.name ?? ''
   const paynowBlocked =
     payNowBlockedByServer || isPayNowTooFarAhead(checkoutSession?.starts_at)
   const displayRail = paynowBlocked || checkoutRail !== 'paynow' ? 'card' : 'paynow'
@@ -711,7 +729,11 @@ export default function ListingDetail() {
     }
 
     if (!activeDateKey) {
-      return <p className="empty-state">No sessions in {formatMonthTitle(visibleMonth)}.</p>
+      return (
+        <p className="empty-state">
+          No {filterType ? `${filterType.name} ` : ''}sessions in {formatMonthTitle(visibleMonth)}.
+        </p>
+      )
     }
 
     return (
@@ -722,6 +744,9 @@ export default function ListingDetail() {
         {daySessions.map((session) => (
           <div key={session.id} className="session-card">
             <div className="session-card__info">
+              {sessionTypes.byId[session.type_id] ? (
+                <p className="session-card__type">{sessionTypes.byId[session.type_id].name}</p>
+              ) : null}
               <p id={`session-${session.id}-time`} className="session-card__date">
                 {formatSessionTime(session.starts_at)}
               </p>
@@ -797,6 +822,7 @@ export default function ListingDetail() {
                   with {hostName}
                   {listing.area ? ` · ${listing.area}` : ''}
                 </p>
+                {checkoutTypeName ? <p className="session-card__type">{checkoutTypeName}</p> : null}
                 <p className="session-card__date">{formatSessionDay(checkoutSession.starts_at)}</p>
                 <p className="session-card__meta">
                   {formatSessionTime(checkoutSession.starts_at)} ·{' '}
@@ -1203,6 +1229,43 @@ export default function ListingDetail() {
             <p className="detail-description">{listing.description}</p>
           </section>
 
+          {activeTypes.length > 0 ? (
+            <section className="detail-section listing-extras session-types">
+              <h2 className="detail-section__title">Choose your session</h2>
+              <p className="listing-extras__intro">
+                Each date is one of these. Same price for all of them.
+              </p>
+              <ul className="listing-extras__list">
+                {activeTypes.map((type) => (
+                  <li key={type.id}>
+                    <button
+                      type="button"
+                      className={`listing-extras__card session-types__card${
+                        typeFilter === type.id ? ' session-types__card--on' : ''
+                      }`}
+                      aria-pressed={typeFilter === type.id}
+                      onClick={() => {
+                        if (activeTypes.length > 1) setTypeFilter(type.id)
+                        bookingRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+                      }}
+                    >
+                      {type.photoUrl ? (
+                        <img src={type.photoUrl} alt="" className="listing-extras__photo" />
+                      ) : null}
+                      <span className="listing-extras__copy">
+                        <span className="listing-extras__name">{type.name}</span>
+                        {type.description ? (
+                          <span className="listing-extras__desc">{type.description}</span>
+                        ) : null}
+                        <span className="session-types__see">See dates</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           {addonsAvailable && listingAddons.length > 0 ? (
             <section className="detail-section listing-extras">
               <h2 className="detail-section__title">Add a little extra</h2>
@@ -1295,6 +1358,23 @@ export default function ListingDetail() {
 
             {publicSessionRange && !checkoutSessionId && (
               <>
+                {activeTypes.length > 1 ? (
+                  <div className="session-type-filter" role="group" aria-label="Session type">
+                    {[{ id: null, name: 'All' }, ...activeTypes].map((type) => (
+                      <button
+                        key={type.id ?? 'all'}
+                        type="button"
+                        className={`add-sessions__chip${
+                          (typeFilter ?? null) === type.id ? ' add-sessions__chip--on' : ''
+                        }`}
+                        aria-pressed={(typeFilter ?? null) === type.id}
+                        onClick={() => setTypeFilter(type.id)}
+                      >
+                        {type.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="detail-calendar">
                   <SessionCalendar
                     monthKey={visibleMonth}
