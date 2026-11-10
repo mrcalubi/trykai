@@ -26,9 +26,9 @@ import {
 
 const BASE_COLUMNS = 'title,area,price_per_person,photo_urls'
 const LISTING_COLUMNS =
-  `${BASE_COLUMNS},description,category,duration_mins,max_guests,whats_provided,what_to_bring,` +
+  `${BASE_COLUMNS},description,category,duration_mins,max_guests,whats_provided,what_to_bring,created_at,` +
   'host_id,users!host_id(display_name,is_id_verified)'
-const SESSION_COLUMNS = 'starts_at,duration_mins,spots_remaining'
+const SESSION_COLUMNS = 'starts_at,duration_mins,spots_remaining,created_at'
 const MAX_SESSIONS = 10
 
 const FALLBACK_HTML = `<!doctype html>

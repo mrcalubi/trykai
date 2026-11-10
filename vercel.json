@@ -13,7 +13,7 @@
     },
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     {
-      "source": "/(login|logout|forgot-password|reset-password|create-listing|verify-identity|bookings|hosting|dashboard|settings|refund-policy|cancellation-policy|dispute-policy|terms|privacy|style-guide)",
+      "source": "/(login|logout|forgot-password|reset-password|create-listing|verify-identity|bookings|hosting|dashboard|settings|refund-policy|cancellation-policy|dispute-policy|terms|privacy|style-guide|unsubscribe)",
       "destination": "/index.html"
     },
     { "source": "/(listings|u|edit-listing|bookings|join)/:id", "destination": "/index.html" },

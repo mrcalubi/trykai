@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  PREHEADER_PADDING,
   bookingCancelledGuestHtml,
   bookingCancelledGuestSubject,
   bookingCancelledHostHtml,
@@ -1994,5 +1995,11 @@ describe('two-way review emails', () => {
     expect(html).toContain('&lt;b&gt;Latte&lt;/b&gt;')
     expect(html).not.toContain('<script>alert(1)</script>')
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+  })
+})
+
+describe('inbox preview text', () => {
+  it('pads the preview long enough that the body is not pulled in after it', () => {
+    expect(PREHEADER_PADDING.match(/&#847;&zwnj;&nbsp;/g)).toHaveLength(160)
   })
 })
