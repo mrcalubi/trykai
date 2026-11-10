@@ -146,13 +146,13 @@ describe('injectPreviewMeta', () => {
 
 describe('index.html default preview', () => {
   it('uses an absolute image URL, which unfurlers require', () => {
-    expect(indexHtml).toContain('<meta property="og:image" content="https://www.trykai.sg/og-home.jpg" />')
+    expect(indexHtml).toContain('<meta property="og:image" content="https://www.trykai.sg/og-home-2.jpg" />')
     expect(indexHtml).not.toMatch(/og:image" content="\//)
   })
 
   it('points images at www, which production serves without a redirect', () => {
     // trykai.sg answers with a 308 to www.trykai.sg; some unfurlers do not follow it.
-    expect(indexHtml).toContain('<meta name="twitter:image" content="https://www.trykai.sg/og-home.jpg" />')
+    expect(indexHtml).toContain('<meta name="twitter:image" content="https://www.trykai.sg/og-home-2.jpg" />')
     expect(indexHtml).not.toContain('https://trykai.sg/')
   })
 
@@ -160,7 +160,7 @@ describe('index.html default preview', () => {
     expect(indexHtml).toContain('<meta name="twitter:card" content="summary_large_image" />')
     expect(indexHtml).toContain('<meta property="og:image:width" content="1200" />')
     expect(indexHtml).toContain('<meta property="og:image:height" content="630" />')
-    expect(existsSync(resolve(import.meta.dirname, '../../public/og-home.jpg'))).toBe(true)
+    expect(existsSync(resolve(import.meta.dirname, '../../public/og-home-2.jpg'))).toBe(true)
   })
 })
 
