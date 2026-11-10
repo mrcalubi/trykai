@@ -2,7 +2,7 @@
 
 Derived by walking every end to end flow the platform promises and marking where it breaks today. Ordered by what blocks launch, then by risk.
 
-**Prepared 16 August 2026. Status rewritten 21 September 2026; updated 19 October 2026 against `staging` and both databases.** Companion to ENGINEERING.md, which describes how things work. This describes what to build next and why.
+**Prepared 16 August 2026. Status rewritten 21 September 2026; updated 19 October 2026 against `staging` and both databases.** **Since 3 November the current next work lives in HANDOVER.md ("Next work"); this file is the launch-readiness record and is not kept up to date item by item.** Companion to ENGINEERING.md, which describes how things work. This describes what to build next and why.
 
 ---
 

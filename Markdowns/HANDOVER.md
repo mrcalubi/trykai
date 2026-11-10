@@ -1,6 +1,6 @@
 # TryKai: Handover
 
-*Written 10 November 2026 against `staging` at #269, with `main` at #270 and #271 (host replies to reviews) open. Supersedes the 3 November handover. Read this first if you are Cursor, a new Claude chat, or anyone picking up the code.*
+*Written 10 November 2026 (afternoon) against `staging` at #273, with `main` at #270. Supersedes the 3 November handover and this morning's version. Read this first if you are Cursor, a new Claude chat, or anyone picking up the code.*
 
 ---
 
@@ -30,6 +30,13 @@ Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. **Hosts so far:**
 - Branch from `staging`, one scope per branch, `npm run verify` and `npm run test:e2e`, PR into `staging`. **Caleb merges.** Nobody pushes to `staging` or `main` directly.
 - Cursor prompt pattern: branch name, numbered scope, a Docs section (DECISIONS, ENGINEERING, OPERATIONS), a Tests section ("keep the coverage floors"), and "Report the PR link and any unmapped items".
 - **Secrets stay with Caleb.** Never hold or ask for a Supabase access token. Caleb applies migrations and sets secrets himself.
+- **Working notes for a Claude session in the cloud workspace** (they cost time to rediscover):
+  - Git identity `-c user.name=Claude -c user.email=noreply@anthropic.com`. Open PRs with the REST API (`gh api repos/mrcalubi/trykai/pulls -f title=... -f head=... -f base=staging -F body=@file`); GraphQL `gh pr create` is blocked.
+  - Check migrations locally before Caleb runs them: `pg_ctlcluster 16 main start`, database `trykai_test`, copy the file to `/var/tmp/pgt`, then `su postgres -c "psql -v ON_ERROR_STOP=1 -d trykai_test -f /var/tmp/pgt/X.sql"`. Apply each migration twice (it must be safe to rerun) and run its check file.
+  - Screenshots: a throwaway `playwright.zz.config.js` with `launchOptions.executablePath: '/usr/bin/google-chrome'` and a throwaway `e2e/zz_shots.spec.js`; delete both before committing. Locally, "renders the home page without console errors" always fails because the sandbox blocks Google Fonts; it passes in CI.
+  - `npm run verify` before every PR; rerun e2e after any wording change (operational rule 17). `booking.ts` must keep 100% branch coverage.
+  - New Edge Functions go in `supabase/config.toml`, the FUNCTIONS list in `scripts/deploy-edge-functions.test.js`, and the deno check list in `.github/workflows/ci.yml`.
+  - Google Sheets connector works on the Management Sheet (ID `1t1DksL4VNDqnvFWlK82Q5AgFebsPVDmwotdtELjDe54`): tabs Guests, Outreach summary, Host outreach.
 - Caleb's preferences: one step at a time, plain language, honest pushback over validation, numbers over adjectives, **no em dashes in anything written for him or shown to users**. UI copy is short lines, not paragraphs: "Reviewed you · 5 days left", not three sentences of explanation (3 November). Fewer steps beats more explanation: an extra tap or an extra block of text on checkout is a regression even if it is "clearer".
 
 ---
@@ -66,7 +73,9 @@ Details and reasons are in DECISIONS.md under the same dates. All of it is on pr
 - **Google rich results fix** (#267): event offers carry `validFrom`. Caleb clicks Validate fix in Search Console once #270 is live.
 - **Marketing email consent** (#268, `00054`): an optional, unticked "Allow TryKai to email me new sessions and offers (at most once a week)" box above the required Terms box. Existing accounts were opted in (Caleb's call). Settings toggle, one-tap `/unsubscribe` link, and `marketing_last_sent_at` for a once-a-week limit. No sending tool yet: OPERATIONS, Marketing emails has the export query.
 - **Email preview text** (#269): the hidden preheader is padded so Gmail no longer shows "TryKai..." indented after the logo. The confirm-signup template in the Supabase dashboard only changes if Caleb repastes it.
-- **Host replies to reviews** (#271, `00055`): open, see "In flight".
+- **Host replies to reviews** (#271, `00055`, staging): a host posts one public reply (up to 600 characters) under each guest review once the review is public, and can edit or delete it (delete asks first). Shown as "Reply from <name>" under the review on the listing page and the host's profile. Hosts reply from their profile's Reviews tab or their listing page. Guests cannot answer back. No email to the guest yet.
+- **Session types v1** (#273, `00056`, staging): up to 4 types per listing (name, short description, optional photo), all at the listing's price, edited in Edit listing. The **host sets the type per batch of dates** in Add sessions (Caleb's choice over guests picking at checkout), so a guest picks a type by picking a date. Listing page: "Choose your session" cards under About and filter chips above the calendar. The type shows on each session, at checkout, on Bookings, the booking page and Hosting. A different type at a time that already has a session is refused. A session's type cannot be changed afterwards (delete the empty session and add it again). Removing a type keeps it on existing dates.
+- **Handover** (#272): this file.
 
 **Outside the code.** Google Search Console verified for trykai.sg on Caleb's Google account (DNS TXT record at Vodien; keep it), sitemap submitted, 8 pages indexed by 9 November. Bing Webmaster Tools imported from Google. The Management Sheet has three outreach tabs: Guests (who reached out to whom and the stage), Outreach summary (weekly counts against targets), Host outreach (Craft Fest booths and Pris).
 
@@ -120,9 +129,9 @@ Details and reasons are in DECISIONS.md under the same dates.
 
 ## State on 10 November
 
-**Migrations.** `00001` to `00054` are on **staging and production** (`00054` went on production with release #270; run `supabase/tests/which_migrations.sql` if in doubt). `00055` (host replies) is in #271, not applied anywhere yet. A test fails if two migrations share a number.
+**Migrations.** `00001` to `00054` are on **staging and production** (`00054` went on production with release #270). `00055` (host replies) and `00056` (session types) are on **staging only**; production gets them with the next release, in that order, before merging it. Run `supabase/tests/which_migrations.sql` on either database if in doubt (it covers up to `00056`). Next free number: `00057`. A test fails if two migrations share a number.
 
-**Production.** `main` has everything to #269 (release #270, 10 November). Stripe live: Connected accounts webhook done (25 October), platform payout schedule **Manual** (set 1 November), payout cron running hourly. The "canceled" payments in Stripe up to 9 November were team tests (Caleb and Rui Heng on 28 October, Rui Heng's PayNow expiry on 9 November), not lost guests. Telegram: both bots live, production webhook points at production (it was briefly set to the staging URL on 9 November and fixed).
+**Production.** `main` has everything to #269 (release #270, 10 November). #271 to #273 are on staging, not released. Stripe live: Connected accounts webhook done (25 October), platform payout schedule **Manual** (set 1 November), payout cron running hourly. The "canceled" payments in Stripe up to 9 November were team tests (Caleb and Rui Heng on 28 October, Rui Heng's PayNow expiry on 9 November), not lost guests. Telegram: both bots live, production webhook points at production (it was briefly set to the staging URL on 9 November and fixed).
 
 **Caleb, after #270:** click Validate fix in Search Console (Events, `validFrom`). Optionally repaste `supabase/templates/confirm-signup.html` into Supabase Auth email templates on both projects.
 
@@ -138,15 +147,16 @@ Safe to pay out = Stripe Available minus `owed_to_hosts_sgd` minus about S$50 bu
 
 ## In flight
 
-**Host replies to reviews** (#271, `00055`). A host posts one public reply (up to 600 characters) under each guest review once it is public, and can edit or delete it. Shown under the review on the listing page and the host's profile. Guests cannot answer back. No email to the guest yet. Order: `00055` and `supabase/tests/review_replies_check.sql` on staging, merge, then production with the next release.
+Nothing open. Everything to #273 is merged to `staging`.
 
 ## Next work
 
-1. Host replies to reviews: merge #271, then release.
-2. **Session types v1** (Claude, next): a listing can offer several types (name, short description, photo), all at the listing's price for now.
-3. **Database move, Mumbai to Singapore** (last week of November). Rehearse on staging first, back up, pause bookings, go or no-go check, pause the Mumbai crons, keep Mumbai untouched for 2 weeks as the way back. Singpass needs no change (its redirect goes to trykai.sg and the JWKS is pasted). A runbook and a bookings pause switch are still to be written.
-4. Parked until Caleb picks them up: Craft Fest host messages (drafts written), a Telegram admin feed and host commands, a minimum group size per listing (for a host who needs at least 6), and a tool to send the weekly marketing email.
-5. Founders' agreement, card booking test, insurance (see Carried). Only Caleb can do these.
+1. **Release #271 to #273 to production.** Open a `staging` → `main` PR with the checklist at the top: Kai ref, backup under 24 hours, `00055` then `review_replies_check.sql`, `00056` then `session_types_check.sql`, then merge. `00056` must be on production before the code: Hosting and the profile's Hosting tab read `sessions.type_id`.
+2. **Tell Nicholas about session types** once released, and help him add his two types (Edit listing, then add dates per type).
+3. **Session types, next steps** (only if hosts use v1): types in the create-listing wizard, the type name in emails and Telegram, prices per type, and a type on shared availability ("Also offer these times on" adds untyped sessions today).
+4. **Database move, Mumbai to Singapore** (last week of November). Rehearse on staging first, back up, pause bookings, go or no-go check, pause the Mumbai crons, keep Mumbai untouched for 2 weeks as the way back. Singpass needs no change (its redirect goes to trykai.sg and the JWKS is pasted). A runbook and a bookings pause switch are still to be written.
+5. Parked until Caleb picks them up: Craft Fest host messages (drafts written in the 9 November chat; the booths are in the Management Sheet, Host outreach tab), a Telegram admin feed and host commands, a minimum group size per listing (@le.bow.k needs at least 6 at about $40 a head), an email to the guest when a host replies, and a tool to send the weekly marketing email.
+6. Founders' agreement, card booking test, insurance (see Carried). Only Caleb can do these.
 
 ---
 

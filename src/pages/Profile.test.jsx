@@ -397,7 +397,7 @@ describe('Profile public content', () => {
           rating: 5,
           created_at: '2026-11-01T00:00:00Z',
           revealed_at: null,
-          reveal_after: '2026-11-10T04:00:00.000Z',
+          reveal_after: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           bookings: { sessions: { listings: { title: 'Latte art' } } },
         },
       ],

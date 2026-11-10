@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 4 November 2026
+Last updated: 9 November 2026
 
 This policy explains how TryKai collects, uses, shares and protects your personal data, in line with Singapore's Personal Data Protection Act 2012 (PDPA).
 
@@ -24,6 +24,7 @@ Contact our Data Protection Officer for any question about your data or to exerc
 | Identity verification result | Before you host | To confirm Hosts are real, identifiable people |
 | Your name, date of birth and mobile number as held by Singpass, and a Singpass identifier for your TryKai account | When you verify to host with Singpass | To confirm Hosts are real, identifiable adults, that one person has one host account, and to reach Hosts about their sessions |
 | ID document and selfie | When you verify to host by upload | Same as above |
+| Your choice about offer emails | Signup, or later in Settings | To email you new sessions and offers, at most once a week, only if you agreed. Every such email has a one-tap unsubscribe link, and you can turn them off in Settings at any time. Booking emails and reminders are not affected |
 | Basic usage data (pages viewed, device type) | Automatically | To keep the site working and improve it |
 
 We do not collect your full card details. Stripe handles them.
