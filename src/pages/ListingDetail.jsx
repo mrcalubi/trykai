@@ -65,6 +65,7 @@ import KeenPanel from '../components/KeenPanel'
 import { usePageTitle } from '../lib/pageTitle'
 import { MOSAIC_VISIBLE_PHOTOS } from '../lib/listingPhotos'
 import { hostRatingFromRpc } from '../lib/twoWayReviews'
+import { loadRepliesInto, replaceReply } from '../lib/reviewReplies'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -326,7 +327,9 @@ export default function ListingDetail() {
       }
 
       if (!reviewsResult.error) {
-        setReviews(reviewsResult.data ?? [])
+        const reviewRows = reviewsResult.data ?? []
+        setReviews(reviewRows)
+        void loadRepliesInto(reviewRows, setReviews)
       }
 
       setHostRating(hostRatingFromRpc(hostRatingResult.data, hostRatingResult.error))
@@ -1381,6 +1384,9 @@ export default function ListingDetail() {
                     review={review}
                     listingTitle={listing.title}
                     viewerId={viewerId}
+                    canReply={isOwnListing}
+                    hostName={hostName}
+                    onReplyChange={(reviewId, reply) => setReviews(replaceReply(reviewId, reply))}
                   />
                 ))}
               </div>

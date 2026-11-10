@@ -53,6 +53,7 @@ import {
 } from '../lib/profileV2'
 import { formatSessionTime } from '../lib/sessionDate'
 import { reviewClosedOnLabel, reviewIsPublic } from '../lib/twoWayReviews'
+import { loadRepliesInto, replaceReply } from '../lib/reviewReplies'
 import { profileReportSubject, reportMailto } from '../lib/reportMailto'
 import { SHARE_NOTES, shareOrCopy } from '../lib/share'
 import OverflowMenu from '../components/ui/OverflowMenu'
@@ -324,7 +325,7 @@ function ListingCards({ listings, ratings }) {
   )
 }
 
-function ReviewsList({ reviews, viewerId }) {
+function ReviewsList({ reviews, viewerId, canReply = false, hostName, onReplyChange }) {
   if (reviews.length === 0) {
     return <p className="empty-state">No reviews yet.</p>
   }
@@ -332,7 +333,14 @@ function ReviewsList({ reviews, viewerId }) {
   return (
     <div className="reviews-list profile-reviews">
       {reviews.map((review) => (
-        <ReviewCard key={review.id} review={review} viewerId={viewerId} />
+        <ReviewCard
+          key={review.id}
+          review={review}
+          viewerId={viewerId}
+          canReply={canReply}
+          hostName={hostName}
+          onReplyChange={onReplyChange}
+        />
       ))}
     </div>
   )
@@ -545,7 +553,9 @@ export default function Profile() {
       }
 
       if (!reviewsResult.error) {
-        setReviews(reviewsResult.data ?? [])
+        const reviewRows = reviewsResult.data ?? []
+        setReviews(reviewRows)
+        void loadRepliesInto(reviewRows, setReviews)
       }
       if (!fromHostsResult.error) {
         setFromHosts((fromHostsResult.data ?? []).map(hostReviewAsCard))
@@ -934,7 +944,13 @@ export default function Profile() {
               {isHost ? (
                 <>
                   <ReviewsHeading reviews={hostReviews} />
-                  <ReviewsList reviews={hostReviews} viewerId={viewerId} />
+                  <ReviewsList
+                    reviews={hostReviews}
+                    viewerId={viewerId}
+                    canReply
+                    hostName={givenName}
+                    onReplyChange={(reviewId, reply) => setReviews(replaceReply(reviewId, reply))}
+                  />
                 </>
               ) : null}
               <FromHostsSection reviews={fromHosts} viewerId={viewerId} heading="About you" />
@@ -956,7 +972,7 @@ export default function Profile() {
           {isHost ? (
             <section id="profile-reviews" className="profile-section" aria-label="Reviews">
               <ReviewsHeading reviews={hostReviews} />
-              <ReviewsList reviews={hostReviews} viewerId={viewerId} />
+              <ReviewsList reviews={hostReviews} viewerId={viewerId} hostName={givenName} />
             </section>
           ) : null}
           <FromHostsSection reviews={fromHosts} viewerId={viewerId} />

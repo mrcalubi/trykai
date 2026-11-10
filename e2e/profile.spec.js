@@ -34,6 +34,9 @@ test.describe('public profile v2', () => {
       sessions: [OPEN_SESSION, { ...OPEN_SESSION, id: 'session-3', starts_at: hoursFromNow(100) }],
       reviews: [{ id: 'review-1', reviewer_id: 'guest-1' }],
       'rpc/reviews_for_host': [REVIEW],
+      'rpc/review_replies': [
+        { review_id: 'review-1', body: 'Thanks Sam, come again!', host_display_name: 'Mei' },
+      ],
       'rpc/host_sessions_held': [3],
       'rpc/host_is_founding': [true],
       'rpc/listing_ratings': [],
@@ -56,6 +59,10 @@ test.describe('public profile v2', () => {
     await expect(comingUp.getByRole('link')).toHaveCount(2)
     await expect(comingUp.getByRole('link').first()).toHaveAttribute('href', `/listings/${LATTE_ART.id}`)
     await expect(page.getByRole('heading', { name: 'Sessions by Mei' })).toBeVisible()
+    const reviews = page.getByRole('region', { name: 'Reviews' })
+    await expect(reviews).toContainText('Reply from Mei')
+    await expect(reviews).toContainText('Thanks Sam, come again!')
+    await expect(reviews.getByRole('button', { name: 'Reply publicly' })).toHaveCount(0)
     await expect(page.getByText('Only you see these')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Milestones' })).toHaveCount(0)
 
