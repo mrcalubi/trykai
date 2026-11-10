@@ -429,8 +429,8 @@ describe('BookingDetail', () => {
           i_reviewed: true,
           my_review_public: false,
           other_side_reviewed: false,
-          reveal_after: '2026-11-10T12:00:00.000Z',
-          deadline: '2026-11-10T12:00:00.000Z',
+          reveal_after: hoursFromNow(72),
+          deadline: hoursFromNow(72),
         },
       ],
     })

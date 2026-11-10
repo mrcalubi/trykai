@@ -3441,7 +3441,8 @@ body.lightbox-open {
 .featured-review__text,
 .coming-up__title,
 .featured-choice__text,
-.edit-preview__name {
+.edit-preview__name,
+.review-reply__body {
   overflow-wrap: break-word;
 }
 
@@ -7010,6 +7011,67 @@ body.lightbox-open {
   text-decoration: underline;
 }
 
+/* Host reply under a guest review (00055). Indented with a rule so it reads
+   as an answer to the review above, not a second review. */
+.review-reply {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--border-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--cream);
+}
+
+.review-reply__label {
+  display: block;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.review-reply__body {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-line;
+}
+
+.review-reply--form .input--textarea {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.review-reply__hint {
+  margin: 6px 0 0;
+}
+
+.review-reply__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 10px;
+}
+
+.review-reply__actions .link-button {
+  font-size: 13px;
+}
+
+.review-reply__confirm {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.review-reply__start {
+  margin-top: 12px;
+}
+
+.review-reply__start .link-button {
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .review-photos {
   display: flex;
   flex-wrap: wrap;
@@ -10510,6 +10572,70 @@ body:has(.edit-profile__bar) .site-footer {
 
 .listing-extras__price {
   color: var(--text);
+}
+
+/* Session types (00056): the listing page cards double as a filter. */
+.session-types__card {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.session-types__card:hover,
+.session-types__card:focus-visible {
+  border-color: var(--border-strong);
+}
+
+.session-types__card--on,
+.session-types__card--on:hover {
+  border-color: var(--navy);
+  box-shadow: inset 0 0 0 1px var(--navy);
+}
+
+.session-types__card .listing-extras__copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.session-types__see {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--coral-ink);
+}
+
+.session-type-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.session-card__type {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--coral-ink);
+}
+
+.booking-page__type {
+  margin: 6px 0 0;
+}
+
+.hosting-session__type {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--coral-ink);
+}
+
+.add-sessions__types {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
 }
 
 .checkout-addons {
