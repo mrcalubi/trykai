@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import AddSessionsForm from '../components/AddSessionsForm'
+import { querySessionTypes, typesByListing } from '../lib/sessionTypes'
 import {
   clearSessionDraft,
   readOpenSessionForm,
@@ -86,6 +87,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
 
   const [listings, setListings] = useState([])
   const [hostSessions, setHostSessions] = useState([])
+  const [sessionTypeRows, setSessionTypeRows] = useState([])
   const [prepareBySession, setPrepareBySession] = useState({})
   const [monthSessions, setMonthSessions] = useState([])
   const [verificationStatus, setVerificationStatus] = useState(null)
@@ -232,6 +234,9 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
 
     const loadedListings = listingsResult.error ? [] : (listingsResult.data ?? [])
     const listingIds = loadedListings.map((l) => l.id)
+    // Session types (00056); none until it is applied.
+    const { rows: typeRows } = await querySessionTypes(supabase, listingIds)
+    setSessionTypeRows(typeRows)
     // 00032. Until it is applied the RPC errors; the page simply shows no banner.
     const { data: interestRows } = await supabase.rpc('host_listing_interest')
     const interest = hostInterestById(interestRows)
@@ -438,7 +443,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
 
   async function handleCreateSessions(
     listingId,
-    { accepted, skipped, spots, duration, usesListingDuration, alsoListingIds = [] },
+    { accepted, skipped, spots, duration, usesListingDuration, alsoListingIds = [], typeId = null },
   ) {
     const rejected = [...skipped]
 
@@ -449,6 +454,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
           p_listing_id: listingId,
           p_starts_at: item.startsAt.toISOString(),
           p_spots: spots,
+          ...(typeId ? { p_type_id: typeId } : {}),
         })
         rpcError = result.error
       } else {
@@ -459,6 +465,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
           spots_total: spots,
           spots_remaining: spots,
           status: 'open',
+          ...(typeId ? { type_id: typeId } : {}),
         })
         rpcError = result.error
       }
@@ -730,6 +737,8 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   const confirmStats = confirmListing
     ? listingUpcomingStats(confirmListing.id, hostSessions)
     : null
+  const activeTypesByListing = typesByListing(sessionTypeRows)
+  const typeNameById = Object.fromEntries(sessionTypeRows.map((row) => [row.id, row.name]))
   const bookedHostSessions = hostSessions
     .filter((session) => activeBookingsOn(session).length > 0)
     .slice()
@@ -948,6 +957,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                 <div key={session.id} className="dashboard-card">
                   <SessionRow
                     session={session}
+                    typeName={typeNameById[session.type_id] ?? ''}
                     showListing
                     selectable={false}
                     selected={false}
@@ -1140,6 +1150,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                         listing={listing}
                         existingSessions={hostSessions}
                         otherListings={listings.filter((other) => other.id !== listing.id)}
+                        sessionTypes={activeTypesByListing[listing.id] ?? []}
                         onCancel={closeSessionForm}
                         onCreated={(payload) => handleCreateSessions(listing.id, payload)}
                       />
@@ -1147,6 +1158,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
 
                     <ListingSessions
                       listingId={listing.id}
+                      typeNameById={typeNameById}
                       heldByTitles={heldByTitles}
                       sessions={upcoming.filter(
                         (session) => activeBookingsOn(session).length === 0,
@@ -1274,6 +1286,7 @@ function DraftListingCard({ draft, onDiscard }) {
 
 function ListingSessions({
   listingId,
+  typeNameById = {},
   heldByTitles = {},
   sessions,
   selectedIds,
@@ -1311,6 +1324,7 @@ function ListingSessions({
         <SessionRow
           key={session.id}
           session={session}
+          typeName={typeNameById[session.type_id] ?? ''}
           heldNote={isHeld(session) ? heldSessionLine(heldByTitles[session.held_by_session_id]) : ''}
           selectable
           selected={selectedIds.has(session.id)}
@@ -1378,6 +1392,7 @@ function ListingSessions({
 
 function SessionRow({
   session,
+  typeName = '',
   heldNote = '',
   showListing = false,
   selectable,
@@ -1452,6 +1467,7 @@ function SessionRow({
         ) : (
           <div className="hosting-session__text">
             <p className="dashboard-card__title">{title}</p>
+            {typeName ? <p className="hosting-session__type">{typeName}</p> : null}
             {heldNote ? <p className="hosting-session__held">{heldNote}</p> : null}
             {showListing ? (
               <p className="dashboard-card__meta">

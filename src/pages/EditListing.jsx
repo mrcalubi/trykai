@@ -10,6 +10,7 @@ import { revokePhotoUrls } from '../lib/coverCrop'
 import { MAX_PHOTOS, photosFromUrls, uploadListingPhotos } from '../lib/listingPhotos'
 import ListingPricePanel from '../components/ListingPricePanel'
 import ListingAddonsEditor from '../components/ListingAddonsEditor'
+import SessionTypesEditor from '../components/SessionTypesEditor'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
 import WhatToBringFields from '../components/WhatToBringFields'
 import FieldHint from '../components/FieldHint'
@@ -35,6 +36,12 @@ import {
   loadListingAddons,
   saveListingAddons,
 } from '../lib/listingAddons'
+import {
+  isMissingSessionTypes,
+  loadSessionTypesForEditor,
+  saveSessionTypes,
+  sessionTypeFieldHints,
+} from '../lib/sessionTypes'
 import { useUnsavedChangesGuard } from '../lib/useUnsavedChangesGuard'
 import ListingDeleteDialog from '../components/ListingDeleteDialog'
 import {
@@ -101,6 +108,10 @@ export default function EditListing() {
   const [savedAddons, setSavedAddons] = useState([])
   const [addonsAvailable, setAddonsAvailable] = useState(false)
   const [addonsLoaded, setAddonsLoaded] = useState(false)
+  const [sessionTypes, setSessionTypes] = useState([])
+  const [savedSessionTypes, setSavedSessionTypes] = useState([])
+  const [typesAvailable, setTypesAvailable] = useState(false)
+  const [typesLoaded, setTypesLoaded] = useState(false)
   const photosRef = useRef(photos)
   const photoPickerRef = useRef(null)
   const [isFoundingHost, setIsFoundingHost] = useState(null)
@@ -208,6 +219,12 @@ export default function EditListing() {
       setAddonsAvailable(addonResult.available)
       setAddonsLoaded(addonResult.loaded)
       setSavedAddons(nextAddons)
+      const typeResult = await loadSessionTypesForEditor(supabase, id)
+      const nextTypes = typeResult.types
+      setTypesAvailable(typeResult.available)
+      setTypesLoaded(typeResult.loaded)
+      setSavedSessionTypes(nextTypes)
+      setSessionTypes(nextTypes)
       setTitle(nextTitle)
       setDescription(nextDescription)
       setCategory(nextCategory)
@@ -240,6 +257,7 @@ export default function EditListing() {
           whatToBring: nextBring,
           photos: nextPhotos,
           addons: nextAddons,
+          sessionTypes: nextTypes,
         }),
       )
       setFetching(false)
@@ -266,6 +284,7 @@ export default function EditListing() {
     if (!area) hints.area = LISTING_FIELD_HINTS.area
     if (!fullAddress.trim()) hints.fullAddress = LISTING_FIELD_HINTS.fullAddress
     if (addonsAvailable) Object.assign(hints, addonFieldHints(addons))
+    if (typesAvailable) Object.assign(hints, sessionTypeFieldHints(sessionTypes))
     return hints
   }
 
@@ -377,6 +396,28 @@ export default function EditListing() {
       }
     }
 
+    if (typesAvailable && typesLoaded) {
+      const { error: typesError, insertedIds } = await saveSessionTypes({
+        client: supabase,
+        listingId: id,
+        types: sessionTypes,
+        existing: savedSessionTypes,
+        userId,
+        storage: supabase.storage,
+      })
+      if (typesError && !isMissingSessionTypes(typesError)) {
+        // Keep what did save, so pressing Save again updates instead of duplicating.
+        setSessionTypes((prev) =>
+          prev.map((type) => (insertedIds?.[type.key] ? { ...type, id: insertedIds[type.key] } : type)),
+        )
+        const fresh = await loadSessionTypesForEditor(supabase, id)
+        if (fresh.loaded) setSavedSessionTypes(fresh.types)
+        setLoading(false)
+        showSaveProblem(typesError)
+        return
+      }
+    }
+
     // Stay "saving" so the unsaved-changes guard does not fire on this leave.
     // Only does anything when this edit put the listing back in the queue.
     photosRef.current.forEach(revokePhotoUrls)
@@ -439,6 +480,7 @@ export default function EditListing() {
     whatToBring,
     photos,
     addons,
+    sessionTypes,
   })
   const isDirty =
     !fetching && !loading && !leaving && savedDraft != null && currentDraft !== savedDraft
@@ -573,6 +615,10 @@ export default function EditListing() {
 
           {addonsAvailable ? (
             <ListingAddonsEditor addons={addons} onChange={setAddons} fieldHints={fieldHints} />
+          ) : null}
+
+          {typesAvailable ? (
+            <SessionTypesEditor types={sessionTypes} onChange={setSessionTypes} fieldHints={fieldHints} />
           ) : null}
 
           <BookingCutoffFields value={bookingCutoff} onChange={setBookingCutoff} />

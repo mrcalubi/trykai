@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { screen, waitFor, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ListingDetail from './ListingDetail'
 import BackButton, { BackSlotProvider } from '../components/BackButton'
 import { supabase } from '../lib/supabase'
@@ -1869,5 +1869,80 @@ describe('ListingDetail booking cutoff', () => {
     expect(await screen.findByText('Booking closed')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Book' })).not.toBeInTheDocument()
     expect(screen.getByText(/spots left/)).toBeInTheDocument()
+  })
+})
+
+describe('ListingDetail session types', () => {
+  const TYPES = [
+    { id: 't1', listing_id: 'listing-1', name: 'Hand-tied bouquet', description: 'Take one home.', photo_url: null, position: 0, is_active: true },
+    { id: 't2', listing_id: 'listing-1', name: 'Table centrepiece', description: '', photo_url: null, position: 1, is_active: true },
+    { id: 't3', listing_id: 'listing-1', name: 'Old wreath', description: '', photo_url: null, position: 2, is_active: false },
+  ]
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-10T02:00:00Z'))
+    givenListing(makeListing({ users: { display_name: 'Mei', stripe_payouts_enabled: true } }))
+    givenSessions([
+      makeSession({ id: 's1', starts_at: hoursFromNow(48), spots_remaining: 4, type_id: 't1' }),
+      makeSession({ id: 's2', starts_at: hoursFromNow(50), spots_remaining: 4, type_id: 't2' }),
+      makeSession({ id: 's3', starts_at: hoursFromNow(52), spots_remaining: 4, type_id: 't3' }),
+    ])
+    givenReviews([])
+    supabase.__on('listing_session_types', 'select', { data: TYPES, error: null })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('shows the active types and labels each session, removed types included', async () => {
+    renderPage()
+    expect(await screen.findByRole('heading', { name: 'Choose your session' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Old wreath/ })).not.toBeInTheDocument()
+    const day = document.querySelector('.session-day')
+    await waitFor(() => expect(within(day).getAllByRole('button', { name: 'Book' })).toHaveLength(3))
+    expect(within(day).getByText('Hand-tied bouquet')).toBeInTheDocument()
+    expect(within(day).getByText('Old wreath')).toBeInTheDocument()
+  })
+
+  it('filters dates by type from the chips and the cards', async () => {
+    const { user } = renderPage()
+    const day = await waitFor(() => {
+      const node = document.querySelector('.session-day')
+      expect(within(node).getAllByRole('button', { name: 'Book' })).toHaveLength(3)
+      return node
+    })
+    const filter = screen.getByRole('group', { name: 'Session type' })
+    await user.click(within(filter).getByRole('button', { name: 'Table centrepiece' }))
+    expect(within(day).getAllByRole('button', { name: 'Book' })).toHaveLength(1)
+    expect(within(day).getByText('Table centrepiece')).toBeInTheDocument()
+
+    await user.click(within(filter).getByRole('button', { name: 'All' }))
+    expect(within(day).getAllByRole('button', { name: 'Book' })).toHaveLength(3)
+
+    await user.click(screen.getByRole('button', { name: /Hand-tied bouquet.*See dates/ }))
+    expect(within(day).getAllByRole('button', { name: 'Book' })).toHaveLength(1)
+    expect(within(filter).getByRole('button', { name: 'Hand-tied bouquet' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('reads sessions without type_id before 00056', async () => {
+    supabase.__on('listing_session_types', 'select', {
+      data: null,
+      error: { code: 'PGRST205', message: "Could not find the table 'public.listing_session_types'" },
+    })
+    let first = true
+    const rows = [makeSession({ id: 's1', starts_at: hoursFromNow(48), spots_remaining: 4 })]
+    supabase.__on('sessions', 'select', (call) => {
+      const columns = call.chain.find((step) => step.method === 'select')?.args[0] ?? ''
+      if (columns.includes('type_id') && first) {
+        first = false
+        return { data: null, error: { code: '42703', message: 'column sessions.type_id does not exist' } }
+      }
+      return { data: rows, error: null }
+    })
+    renderPage()
+    expect(await screen.findByRole('button', { name: 'Book' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Choose your session' })).not.toBeInTheDocument()
   })
 })
