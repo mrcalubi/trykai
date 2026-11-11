@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { publicName } from '../lib/publicName'
 import { reportMailto, reviewReportSubject } from '../lib/reportMailto'
 import Avatar from './ui/Avatar'
@@ -39,6 +40,7 @@ export default function ReviewCard({
   const name = displayName || 'Guest'
   const listing = listingTitle || review.listing_title || 'listing'
   const isOwnReview = Boolean(viewerId && review.reviewer_id && viewerId === review.reviewer_id)
+  const profileHref = review.reviewer_id ? `/u/${review.reviewer_id}` : null
   const photoPaths = Array.isArray(review.photo_paths) ? review.photo_paths.filter(Boolean) : []
   const hasPhotos = photoPaths.length > 0
   const reportHref = reportMailto({
@@ -50,14 +52,33 @@ export default function ReviewCard({
   return (
     <div className="review-card">
       <div className="review-card__header">
-        <Avatar
-          avatarUrl={review.users?.avatar_url}
-          displayName={displayName}
-          size={40}
-          className="review-card__avatar"
-        />
+        {profileHref ? (
+          <Link to={profileHref} className="review-card__avatar-link" aria-hidden="true" tabIndex={-1}>
+            <Avatar
+              avatarUrl={review.users?.avatar_url}
+              displayName={displayName}
+              size={40}
+              className="review-card__avatar"
+            />
+          </Link>
+        ) : (
+          <Avatar
+            avatarUrl={review.users?.avatar_url}
+            displayName={displayName}
+            size={40}
+            className="review-card__avatar"
+          />
+        )}
         <div className="review-card__author">
-          <p className="review-card__name">{name}</p>
+          <p className="review-card__name">
+            {profileHref ? (
+              <Link to={profileHref} className="review-card__name-link">
+                {name}
+              </Link>
+            ) : (
+              name
+            )}
+          </p>
           {review.listing_title ? (
             <p className="review-card__listing">{review.listing_title}</p>
           ) : null}

@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render as rtlRender, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReviewCard from './ReviewCard'
@@ -7,11 +8,23 @@ import { supabase } from '../lib/supabase'
 
 vi.mock('../lib/supabase')
 
+const render = (ui) => rtlRender(ui, { wrapper: MemoryRouter })
+
 function renderReview(overrides) {
   return render(<ReviewCard review={makeReview(overrides)} />)
 }
 
 describe('ReviewCard', () => {
+  it('links the reviewer photo and name to their profile', () => {
+    renderReview({ reviewer_id: 'user-42' })
+    expect(screen.getByRole('link', { name: /./ })).toHaveAttribute('href', '/u/user-42')
+  })
+
+  it('shows a plain name when the reviewer is unknown', () => {
+    renderReview({ reviewer_id: null })
+    expect(screen.queryByRole('link', { name: /./ })).not.toBeInTheDocument()
+  })
+
   beforeEach(() => {
     supabase.__reset()
   })

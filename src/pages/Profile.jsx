@@ -954,7 +954,7 @@ export default function Profile() {
                 </>
               ) : null}
               <FromHostsSection reviews={fromHosts} viewerId={viewerId} heading="About you" />
-              <WrittenReviewsSection reviews={writtenReviews} nowMs={nowMs} />
+              <WrittenReviewsSection reviews={writtenReviews} nowMs={nowMs} author={profile} />
             </section>
           ) : null}
         </>
@@ -1013,7 +1013,7 @@ function FromHostsSection({ reviews, viewerId, heading }) {
   )
 }
 
-function WrittenReviewsSection({ reviews, nowMs }) {
+function WrittenReviewsSection({ reviews, nowMs, author }) {
   if (!reviews?.length) return null
   return (
     <section className="profile-section" aria-label="By you">
@@ -1025,7 +1025,13 @@ function WrittenReviewsSection({ reviews, nowMs }) {
           return (
             <div key={review.id}>
               <ReviewCard
-                review={{ ...review, listing_title: listingTitle }}
+                review={{
+                  ...review,
+                  listing_title: listingTitle,
+                  reviewer_id: author?.id,
+                  users: { full_name: author?.display_name, avatar_url: author?.avatar_url },
+                }}
+                viewerId={author?.id}
                 hideRating={review.role === 'host'}
               />
               {pending ? (

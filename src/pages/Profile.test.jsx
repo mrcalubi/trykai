@@ -411,6 +411,9 @@ describe('Profile public content', () => {
     const written = screen.getByRole('region', { name: 'By you' })
     expect(within(written).getByText('Great class')).toBeInTheDocument()
     expect(within(written).getByText(/Live on /)).toBeInTheDocument()
+    // Your own review shows you as the author, with no Report menu on it.
+    expect(within(written).queryByText('Guest')).not.toBeInTheDocument()
+    expect(within(written).queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
   })
 
   it('lists active listings with the browse card', async () => {
