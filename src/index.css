@@ -6970,6 +6970,16 @@ body.lightbox-open {
   min-width: 0;
 }
 
+.review-card__name-link,
+.review-card__avatar-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.review-card__name-link:hover {
+  text-decoration: underline;
+}
+
 .review-card__name {
   margin: 0;
   font-weight: 600;
