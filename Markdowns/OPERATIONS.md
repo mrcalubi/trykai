@@ -421,7 +421,7 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 | Site | trykai.vercel.app | trykai.sg |
 | Git branch | `staging` | `main` |
 | Edge Function deploy | Automatic on push to `staging` | Automatic on push to `main` (`PRODUCTION_SUPABASE_PROJECT_REF` GitHub secret, required) |
-| Migrations | By hand, SQL Editor | By hand, SQL Editor |
+| Migrations | By hand, SQL Editor, until `STAGING_SUPABASE_DB_PASSWORD` is set (Migration deploys) | By hand, SQL Editor, until `PRODUCTION_SUPABASE_DB_PASSWORD` is set (Migration deploys) |
 
 **Both dashboards show the "PRODUCTION" label.** It is not a guide. The ref in the URL is. The runbooks below are written against staging; for production, swap in `dqqlwofluvhikebtjune`.
 
@@ -437,6 +437,28 @@ Every migration, and any other SQL that writes on production.
 4. **Record it.** Update the migration table below.
 
 A manual dump gives a restore point from the minute before a risky change, newer than the daily backup. It is optional and needs Docker Desktop and the production database password, so it is for whoever has those set up (Rui Heng): `npx supabase link --project-ref dqqlwofluvhikebtjune`, then `npx supabase db dump -f prod-schema.sql` and `npx supabase db dump --data-only -f prod-data.sql`, run outside the repo folder. Dumps hold users' personal data: never commit them (`.gitignore` blocks `prod-*.sql`) and never upload them to chat.
+
+## Migration deploys
+
+CI can apply migrations itself. The deploy job runs `scripts/push-migrations.mjs` before it deploys Edge Functions: push to `staging` targets staging, push to `main` targets production. It is **off for an environment until that environment's database password is a GitHub secret**; until then the step prints a warning and migrations stay manual (Production SQL above). Switch staging on first and run a release or two through it before production.
+
+**Switching an environment on (Caleb, once per environment, in this order).**
+
+1. **Check which migrations are on the database.** Run `supabase/tests/which_migrations.sql` in the SQL Editor. Apply any that are missing by hand, so the database matches the branch that deploys to it (`staging` or `main`).
+2. **Record them in the history table.** Migrations pasted into the SQL Editor are not in `supabase_migrations.schema_migrations`, which is how the CLI knows what has run. From a terminal in the repo, with `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` set in that shell:
+   - `npx supabase@2.121.0 migration list --project-ref <ref>` shows Local against Remote.
+   - `npx supabase@2.121.0 migration repair --status applied 00001 00002 … --project-ref <ref>` marks versions as applied without running them. List every version that is on the database and blank under Remote.
+   - Run `migration list` again: every row should have both columns filled.
+3. **Add the GitHub secret**: `STAGING_SUPABASE_DB_PASSWORD` or `PRODUCTION_SUPABASE_DB_PASSWORD` (Supabase dashboard, Database, Settings; resetting the password there is fine, nothing else uses it).
+4. **Check the next deploy.** The job summary lists what it applied, or says the project is up to date.
+
+**Once it is on.**
+
+- **Never paste a migration into the SQL Editor on that environment again.** A pasted migration is not in the history, so the next push runs it a second time. If it happens, record it with `migration repair --status applied <version>`.
+- **The script refuses to push more than 5 migrations at once.** That is the guard against a database whose history was never backfilled. A release that really carries more needs a manual run with `--max-pending`.
+- **A failed migration stops the Edge Function deploy.** Fix forward with a new migration; do not edit one that has already been applied anywhere.
+- **Production changes happen at merge, with no human step.** Check the daily backup before merging a release that carries a migration. The website deploys from Vercel at the same moment, so for a minute or so new pages can run against the old schema: keep writing migrations as additive, and keep shipping lock-down migrations separately from the code that stops needing the old access.
+- **Numbers must still be unique and increasing.** `db push` refuses a migration numbered below one that is already applied.
 
 ## Migration state
 
@@ -687,7 +709,7 @@ Write one password-manager note called `PAYOUT_CRON_SECRET (staging)` and reuse 
 
 ## 1. Stripe: stop automatic payouts to the bank
 
-This is the **platform** Stripe account (TryKai), not a host's Connect account. Automatic payouts empty the platform balance. Host Transfers then fail, and retrying without pinning to the original charge would take a later guest's funds.
+This is the **platform** Stripe account (TryKai), not a host's Connect account. Automatic payouts empty the platform balance. Host Transfers then fail, and retrying without pinning to the original charge would take a later guest's funds. A host who asks to be paid into a different bank follows **Host bank account change** below. Their bank lives on the Express account.
 
 1. Open https://dashboard.stripe.com (the TryKai account).
 2. Turn **Test mode** on if you are working on staging sandbox charges (toggle in the top right). Live mode is a separate setting; you will repeat this on live before real money.
@@ -826,6 +848,86 @@ Also open **Edge Functions → release-payout → Logs** and look for a line sta
 | `failed` + insufficient available funds | Platform available balance is too low (automatic payouts already sent it to the bank). Two Transfers can succeed and the rest fail in the same run. In **test mode**, Stripe's own message is the fix: create a charge with card `4000000000000077` (any future expiry and CVC) so funds land in the available balance, then run the same command again. Bookings already in `released` are not paid twice. |
 
 GitHub secrets `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAYOUT_CRON_SECRET` (and `PRODUCTION_*`) are optional on staging because of the database cron. They are needed for production once `.github/workflows/release-payout.yml` is on `main`. GitHub **schedule** only runs from `main`. **Actions → Release host payouts → Run workflow** works after that.
+
+---
+
+# Host bank account change
+
+A verified host who has already finished payout setup emails `hello@trykai.sg` to move later Stripe deposits to another bank. TryKai never stores the account number. Stripe holds it on the Express connected account (`users.stripe_account_id`). Once `stripe_payouts_enabled` is true, Hosting has no bank form. **Set up payouts** only confirms that payouts are on, because `create-account-link` returns no URL for an account that already pays out.
+
+The host types the new account on Stripe's Express Dashboard. Express accounts have that dashboard, so the platform cannot create or replace the bank account through the API or by typing it into the Dashboard. Leave the full account number out of email, Slack, and the support thread.
+
+Two hops, and only the second one uses the bank:
+
+1. `release-payout` Transfers the host share onto the connected account's Stripe balance 72 hours after the session ends (`starts_at` + `duration_mins`). A bank change does not move or reroute that Transfer.
+2. Stripe then pays that balance out to the connected account's default bank. That payout is a `po_` on the **connected** account, separate from TryKai's own manual payout to Aspire.
+
+A payout Stripe has already created still arrives in the bank that was the default when Stripe created it. Money already in the old bank stays there. The next payout Stripe creates after the new account is the SGD default goes to the new bank.
+
+The replacement is a Singapore bank account in the name on the Stripe account. TryKai ID verification stays as it is.
+
+## 0. Confirm it is the host
+
+Reply when the request comes from the email on the TryKai account, or after you have confirmed another way that the sender is that person. Generating an update code in step 2 makes TryKai solely liable for a payout to the wrong account.
+
+Production hosts live on ref `dqqlwofluvhikebtjune`. Staging is `hzgybclfvpuxkmytdoos`. Confirm the ref in the SQL Editor URL, then run:
+
+```sql
+select id, email, full_name, display_name, phone,
+       stripe_account_id, stripe_payouts_enabled, verification_status
+from public.users
+where email ilike 'host@example.com';
+```
+
+You want one row, `stripe_account_id` starting with `acct_`, and `stripe_payouts_enabled` true. Stop if more than one row matches.
+
+- `stripe_account_id` is null: they have not started payout setup. Send them to their Hosting tab and **Set up payouts**. Do not create a second Express account.
+- `stripe_account_id` is set and `stripe_payouts_enabled` is false: onboarding is unfinished. **Continue payout setup** on Hosting collects the bank. This runbook is for an account that already pays out.
+
+Write the support note with the date, the host email, and the `acct_…`. Leave the bank account number out of it.
+
+## 1. Send them to the Express Dashboard
+
+This is the usual path. Live accounts only. Send:
+
+> You change the bank in Stripe. Open https://connect.stripe.com/express_login and sign in with this email address. Stripe texts a 6-digit code. If you no longer have that phone, choose "I no longer have access to this phone number" on that page and Stripe will email a code instead.
+>
+> Then go to Settings, and under Business details open Payout details and choose Edit. Add a Singapore bank account in your own name and save. If the old account is still listed, set the new one as the account for SGD before you leave.
+>
+> A deposit Stripe has already started still arrives in the old account. The next one goes to the new account. TryKai still sends your share to your Stripe balance 72 hours after the session ends.
+>
+> If Stripe asks for the current account number, enter it there. If it asks you to contact TryKai for a code, reply to this email.
+
+`express_login` is the page Stripe publishes for live Express accounts. Keep one-time Login Links inside the Dashboard (the connected account's login link, or `POST /v1/accounts/:id/login_links`). Stripe treats a login link sent by email or text as a leaked credential.
+
+Test mode cannot use `express_login`. For a staging host, open their connected account in the Dashboard with **Test mode** on and use the login link in the same sitting, with them present. The same rule applies: that URL stays off email and chat.
+
+## 2. When Stripe will not let them edit
+
+Use this when step 1 is blocked: they no longer have the old account number, Stripe says it cannot verify them, or Stripe tells them to contact the platform for a validation code.
+
+TryKai's connected accounts set `losses_collector` to `application` (`_shared/connect.ts`), so the platform is responsible for negative balances and Stripe allows this code. It exists in live mode only. Your Stripe role must be Support Associate, Support Specialist, Developer, Administrator, or Super Administrator.
+
+When you generate the code, TryKai accepts sole legal and financial liability for a payout that lands in the wrong account. Stop if the email, name, or `acct_` does not match the request.
+
+1. Open https://dashboard.stripe.com with **Test mode** off.
+2. Open the Connected accounts page and select the `acct_…` from the SQL.
+3. Confirm the owner name and email match the host and the email you received.
+4. In **Payout information**, open the overflow menu (⋯) next to the external account, then **Generate update code**.
+5. Confirm the owner details and accept liability.
+6. Click **Send**. Stripe emails the code to the email on that connected account. It lasts 7 days. If it expires before they finish, generate another the same way. The code goes to that Stripe email only.
+
+They then return to **Payout details → Edit** and enter the code instead of the old account number.
+
+If **Generate update code** is missing, they complete whatever identity check Stripe shows on the Express page, or you contact Stripe Support with the `acct_…`. The new account number stays on Stripe's form either way.
+
+## 3. Afterwards
+
+- Ask them to reply once Stripe shows the new bank. The last four digits are enough.
+- On the same connected account, open **Payout information** and confirm the new bank is the default for SGD. You will see the bank name and last four.
+- Tell them again which way an in-progress payout goes: one Stripe has already created still uses the old bank; the next one uses the new default. The 72 hour Transfer onto their Stripe balance is unchanged.
+- Leave `stripe_account_id` on that same `acct_`. `stripe_payouts_enabled` stays true. If the connected account page shows payouts disabled afterwards, Stripe is asking for something else. Follow **Connected accounts webhook** and have them finish that request from Hosting.
+- Add the date and the new last four to the support note.
 
 ---
 

@@ -1,4 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { Route } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import EditListing from './EditListing'
@@ -360,6 +362,20 @@ describe('EditListing validation', () => {
     submitForm()
 
     expect(await screen.findByText(LISTING_FIELD_HINTS.spots)).toBeInTheDocument()
+  })
+})
+
+describe('EditListing layout', () => {
+  it('lets price and spots share their row evenly so neither runs off a phone screen', async () => {
+    await renderLoaded()
+
+    const row = screen.getByLabelText('Spots per session').closest('.form__row')
+    expect(row).toContainElement(screen.getByLabelText('Price per person (SGD)'))
+
+    const css = readFileSync(resolve(import.meta.dirname, '../index.css'), 'utf8')
+    const rule = css.match(/\.form__row > \* \{[^}]*\}/)?.[0]
+    expect(rule).toMatch(/flex:\s*1 1 0/)
+    expect(rule).toMatch(/min-width:\s*0/)
   })
 })
 
