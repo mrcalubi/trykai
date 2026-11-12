@@ -261,6 +261,15 @@ test.describe('listing spots', () => {
     await expect(page.getByText('12 Coffee Road')).toBeVisible()
     await expect(page.getByText('Hidden from guests until they book.')).toBeVisible()
     await expect(page.getByLabel('Spots per session')).toHaveValue('6')
+
+    // Price and spots share a row. On a phone the spots field used to run past
+    // the right edge of the card.
+    const card = await page.locator('.form-card').boundingBox()
+    const spots = await page.getByLabel('Spots per session').boundingBox()
+    const price = await page.getByLabel('Price per person (SGD)').boundingBox()
+    expect(spots.x + spots.width).toBeLessThanOrEqual(card.x + card.width)
+    expect(price.x + price.width).toBeLessThanOrEqual(spots.x)
+
     await page.getByLabel('Spots per session').fill('4')
     await page.getByRole('button', { name: 'Save changes' }).click()
 
