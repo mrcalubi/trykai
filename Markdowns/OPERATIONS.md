@@ -421,7 +421,7 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 | Site | trykai.vercel.app | trykai.sg |
 | Git branch | `staging` | `main` |
 | Edge Function deploy | Automatic on push to `staging` | Automatic on push to `main` (`PRODUCTION_SUPABASE_PROJECT_REF` GitHub secret, required) |
-| Migrations | By hand, SQL Editor | By hand, SQL Editor |
+| Migrations | By hand, SQL Editor, until `STAGING_SUPABASE_DB_PASSWORD` is set (Migration deploys) | By hand, SQL Editor, until `PRODUCTION_SUPABASE_DB_PASSWORD` is set (Migration deploys) |
 
 **Both dashboards show the "PRODUCTION" label.** It is not a guide. The ref in the URL is. The runbooks below are written against staging; for production, swap in `dqqlwofluvhikebtjune`.
 
@@ -437,6 +437,28 @@ Every migration, and any other SQL that writes on production.
 4. **Record it.** Update the migration table below.
 
 A manual dump gives a restore point from the minute before a risky change, newer than the daily backup. It is optional and needs Docker Desktop and the production database password, so it is for whoever has those set up (Rui Heng): `npx supabase link --project-ref dqqlwofluvhikebtjune`, then `npx supabase db dump -f prod-schema.sql` and `npx supabase db dump --data-only -f prod-data.sql`, run outside the repo folder. Dumps hold users' personal data: never commit them (`.gitignore` blocks `prod-*.sql`) and never upload them to chat.
+
+## Migration deploys
+
+CI can apply migrations itself. The deploy job runs `scripts/push-migrations.mjs` before it deploys Edge Functions: push to `staging` targets staging, push to `main` targets production. It is **off for an environment until that environment's database password is a GitHub secret**; until then the step prints a warning and migrations stay manual (Production SQL above). Switch staging on first and run a release or two through it before production.
+
+**Switching an environment on (Caleb, once per environment, in this order).**
+
+1. **Check which migrations are on the database.** Run `supabase/tests/which_migrations.sql` in the SQL Editor. Apply any that are missing by hand, so the database matches the branch that deploys to it (`staging` or `main`).
+2. **Record them in the history table.** Migrations pasted into the SQL Editor are not in `supabase_migrations.schema_migrations`, which is how the CLI knows what has run. From a terminal in the repo, with `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` set in that shell:
+   - `npx supabase@2.121.0 migration list --project-ref <ref>` shows Local against Remote.
+   - `npx supabase@2.121.0 migration repair --status applied 00001 00002 … --project-ref <ref>` marks versions as applied without running them. List every version that is on the database and blank under Remote.
+   - Run `migration list` again: every row should have both columns filled.
+3. **Add the GitHub secret**: `STAGING_SUPABASE_DB_PASSWORD` or `PRODUCTION_SUPABASE_DB_PASSWORD` (Supabase dashboard, Database, Settings; resetting the password there is fine, nothing else uses it).
+4. **Check the next deploy.** The job summary lists what it applied, or says the project is up to date.
+
+**Once it is on.**
+
+- **Never paste a migration into the SQL Editor on that environment again.** A pasted migration is not in the history, so the next push runs it a second time. If it happens, record it with `migration repair --status applied <version>`.
+- **The script refuses to push more than 5 migrations at once.** That is the guard against a database whose history was never backfilled. A release that really carries more needs a manual run with `--max-pending`.
+- **A failed migration stops the Edge Function deploy.** Fix forward with a new migration; do not edit one that has already been applied anywhere.
+- **Production changes happen at merge, with no human step.** Check the daily backup before merging a release that carries a migration. The website deploys from Vercel at the same moment, so for a minute or so new pages can run against the old schema: keep writing migrations as additive, and keep shipping lock-down migrations separately from the code that stops needing the old access.
+- **Numbers must still be unique and increasing.** `db push` refuses a migration numbered below one that is already applied.
 
 ## Migration state
 
