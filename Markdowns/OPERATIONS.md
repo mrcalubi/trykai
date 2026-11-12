@@ -709,7 +709,7 @@ Write one password-manager note called `PAYOUT_CRON_SECRET (staging)` and reuse 
 
 ## 1. Stripe: stop automatic payouts to the bank
 
-This is the **platform** Stripe account (TryKai), not a host's Connect account. Automatic payouts empty the platform balance. Host Transfers then fail, and retrying without pinning to the original charge would take a later guest's funds.
+This is the **platform** Stripe account (TryKai), not a host's Connect account. Automatic payouts empty the platform balance. Host Transfers then fail, and retrying without pinning to the original charge would take a later guest's funds. A host who asks to be paid into a different bank follows **Host bank account change** below. Their bank lives on the Express account.
 
 1. Open https://dashboard.stripe.com (the TryKai account).
 2. Turn **Test mode** on if you are working on staging sandbox charges (toggle in the top right). Live mode is a separate setting; you will repeat this on live before real money.
@@ -848,6 +848,86 @@ Also open **Edge Functions → release-payout → Logs** and look for a line sta
 | `failed` + insufficient available funds | Platform available balance is too low (automatic payouts already sent it to the bank). Two Transfers can succeed and the rest fail in the same run. In **test mode**, Stripe's own message is the fix: create a charge with card `4000000000000077` (any future expiry and CVC) so funds land in the available balance, then run the same command again. Bookings already in `released` are not paid twice. |
 
 GitHub secrets `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_PAYOUT_CRON_SECRET` (and `PRODUCTION_*`) are optional on staging because of the database cron. They are needed for production once `.github/workflows/release-payout.yml` is on `main`. GitHub **schedule** only runs from `main`. **Actions → Release host payouts → Run workflow** works after that.
+
+---
+
+# Host bank account change
+
+A verified host who has already finished payout setup emails `hello@trykai.sg` to move later Stripe deposits to another bank. TryKai never stores the account number. Stripe holds it on the Express connected account (`users.stripe_account_id`). Once `stripe_payouts_enabled` is true, Hosting has no bank form. **Set up payouts** only confirms that payouts are on, because `create-account-link` returns no URL for an account that already pays out.
+
+The host types the new account on Stripe's Express Dashboard. Express accounts have that dashboard, so the platform cannot create or replace the bank account through the API or by typing it into the Dashboard. Leave the full account number out of email, Slack, and the support thread.
+
+Two hops, and only the second one uses the bank:
+
+1. `release-payout` Transfers the host share onto the connected account's Stripe balance 72 hours after the session ends (`starts_at` + `duration_mins`). A bank change does not move or reroute that Transfer.
+2. Stripe then pays that balance out to the connected account's default bank. That payout is a `po_` on the **connected** account, separate from TryKai's own manual payout to Aspire.
+
+A payout Stripe has already created still arrives in the bank that was the default when Stripe created it. Money already in the old bank stays there. The next payout Stripe creates after the new account is the SGD default goes to the new bank.
+
+The replacement is a Singapore bank account in the name on the Stripe account. TryKai ID verification stays as it is.
+
+## 0. Confirm it is the host
+
+Reply when the request comes from the email on the TryKai account, or after you have confirmed another way that the sender is that person. Generating an update code in step 2 makes TryKai solely liable for a payout to the wrong account.
+
+Production hosts live on ref `dqqlwofluvhikebtjune`. Staging is `hzgybclfvpuxkmytdoos`. Confirm the ref in the SQL Editor URL, then run:
+
+```sql
+select id, email, full_name, display_name, phone,
+       stripe_account_id, stripe_payouts_enabled, verification_status
+from public.users
+where email ilike 'host@example.com';
+```
+
+You want one row, `stripe_account_id` starting with `acct_`, and `stripe_payouts_enabled` true. Stop if more than one row matches.
+
+- `stripe_account_id` is null: they have not started payout setup. Send them to their Hosting tab and **Set up payouts**. Do not create a second Express account.
+- `stripe_account_id` is set and `stripe_payouts_enabled` is false: onboarding is unfinished. **Continue payout setup** on Hosting collects the bank. This runbook is for an account that already pays out.
+
+Write the support note with the date, the host email, and the `acct_…`. Leave the bank account number out of it.
+
+## 1. Send them to the Express Dashboard
+
+This is the usual path. Live accounts only. Send:
+
+> You change the bank in Stripe. Open https://connect.stripe.com/express_login and sign in with this email address. Stripe texts a 6-digit code. If you no longer have that phone, choose "I no longer have access to this phone number" on that page and Stripe will email a code instead.
+>
+> Then go to Settings, and under Business details open Payout details and choose Edit. Add a Singapore bank account in your own name and save. If the old account is still listed, set the new one as the account for SGD before you leave.
+>
+> A deposit Stripe has already started still arrives in the old account. The next one goes to the new account. TryKai still sends your share to your Stripe balance 72 hours after the session ends.
+>
+> If Stripe asks for the current account number, enter it there. If it asks you to contact TryKai for a code, reply to this email.
+
+`express_login` is the page Stripe publishes for live Express accounts. Keep one-time Login Links inside the Dashboard (the connected account's login link, or `POST /v1/accounts/:id/login_links`). Stripe treats a login link sent by email or text as a leaked credential.
+
+Test mode cannot use `express_login`. For a staging host, open their connected account in the Dashboard with **Test mode** on and use the login link in the same sitting, with them present. The same rule applies: that URL stays off email and chat.
+
+## 2. When Stripe will not let them edit
+
+Use this when step 1 is blocked: they no longer have the old account number, Stripe says it cannot verify them, or Stripe tells them to contact the platform for a validation code.
+
+TryKai's connected accounts set `losses_collector` to `application` (`_shared/connect.ts`), so the platform is responsible for negative balances and Stripe allows this code. It exists in live mode only. Your Stripe role must be Support Associate, Support Specialist, Developer, Administrator, or Super Administrator.
+
+When you generate the code, TryKai accepts sole legal and financial liability for a payout that lands in the wrong account. Stop if the email, name, or `acct_` does not match the request.
+
+1. Open https://dashboard.stripe.com with **Test mode** off.
+2. Open the Connected accounts page and select the `acct_…` from the SQL.
+3. Confirm the owner name and email match the host and the email you received.
+4. In **Payout information**, open the overflow menu (⋯) next to the external account, then **Generate update code**.
+5. Confirm the owner details and accept liability.
+6. Click **Send**. Stripe emails the code to the email on that connected account. It lasts 7 days. If it expires before they finish, generate another the same way. The code goes to that Stripe email only.
+
+They then return to **Payout details → Edit** and enter the code instead of the old account number.
+
+If **Generate update code** is missing, they complete whatever identity check Stripe shows on the Express page, or you contact Stripe Support with the `acct_…`. The new account number stays on Stripe's form either way.
+
+## 3. Afterwards
+
+- Ask them to reply once Stripe shows the new bank. The last four digits are enough.
+- On the same connected account, open **Payout information** and confirm the new bank is the default for SGD. You will see the bank name and last four.
+- Tell them again which way an in-progress payout goes: one Stripe has already created still uses the old bank; the next one uses the new default. The 72 hour Transfer onto their Stripe balance is unchanged.
+- Leave `stripe_account_id` on that same `acct_`. `stripe_payouts_enabled` stays true. If the connected account page shows payouts disabled afterwards, Stripe is asking for something else. Follow **Connected accounts webhook** and have them finish that request from Hosting.
+- Add the date and the new last four to the support note.
 
 ---
 

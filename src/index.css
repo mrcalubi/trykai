@@ -1814,8 +1814,13 @@ a {
   gap: 16px;
 }
 
-.form__row > .label {
-  flex: 1;
+/* Every field in the row shares the width evenly and may shrink below its
+   input's natural size. Only labels used to flex, so a field wrapped in a div
+   (price, with its hint) kept the number input's natural width and pushed
+   the next field out of the card on phones. */
+.form__row > * {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .label {
