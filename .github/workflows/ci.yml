@@ -170,8 +170,8 @@ jobs:
       - name: Check every edge function is ready to deploy
         run: node scripts/deploy-edge-functions.mjs --dry-run
 
-  # Push to staging or main deploys the whole functions directory after the
-  # checks above pass. Pull requests do not deploy. `_shared/` is bundled into
+  # Push to staging or main applies new migrations, then deploys the whole
+  # functions directory, after the checks above pass. Pull requests do not deploy. `_shared/` is bundled into
   # each function, so the script always ships the full set.
   deploy-edge-functions:
     name: Deploy edge functions
@@ -215,6 +215,17 @@ jobs:
             echo "name=staging" >> "$GITHUB_OUTPUT"
             echo "ref=${ref}" >> "$GITHUB_OUTPUT"
           fi
+
+      # Migrations go first so a new function never runs against an old schema;
+      # a failed push stops the function deploy. Skipped with a warning until
+      # the environment's database password secret exists (OPERATIONS.md,
+      # Migration deploys).
+      - name: Apply new migrations to ${{ steps.target.outputs.name }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ steps.target.outputs.ref }}
+          SUPABASE_DB_PASSWORD: ${{ github.ref_name == 'main' && secrets.PRODUCTION_SUPABASE_DB_PASSWORD || secrets.STAGING_SUPABASE_DB_PASSWORD }}
+        run: node scripts/push-migrations.mjs --skip-if-unconfigured
 
       - name: Deploy all edge functions to ${{ steps.target.outputs.name }}
         env:
