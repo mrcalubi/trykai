@@ -5130,26 +5130,38 @@ body.lightbox-open {
 }
 
 .booking-cutoff {
-  margin: 16px 0 0;
-  border: 0;
-  padding: 0;
+  margin-top: 28px;
 }
 
-.booking-cutoff__legend {
-  margin: 0 0 8px;
-  font-weight: 700;
+.booking-cutoff__intro {
+  margin: -4px 0 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
 }
 
-.booking-cutoff__options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
+.choice-chips.booking-cutoff__options {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
-.booking-cutoff__option {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.booking-cutoff__example {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--sand);
+  border-radius: var(--radius);
+}
+
+.booking-cutoff__example p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--navy);
+}
+
+.booking-cutoff__example .hint {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
 }
 
 .checkout-host-note {
@@ -10301,10 +10313,11 @@ body:has(.edit-profile__bar) .site-footer {
   font-weight: 700;
 }
 
-/* Add-ons, host setup (Create / Edit listing) */
+/* Add-ons, host setup (Create / Edit listing). Finished add-ons are one-line
+   rows; only the one being written opens as a card. */
 .addons-editor {
   display: grid;
-  gap: 16px;
+  gap: 14px;
   margin-top: 28px;
 }
 
@@ -10326,53 +10339,138 @@ body:has(.edit-profile__bar) .site-footer {
   color: var(--muted);
 }
 
-.addons-pitch {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-}
-
-.addons-pitch__mascot {
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
-
-.addons-pitch__title {
-  margin: 0;
-  font-family: var(--display);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--navy);
-}
-
-.addons-pitch__body {
-  margin: 4px 0 0;
+.addons-editor__intro {
+  margin: -6px 0 0;
   font-size: 14px;
   line-height: 1.45;
   color: var(--muted);
 }
 
-.addons-ideas__label {
-  margin: 0 0 8px;
-  font-size: 14px;
+.addons-editor__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.addons-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.addon-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.addon-row__thumb {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+}
+
+.addon-row__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.addon-row__name {
+  margin: 0;
+  overflow: hidden;
+  font-size: 15px;
   font-weight: 700;
   color: var(--navy);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addon-row__meta {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.addon-row__meta--todo {
+  font-weight: 600;
+  color: var(--coral-ink);
+}
+
+.addon-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.addon-row__remove,
+.addons-picker__close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.addon-row__remove:hover,
+.addons-picker__close:hover {
+  color: var(--navy);
+  background: var(--sand);
+}
+
+.addons-picker {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.addons-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -6px -6px -6px 0;
+}
+
+.addons-picker__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.addons-picker > .btn {
+  justify-self: start;
+}
+
+.addons-ideas__label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
 }
 
 .addons-ideas__chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.addons-ideas__chips + .hint {
-  margin-top: 10px;
 }
 
 .addons-chip {
@@ -10383,19 +10481,14 @@ body:has(.edit-profile__bar) .site-footer {
   font-size: 13px;
   font-weight: 600;
   color: var(--navy);
-  background: var(--surface);
+  background: var(--cream);
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   cursor: pointer;
 }
 
-.addons-chip:hover:not(:disabled) {
+.addons-chip:hover {
   border-color: var(--navy);
-}
-
-.addons-chip:disabled {
-  color: var(--disabled);
-  cursor: not-allowed;
 }
 
 .addon-card {
@@ -10403,8 +10496,85 @@ body:has(.edit-profile__bar) .site-footer {
   gap: 12px;
   padding: 16px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--navy);
   border-radius: var(--radius-lg);
+}
+
+/* Session types reuse the card; they are always open, so no "editing" border. */
+.session-type-card {
+  border-color: var(--border);
+}
+
+.addon-card__remove {
+  justify-self: start;
+}
+
+.addon-card__legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.addon-card__unit {
+  grid-template-columns: 1fr 1fr;
+}
+
+.addon-card__unit + .hint {
+  margin: 8px 0 0;
+}
+
+.addon-card__price {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.addon-card__price .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.addon-card__pill {
+  margin: 0;
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--success);
+  background: var(--success-bg);
+  border-radius: 999px;
+}
+
+.addon-card__earnings {
+  margin: -4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.addon-card__more {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.addon-card__more > summary {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  cursor: pointer;
+}
+
+.addon-card__more-body {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.addon-card__more-body .hint {
+  margin: -6px 0 0;
 }
 
 .addon-card__photo {
@@ -10415,8 +10585,8 @@ body:has(.edit-profile__bar) .site-footer {
 
 .addon-card__thumb,
 .addon-card__add-photo {
-  width: 88px;
-  height: 88px;
+  width: 64px;
+  height: 64px;
   border-radius: var(--radius);
   flex-shrink: 0;
 }
@@ -10438,40 +10608,13 @@ body:has(.edit-profile__bar) .site-footer {
 
 .addon-card__photo-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-wrap: wrap;
   gap: 6px;
-}
-
-.addon-card__price {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.addon-card__price .input {
-  flex: 1;
-}
-
-.addon-card__unit {
-  grid-template-columns: 1fr 1fr;
-}
-
-.addon-card__pill {
-  margin: 0;
-  display: inline-flex;
-  width: fit-content;
-  padding: 6px 10px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--success);
-  background: var(--success-bg);
-  border-radius: 999px;
 }
 
 .addon-card__photo-hint {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   margin: 0;
   font-size: 13px;
   line-height: 1.45;
@@ -10483,15 +10626,21 @@ body:has(.edit-profile__bar) .site-footer {
   color: var(--navy);
 }
 
-.addon-card__remove {
-  justify-self: start;
+.addon-card__limit {
+  max-width: 160px;
 }
 
-.addons-editor__earnings {
-  margin: 0;
+.addon-card__footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.addon-card__done {
+  min-height: 36px;
+  padding: 6px 18px;
   font-size: 14px;
-  font-weight: 600;
-  color: var(--success);
 }
 
 .listing-review__addons {

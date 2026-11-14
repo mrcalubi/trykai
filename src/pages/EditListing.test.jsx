@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Route } from 'react-router-dom'
@@ -407,14 +407,15 @@ describe('EditListing saving', () => {
     expect(call.filters).toContainEqual({ method: 'eq', column: 'host_id', value: HOST_ID })
   })
 
-  it('saves Bookings close and How to find me without sending the listing back for review', async () => {
+  it('saves the booking notice and How to find me without sending the listing back for review', async () => {
     givenFoundingHost(false, null, { updated: 0, held: [] }, '12 Coffee Road', 'Ring the bell')
     givenListing({ booking_cutoff_hours: 6 })
     const { user } = await renderLoaded()
 
     expect(screen.getByLabelText(/How to find me/)).toHaveValue('Ring the bell')
-    expect(screen.getByLabelText('6 hours')).toBeChecked()
-    await user.click(screen.getByLabelText('12 hours'))
+    expect(screen.getByLabelText('6 hr')).toBeChecked()
+    await user.click(screen.getByLabelText('12 hr'))
+    expect(screen.getByText(/the last booking is at 7 am that day/)).toBeInTheDocument()
     await user.clear(screen.getByLabelText(/How to find me/))
     await user.type(screen.getByLabelText(/How to find me/), 'Lift B to #04-56')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
@@ -936,13 +937,18 @@ describe('EditListing add-ons', () => {
     const { user } = await renderLoaded()
     expect(await screen.findByRole('heading', { name: 'Add-ons · optional' })).toBeInTheDocument()
 
-    const addonCards = () => document.querySelectorAll('.addon-card')
-    await user.clear(within(addonCards()[0]).getByLabelText('Name'))
-    await user.type(within(addonCards()[0]).getByLabelText('Name'), 'Premium kit')
-    await user.click(within(addonCards()[1]).getByRole('button', { name: 'Remove' }))
-    await user.click(screen.getByRole('button', { name: '+ Add an add-on' }))
-    await user.type(within(addonCards()[1]).getByLabelText('Name'), 'Drinks')
-    await user.type(within(addonCards()[1]).getByLabelText('You get in Singapore dollars'), '8')
+    expect(screen.getByText(/^You get S\$10 per guest · guests pay S\$\d+$/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Edit Kit' }))
+    await user.clear(screen.getByLabelText('Name'))
+    await user.type(screen.getByLabelText('Name'), 'Premium kit')
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    await user.click(screen.getByRole('button', { name: 'Remove Wrap' }))
+    await user.click(screen.getByRole('button', { name: 'Add an add-on' }))
+    await user.click(screen.getByRole('button', { name: 'Write my own' }))
+    await user.type(screen.getByLabelText('Name'), 'Drinks')
+    await user.type(screen.getByLabelText('You get in Singapore dollars'), '8')
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
@@ -967,13 +973,15 @@ describe('EditListing add-ons', () => {
     })
     const { user } = await renderLoaded()
     await screen.findByRole('heading', { name: 'Add-ons · optional' })
-    const addonCards = () => document.querySelectorAll('.addon-card')
-    await user.click(screen.getByRole('button', { name: '+ Add an add-on' }))
-    await user.type(within(addonCards()[0]).getByLabelText('Name'), 'Kit')
-    await user.type(within(addonCards()[0]).getByLabelText('You get in Singapore dollars'), '10')
-    await user.click(screen.getByRole('button', { name: '+ Add an add-on' }))
-    await user.type(within(addonCards()[1]).getByLabelText('Name'), 'Wrap')
-    await user.type(within(addonCards()[1]).getByLabelText('You get in Singapore dollars'), '5')
+    async function addOwn(name, price) {
+      await user.click(screen.getByRole('button', { name: 'Add an add-on' }))
+      await user.click(screen.getByRole('button', { name: 'Write my own' }))
+      await user.type(screen.getByLabelText('Name'), name)
+      await user.type(screen.getByLabelText('You get in Singapore dollars'), price)
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+    }
+    await addOwn('Kit', '10')
+    await addOwn('Wrap', '5')
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => expect(inserts).toBe(2))
@@ -996,7 +1004,7 @@ describe('EditListing add-ons', () => {
       withNav: true,
       extraRoutes: <Route path="/" element={<h1>Home</h1>} />,
     })
-    await screen.findByDisplayValue('Kit')
+    await user.click(await screen.findByRole('button', { name: 'Edit Kit' }))
     await user.type(screen.getByLabelText('Name'), ' extra')
     await user.click(screen.getByRole('link', { name: 'TryKai home' }))
     expect(screen.getByRole('dialog', { name: 'Discard your changes?' })).toBeInTheDocument()
