@@ -8,10 +8,24 @@ export function addonLineLabel(name, quantity) {
   return `${name} × ${quantity}`
 }
 
-export function guestAddonPriceLabel(addon) {
+/**
+ * The listing page's extras menu: the amount on the name row, how it's
+ * charged under it. "Once per group" says plainly that a per-booking extra
+ * is paid one time, however many come.
+ */
+export function guestAddonPriceParts(addon) {
   const guest = addonGuestUnitCents(addon.price_cents)
-  const unit = addon.unit === 'booking' ? 'per booking' : 'per person'
-  return `+$${Math.round(guest / 100)} ${unit}`
+  return {
+    amount: `+$${Math.round(guest / 100)}`,
+    unit: addon.unit === 'booking' ? 'once per group' : 'per person',
+  }
+}
+
+/** "Only 6 per session", or nothing when the host set no limit. */
+export function addonLimitLabel(addon) {
+  const limit = Number(addon.session_limit)
+  if (addon.session_limit == null || !Number.isInteger(limit) || limit < 1) return ''
+  return `Only ${limit} per session`
 }
 
 export function remainingForAddon(addon, remainingById) {

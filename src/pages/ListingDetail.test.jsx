@@ -1744,16 +1744,29 @@ describe('ListingDetail add-ons', () => {
     expect(screen.queryByRole('heading', { name: 'Add a little extra' })).not.toBeInTheDocument()
   })
 
-  it('shows add-on cards under About this experience', async () => {
-    givenAddons([BLOOMS, WRAP])
+  it('lists add-ons like a menu under About this experience', async () => {
+    givenAddons([BLOOMS, { ...WRAP, photo_url: 'https://cdn.example/wrap.jpg' }])
     renderPage()
-    expect(await screen.findByRole('heading', { name: 'Add a little extra' })).toBeInTheDocument()
-    expect(
-      screen.getByText(/Mei offers these with this session. Pick any when you book/),
-    ).toBeInTheDocument()
-    expect(screen.getByText('+$17 per person')).toBeInTheDocument()
-    expect(screen.getByText('+$9 per booking')).toBeInTheDocument()
-    expect(screen.getByText('4 per session')).toBeInTheDocument()
+    const section = (
+      await screen.findByRole('heading', { name: 'Add a little extra' })
+    ).closest('section')
+    expect(within(section).getByText('Optional extras from Mei. Add them when you book.')).toBeInTheDocument()
+
+    const [blooms, wrap] = within(section).getAllByRole('listitem')
+    expect(within(blooms).getByText('Premium blooms')).toBeInTheDocument()
+    expect(within(blooms).getByText('+$17')).toBeInTheDocument()
+    expect(within(blooms).getByText('per person')).toBeInTheDocument()
+    expect(within(blooms).getByText('A better bunch')).toBeInTheDocument()
+    expect(within(blooms).getByText('Only 4 per session')).toBeInTheDocument()
+    expect(blooms.querySelector('.extras-menu__thumb--empty')).toBeInTheDocument()
+
+    expect(within(wrap).getByText('+$9')).toBeInTheDocument()
+    expect(within(wrap).getByText('once per group')).toBeInTheDocument()
+    expect(within(wrap).queryByText(/per session/)).not.toBeInTheDocument()
+    expect(wrap.querySelector('img.extras-menu__thumb')).toHaveAttribute(
+      'src',
+      expect.stringContaining('wrap.jpg'),
+    )
   })
 
   it('lets a guest step a per-person add-on and toggle a per-booking one', async () => {

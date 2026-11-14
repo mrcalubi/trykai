@@ -604,6 +604,18 @@ test('books with an add-on and shows it on the confirmation', async ({ page }) =
           position: 0,
           is_active: true,
         },
+        {
+          id: 'addon-proposal',
+          listing_id: LATTE_ART.id,
+          name: 'Proposal help with a ring box hidden in the last cup',
+          description: '',
+          price_cents: 9000,
+          unit: 'booking',
+          session_limit: null,
+          photo_url: null,
+          position: 1,
+          is_active: true,
+        },
       ],
       'rpc/session_addon_remaining': [{ addon_id: 'addon-blooms', remaining: 4 }],
       'rpc/reviews_for_listing': [],
@@ -640,6 +652,24 @@ test('books with an add-on and shows it on the confirmation', async ({ page }) =
 
   await page.goto('/listings/listing-latte')
   await expect(page.getByRole('heading', { name: 'Add a little extra' })).toBeVisible()
+  // Read like a menu: every row has a thumbnail, the price sits on the name's
+  // line inside the card, and a long name wraps instead of pushing it out.
+  const extras = page.locator('.extras-menu__item')
+  await expect(extras).toHaveCount(2)
+  await expect(extras.nth(0)).toContainText('Only 4 per session')
+  await expect(extras.nth(1)).toContainText('once per group')
+  const list = await page.locator('.extras-menu__list').boundingBox()
+  for (const row of [extras.nth(0), extras.nth(1)]) {
+    await expect(row.locator('.extras-menu__thumb')).toBeVisible()
+    const name = await row.locator('.extras-menu__name').boundingBox()
+    const price = await row.locator('.extras-menu__price').boundingBox()
+    expect(Math.abs(price.y - name.y)).toBeLessThan(4)
+    expect(price.x).toBeGreaterThanOrEqual(name.x + name.width)
+    expect(price.x + price.width).toBeLessThanOrEqual(list.x + list.width)
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    page.viewportSize().width,
+  )
   await page.getByRole('button', { name: 'Book' }).click()
   await expect(page.getByLabel(/Note for Mei \(optional\)/)).toBeVisible()
   await page.getByRole('button', { name: 'More Premium blooms' }).click()
