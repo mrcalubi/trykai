@@ -3447,7 +3447,9 @@ body.lightbox-open {
 .coming-up__title,
 .featured-choice__text,
 .edit-preview__name,
-.review-reply__body {
+.review-reply__body,
+.extras-menu__name,
+.extras-menu__desc {
   overflow-wrap: break-word;
 }
 
@@ -10736,6 +10738,111 @@ body:has(.edit-profile__bar) .site-footer {
 
 .listing-extras__price {
   color: var(--text);
+}
+
+/* Listing page add-ons: one card read like a menu. Every row has the same
+   thumbnail slot, the price sits on the name row, and how it's charged and
+   any limit sit underneath. */
+.extras-menu__intro {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+
+.extras-menu__list {
+  margin: 0;
+  padding: 0 16px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.extras-menu__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 0;
+}
+
+.extras-menu__item + .extras-menu__item {
+  border-top: 1px solid var(--border);
+}
+
+.extras-menu__thumb {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+}
+
+.extras-menu__thumb--empty {
+  display: grid;
+  place-items: center;
+  color: var(--coral-ink);
+  background: var(--sand);
+}
+
+.extras-menu__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.extras-menu__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.extras-menu__name {
+  min-width: 0;
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--navy);
+}
+
+.extras-menu__price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  margin: 0;
+  text-align: right;
+}
+
+.extras-menu__amount {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--navy);
+}
+
+.extras-menu__unit {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.extras-menu__desc {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.extras-menu__limit {
+  display: inline-block;
+  margin: 8px 0 0;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--coral-ink);
+  background: var(--coral-soft);
+  border-radius: 999px;
 }
 
 /* Session types (00056): the listing page cards double as a filter. */

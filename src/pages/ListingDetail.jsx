@@ -41,7 +41,8 @@ import {
   addonLineLabel,
   checkoutAddonPayload,
   clampAddonQuantities,
-  guestAddonPriceLabel,
+  addonLimitLabel,
+  guestAddonPriceParts,
   pickedAddonLines,
 } from '../lib/bookingAddons'
 import CheckoutAddons from '../components/CheckoutAddons'
@@ -1267,30 +1268,40 @@ export default function ListingDetail() {
           ) : null}
 
           {addonsAvailable && listingAddons.length > 0 ? (
-            <section className="detail-section listing-extras">
+            <section className="detail-section extras-menu">
               <h2 className="detail-section__title">Add a little extra</h2>
-              <p className="listing-extras__intro">
-                {hostName} offers these with this session. Pick any when you book, for one person or
-                everyone.
+              <p className="extras-menu__intro">
+                Optional extras from {hostName}. Add them when you book.
               </p>
-              <ul className="listing-extras__list">
-                {listingAddons.map((addon) => (
-                  <li key={addon.id} className="listing-extras__card">
-                    {addon.photo?.remoteUrl ? (
-                      <img src={addon.photo.remoteUrl} alt="" className="listing-extras__photo" />
-                    ) : null}
-                    <div className="listing-extras__copy">
-                      <p className="listing-extras__name">{addon.name}</p>
-                      {addon.description ? (
-                        <p className="listing-extras__desc">{addon.description}</p>
-                      ) : null}
-                      <p className="listing-extras__price">{guestAddonPriceLabel(addon)}</p>
-                      {addon.session_limit != null ? (
-                        <p className="listing-extras__limit">{addon.session_limit} per session</p>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
+              <ul className="extras-menu__list">
+                {listingAddons.map((addon) => {
+                  const price = guestAddonPriceParts(addon)
+                  const limit = addonLimitLabel(addon)
+                  return (
+                    <li key={addon.id} className="extras-menu__item">
+                      {addon.photo?.remoteUrl ? (
+                        <img src={addon.photo.remoteUrl} alt="" className="extras-menu__thumb" />
+                      ) : (
+                        <span className="extras-menu__thumb extras-menu__thumb--empty" aria-hidden="true">
+                          <Icon name="sparkle" size={22} />
+                        </span>
+                      )}
+                      <div className="extras-menu__body">
+                        <div className="extras-menu__top">
+                          <p className="extras-menu__name">{addon.name}</p>
+                          <p className="extras-menu__price">
+                            <span className="extras-menu__amount">{price.amount}</span>
+                            <span className="extras-menu__unit"> {price.unit}</span>
+                          </p>
+                        </div>
+                        {addon.description ? (
+                          <p className="extras-menu__desc">{addon.description}</p>
+                        ) : null}
+                        {limit ? <p className="extras-menu__limit">{limit}</p> : null}
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
             </section>
           ) : null}
