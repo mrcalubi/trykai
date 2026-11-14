@@ -3,7 +3,9 @@ import {
   ARRIVAL_INSTRUCTIONS_MAX,
   arrivalInstructionsForSave,
   bookingClosedMessage,
+  bookingCutoffExample,
   bookingCutoffHours,
+  bookingCutoffLabel,
   isBookingClosed,
   isMissingCutoffColumn,
 } from './bookingCutoff'
@@ -35,5 +37,27 @@ describe('booking cutoff', () => {
     expect(isMissingCutoffColumn({ code: 'PGRST204', message: 'booking_cutoff_hours' })).toBe(true)
     expect(isMissingCutoffColumn({ message: 'arrival_instructions' })).toBe(true)
     expect(isMissingCutoffColumn(null)).toBe(false)
+  })
+})
+
+describe('booking notice copy', () => {
+  it('labels hours and whole days', () => {
+    expect([3, 6, 12, 24, 48].map(bookingCutoffLabel)).toEqual([
+      '3 hr',
+      '6 hr',
+      '12 hr',
+      '1 day',
+      '2 days',
+    ])
+  })
+
+  it('shows what each notice means for a Saturday 7 pm session', () => {
+    expect(bookingCutoffExample(3)).toBe(
+      'For a Saturday 7 pm session, the last booking is at 4 pm that day.',
+    )
+    expect(bookingCutoffExample(12)).toMatch(/at 7 am that day\.$/)
+    expect(bookingCutoffExample(19)).toMatch(/at 12 am that day\.$/)
+    expect(bookingCutoffExample(24)).toMatch(/Friday at 7 pm\.$/)
+    expect(bookingCutoffExample(48)).toMatch(/Thursday at 7 pm\.$/)
   })
 })

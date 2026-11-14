@@ -24,6 +24,7 @@ test.describe('host add sessions', () => {
         ],
         sessions: [],
         reviews: [],
+        listing_addons: [],
         users: [
           {
             id: SIGNED_IN_USER.id,
@@ -179,6 +180,22 @@ test.describe('verified host create listing', () => {
     await expect(page.getByText('You get')).toBeVisible()
     await expect(page.getByText(/Full session of 6/)).toBeVisible()
     await expect(page.getByText('10% host fee from your 4th booking.')).toBeVisible()
+    await expect(page.getByText('How much notice do you need?')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Add an add-on' }).click()
+    await expect(page.getByText('Charged per guest')).toBeVisible()
+    await page.getByRole('button', { name: 'Take-home kit' }).click()
+    await page.getByLabel('You get in Singapore dollars').fill('15')
+    await expect(page.getByText(/^You get S\$15 · guests pay S\$\d+$/)).toBeVisible()
+    await page.getByRole('button', { name: 'Done' }).click()
+    await expect(page.getByRole('button', { name: 'Edit Take-home kit' })).toBeVisible()
+    // The row keeps "You get S$15 per guest" and "guests pay S$17" each on one line.
+    await expect(page.locator('.addon-row__meta')).toHaveText(
+      /^You\sget\sS\$15\sper\sguest · guests\spay\sS\$\d+$/,
+    )
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      page.viewportSize().width,
+    )
     await next()
 
     await expect(page.getByRole('heading', { name: 'Where it happens' })).toBeVisible()
@@ -188,6 +205,17 @@ test.describe('verified host create listing', () => {
     await next()
 
     await expect(page.getByRole('heading', { name: 'Final touches' })).toBeVisible()
+    await page.getByText('1 day', { exact: true }).click()
+    await expect(page.getByText(/the last booking is Friday at 7 pm/)).toBeVisible()
+    // All five notice chips sit on one row, even on a phone.
+    const chips = page.locator('.booking-cutoff .choice-chip')
+    await expect(chips).toHaveCount(5)
+    const first = await chips.first().boundingBox()
+    const last = await chips.last().boundingBox()
+    expect(Math.abs(last.y - first.y)).toBeLessThan(first.height / 2)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      page.viewportSize().width,
+    )
     await page.getByRole('checkbox', { name: /I agree to the Host terms/ }).check()
     await page.getByRole('button', { name: 'Create listing' }).click()
 

@@ -10,15 +10,25 @@ import {
 import { ARRIVAL_INSTRUCTIONS_PLACEHOLDER } from '../lib/bookingCutoff'
 
 describe('BookingCutoffFields', () => {
-  it('lets the host pick how long before a session bookings close', async () => {
+  it('asks how much notice the host needs and spells out what it means', async () => {
     const onChange = vi.fn()
     const { user } = renderWithRouter(<BookingCutoffFields value={3} onChange={onChange} />)
-    expect(screen.getByLabelText('3 hours')).toBeChecked()
+    expect(screen.getByRole('group', { name: 'How much notice do you need?' })).toBeInTheDocument()
+    expect(screen.getByLabelText('3 hr')).toBeChecked()
     expect(
-      screen.getByText('Pick longer if you need time to buy materials or prepare add-ons.'),
+      screen.getByText('For a Saturday 7 pm session, the last booking is at 4 pm that day.'),
     ).toBeInTheDocument()
-    await user.click(screen.getByLabelText('48 hours'))
+    expect(
+      screen.getByText('More notice gives you time to buy materials or prepare add-ons.'),
+    ).toBeInTheDocument()
+    await user.click(screen.getByLabelText('2 days'))
     expect(onChange).toHaveBeenCalledWith(48)
+  })
+
+  it('shows the example for the notice already chosen', () => {
+    renderWithRouter(<BookingCutoffFields value={48} onChange={() => {}} />)
+    expect(screen.getByLabelText('2 days')).toBeChecked()
+    expect(screen.getByText(/the last booking is Thursday at 7 pm/)).toBeInTheDocument()
   })
 
   it('counts How to find me characters and keeps the placeholder', async () => {

@@ -5,6 +5,7 @@ import {
   MAX_LISTING_ADDONS,
   addonDraftFingerprint,
   addonEarningsLine,
+  addonSummary,
   addonFieldHints,
   addonFromRow,
   addonLivePill,
@@ -22,6 +23,22 @@ import {
 vi.mock('./supabase')
 
 describe('listingAddons helpers', () => {
+  it('sums up an add-on in one line, or says what it still needs', () => {
+    expect(addonSummary({ name: 'Kit', price: '15', unit: 'person' })).toEqual({
+      ready: true,
+      text: 'You get S$15 per guest · guests pay S$17',
+    })
+    expect(addonSummary({ name: 'Wrap', price: '5', unit: 'booking' }).text).toBe(
+      'You get S$5 per booking · guests pay S$6',
+    )
+    expect(addonSummary({ name: ' ', price: '15', unit: 'person' })).toEqual({
+      ready: false,
+      text: 'Needs a name',
+    })
+    expect(addonSummary({ name: 'Kit', price: '0.5' }).text).toBe('Needs a price')
+    expect(addonSummary(undefined).text).toBe('Needs a name and a price')
+  })
+
   it('parses whole dollars from S$1 to S$500', () => {
     expect(parseAddonPriceCents('15')).toBe(1500)
     expect(parseAddonPriceCents('1')).toBe(100)

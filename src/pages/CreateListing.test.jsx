@@ -594,18 +594,20 @@ describe('CreateListing submission', () => {
     expect(supabase.__lastCall('listings', 'insert').payload.group_pricing).toBe(false)
   })
 
-  it('saves Bookings close and How to find me', async () => {
+  it('asks for booking notice on Final touches, not the price step, and saves it', async () => {
     const { user } = renderPage()
     await goToPrice(user)
-    expect(
-      screen.getByText('Pick longer if you need time to buy materials or prepare add-ons.'),
-    ).toBeInTheDocument()
-    await user.click(screen.getByLabelText('24 hours'))
+    expect(screen.queryByText('How much notice do you need?')).not.toBeInTheDocument()
     await completePrice(user, VALID)
     await stepHeading('Where it happens')
     await user.type(screen.getByLabelText(/How to find me/), '  Lift B to #04-56  ')
     await completeLocation(user, VALID)
     await stepHeading('Final touches')
+    expect(screen.getByText('How much notice do you need?')).toBeInTheDocument()
+    expect(screen.getByLabelText('3 hr')).toBeChecked()
+    expect(screen.getByText(/the last booking is at 4 pm that day/)).toBeInTheDocument()
+    await user.click(screen.getByLabelText('1 day'))
+    expect(screen.getByText(/the last booking is Friday at 7 pm/)).toBeInTheDocument()
     await user.click(screen.getByRole('checkbox', { name: /I agree to the Host terms/ }))
     await user.click(screen.getByRole('button', { name: 'Create listing' }))
 
@@ -1270,6 +1272,7 @@ describe('CreateListing add-ons', () => {
     await user.type(screen.getByLabelText('Your price per guest'), price)
     await user.click(screen.getByRole('radio', { name: '1.5 hr' }))
     await screen.findByRole('heading', { name: 'Add-ons · optional' })
+    await user.click(screen.getByRole('button', { name: 'Add an add-on' }))
     await user.click(screen.getByRole('button', { name: 'Take-home kit' }))
     await user.type(screen.getByLabelText('You get in Singapore dollars'), addonPrice)
     await next(user)
