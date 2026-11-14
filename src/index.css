@@ -227,6 +227,12 @@ a {
   border: 0;
 }
 
+.paynow-badge.paynow-badge--fill {
+  font-family: var(--mono);
+  background: var(--success-bg);
+  border-color: transparent;
+}
+
 .paynow-badge {
   display: inline-block;
   flex-shrink: 0;
@@ -3447,7 +3453,9 @@ body.lightbox-open {
 .coming-up__title,
 .featured-choice__text,
 .edit-preview__name,
-.review-reply__body {
+.review-reply__body,
+.extras-menu__name,
+.extras-menu__desc {
   overflow-wrap: break-word;
 }
 
@@ -3478,6 +3486,17 @@ body.lightbox-open {
 
 .detail-fact .ui-icon {
   color: var(--navy);
+}
+
+/* The listing's own rating jumps to its reviews. */
+.detail-fact--link {
+  text-decoration: none;
+}
+
+.detail-fact--link:hover {
+  color: var(--navy);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .detail-host {
@@ -4921,6 +4940,53 @@ body.lightbox-open {
   }
 }
 
+/* What's provided and What to bring read as a pair: side by side from 640px,
+   each a single column. Things to bring get a plain bullet, not a check,
+   so they don't look like they're included. */
+.detail-pair {
+  display: grid;
+  column-gap: 32px;
+}
+
+@media (min-width: 640px) {
+  .detail-pair {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+
+  .detail-pair:has(> :nth-child(2)) .detail-list--checks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.detail-list__dot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 24px;
+}
+
+.detail-list__dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.detail-reviews {
+  scroll-margin-top: 88px;
+}
+
+/* On phones the layout's own gap already separates the dates from what
+   follows, so the first section there doesn't add a second one. */
+@media (max-width: 1023px) {
+  .detail-main--after > .detail-section:first-child {
+    margin-top: 0;
+  }
+}
+
 .detail-location {
   display: flex;
   flex-direction: column;
@@ -5027,7 +5093,11 @@ body.lightbox-open {
 .detail-booking-card__note {
   font-size: 14px;
   color: var(--text);
-  margin: 0 0 20px;
+  margin: 0 0 16px;
+}
+
+.detail-booking-card .bring-friend {
+  margin-bottom: 16px;
 }
 
 .detail-booking-card__error {
@@ -5167,7 +5237,7 @@ body.lightbox-open {
 .checkout-host-note {
   display: grid;
   gap: 6px;
-  margin: 16px 0 0;
+  margin: 0;
   font-size: 14px;
   font-weight: 600;
 }
@@ -5649,7 +5719,8 @@ body.lightbox-open {
 }
 
 .payment-rail__hint {
-  font-size: 12px;
+  flex-shrink: 0;
+  font-size: 13px;
   color: var(--muted);
 }
 
@@ -5677,6 +5748,44 @@ body.lightbox-open {
   letter-spacing: -0.02em;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.checkout-total {
+  display: grid;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.checkout-total__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.checkout-total__amount {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.checkout-total__toggle {
+  justify-self: start;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none;
+  border: 0;
+  cursor: pointer;
 }
 
 .price-breakdown {
@@ -5723,6 +5832,7 @@ body.lightbox-open {
 .checkout-pay-bar {
   display: flex;
   flex-direction: column;
+  gap: 8px;
 }
 
 .checkout-pay {
@@ -5732,52 +5842,11 @@ body.lightbox-open {
 
 .checkout-pay .ui-button__idle {
   width: 100%;
-  justify-content: space-between;
+  justify-content: center;
 }
 
 .checkout-pay__label {
   font-weight: 700;
-}
-
-@media (max-width: 767px) {
-  .checkout-pay-bar {
-    position: fixed;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 150;
-    padding: 12px var(--gutter) calc(12px + env(safe-area-inset-bottom));
-    background: var(--cream);
-    border-top: 1px solid var(--border);
-  }
-
-  .page--with-checkout-bar {
-    padding-bottom: 120px;
-  }
-
-  /* The fixed pay bar would otherwise cover the bottom of the site footer. */
-  body:has(.checkout-pay-bar) .site-footer {
-    margin-bottom: calc(69px + env(safe-area-inset-bottom, 0px));
-  }
-}
-
-.checkout-promises {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.checkout-promises__item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-
-.checkout-promises__item .ui-icon {
-  margin-top: 1px;
 }
 
 .payment-agree {
@@ -5896,6 +5965,24 @@ body.lightbox-open {
 
   body.checkout-open {
     overflow: hidden;
+  }
+
+  /* The pay button sticks to the bottom of the full-screen checkout. Sticky,
+     not fixed: it takes its own space, so the total and the breakdown link
+     above it scroll clear instead of sitting underneath. */
+  .checkout-pay-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    margin: auto calc(var(--gutter) * -1) -24px;
+    padding: 12px var(--gutter) calc(12px + env(safe-area-inset-bottom));
+    background: var(--cream);
+    border-top: 1px solid var(--border);
+  }
+
+  .checkout-pay-bar .payment-agree {
+    font-size: 12px;
+    text-align: center;
   }
 }
 
@@ -10738,6 +10825,111 @@ body:has(.edit-profile__bar) .site-footer {
   color: var(--text);
 }
 
+/* Listing page add-ons: one card read like a menu. Every row has the same
+   thumbnail slot, the price sits on the name row, and how it's charged and
+   any limit sit underneath. */
+.extras-menu__intro {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+
+.extras-menu__list {
+  margin: 0;
+  padding: 0 16px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.extras-menu__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 0;
+}
+
+.extras-menu__item + .extras-menu__item {
+  border-top: 1px solid var(--border);
+}
+
+.extras-menu__thumb {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+}
+
+.extras-menu__thumb--empty {
+  display: grid;
+  place-items: center;
+  color: var(--coral-ink);
+  background: var(--sand);
+}
+
+.extras-menu__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.extras-menu__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.extras-menu__name {
+  min-width: 0;
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--navy);
+}
+
+.extras-menu__price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  margin: 0;
+  text-align: right;
+}
+
+.extras-menu__amount {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--navy);
+}
+
+.extras-menu__unit {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.extras-menu__desc {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.extras-menu__limit {
+  display: inline-block;
+  margin: 8px 0 0;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--coral-ink);
+  background: var(--coral-soft);
+  border-radius: 999px;
+}
+
 /* Session types (00056): the listing page cards double as a filter. */
 .session-types__card {
   width: 100%;
@@ -10802,81 +10994,326 @@ body:has(.edit-profile__bar) .site-footer {
   border: 0;
 }
 
-.checkout-addons {
-  display: grid;
+/* Checkout extras: one row on the checkout ("Make it extra · from $9")
+   that opens a panel. Bottom sheet on phones, a centred dialog from 768px. */
+.extras-row {
+  display: flex;
+  align-items: center;
   gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  font: inherit;
+  color: var(--navy);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
 }
 
-.checkout-addons__optional {
-  font-weight: 500;
-  color: var(--muted);
+.extras-row:hover,
+.extras-row:focus-visible {
+  border-color: var(--navy);
 }
 
-.checkout-addons__list {
+.extras-row--picked {
+  border-color: var(--navy);
+}
+
+.extras-row__icon {
   display: grid;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--navy);
+  background: var(--sand);
+  border-radius: var(--radius);
 }
 
-.checkout-addons__item {
+.extras-row__copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.extras-row__title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.extras-row__sub {
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extras-row--picked .extras-row__sub {
+  color: var(--navy);
+}
+
+.extras-row__price {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+body.extras-sheet-open {
+  overflow: hidden;
+}
+
+.extras-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 350;
+  display: flex;
+  align-items: flex-end;
+  background: rgb(22 34 66 / 0.45);
+}
+
+.extras-sheet__panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 88dvh;
+  padding: 10px var(--gutter, 16px) 0;
+  overflow-y: auto;
+  background: var(--cream);
+  border-radius: 24px 24px 0 0;
+  box-shadow: var(--shadow-md);
+}
+
+.extras-sheet__handle {
+  align-self: center;
+  width: 40px;
+  height: 4px;
+  margin-bottom: 12px;
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+
+.extras-sheet__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.checkout-addons__name {
+.extras-sheet__title {
   margin: 0;
-  font-weight: 700;
-}
-
-.checkout-addons__hint,
-.checkout-addons__price,
-.checkout-addons__left {
-  margin: 2px 0 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.checkout-addons__left {
-  color: var(--navy);
-}
-
-.checkout-addons__toggle {
-  min-width: 72px;
-  padding: 8px 12px;
-  font: inherit;
+  font-family: var(--display);
+  font-size: 22px;
   font-weight: 700;
   color: var(--navy);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
+}
+
+.extras-sheet__close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  border-radius: 50%;
   cursor: pointer;
 }
 
-.checkout-addons__toggle--on {
-  color: var(--cream);
-  background: var(--navy);
-  border-color: var(--navy);
+.extras-sheet__close:hover {
+  background: var(--sand);
 }
 
-.checkout-addons__note {
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
+.extras-sheet__intro {
+  margin: 2px 0 16px;
+  font-size: 14px;
   color: var(--muted);
 }
 
-.checkout-addons__note input {
-  width: 100%;
-  padding: 10px 12px;
-  font: inherit;
-  color: var(--text);
+.extras-sheet__list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.extras-card {
+  padding: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.extras-card--on {
+  border-color: var(--navy);
+  box-shadow: inset 0 0 0 1px var(--navy);
+}
+
+.extras-card__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.extras-card__thumb {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  object-fit: cover;
   border-radius: var(--radius);
+  background: var(--bg-subtle);
+}
+
+.extras-card__thumb--empty {
+  display: grid;
+  place-items: center;
+  color: var(--coral-ink);
+  background: var(--sand);
+}
+
+.extras-card__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.extras-card__name {
+  margin: 0;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.extras-card__desc {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.extras-card__price {
+  margin: 6px 0 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.extras-card__left {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--coral-ink);
+}
+
+.extras-card__add {
+  flex-shrink: 0;
+  align-self: center;
+  min-width: 68px;
+  min-height: 40px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  background: var(--surface);
+  border: 1px solid var(--navy);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.extras-card__add--on {
+  color: var(--cream);
+  background: var(--navy);
+}
+
+.extras-card__add:disabled {
+  color: var(--muted);
+  border-color: var(--border);
+  cursor: not-allowed;
+}
+
+.extras-card__count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  border-top: 1px solid var(--border);
+}
+
+.extras-sheet__foot {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  gap: 8px;
+  margin: 16px calc(-1 * var(--gutter, 16px)) 0;
+  padding: 12px var(--gutter, 16px) calc(12px + env(safe-area-inset-bottom));
+  background: var(--cream);
+  border-top: 1px solid var(--border);
+}
+
+.extras-sheet__apply {
+  width: 100%;
+}
+
+.extras-sheet__note {
+  margin: 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--muted);
+}
+
+@media (min-width: 768px) {
+  .extras-sheet {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .extras-sheet__panel {
+    max-width: 460px;
+    max-height: 84dvh;
+    padding-top: 20px;
+    border-radius: var(--radius-xl);
+  }
+
+  .extras-sheet__handle {
+    display: none;
+  }
+
+  .extras-sheet__foot {
+    padding-bottom: 16px;
+  }
+}
+
+/* "+ Add a note for Mei": the note field only opens when asked for. */
+.checkout-note-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.checkout-note-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .hosting-prepare {

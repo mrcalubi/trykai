@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addonLimitLabel,
+  checkoutExtrasSummary,
   addonLineLabel,
   clampAddonQuantities,
-  guestAddonPriceLabel,
+  guestAddonPriceParts,
   guestFirstName,
   maxAddonQuantity,
   pickedAddonLines,
@@ -27,10 +29,35 @@ const wrap = {
   session_limit: null,
 }
 
+describe('checkout extras row', () => {
+  it('names the extras and the cheapest guest price before anything is picked', () => {
+    expect(checkoutExtrasSummary([blooms, wrap], {})).toEqual({
+      picked: false,
+      text: 'Optional · Premium blooms, Gift wrap',
+      cents: 900,
+    })
+  })
+
+  it('says what was picked and what it adds', () => {
+    expect(checkoutExtrasSummary([blooms, wrap], { blooms: 2, wrap: 1 })).toEqual({
+      picked: true,
+      text: 'Premium blooms × 2, Gift wrap × 1',
+      cents: 1700 * 2 + 900,
+    })
+  })
+
+  it('copes with no extras at all', () => {
+    expect(checkoutExtrasSummary(undefined, {})).toEqual({ picked: false, text: 'Optional · ', cents: 0 })
+  })
+})
+
 describe('booking addon helpers', () => {
   it('labels guest prices and prepare lines', () => {
-    expect(guestAddonPriceLabel(blooms)).toBe('+$17 per person')
-    expect(guestAddonPriceLabel(wrap)).toBe('+$9 per booking')
+    expect(guestAddonPriceParts(blooms)).toEqual({ amount: '+$17', unit: 'per person' })
+    expect(guestAddonPriceParts(wrap)).toEqual({ amount: '+$9', unit: 'once per group' })
+    expect(addonLimitLabel(blooms)).toBe('Only 4 per session')
+    expect(addonLimitLabel(wrap)).toBe('')
+    expect(addonLimitLabel({ session_limit: 0 })).toBe('')
     expect(addonLineLabel('Premium blooms', 1)).toBe('Premium blooms × 1')
     expect(prepareAddonsSentence([{ name: 'Premium blooms', quantity: 1 }, { name: 'Gift wrap', quantity: 2 }])).toBe(
       'Add-ons to prepare: Premium blooms × 1, Gift wrap × 2.',

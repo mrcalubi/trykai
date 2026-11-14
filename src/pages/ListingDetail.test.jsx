@@ -108,7 +108,7 @@ function cardRail() {
 }
 
 function continueToPayment() {
-  return screen.getByRole('button', { name: /Continue to payment/ })
+  return screen.getByRole('button', { name: /^Pay \$[\d,.]+ (with PayNow|by card)$/ })
 }
 
 function renderPage() {
@@ -477,14 +477,31 @@ describe('ListingDetail content', () => {
   it('averages the host reviews to one decimal place', async () => {
     givenListing()
     givenReviews([makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })])
-    givenHostReviews([makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })])
+    givenHostReviews([
+      makeReview({ id: 'r1', rating: 5 }),
+      makeReview({ id: 'r2', rating: 4 }),
+      makeReview({ id: 'r-other', rating: 4 }),
+    ])
     renderPage()
 
     await screen.findByRole('heading', { name: 'Reviews (2)' })
     expect(document.querySelector('.detail-host__rating').textContent.replace(/\s+/g, ' ').trim()).toBe(
-      '★ 4.5 · 2 reviews'
+      '★ 4.3 · 3 reviews'
     )
     expect(document.querySelector('.detail-host__star')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('shows the rating once when all the host reviews are on this listing', async () => {
+    givenListing()
+    givenReviews([makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })])
+    givenHostReviews([makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })])
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Reviews (2)' })
+    expect(document.querySelector('.detail-host__rating')).not.toBeInTheDocument()
+    const rating = screen.getByRole('link', { name: '4.5 · 2 reviews' })
+    expect(rating).toHaveAttribute('href', '#reviews')
+    expect(document.getElementById('reviews')).toHaveTextContent('Reviews (2)')
   })
 
   it('rates the host from every listing, not only this one', async () => {
@@ -610,13 +627,36 @@ describe('ListingDetail content', () => {
     expect(screen.queryByRole('heading', { name: "What's provided" })).not.toBeInTheDocument()
   })
 
-  it('lists what guests should bring under what is provided', async () => {
-    givenListing(makeListing({ what_to_bring: ['Water bottle', 'Notebook and pen'] }))
+  it('pairs what to bring with what is provided, with bullets instead of checks', async () => {
+    givenListing(
+      makeListing({ whats_provided: ['Materials'], what_to_bring: ['Water bottle', 'Notebook and pen'] }),
+    )
+    renderPage()
+
+    const bring = (await screen.findByRole('heading', { name: 'What to bring' })).closest('section')
+    const provided = screen.getByRole('heading', { name: "What's provided" }).closest('section')
+    expect(bring.parentElement).toHaveClass('detail-pair')
+    expect(provided.parentElement).toBe(bring.parentElement)
+    expect(within(bring).getByText('Water bottle')).toBeInTheDocument()
+    expect(within(bring).getByText('Notebook and pen')).toBeInTheDocument()
+    expect(bring.querySelectorAll('.detail-list__dot')).toHaveLength(2)
+    expect(bring.querySelector('.ui-icon')).not.toBeInTheDocument()
+  })
+
+  it('shows what to bring on its own when nothing is provided', async () => {
+    givenListing(makeListing({ whats_provided: [], what_to_bring: ['Water bottle'] }))
     renderPage()
 
     await screen.findByRole('heading', { name: 'What to bring' })
-    expect(screen.getByText('Water bottle')).toBeInTheDocument()
-    expect(screen.getByText('Notebook and pen')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: "What's provided" })).not.toBeInTheDocument()
+  })
+
+  it('leaves out the pair when there is nothing to provide or bring', async () => {
+    givenListing(makeListing({ whats_provided: [], what_to_bring: [] }))
+    renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(document.querySelector('.detail-pair')).not.toBeInTheDocument()
   })
 
   it('omits the bring section when the list is empty', async () => {
@@ -1029,41 +1069,41 @@ describe('ListingDetail booking', () => {
     const card = screen.getByRole('radio', { name: /^Card/ })
     expect(paynow.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(paynow).toHaveClass('payment-rail--paynow')
-    expect(paynow).toHaveTextContent('Save 3%')
-    expect(paynow).not.toHaveTextContent('Save 5%')
-    expect(paynow).not.toHaveTextContent('Best price')
-    expect(paynow).not.toHaveTextContent('·')
+    // The rows carry no prices: PayNow shows what it saves, the total shows once.
+    expect(paynow).toHaveTextContent('PayNowSave $1.53')
+    expect(paynow).not.toHaveTextContent('%')
+    expect(paynow).not.toHaveTextContent('$49.47')
     expect(paynow).not.toHaveTextContent('Scan the QR')
     expect(paynow).toHaveAttribute('aria-checked', 'true')
-    expect(paynow).toHaveTextContent('$51')
-    expect(paynow).toHaveTextContent('$49.47')
-    expect(card).toHaveTextContent('$51')
-    expect(card).not.toHaveTextContent('Credit or debit card')
-    expect(continueToPayment()).toBeInTheDocument()
+    expect(card).toHaveTextContent('Credit or debit card')
+    expect(card).not.toHaveTextContent('$51')
+    expect(document.querySelector('.checkout-total__amount')).toHaveTextContent('$49.47')
+    expect(continueToPayment()).toHaveTextContent('Pay $49.47 with PayNow')
+    expect(screen.queryByText('Show price breakdown')).toBeInTheDocument()
+    expect(document.querySelector('.price-breakdown')).not.toBeInTheDocument()
     expect(screen.getAllByRole('heading', { name: 'Confirm and pay' })).toHaveLength(1)
     expect(screen.queryByText('Pick a date, then a time')).not.toBeInTheDocument()
     expect(document.querySelector('.detail-booking-card__note')).not.toBeInTheDocument()
     expect(
-      screen.getByText(
-        'Cancel 48 or more hours before for a refund of everything except the booking fee.',
-      ),
+      screen.getByText(/^Refund minus the booking fee if you cancel 48\+ hours before\./),
     ).toBeInTheDocument()
     expect(screen.queryByText(/Full refund if you cancel/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/passed an ID check before listing/)).not.toBeInTheDocument()
   })
 
-  it('steps the PayNow badge from Save 3% to Save 2% when the basket passes $60', async () => {
+  it('steps the PayNow saving from 3% to 2% when the basket passes $60', async () => {
     givenListing(makeListing({ price_per_person: 4500 }))
     givenSessions([makeSession({ id: 'session-7', spots_remaining: 4 })])
     givenSignedIn()
     const { user } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('Save 3%')
+    expect(paynowRail()).toHaveTextContent('Save $1.53')
 
     await user.click(screen.getByRole('button', { name: 'Add a friend and save $11' }))
-    expect(screen.getByRole('radio', { name: /^Card/ })).toHaveTextContent('$91')
-    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('Save 2%')
-    expect(screen.getByRole('radio', { name: /PayNow/ })).not.toHaveTextContent('Save 3%')
+    await user.click(cardRail())
+    expect(continueToPayment()).toHaveTextContent('Pay $91 by card')
+    expect(paynowRail()).toHaveTextContent('Save $1.82')
   })
 
   it('tells PayNow guests to screenshot the QR only on the payment step', async () => {
@@ -1114,8 +1154,8 @@ describe('ListingDetail booking', () => {
     ).toBeInTheDocument()
     expect(screen.queryByText(/take a screenshot of it instead/)).not.toBeInTheDocument()
     expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$51')
-    expect(paynow).toHaveTextContent('$51')
-    expect(paynow).not.toHaveTextContent('$49.47')
+    expect(paynow).not.toHaveTextContent('Save')
+    expect(continueToPayment()).toHaveTextContent('Pay $51 by card')
     expect(screen.getByRole('radio', { name: /^Card/ })).toHaveAttribute('aria-checked', 'true')
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
   })
@@ -1267,23 +1307,35 @@ describe('ListingDetail booking', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Book' }))
     expect(paynowRail()).toHaveAttribute('aria-checked', 'true')
+    const total = () => document.querySelector('.checkout-total__amount')
     expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$49.47')
-    expect(document.querySelector('.price-breakdown__total')).toHaveTextContent('$49.47')
-    expect(continueToPayment()).toHaveTextContent('$49.47')
+    expect(total()).toHaveTextContent('$49.47')
+    expect(continueToPayment()).toHaveTextContent('Pay $49.47 with PayNow')
 
     await user.click(cardRail())
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
     expect(document.querySelector('.detail-booking-card__price')).toHaveTextContent('$51')
-    expect(document.querySelector('.price-breakdown__total')).toHaveTextContent('$51')
-    expect(continueToPayment()).toHaveTextContent('$51')
+    expect(total()).toHaveTextContent('$51')
+    expect(continueToPayment()).toHaveTextContent('Pay $51 by card')
 
     await user.click(paynowRail())
     expect(supabase.functions.invoke).not.toHaveBeenCalled()
-    expect(document.querySelector('.price-breakdown__total')).toHaveTextContent('$49.47')
-    expect(continueToPayment()).toHaveTextContent('$49.47')
+    expect(total()).toHaveTextContent('$49.47')
     expect(paynowRail()).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByText('Total (all in)')).toBeInTheDocument()
+    expect(screen.getByText('Total, all in')).toBeInTheDocument()
     expect(screen.queryByText(/Booking fee included/)).not.toBeInTheDocument()
+
+    // The breakdown opens on demand and shows the PayNow saving.
+    const toggle = screen.getByRole('button', { name: 'Show price breakdown' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(toggle).toHaveTextContent('Hide price breakdown')
+    const breakdown = document.getElementById('price-breakdown')
+    expect(within(breakdown).getByText('1 guest, all in')).toBeInTheDocument()
+    expect(within(breakdown).getByText('PayNow saving')).toBeInTheDocument()
+    await user.click(toggle)
+    expect(document.getElementById('price-breakdown')).not.toBeInTheDocument()
   })
 
   it('reports a business error returned in the response body', async () => {
@@ -1399,9 +1451,9 @@ describe('ListingDetail booking', () => {
     givenSignedIn()
     const { user } = renderPage()
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    expect(screen.getByRole('radio', { name: /^Card/ })).toHaveTextContent('$8')
-    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('$8')
-    expect(screen.getByRole('radio', { name: /PayNow/ }).querySelector('.price__group')).toBeNull()
+    await user.click(cardRail())
+    expect(document.querySelector('.checkout-total__amount')).toHaveTextContent('$8')
+    expect(document.querySelector('.checkout-total__amount .price__group')).toBeNull()
   })
 
   it('renders a $9,999 rail total with the comma in the body font', async () => {
@@ -1409,8 +1461,9 @@ describe('ListingDetail booking', () => {
     givenSignedIn()
     const { user } = renderPage()
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    expect(screen.getByRole('radio', { name: /^Card/ })).toHaveTextContent('$9,999')
-    expect(screen.getByRole('radio', { name: /PayNow/ }).querySelector('.price__group')).toHaveTextContent(',')
+    await user.click(cardRail())
+    expect(document.querySelector('.checkout-total__amount')).toHaveTextContent('$9,999')
+    expect(document.querySelector('.checkout-total__amount .price__group')).toHaveTextContent(',')
   })
 
   it('hides the next-tier button when group pricing is off', async () => {
@@ -1431,7 +1484,7 @@ describe('ListingDetail booking', () => {
     expect(screen.queryByRole('button', { name: /Add 1 more/ })).not.toBeInTheDocument()
   })
 
-  it('updates the live per-person price when more guests are added', async () => {
+  it('says the group price is applied once a friend joins, and updates the total', async () => {
     givenListing(makeListing({ price_per_person: 2500 }))
     givenSessions([makeSession({ id: 'session-7', spots_remaining: 4 })])
     givenSignedIn()
@@ -1440,32 +1493,50 @@ describe('ListingDetail booking', () => {
     await user.click(await screen.findByRole('button', { name: 'Book' }))
     await user.click(cardRail())
 
-    expect(screen.getByText('$28 per person')).toBeInTheDocument()
+    expect(screen.queryByText(/per person/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add a friend and save $5' })).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: /^Card/ })).toHaveTextContent('$28')
+    expect(continueToPayment()).toHaveTextContent('Pay $28 by card')
 
     await user.click(screen.getByRole('button', { name: 'Add a friend and save $5' }))
-    expect(screen.getByText('$25.50 each · 5% group discount')).toBeInTheDocument()
-    expect(screen.getByText('You save $5 by booking together')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add 1 more for 10% off' })).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Add 1 more for 10% off' }))
-    await user.click(screen.getByRole('button', { name: 'Add 1 more for 15% off' }))
-
-    expect(screen.getByText('$22 each · 15% group discount')).toBeInTheDocument()
-    expect(screen.getByText('You save $24 by booking together')).toBeInTheDocument()
+    expect(screen.getByText('Group price applied, you save $5')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Add a friend/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Add 1 more/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: /^Card/ })).toHaveTextContent('$88')
-    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('$88')
-    expect(screen.getByRole('radio', { name: /PayNow/ })).toHaveTextContent('$86.24')
+
+    await user.click(screen.getByRole('button', { name: 'More guests' }))
+    await user.click(screen.getByRole('button', { name: 'More guests' }))
+    expect(screen.getByText('Group price applied, you save $24')).toBeInTheDocument()
+    expect(continueToPayment()).toHaveTextContent('Pay $88 by card')
+    await user.click(paynowRail())
+    expect(continueToPayment()).toHaveTextContent('Pay $86.24 with PayNow')
+  })
+
+  it('shows spots left under Guests only when the session is nearly full', async () => {
+    givenSessions([makeSession({ id: 'session-7', spots_remaining: 2 })])
+    givenSignedIn()
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.getByText(/2 spots left in this session/)).toBeInTheDocument()
+  })
+
+  it('leaves out the spots line when there is plenty of room', async () => {
+    givenSessions([makeSession({ id: 'session-7', spots_remaining: 8 })])
+    givenSignedIn()
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.queryByText(/in this session/)).not.toBeInTheDocument()
   })
 
   it('tells guests a friend saves before they pick a session', async () => {
     givenListing(makeListing({ price_per_person: 1500 }))
     givenSessions([makeSession({ id: 'session-7', spots_remaining: 4 })])
     renderPage()
-    expect(await screen.findByText('Bring a friend, save $5.')).toBeInTheDocument()
+    const friend = await screen.findByText('Bring a friend, save $5.')
     expect(screen.getByText(/Their seat skips/)).toBeInTheDocument()
+    // Under "Pick a date, then a time", which is the section title on phones.
+    expect(
+      screen.getByText('Pick a date, then a time').compareDocumentPosition(friend) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('sends the chosen guest count to create-payment-intent', async () => {
@@ -1744,35 +1815,115 @@ describe('ListingDetail add-ons', () => {
     expect(screen.queryByRole('heading', { name: 'Add a little extra' })).not.toBeInTheDocument()
   })
 
-  it('shows add-on cards under About this experience', async () => {
-    givenAddons([BLOOMS, WRAP])
+  it('lists add-ons like a menu after the dates', async () => {
+    givenAddons([BLOOMS, { ...WRAP, photo_url: 'https://cdn.example/wrap.jpg' }])
     renderPage()
-    expect(await screen.findByRole('heading', { name: 'Add a little extra' })).toBeInTheDocument()
+    const section = (
+      await screen.findByRole('heading', { name: 'Add a little extra' })
+    ).closest('section')
+    expect(within(section).getByText('Optional extras from Mei. Add them at checkout.')).toBeInTheDocument()
+    // After the booking card in the page, so on phones the dates come first.
     expect(
-      screen.getByText(/Mei offers these with this session. Pick any when you book/),
-    ).toBeInTheDocument()
-    expect(screen.getByText('+$17 per person')).toBeInTheDocument()
-    expect(screen.getByText('+$9 per booking')).toBeInTheDocument()
-    expect(screen.getByText('4 per session')).toBeInTheDocument()
+      document.getElementById('booking').compareDocumentPosition(section) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+
+    const [blooms, wrap] = within(section).getAllByRole('listitem')
+    expect(within(blooms).getByText('Premium blooms')).toBeInTheDocument()
+    expect(within(blooms).getByText('+$17')).toBeInTheDocument()
+    expect(within(blooms).getByText('per person')).toBeInTheDocument()
+    expect(within(blooms).getByText('A better bunch')).toBeInTheDocument()
+    expect(within(blooms).getByText('Only 4 per session')).toBeInTheDocument()
+    expect(blooms.querySelector('.extras-menu__thumb--empty')).toBeInTheDocument()
+
+    expect(within(wrap).getByText('+$9')).toBeInTheDocument()
+    expect(within(wrap).getByText('once per group')).toBeInTheDocument()
+    expect(within(wrap).queryByText(/per session/)).not.toBeInTheDocument()
+    expect(wrap.querySelector('img.extras-menu__thumb')).toHaveAttribute(
+      'src',
+      expect.stringContaining('wrap.jpg'),
+    )
   })
 
-  it('lets a guest step a per-person add-on and toggle a per-booking one', async () => {
+  const extrasRow = () => screen.getByRole('button', { name: /^Make it extra/ })
+
+  it('shows the extras as one row that opens a panel', async () => {
     givenAddons([BLOOMS, WRAP], [{ addon_id: 'addon-blooms', remaining: 2 }])
     const { user } = renderPage()
     await user.click(await screen.findByRole('button', { name: 'Book' }))
 
-    expect(screen.getByText(/Make it extra/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
-    expect(screen.getByLabelText(/Note for Mei \(optional\)/)).toBeInTheDocument()
+    expect(extrasRow()).toHaveTextContent('Optional · Premium blooms, Gift wrap')
+    expect(extrasRow()).toHaveTextContent('from $9')
+    expect(extrasRow()).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(screen.queryByRole('button', { name: 'More Premium blooms' })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
+    await user.click(extrasRow())
+    const panel = screen.getByRole('dialog', { name: 'Make it extra' })
+    expect(panel.parentElement.parentElement).toBe(document.body)
+    expect(screen.getByRole('button', { name: 'Close extras' })).toHaveFocus()
+    expect(within(panel).getByText('2 left this session')).toBeInTheDocument()
+    expect(within(panel).getByText('$17 per person')).toBeInTheDocument()
+    expect(within(panel).getByText('$9 once per group')).toBeInTheDocument()
+
+    await user.click(within(panel).getByRole('button', { name: 'Add Premium blooms' }))
+    expect(within(panel).getByText('For how many of you?')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'More Premium blooms' })).toBeDisabled()
+    await user.click(within(panel).getByRole('button', { name: 'Add Gift wrap' }))
+    expect(within(panel).getByRole('button', { name: 'Add Gift wrap' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(within(panel).getByRole('button', { name: /^Add to booking · \+\$26$/ })).toBeInTheDocument()
+    // Nothing reaches the checkout until the guest confirms.
+    expect(extrasRow()).toHaveTextContent('from $9')
+
+    await user.click(within(panel).getByRole('button', { name: /^Add to booking/ }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(extrasRow()).toHaveTextContent('Premium blooms × 1, Gift wrap × 1')
+    expect(extrasRow()).toHaveTextContent('+$26')
+    expect(extrasRow()).toHaveFocus()
+
+    await user.click(screen.getByRole('button', { name: 'Show price breakdown' }))
     expect(screen.getByText('Premium blooms × 1')).toBeInTheDocument()
-    expect(screen.getByText('2 left this session')).toBeInTheDocument()
-    expect(screen.getByLabelText(/Note for Mei \(optional\)/)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Add' }))
-    expect(screen.getByRole('button', { name: 'Added' })).toBeInTheDocument()
     expect(screen.getByText('Gift wrap × 1')).toBeInTheDocument()
+  })
+
+  it('drops what was picked in the panel when it is closed without adding', async () => {
+    givenAddons([BLOOMS])
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(extrasRow())
+    await user.click(screen.getByRole('button', { name: 'Add Premium blooms' }))
+    // The stepper replaces Add, so focus moves into it rather than falling out of the panel.
+    expect(screen.getByRole('button', { name: 'Fewer Premium blooms' })).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(extrasRow()).toHaveTextContent('from $17')
+
+    await user.click(extrasRow())
+    await user.click(screen.getByRole('button', { name: 'Close extras' }))
+    expect(extrasRow()).not.toHaveTextContent('×')
+  })
+
+  it('takes a per-person add-on back to zero and says Done with nothing picked', async () => {
+    givenAddons([BLOOMS])
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(extrasRow())
+    await user.click(screen.getByRole('button', { name: 'Add Premium blooms' }))
+    await user.click(screen.getByRole('button', { name: 'Fewer Premium blooms' }))
+    expect(screen.getByRole('button', { name: 'Add Premium blooms' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    expect(extrasRow()).toHaveTextContent('from $17')
+  })
+
+  it('closes the panel when the backdrop is clicked', async () => {
+    givenAddons([BLOOMS])
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(extrasRow())
+    await user.click(document.querySelector('.extras-sheet'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('clamps a per-person add-on when the guest count drops', async () => {
@@ -1780,13 +1931,23 @@ describe('ListingDetail add-ons', () => {
     const { user } = renderPage()
     await user.click(await screen.findByRole('button', { name: 'Book' }))
     await user.click(screen.getByRole('button', { name: 'More guests' }))
+    await user.click(extrasRow())
+    await user.click(screen.getByRole('button', { name: 'Add Premium blooms' }))
     await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
-    await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
-    expect(screen.getByText('Premium blooms × 2')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Add to booking/ }))
+    expect(extrasRow()).toHaveTextContent('Premium blooms × 2')
 
     await user.click(screen.getByRole('button', { name: 'Fewer guests' }))
-    expect(screen.getByText('Premium blooms × 1')).toBeInTheDocument()
-    expect(screen.queryByText('Premium blooms × 2')).not.toBeInTheDocument()
+    expect(extrasRow()).toHaveTextContent('Premium blooms × 1')
+  })
+
+  it('opens the note for the host from a link', async () => {
+    givenAddons([])
+    const { user } = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    expect(screen.queryByLabelText(/Note for Mei/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add a note for Mei' }))
+    expect(screen.getByLabelText(/Note for Mei \(optional\)/)).toHaveFocus()
   })
 
   it('sends picked add-ons and the note with the combined total', async () => {
@@ -1797,7 +1958,10 @@ describe('ListingDetail add-ons', () => {
     })
     const { user } = renderPage()
     await user.click(await screen.findByRole('button', { name: 'Book' }))
-    await user.click(screen.getByRole('button', { name: 'More Premium blooms' }))
+    await user.click(screen.getByRole('button', { name: /^Make it extra/ }))
+    await user.click(screen.getByRole('button', { name: 'Add Premium blooms' }))
+    await user.click(screen.getByRole('button', { name: /^Add to booking/ }))
+    await user.click(screen.getByRole('button', { name: 'Add a note for Mei' }))
     await user.type(screen.getByLabelText(/Note for Mei \(optional\)/), 'For Alex')
     await user.click(cardRail())
     await user.click(continueToPayment())
@@ -1824,6 +1988,8 @@ describe('ListingDetail add-ons', () => {
     const { user } = renderPage()
     await user.click(await screen.findByRole('button', { name: 'Book' }))
     expect(screen.queryByRole('heading', { name: 'Add a little extra' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Make it extra/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add a note for Mei' }))
     expect(screen.getByText(/Anything you.d like .+ to know\./)).toBeInTheDocument()
     await user.type(screen.getByLabelText(/Note for Mei \(optional\)/), 'Running late')
     await user.click(cardRail())
