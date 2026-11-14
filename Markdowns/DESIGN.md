@@ -169,7 +169,14 @@ No photo banner and no persistent search bar for launch (unchanged): with tens o
 
 ### Checkout ("Confirm and pay", from the canvas "Checkout · phone" mockup)
 - **Phones and tablets:** a full-screen sheet with a back arrow (cancels and returns to the dates). **From 1024px:** the same content inside the booking card, which stops being sticky so the whole checkout scrolls with the page.
-- Session summary card (photo, title, host and area, date and time in mono, "Change"), guests row with spots left and round 44px steppers plus the group-pricing line, "Pay with" PayNow and Card as radio cards (PayNow shows the sliding 5–2% saving and the struck-through card price), "Make it extra" add-ons when the listing has them, a price breakdown (guests all in, one row per add-on, PayNow saving in green, total, "Booking fee included"), three short promises we can stand behind (host ID check, address after booking, 48-hour full refund), and the agreement line.
+- Built from the canvas option A, "One row and a pop-up panel".
+- Session summary card, then **Guests** with its stepper. Under the label: spots left only when the session is nearly full (coral), then one green line: "Add a friend and save $X" (a button) at 1 guest, or "Group price applied, you save $X" from 2 guests. No per-person price line.
+- **Make it extra** is one row (sand star tile, "Optional · <names>", "from $9", chevron). It opens a panel: a bottom sheet on phones, a centred dialog from 768px, portalled to `<body>`. Each extra is a card with thumbnail, name, description and "$17 per person" / "$9 once per group". Per-person extras show **Add**, which turns into a "For how many of you?" stepper; per-booking extras toggle Add / Added. "N left this session" shows when 3 or fewer remain. Nothing changes on the checkout until **Add to booking · +$X** ("Done" with nothing picked); Close, Escape or the backdrop drops the panel's picks. After adding, the row reads "Premium blooms × 2" and "+$34".
+- **"+ Add a note for <host>"** is a link; the note field opens (focused) only when asked for, or when there's already a note.
+- **Pay with:** PayNow shows only a green "Save $1.36" badge; Card shows "Credit or debit card". Neither row repeats a price.
+- **Total, all in** appears once, with "Show price breakdown" under it (guests, each extra, PayNow saving).
+- **Pay button:** "Pay $66.64 with PayNow" or "Pay $51 by card", and under it one line: "Refund minus the booking fee if you cancel 48+ hours before. By booking, you agree to the Booking terms and Cancellation Policy." On the full-screen checkout (below 1024px) the button and that line are sticky at the bottom of the checkout, not fixed, so nothing scrolls under them.
+- Not built yet: the canvas option C offer of extras on the confirmation screen ("Make it extra · Add until …"), which needs a way to take a second payment for an existing booking.
 - Choosing a method still creates the payment straight away (unchanged flow, so the server's price check runs before the guest pays). Stripe's payment form then appears with "Pay $X", pinned to the bottom of the screen on phones.
 
 ### Hosting, bookings, profile, settings, auth

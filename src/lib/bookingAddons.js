@@ -64,6 +64,32 @@ export function pickedAddonLines(addons, quantities) {
     .filter((addon) => addon.quantity > 0)
 }
 
+/**
+ * The single "Make it extra" row at checkout. Nothing picked: the extras by
+ * name and the cheapest guest price ("from $9"). Something picked: what and
+ * how many ("Premium materials × 2") and what it adds to the total.
+ */
+export function checkoutExtrasSummary(addons, quantities) {
+  const list = addons ?? []
+  const picked = pickedAddonLines(list, quantities)
+  if (picked.length) {
+    return {
+      picked: true,
+      text: picked.map((line) => addonLineLabel(line.name, line.quantity)).join(', '),
+      cents: picked.reduce(
+        (sum, line) => sum + addonGuestUnitCents(line.hostUnitCents) * line.quantity,
+        0,
+      ),
+    }
+  }
+  const prices = list.map((addon) => addonGuestUnitCents(addon.price_cents))
+  return {
+    picked: false,
+    text: `Optional · ${list.map((addon) => addon.name).join(', ')}`,
+    cents: prices.length ? Math.min(...prices) : 0,
+  }
+}
+
 export function checkoutAddonPayload(lines) {
   return lines.map((line) => ({ id: line.id, quantity: line.quantity }))
 }

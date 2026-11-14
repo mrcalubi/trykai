@@ -27,13 +27,11 @@ import {
   bookTogetherSavingCents,
   calculateBookingCharge,
   discountedLessonCents,
-  groupPriceLabel,
   guestFacingPriceCents,
   isPayNowTooFarAhead,
   MAX_GUESTS_PER_BOOKING,
   nextGroupTierHint,
   PAYNOW_TOO_FAR_AHEAD_MESSAGE,
-  paynowDiscountRate,
 } from '../lib/pricing'
 import { loadPublicListingAddons } from '../lib/listingAddons'
 import { isMissingSessionTypes, loadPublicSessionTypes, sessionsOfType } from '../lib/sessionTypes'
@@ -219,6 +217,8 @@ export default function ListingDetail() {
   const [addonsAvailable, setAddonsAvailable] = useState(false)
   const [addonQuantities, setAddonQuantities] = useState({})
   const [addonNote, setAddonNote] = useState('')
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [breakdownOpen, setBreakdownOpen] = useState(false)
   const [addonRemaining, setAddonRemaining] = useState({})
 
   useEffect(() => {
@@ -464,6 +464,8 @@ export default function ListingDetail() {
     setGuestsCount(1)
     setAddonQuantities({})
     setAddonNote('')
+    setNoteOpen(false)
+    setBreakdownOpen(false)
     setAddonRemaining({})
     setCheckoutRail(defaultCheckoutRail(findCachedSession(checkoutSessionId)?.starts_at, payNowBlockedByServer))
     setClientSecret(null)
@@ -527,6 +529,8 @@ export default function ListingDetail() {
     setGuestsCount(1)
     setAddonQuantities({})
     setAddonNote('')
+    setNoteOpen(false)
+    setBreakdownOpen(false)
     setAddonRemaining({})
     setCheckoutSessionId(sessionId)
   }
@@ -796,7 +800,6 @@ export default function ListingDetail() {
   const checkoutPaynowTotal = paynowCharge.totalAmount
   const paynowSaving = checkoutCardTotal - checkoutPaynowTotal
   const showPaynowSaving = displayRail === 'paynow' && paynowSaving > 0
-  const paynowPercent = Math.round(paynowDiscountRate(checkoutCardTotal) * 100)
 
   function renderCheckout() {
     return (
@@ -846,17 +849,32 @@ export default function ListingDetail() {
                   <div className="guest-stepper__row">
                     <div>
                       <p className="guest-stepper__label">Guests</p>
-                      <p
-                        className={`guest-stepper__spots${
-                          isLowSpots(checkoutSession.spots_remaining)
-                            ? ' guest-stepper__spots--low'
-                            : ''
-                        }`}
-                      >
-                        {isLowSpots(checkoutSession.spots_remaining)
-                          ? `${spotsLabel(checkoutSession.spots_remaining)} in this session`
-                          : `${checkoutSession.spots_remaining} spots in this session`}
-                      </p>
+                      {isLowSpots(checkoutSession.spots_remaining) ? (
+                        <p className="guest-stepper__spots guest-stepper__spots--low">
+                          {spotsLabel(checkoutSession.spots_remaining)} in this session
+                        </p>
+                      ) : null}
+                      {guestsCount > 1 && togetherSavingCents > 0 ? (
+                        <p className="guest-stepper__saving">
+                          Group price applied, you save {formatCents(togetherSavingCents)}
+                        </p>
+                      ) : guestsCount === 1 && canBringFriend ? (
+                        <button
+                          type="button"
+                          className="guest-stepper__hint"
+                          onClick={() => changeGuests(2)}
+                        >
+                          Add a friend and save {formatCents(friendSavingCents)}
+                        </button>
+                      ) : nextHint ? (
+                        <button
+                          type="button"
+                          className="guest-stepper__hint"
+                          onClick={() => changeGuests(guestsCount + 1)}
+                        >
+                          {nextHint}
+                        </button>
+                      ) : null}
                     </div>
                     <div className="guest-stepper__controls">
                       <button
@@ -886,31 +904,6 @@ export default function ListingDetail() {
                       </button>
                     </div>
                   </div>
-                  <p className="guest-stepper__price">
-                    {groupPriceLabel(listing.price_per_person, guestsCount, groupPricing, displayRail)}
-                  </p>
-                  {guestsCount > 1 && togetherSavingCents > 0 ? (
-                    <p className="guest-stepper__saving">
-                      You save {formatCents(togetherSavingCents)} by booking together
-                    </p>
-                  ) : null}
-                  {guestsCount === 1 && canBringFriend ? (
-                    <button
-                      type="button"
-                      className="guest-stepper__hint"
-                      onClick={() => changeGuests(2)}
-                    >
-                      Add a friend and save {formatCents(friendSavingCents)}
-                    </button>
-                  ) : nextHint ? (
-                    <button
-                      type="button"
-                      className="guest-stepper__hint"
-                      onClick={() => changeGuests(guestsCount + 1)}
-                    >
-                      {nextHint}
-                    </button>
-                  ) : null}
                 </div>
               )}
 
@@ -920,13 +913,27 @@ export default function ListingDetail() {
                   quantities={addonQuantities}
                   guestsCount={guestsCount}
                   remainingById={addonRemaining}
-                  hostName={hostName}
-                  onQuantity={(addonId, quantity) => {
-                    setAddonQuantities((current) => ({ ...current, [addonId]: Math.max(0, quantity) }))
-                  }}
+                  onApply={(next) =>
+                    setAddonQuantities(
+                      clampAddonQuantities(next, listingAddons, guestsCount, addonRemaining),
+                    )
+                  }
                 />
               ) : null}
-              <CheckoutHostNote hostName={hostName} value={addonNote} onChange={setAddonNote} />
+
+              {noteOpen || addonNote ? (
+                <CheckoutHostNote
+                  hostName={hostName}
+                  value={addonNote}
+                  onChange={setAddonNote}
+                  autoFocus={noteOpen && !addonNote}
+                />
+              ) : (
+                <button type="button" className="checkout-note-link" onClick={() => setNoteOpen(true)}>
+                  <Icon name="plus" size={16} />
+                  Add a note for {hostName}
+                </button>
+              )}
 
               <div className="payment-rails" role="radiogroup" aria-labelledby="pay-with-label">
                 <p className="checkout__label" id="pay-with-label">
@@ -942,29 +949,13 @@ export default function ListingDetail() {
                 >
                   <span className="payment-rail__radio" aria-hidden="true" />
                   <span className="payment-rail__copy">
-                    <span className="payment-rail__row">
-                      <span className="payment-rail__name">PayNow</span>
-                      {paynowBlocked ? null : (
-                        <span className="paynow-badge">Save {paynowPercent}%</span>
-                      )}
+                    <span className="payment-rail__name">PayNow</span>
+                  </span>
+                  {paynowBlocked || paynowSaving <= 0 ? null : (
+                    <span className="paynow-badge paynow-badge--fill">
+                      Save <FormattedPrice cents={paynowSaving} />
                     </span>
-                  </span>
-                  <span className="payment-rail__amounts">
-                    {paynowBlocked ? (
-                      <span className="payment-rail__now">
-                        <FormattedPrice cents={cardPrice} />
-                      </span>
-                    ) : (
-                      <>
-                        <s className="payment-rail__was">
-                          <FormattedPrice cents={cardPrice} />
-                        </s>
-                        <span className="payment-rail__now">
-                          <FormattedPrice cents={paynowPrice} />
-                        </span>
-                      </>
-                    )}
-                  </span>
+                  )}
                 </button>
                 {paynowBlocked ? (
                   <p className="payment-rails__hint">{PAYNOW_TOO_FAR_AHEAD_MESSAGE}</p>
@@ -979,49 +970,56 @@ export default function ListingDetail() {
                 >
                   <span className="payment-rail__radio" aria-hidden="true" />
                   <span className="payment-rail__copy">
-                    <span className="payment-rail__row">
-                      <span className="payment-rail__name">Card</span>
-                    </span>
+                    <span className="payment-rail__name">Card</span>
                   </span>
-                  <span className="payment-rail__amounts">
-                    <span className="payment-rail__now">
-                      <FormattedPrice cents={cardPrice} />
-                    </span>
-                  </span>
+                  <span className="payment-rail__hint">Credit or debit card</span>
                 </button>
               </div>
 
-              <div className="price-breakdown">
-                <p className="price-breakdown__row">
-                  <span>
-                    {guestsCount} guest{guestsCount === 1 ? '' : 's'}, all in
-                  </span>
-                  <span className="price-breakdown__amount">
-                    <FormattedPrice cents={cardCharge.cardLessonTotal} />
-                  </span>
-                </p>
-                {pickedAddons.map((addon) => (
-                  <p key={addon.id} className="price-breakdown__row">
-                    <span>{addonLineLabel(addon.name, addon.quantity)}</span>
-                    <span className="price-breakdown__amount">
-                      <FormattedPrice cents={addonGuestUnitCents(addon.hostUnitCents) * addon.quantity} />
-                    </span>
-                  </p>
-                ))}
-                {showPaynowSaving ? (
-                  <p className="price-breakdown__row price-breakdown__row--saving">
-                    <span>PayNow saving</span>
-                    <span className="price-breakdown__amount">
-                      −<FormattedPrice cents={paynowSaving} />
-                    </span>
-                  </p>
-                ) : null}
-                <p className="price-breakdown__row price-breakdown__row--total">
-                  <span>Total (all in)</span>
-                  <span className="price-breakdown__amount price-breakdown__total">
+              <div className="checkout-total">
+                <p className="checkout-total__row">
+                  <span>Total, all in</span>
+                  <span className="checkout-total__amount">
                     <FormattedPrice cents={checkoutPrice} />
                   </span>
                 </p>
+                <button
+                  type="button"
+                  className="checkout-total__toggle"
+                  aria-expanded={breakdownOpen}
+                  aria-controls="price-breakdown"
+                  onClick={() => setBreakdownOpen((open) => !open)}
+                >
+                  {breakdownOpen ? 'Hide price breakdown' : 'Show price breakdown'}
+                </button>
+                {breakdownOpen ? (
+                  <div id="price-breakdown" className="price-breakdown">
+                    <p className="price-breakdown__row">
+                      <span>
+                        {guestsCount} guest{guestsCount === 1 ? '' : 's'}, all in
+                      </span>
+                      <span className="price-breakdown__amount">
+                        <FormattedPrice cents={cardCharge.cardLessonTotal} />
+                      </span>
+                    </p>
+                    {pickedAddons.map((addon) => (
+                      <p key={addon.id} className="price-breakdown__row">
+                        <span>{addonLineLabel(addon.name, addon.quantity)}</span>
+                        <span className="price-breakdown__amount">
+                          <FormattedPrice cents={addonGuestUnitCents(addon.hostUnitCents) * addon.quantity} />
+                        </span>
+                      </p>
+                    ))}
+                    {showPaynowSaving ? (
+                      <p className="price-breakdown__row price-breakdown__row--saving">
+                        <span>PayNow saving</span>
+                        <span className="price-breakdown__amount">
+                          −<FormattedPrice cents={paynowSaving} />
+                        </span>
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
               <div className="checkout-pay-bar">
@@ -1031,31 +1029,15 @@ export default function ListingDetail() {
                   loadingLabel="Getting your payment ready"
                   onClick={() => startPayment(displayRail)}
                 >
-                  <span className="checkout-pay__label">Continue to payment</span>
-                  <FormattedPrice cents={checkoutPrice} />
+                  Pay <FormattedPrice cents={checkoutPrice} />{' '}
+                  {displayRail === 'paynow' ? 'with PayNow' : 'by card'}
                 </Button>
-              </div>
-
-              <div className="checkout-promises">
-                <p className="checkout-promises__item">
-                  <Icon name="shield" size={14} />
-                  Your host passed an ID check before listing on TryKai.
-                </p>
-                <p className="checkout-promises__item">
-                  <Icon name="pin" size={14} />
-                  The exact address is shared once your booking is confirmed.
-                </p>
-                <p className="checkout-promises__item">
-                  <Icon name="wallet" size={14} />
-                  Cancel 48 or more hours before for a refund of everything except the booking fee.
+                <p className="payment-agree">
+                  Refund minus the booking fee if you cancel 48+ hours before. By booking, you agree
+                  to the <Link to="/terms#part-3-booking">Booking terms</Link> and{' '}
+                  <Link to="/cancellation-policy">Cancellation Policy</Link>.
                 </p>
               </div>
-
-              <p className="payment-agree">
-                By booking, you agree to the{' '}
-                <Link to="/terms#part-3-booking">Booking terms</Link> and{' '}
-                <Link to="/cancellation-policy">Cancellation Policy</Link>
-              </p>
             </>
           ) : (
             <Elements stripe={stripePromise} options={{ clientSecret }}>
@@ -1075,7 +1057,7 @@ export default function ListingDetail() {
 
   return (
     <div
-      className={`page page--detail page--listing${showBookBar ? ' page--with-book-bar' : ''}${checkoutSessionId ? ' page--with-checkout-bar' : ''}`}
+      className={`page page--detail page--listing${showBookBar ? ' page--with-book-bar' : ''}`}
     >
       <BackRowActions>
         <button type="button" className="share-button" aria-label="Share" onClick={shareListing}>

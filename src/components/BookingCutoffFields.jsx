@@ -59,13 +59,14 @@ export function ArrivalInstructionsField({ value, onChange }) {
   )
 }
 
-export function CheckoutHostNote({ hostName, value, onChange }) {
+export function CheckoutHostNote({ hostName, value, onChange, autoFocus = false }) {
   return (
     <label className="checkout-host-note">
       Note for {hostName} (optional)
       <input
         type="text"
         className="input"
+        autoFocus={autoFocus}
         maxLength={120}
         value={value}
         onChange={(event) => onChange(event.target.value.slice(0, 120))}

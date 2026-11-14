@@ -676,11 +676,27 @@ test('books with an add-on and shows it on the confirmation', async ({ page }) =
     page.viewportSize().width,
   )
   await page.getByRole('button', { name: 'Book' }).click()
-  await expect(page.getByLabel(/Note for Mei \(optional\)/)).toBeVisible()
-  await page.getByRole('button', { name: 'More Premium blooms' }).click()
-  await expect(page.getByText('Premium blooms × 1')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add a note for Mei' })).toBeVisible()
+
+  // Extras: one row on the checkout, picked in a panel.
+  const extrasRow = page.getByRole('button', { name: /^Make it extra/ })
+  await expect(extrasRow).toContainText('from $17')
+  await extrasRow.click()
+  const panel = page.getByRole('dialog', { name: 'Make it extra' })
+  await expect(panel).toBeVisible()
+  await panel.getByRole('button', { name: 'Add Premium blooms' }).click()
+  await expect(panel.getByText('For how many of you?')).toBeVisible()
+  // The panel stays inside the screen and its button is reachable.
+  const box = await panel.boundingBox()
+  expect(box.x).toBeGreaterThanOrEqual(0)
+  expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize().width)
+  await panel.getByRole('button', { name: /^Add to booking · \+\$17$/ }).click()
+  await expect(panel).toHaveCount(0)
+  await expect(extrasRow).toContainText('Premium blooms × 1')
+  await expect(extrasRow).toContainText('+$17')
+
   await page.getByRole('radio', { name: /^Card/ }).click()
-  await page.getByRole('button', { name: /Continue to payment/ }).click()
+  await page.getByRole('button', { name: /^Pay \$[\d.,]+ by card$/ }).click()
 
   await page.goto('/bookings/booking-addon')
   await expect(page.getByText('Premium blooms × 1')).toBeVisible()
@@ -722,9 +738,11 @@ test('sends a host note when the listing has no add-ons', async ({ page }) => {
   await page.goto('/listings/listing-latte')
   await page.getByRole('button', { name: 'Book' }).click()
   await expect(page.getByRole('heading', { name: 'Add a little extra' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Make it extra/ })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Add a note for Mei' }).click()
   await page.getByLabel(/Note for Mei \(optional\)/).fill('Running a little late')
   await page.getByRole('radio', { name: /^Card/ }).click()
-  await page.getByRole('button', { name: /Continue to payment/ }).click()
+  await page.getByRole('button', { name: /^Pay \$[\d.,]+ by card$/ }).click()
   await expect.poll(() => intentBody?.addon_note).toBe('Running a little late')
 })
 

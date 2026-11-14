@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addonLimitLabel,
+  checkoutExtrasSummary,
   addonLineLabel,
   clampAddonQuantities,
   guestAddonPriceParts,
@@ -27,6 +28,28 @@ const wrap = {
   unit: 'booking',
   session_limit: null,
 }
+
+describe('checkout extras row', () => {
+  it('names the extras and the cheapest guest price before anything is picked', () => {
+    expect(checkoutExtrasSummary([blooms, wrap], {})).toEqual({
+      picked: false,
+      text: 'Optional · Premium blooms, Gift wrap',
+      cents: 900,
+    })
+  })
+
+  it('says what was picked and what it adds', () => {
+    expect(checkoutExtrasSummary([blooms, wrap], { blooms: 2, wrap: 1 })).toEqual({
+      picked: true,
+      text: 'Premium blooms × 2, Gift wrap × 1',
+      cents: 1700 * 2 + 900,
+    })
+  })
+
+  it('copes with no extras at all', () => {
+    expect(checkoutExtrasSummary(undefined, {})).toEqual({ picked: false, text: 'Optional · ', cents: 0 })
+  })
+})
 
 describe('booking addon helpers', () => {
   it('labels guest prices and prepare lines', () => {
