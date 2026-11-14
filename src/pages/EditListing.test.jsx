@@ -242,9 +242,43 @@ describe('EditListing overview', () => {
     await renderLoaded()
 
     expect(screen.getAllByText('Live').length).toBeGreaterThan(0)
-    expect(screen.getByText(/^Next: .+ · 2 of 4 booked$/)).toBeInTheDocument()
+    // Once in the desktop header, once on the phone summary card.
+    expect(screen.getAllByText(/^Next: .+ · 2 of 4 booked$/)).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: /Manage dates/ })[0]).toHaveAttribute('href', '/hosting')
     expect(screen.getAllByRole('link', { name: /Preview/ })[0]).toHaveAttribute('href', '/listings/listing-1')
+  })
+
+  it('puts Manage dates with the next date, and Preview under the guest card', async () => {
+    supabase.__on('sessions', 'select', {
+      data: [
+        {
+          id: 's-next',
+          listing_id: 'listing-1',
+          starts_at: '2099-06-10T02:00:00.000Z',
+          bookings: [],
+        },
+      ],
+      error: null,
+    })
+    await renderLoaded()
+
+    const meta = document.querySelector('.edit-head__meta')
+    expect(meta).toHaveTextContent(/^Next: .+ · 0 of 4 booked/)
+    expect(within(meta).getByRole('link', { name: 'Manage dates' })).toHaveAttribute('href', '/hosting')
+    expect(document.querySelector('.edit-head__actions')).toBeNull()
+
+    const preview = screen.getByRole('complementary', { name: 'How guests see it' })
+    expect(within(preview).getByRole('link', { name: 'Preview full listing' })).toHaveAttribute(
+      'href',
+      '/listings/listing-1',
+    )
+  })
+
+  it('still offers Manage dates when no date is coming up', async () => {
+    await renderLoaded()
+    const meta = document.querySelector('.edit-head__meta')
+    expect(meta).not.toHaveTextContent('Next:')
+    expect(within(meta).getByRole('link', { name: 'Manage dates' })).toBeInTheDocument()
   })
 
   it('says a listing is in review', async () => {

@@ -939,20 +939,18 @@ export default function EditListing() {
           <Icon name="chevronLeft" size={16} />
           Back to hosting
         </Link>
-        <div className="edit-head__row">
-          <div className="edit-head__name">
-            <h1 className="edit-head__title">{name}</h1>
-            {statusBadge()}
-          </div>
-          <div className="edit-head__actions">
-            <Link to="/hosting" className="btn btn--secondary">
-              Manage dates
-            </Link>
-            <Link to={`/listings/${id}`} className="btn btn--secondary">
-              Preview as guest
-            </Link>
-          </div>
+        <div className="edit-head__name">
+          <h1 className="edit-head__title">{name}</h1>
+          {statusBadge()}
         </div>
+        {/* Manage dates is about the schedule, so it sits with the next date. */}
+        <p className="edit-head__meta">
+          {nextLine ? <span className="edit-head__next">{nextLine}</span> : null}
+          <Link to="/hosting" className="edit-head__dates">
+            <Icon name="calendar" size={16} />
+            Manage dates
+          </Link>
+        </p>
       </header>
 
       <div className="edit-layout">
@@ -1120,6 +1118,10 @@ export default function EditListing() {
             price={priceCents ? `${formatSgd(guestFacingPriceCents(priceCents))}/person` : 'S$—/person'}
           />
           <p className="edit-field__hint">Updates as you edit. Only saved changes go live.</p>
+          <Link to={`/listings/${id}`} className="btn btn--secondary edit-preview__open">
+            <Icon name="eye" size={18} />
+            Preview full listing
+          </Link>
         </aside>
       </div>
 
