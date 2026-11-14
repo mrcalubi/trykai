@@ -652,14 +652,6 @@ export default function CreateListing() {
           {addonsAvailable ? (
             <ListingAddonsEditor addons={addons} onChange={setAddons} fieldHints={fieldHints} />
           ) : null}
-
-          <BookingCutoffFields
-            value={bookingCutoff}
-            onChange={(next) => {
-              setBookingCutoff(next)
-              persistDraft({ bookingCutoffHours: next })
-            }}
-          />
         </>
       )
     }
@@ -696,6 +688,14 @@ export default function CreateListing() {
       <>
         <WhatsProvidedFields value={whatsProvided} onChange={setWhatsProvided} />
         <WhatToBringFields value={whatToBring} onChange={setWhatToBring} />
+
+        <BookingCutoffFields
+          value={bookingCutoff}
+          onChange={(next) => {
+            setBookingCutoff(next)
+            persistDraft({ bookingCutoffHours: next })
+          }}
+        />
 
         <div className="wizard-inline-preview">
           <p className="wizard-preview__label">How guests will see it</p>

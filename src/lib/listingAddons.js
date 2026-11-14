@@ -25,6 +25,20 @@ export const OCCASION_IDEAS = [
   'Proposal help',
 ]
 
+/** How each charge works, in the words the editor and its idea groups use. */
+export const ADDON_UNIT_COPY = {
+  person: {
+    label: 'Per guest',
+    group: 'Charged per guest',
+    hint: 'Each guest who adds it pays. Good for materials and things to take home.',
+  },
+  booking: {
+    label: 'Per booking',
+    group: 'Charged once per booking · for occasions',
+    hint: 'Paid once, whatever the group size. Good for birthdays and date nights.',
+  },
+}
+
 export const ADDON_HINTS = {
   name: 'Give this add-on a name.',
   price: 'Set what you get, from S$1 to S$500 in whole dollars.',
@@ -165,6 +179,23 @@ export function addonLivePill(addon) {
   const hostCents = parseAddonPriceCents(addon?.price)
   if (hostCents == null) return ''
   return `You get ${sgd(hostCents)} · guests pay ${sgd(addonGuestUnitCents(hostCents))}`
+}
+
+/**
+ * One line under a finished add-on's name: "S$15 per guest · guests pay S$17",
+ * or what is still missing.
+ */
+export function addonSummary(addon) {
+  const hostCents = parseAddonPriceCents(addon?.price)
+  const missing = []
+  if (!addon?.name?.trim()) missing.push('a name')
+  if (hostCents == null) missing.push('a price')
+  if (missing.length) return { ready: false, text: `Needs ${missing.join(' and ')}` }
+  const unit = addon.unit === 'booking' ? 'per booking' : 'per guest'
+  return {
+    ready: true,
+    text: `You get ${sgd(hostCents)} ${unit} · guests pay ${sgd(addonGuestUnitCents(hostCents))}`,
+  }
 }
 
 export function addonEarningsLine(addon) {

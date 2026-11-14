@@ -34,7 +34,7 @@ export const LISTING_STEPS = [
     id: 'finish',
     label: 'Publish',
     title: 'Final touches',
-    intro: 'Say what you provide and what guests should bring, then publish.',
+    intro: 'What you provide, what guests bring and how much notice you need. Then publish.',
   },
 ]
 
