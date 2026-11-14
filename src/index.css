@@ -12768,10 +12768,23 @@ body.extras-sheet-open {
     min-height: 0;
     padding: 10px 12px;
     border-radius: var(--radius);
+    transition: background-color 0.15s ease;
   }
 
-  .edit-nav__row--on {
+  /* Hover is a lighter step of the selected fill, so it shows on the cream
+     page and never takes the fill off the section that is open. */
+  .edit-nav__row:hover {
+    background: color-mix(in srgb, var(--sand) 55%, transparent);
+  }
+
+  .edit-nav__row--on,
+  .edit-nav__row--on:hover {
     background: var(--sand);
+  }
+
+  .edit-nav__row:focus-visible {
+    outline: 2px solid var(--navy);
+    outline-offset: 2px;
   }
 
   .edit-nav__row--on .edit-nav__label {
