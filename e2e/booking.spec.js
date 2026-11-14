@@ -659,6 +659,11 @@ test('books with an add-on and shows it on the confirmation', async ({ page }) =
   await expect(extras.nth(0)).toContainText('Only 4 per session')
   await expect(extras.nth(1)).toContainText('once per group')
   const list = await page.locator('.extras-menu__list').boundingBox()
+  if (page.viewportSize().width < 1024) {
+    // Phones: the dates come before the extras, so the extras never push them down.
+    const calendar = await page.locator('.detail-calendar').boundingBox()
+    expect(list.y).toBeGreaterThan(calendar.y + calendar.height)
+  }
   for (const row of [extras.nth(0), extras.nth(1)]) {
     await expect(row.locator('.extras-menu__thumb')).toBeVisible()
     const name = await row.locator('.extras-menu__name').boundingBox()

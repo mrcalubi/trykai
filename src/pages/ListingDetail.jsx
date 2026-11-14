@@ -703,6 +703,9 @@ export default function ListingDetail() {
     reviews.length > 0
       ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
       : null
+  // When every review the host has is on this listing, the host's rating is the
+  // listing's rating; the facts row already shows it, so the host card skips it.
+  const hostRatingRepeats = listingRating != null && hostRating.reviewCount <= reviews.length
   const showBookBar = Boolean(publicSessionRange) && !checkoutSessionId && !isOwnListing
   const nextHint = checkoutSession
     ? nextGroupTierHint(
@@ -1189,10 +1192,10 @@ export default function ListingDetail() {
                 </p>
               ) : null}
               {listingRating ? (
-                <p className="detail-fact">
+                <a href="#reviews" className="detail-fact detail-fact--link">
                   <Icon name="star" size={17} />
-                  {listingRating.toFixed(1)} ({reviews.length} review{reviews.length === 1 ? '' : 's'})
-                </p>
+                  {listingRating.toFixed(1)} · {reviews.length} review{reviews.length === 1 ? '' : 's'}
+                </a>
               ) : null}
             </div>
           ) : null}
@@ -1212,7 +1215,9 @@ export default function ListingDetail() {
                   )}
                 </p>
                 {hostVerified ? <VerifiedBadge /> : null}
-                <HostRating average={hostRating.average} reviewCount={hostRating.reviewCount} />
+                {hostRatingRepeats ? null : (
+                  <HostRating average={hostRating.average} reviewCount={hostRating.reviewCount} />
+                )}
               </div>
             </div>
             {typeof host?.bio === 'string' && host.bio.trim() ? (
@@ -1267,72 +1272,36 @@ export default function ListingDetail() {
             </section>
           ) : null}
 
-          {addonsAvailable && listingAddons.length > 0 ? (
-            <section className="detail-section extras-menu">
-              <h2 className="detail-section__title">Add a little extra</h2>
-              <p className="extras-menu__intro">
-                Optional extras from {hostName}. Add them when you book.
-              </p>
-              <ul className="extras-menu__list">
-                {listingAddons.map((addon) => {
-                  const price = guestAddonPriceParts(addon)
-                  const limit = addonLimitLabel(addon)
-                  return (
-                    <li key={addon.id} className="extras-menu__item">
-                      {addon.photo?.remoteUrl ? (
-                        <img src={addon.photo.remoteUrl} alt="" className="extras-menu__thumb" />
-                      ) : (
-                        <span className="extras-menu__thumb extras-menu__thumb--empty" aria-hidden="true">
-                          <Icon name="sparkle" size={22} />
-                        </span>
-                      )}
-                      <div className="extras-menu__body">
-                        <div className="extras-menu__top">
-                          <p className="extras-menu__name">{addon.name}</p>
-                          <p className="extras-menu__price">
-                            <span className="extras-menu__amount">{price.amount}</span>
-                            <span className="extras-menu__unit"> {price.unit}</span>
-                          </p>
-                        </div>
-                        {addon.description ? (
-                          <p className="extras-menu__desc">{addon.description}</p>
-                        ) : null}
-                        {limit ? <p className="extras-menu__limit">{limit}</p> : null}
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
+          {listing.whats_provided?.length > 0 || listing.what_to_bring?.length > 0 ? (
+            <div className="detail-pair">
+              {listing.whats_provided?.length > 0 ? (
+                <section className="detail-section">
+                  <h2 className="detail-section__title">What&apos;s provided</h2>
+                  <ul className="detail-list detail-list--checks">
+                    {listing.whats_provided.map((item) => (
+                      <li key={item}>
+                        <Icon name="check" size={18} strokeWidth={2.4} />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+              {listing.what_to_bring?.length > 0 ? (
+                <section className="detail-section">
+                  <h2 className="detail-section__title">What to bring</h2>
+                  <ul className="detail-list detail-list--checks detail-list--bring">
+                    {listing.what_to_bring.map((item) => (
+                      <li key={item}>
+                        <span className="detail-list__dot" aria-hidden="true" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+            </div>
           ) : null}
-
-          {listing.whats_provided?.length > 0 && (
-            <section className="detail-section">
-              <h2 className="detail-section__title">What&apos;s provided</h2>
-              <ul className="detail-list detail-list--checks">
-                {listing.whats_provided.map((item) => (
-                  <li key={item}>
-                    <Icon name="check" size={18} strokeWidth={2.4} />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {listing.what_to_bring?.length > 0 && (
-            <section className="detail-section">
-              <h2 className="detail-section__title">What to bring</h2>
-              <ul className="detail-list detail-list--checks">
-                {listing.what_to_bring.map((item) => (
-                  <li key={item}>
-                    <Icon name="check" size={18} strokeWidth={2.4} />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
         </div>
 
         <aside id="booking" ref={bookingRef} className="detail-sidebar">
@@ -1341,6 +1310,9 @@ export default function ListingDetail() {
               <FormattedPrice cents={checkoutPrice} />
               {!checkoutSessionId && <span className="detail-booking-card__unit"> / person</span>}
             </p>
+            {!checkoutSessionId && publicSessionRange && (
+              <p className="detail-booking-card__note">Pick a date, then a time</p>
+            )}
             {!checkoutSessionId && publicSessionRange && canBringFriend && !isOwnListing && (
               <p className="bring-friend">
                 <Icon name="users" size={16} strokeWidth={2} className="bring-friend__icon" />
@@ -1349,9 +1321,6 @@ export default function ListingDetail() {
                   the booking fee.
                 </span>
               </p>
-            )}
-            {!checkoutSessionId && publicSessionRange && (
-              <p className="detail-booking-card__note">Pick a date, then a time</p>
             )}
 
             {paymentError && !checkoutSessionId && (
@@ -1422,6 +1391,45 @@ export default function ListingDetail() {
         </aside>
 
         <div className="detail-main detail-main--after">
+          {addonsAvailable && listingAddons.length > 0 ? (
+            <section className="detail-section extras-menu">
+              <h2 className="detail-section__title">Add a little extra</h2>
+              <p className="extras-menu__intro">
+                Optional extras from {hostName}. Add them at checkout.
+              </p>
+              <ul className="extras-menu__list">
+                {listingAddons.map((addon) => {
+                  const price = guestAddonPriceParts(addon)
+                  const limit = addonLimitLabel(addon)
+                  return (
+                    <li key={addon.id} className="extras-menu__item">
+                      {addon.photo?.remoteUrl ? (
+                        <img src={addon.photo.remoteUrl} alt="" className="extras-menu__thumb" />
+                      ) : (
+                        <span className="extras-menu__thumb extras-menu__thumb--empty" aria-hidden="true">
+                          <Icon name="sparkle" size={22} />
+                        </span>
+                      )}
+                      <div className="extras-menu__body">
+                        <div className="extras-menu__top">
+                          <p className="extras-menu__name">{addon.name}</p>
+                          <p className="extras-menu__price">
+                            <span className="extras-menu__amount">{price.amount}</span>
+                            <span className="extras-menu__unit"> {price.unit}</span>
+                          </p>
+                        </div>
+                        {addon.description ? (
+                          <p className="extras-menu__desc">{addon.description}</p>
+                        ) : null}
+                        {limit ? <p className="extras-menu__limit">{limit}</p> : null}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          ) : null}
+
           {areaLabel ? (
             <section className="detail-section">
               <h2 className="detail-section__title">Where you&apos;ll be</h2>
@@ -1458,7 +1466,7 @@ export default function ListingDetail() {
             </section>
           ) : null}
 
-          <section className="detail-section">
+          <section id="reviews" className="detail-section detail-reviews">
             <h2 className="detail-section__title">
               Reviews{reviews.length > 0 ? ` (${reviews.length})` : ''}
             </h2>

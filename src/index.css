@@ -3482,6 +3482,17 @@ body.lightbox-open {
   color: var(--navy);
 }
 
+/* The listing's own rating jumps to its reviews. */
+.detail-fact--link {
+  text-decoration: none;
+}
+
+.detail-fact--link:hover {
+  color: var(--navy);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .detail-host {
   display: flex;
   flex-direction: column;
@@ -4923,6 +4934,53 @@ body.lightbox-open {
   }
 }
 
+/* What's provided and What to bring read as a pair: side by side from 640px,
+   each a single column. Things to bring get a plain bullet, not a check,
+   so they don't look like they're included. */
+.detail-pair {
+  display: grid;
+  column-gap: 32px;
+}
+
+@media (min-width: 640px) {
+  .detail-pair {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+
+  .detail-pair:has(> :nth-child(2)) .detail-list--checks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.detail-list__dot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 24px;
+}
+
+.detail-list__dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.detail-reviews {
+  scroll-margin-top: 88px;
+}
+
+/* On phones the layout's own gap already separates the dates from what
+   follows, so the first section there doesn't add a second one. */
+@media (max-width: 1023px) {
+  .detail-main--after > .detail-section:first-child {
+    margin-top: 0;
+  }
+}
+
 .detail-location {
   display: flex;
   flex-direction: column;
@@ -5029,7 +5087,11 @@ body.lightbox-open {
 .detail-booking-card__note {
   font-size: 14px;
   color: var(--text);
-  margin: 0 0 20px;
+  margin: 0 0 16px;
+}
+
+.detail-booking-card .bring-friend {
+  margin-bottom: 16px;
 }
 
 .detail-booking-card__error {
