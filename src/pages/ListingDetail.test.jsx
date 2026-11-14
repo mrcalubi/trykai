@@ -477,14 +477,31 @@ describe('ListingDetail content', () => {
   it('averages the host reviews to one decimal place', async () => {
     givenListing()
     givenReviews([makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })])
-    givenHostReviews([makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })])
+    givenHostReviews([
+      makeReview({ id: 'r1', rating: 5 }),
+      makeReview({ id: 'r2', rating: 4 }),
+      makeReview({ id: 'r-other', rating: 4 }),
+    ])
     renderPage()
 
     await screen.findByRole('heading', { name: 'Reviews (2)' })
     expect(document.querySelector('.detail-host__rating').textContent.replace(/\s+/g, ' ').trim()).toBe(
-      '★ 4.5 · 2 reviews'
+      '★ 4.3 · 3 reviews'
     )
     expect(document.querySelector('.detail-host__star')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('shows the rating once when all the host reviews are on this listing', async () => {
+    givenListing()
+    givenReviews([makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })])
+    givenHostReviews([makeReview({ id: 'r1', rating: 5 }), makeReview({ id: 'r2', rating: 4 })])
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Reviews (2)' })
+    expect(document.querySelector('.detail-host__rating')).not.toBeInTheDocument()
+    const rating = screen.getByRole('link', { name: '4.5 · 2 reviews' })
+    expect(rating).toHaveAttribute('href', '#reviews')
+    expect(document.getElementById('reviews')).toHaveTextContent('Reviews (2)')
   })
 
   it('rates the host from every listing, not only this one', async () => {
@@ -610,13 +627,36 @@ describe('ListingDetail content', () => {
     expect(screen.queryByRole('heading', { name: "What's provided" })).not.toBeInTheDocument()
   })
 
-  it('lists what guests should bring under what is provided', async () => {
-    givenListing(makeListing({ what_to_bring: ['Water bottle', 'Notebook and pen'] }))
+  it('pairs what to bring with what is provided, with bullets instead of checks', async () => {
+    givenListing(
+      makeListing({ whats_provided: ['Materials'], what_to_bring: ['Water bottle', 'Notebook and pen'] }),
+    )
+    renderPage()
+
+    const bring = (await screen.findByRole('heading', { name: 'What to bring' })).closest('section')
+    const provided = screen.getByRole('heading', { name: "What's provided" }).closest('section')
+    expect(bring.parentElement).toHaveClass('detail-pair')
+    expect(provided.parentElement).toBe(bring.parentElement)
+    expect(within(bring).getByText('Water bottle')).toBeInTheDocument()
+    expect(within(bring).getByText('Notebook and pen')).toBeInTheDocument()
+    expect(bring.querySelectorAll('.detail-list__dot')).toHaveLength(2)
+    expect(bring.querySelector('.ui-icon')).not.toBeInTheDocument()
+  })
+
+  it('shows what to bring on its own when nothing is provided', async () => {
+    givenListing(makeListing({ whats_provided: [], what_to_bring: ['Water bottle'] }))
     renderPage()
 
     await screen.findByRole('heading', { name: 'What to bring' })
-    expect(screen.getByText('Water bottle')).toBeInTheDocument()
-    expect(screen.getByText('Notebook and pen')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: "What's provided" })).not.toBeInTheDocument()
+  })
+
+  it('leaves out the pair when there is nothing to provide or bring', async () => {
+    givenListing(makeListing({ whats_provided: [], what_to_bring: [] }))
+    renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(document.querySelector('.detail-pair')).not.toBeInTheDocument()
   })
 
   it('omits the bring section when the list is empty', async () => {
@@ -1464,8 +1504,13 @@ describe('ListingDetail booking', () => {
     givenListing(makeListing({ price_per_person: 1500 }))
     givenSessions([makeSession({ id: 'session-7', spots_remaining: 4 })])
     renderPage()
-    expect(await screen.findByText('Bring a friend, save $5.')).toBeInTheDocument()
+    const friend = await screen.findByText('Bring a friend, save $5.')
     expect(screen.getByText(/Their seat skips/)).toBeInTheDocument()
+    // Under "Pick a date, then a time", which is the section title on phones.
+    expect(
+      screen.getByText('Pick a date, then a time').compareDocumentPosition(friend) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('sends the chosen guest count to create-payment-intent', async () => {
@@ -1744,13 +1789,18 @@ describe('ListingDetail add-ons', () => {
     expect(screen.queryByRole('heading', { name: 'Add a little extra' })).not.toBeInTheDocument()
   })
 
-  it('lists add-ons like a menu under About this experience', async () => {
+  it('lists add-ons like a menu after the dates', async () => {
     givenAddons([BLOOMS, { ...WRAP, photo_url: 'https://cdn.example/wrap.jpg' }])
     renderPage()
     const section = (
       await screen.findByRole('heading', { name: 'Add a little extra' })
     ).closest('section')
-    expect(within(section).getByText('Optional extras from Mei. Add them when you book.')).toBeInTheDocument()
+    expect(within(section).getByText('Optional extras from Mei. Add them at checkout.')).toBeInTheDocument()
+    // After the booking card in the page, so on phones the dates come first.
+    expect(
+      document.getElementById('booking').compareDocumentPosition(section) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
 
     const [blooms, wrap] = within(section).getAllByRole('listitem')
     expect(within(blooms).getByText('Premium blooms')).toBeInTheDocument()
