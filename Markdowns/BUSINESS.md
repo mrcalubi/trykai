@@ -65,14 +65,36 @@ The founding insight: Singapore is perceived as expensive and boring, and there 
 | Airbnb Experiences | Global curated experiences | Paused 2022 to 2024 for losing its way, relaunched 2025 targeting locals | Even a giant struggled here, and is now entering our lane with vastly more capital |
 
 ### Position against alternatives
-| | TryKai | ToGatherSG | Airbnb Experiences | Klook | Private tutors |
-|---|---|---|---|---|---|
-| Audience | Local Singaporeans, 18 to 28 primarily | Muddied, no clear archetype | Tourists | Tourists | Serious learners |
-| Host type | Individuals and small operators | Individuals | Semi professional | Licensed operators | Credentialed |
-| Price point | S$10 to S$40 | S$15 to S$125, no anchor | S$50 to S$150 | S$30 to S$100 | S$40 to S$100/hr |
-| Barrier to list | Low, unified account | Medium, separate host app required | High | High | High |
-| Browse without install | Yes, web | No, app only | Yes | Yes | N/A |
-| Date framing | Explicit, Date Mode planned | Absent | Absent | Absent | N/A |
+| | TryKai | ToGatherSG | Seek Sophie | Airbnb Experiences | Klook | Private tutors |
+|---|---|---|---|---|---|---|
+| Audience | Local Singaporeans, 18 to 28 primarily | Muddied, no clear archetype | Travellers, plus locals with more to spend | Tourists | Tourists | Serious learners |
+| Host type | Individuals and small operators | Individuals | Studios and small businesses, curated | Semi professional | Licensed operators | Credentialed |
+| Price point | S$10 to S$40 | S$15 to S$125, no anchor | S$39 to S$290, median about S$78 | S$50 to S$150 | S$30 to S$100 | S$40 to S$100/hr |
+| Barrier to list | Low, unified account | Medium, separate host app required | High, curated | High | High | High |
+| Browse without install | Yes, web | No, app only | Yes | Yes | Yes | N/A |
+| Date framing | Explicit, Date Mode planned | Absent | A "date ideas" collection | Absent | Absent | N/A |
+
+### The established local competitor: Seek Sophie
+
+*Researched 12 November 2026. seeksophie.com.*
+
+**What it is.** A Singapore-founded curated experiences marketplace (started 2018 by Jacinta Lim and Lina Gedvilaite, Techstars Lisbon alumni, about US$120K raised, 11 to 50 staff). Began as off-the-beaten-path travel across Southeast Asia, and now sells Singapore workshops to locals too: creative workshops, a "Non-Boring Date Ideas in Singapore" collection, and corporate team-building collections. Takes about 10% commission.
+
+**Singapore workshops, as observed:** 12 creative workshops in its main collection, S$39 to S$290 per person, median about S$78. Groups of 6 to 10. Hosts are mostly established studios and small businesses (Sage Artelier, Kintsugi Art Studio, J² Terrarium), not individuals. Reviews in the thousands across those listings (4 to 545 each). Host pages show languages spoken and an acceptance rate.
+
+**Why it matters more than ToGatherSG.** It already owns what we are trying to build: years of reviews, search rankings for "workshops in Singapore" and "date ideas Singapore", and a corporate channel. A guest Googling a date idea is more likely to land there today than on TryKai.
+
+**Where we differ.**
+| | TryKai | Seek Sophie |
+|---|---|---|
+| Price | S$15 to S$40 | Median about S$78 |
+| Hosts | Individuals and home makers, low barrier | Studios and businesses, curated |
+| Format | Small, casual, try-something | Polished, premium, often 2 to 4 hours |
+| Audience | 18 to 28 locals, friends and dates | Travellers plus locals with more to spend |
+
+**Risks.** (1) Professional hosts we recruit (Le Bow K, Left Hander Pottery) may already list there; ask on the first call and position TryKai as extra bookings, not a replacement. (2) It could add cheaper, individual-run classes and compete on our price band. (3) It outranks us in search for our core queries.
+
+**What to take from it.** Date-idea and corporate collections as landing pages; "speaks English and Chinese" on host profiles; publishing how quickly hosts respond.
 
 ### The direct peer competitor: ToGatherSG
 
