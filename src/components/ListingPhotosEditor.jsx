@@ -57,6 +57,7 @@ function PhotoTile({
   onMakeCover,
   onUndoCrop,
   onRemove,
+  quickRemove = true,
 }) {
   const {
     attributes,
@@ -113,15 +114,23 @@ function PhotoTile({
         >
           <img src={photo.previewUrl} alt="" className="preview-image" />
           {isCover ? <span className="preview-item__cover">Cover</span> : null}
+          {quickRemove ? null : (
+            <span className="preview-item__more" aria-hidden="true">
+              ⋯
+            </span>
+          )}
         </button>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="preview-remove"
-          aria-label="Remove photo"
-        >
-          ×
-        </button>
+        {/* Slots layout: removing lives only in the ⋯ menu, so it can't be hit by mistake. */}
+        {quickRemove ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="preview-remove"
+            aria-label="Remove photo"
+          >
+            ×
+          </button>
+        ) : null}
         {menuOpen ? (
           <div
             className="preview-item__menu"
@@ -161,6 +170,7 @@ export default function ListingPhotosEditor({
   max = MAX_PHOTOS,
   pickerRef,
   error,
+  slots = null,
 }) {
   const localInputRef = useRef(null)
   const inputRef = pickerRef ?? localInputRef
@@ -356,6 +366,172 @@ export default function ListingPhotosEditor({
     onChange(movePhoto(photos, from, to))
   }
 
+  const emptyTiles = slots ? (
+    <>
+      {slots.slice(photos.length).map((slot) => (
+        <button
+          key={slot.title}
+          type="button"
+          className="photo-slot"
+          disabled={adding}
+          onClick={() => inputRef.current?.click()}
+        >
+          <span className="photo-slot__plus" aria-hidden="true">
+            <Icon name="plus" size={18} />
+          </span>
+          <span className="photo-slot__title">{slot.title}</span>
+          <span className="photo-slot__hint">{slot.hint}</span>
+        </button>
+      ))}
+      {photos.length >= slots.length && !atCap ? (
+        <button
+          type="button"
+          className="photo-slot"
+          disabled={adding}
+          onClick={() => inputRef.current?.click()}
+        >
+          <span className="photo-slot__plus" aria-hidden="true">
+            <Icon name="plus" size={18} />
+          </span>
+          <span className="photo-slot__title">Add another</span>
+          <span className="photo-slot__hint">Up to {max} photos</span>
+        </button>
+      ) : null}
+    </>
+  ) : null
+
+  const notes = (
+    <>
+      {dropHint ? (
+        <p className="field-hint" role="status">
+          {dropHint}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="field-hint" role="status">
+          {error}
+        </p>
+      ) : null}
+    </>
+  )
+
+  // Edit listing: the five suggested shots are the empty tiles themselves.
+  if (slots) {
+    return (
+      <div
+        className={`photo-slots${dragOver ? ' photo-slots--over' : ''}`}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <div className="photo-slots__head">
+          <p className="photo-slots__title">Your photos</p>
+          <p className="photo-slots__count">
+            {photos.length} of {max}
+          </p>
+        </div>
+        <p className="hint photo-slots__hint">
+          {adding
+            ? 'Adding photos…'
+            : 'The first photo is your cover. Hold and drag to change the order.'}
+        </p>
+        <input
+          ref={inputRef}
+          type="file"
+          accept={IMAGE_ACCEPT}
+          multiple
+          aria-label="Photos"
+          onChange={handleFiles}
+          disabled={atCap || adding}
+          className="visually-hidden"
+        />
+        {notes}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={({ active }) => {
+            setActiveId(active.id)
+            setMenuId(null)
+          }}
+          onDragCancel={() => setActiveId(null)}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={photos.map((photo) => photo.id)} strategy={rectSortingStrategy}>
+            <div className={`preview-grid${slots ? ' photo-slots__grid' : ''}`}>
+              {photos.map((photo, index) => (
+                <PhotoTile
+                  key={photo.id}
+                  photo={photo}
+                  index={index}
+                  isCover={index === 0}
+                  menuOpen={menuId === photo.id}
+                  onOpenMenu={() => setMenuId(photo.id)}
+                  onCloseMenu={() => setMenuId(null)}
+                  onView={() => {
+                    setMenuId(null)
+                    setViewingIndex(index)
+                  }}
+                  onCrop={() => startCrop(photo)}
+                  onMakeCover={() => {
+                    setMenuId(null)
+                    onChange(movePhoto(photos, index, 0))
+                  }}
+                  onUndoCrop={photoIsCropped(photo) ? () => undoCrop(photo) : undefined}
+                  onRemove={() => removeAt(index)}
+                  quickRemove={!slots}
+                />
+              ))}
+              {emptyTiles}
+            </div>
+          </SortableContext>
+          <DragOverlay>
+            {activePhoto ? (
+              <div className="preview-item preview-item--overlay">
+                <div className="preview-item__frame">
+                  <img src={activePhoto.previewUrl} alt="" className="preview-image" />
+                </div>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+
+      {viewingIndex !== null && photos.length ? (
+        <PhotoLightbox
+          photos={photos.map((photo) => photo.previewUrl)}
+          title="Listing photos"
+          label="Listing photos"
+          startIndex={viewingIndex}
+          onClose={() => setViewingIndex(null)}
+        />
+      ) : null}
+
+      {croppingPhoto ? (
+        <PhotoCropDialog
+          title={photos[0]?.id === croppingPhoto.id ? 'Crop the cover' : 'Crop this photo'}
+          image={cropSourceUrl(croppingPhoto)}
+          aspect={LISTING_COVER_ASPECT}
+          crop={crop}
+          zoom={zoom}
+          onCropChange={setCrop}
+          onZoomChange={setZoom}
+          onCropComplete={(_, area) => setCroppedArea(area)}
+          onApply={applyCrop}
+          applyDisabled={!croppedArea}
+          onCancel={() => setCropping(null)}
+          extraActions={
+            photoIsCropped(croppingPhoto) ? (
+              <Button variant="secondary" onClick={resetCrop}>
+                Reset to original
+              </Button>
+            ) : null
+          }
+        />
+      ) : null}
+      </div>
+    )
+  }
+
   return (
     <div>
       <label
@@ -385,16 +561,8 @@ export default function ListingPhotosEditor({
       <p className="hint photo-drop__count">
         Maximum of {max} photos ({photos.length}/{max})
       </p>
-      {dropHint ? (
-        <p className="field-hint" role="status">
-          {dropHint}
-        </p>
-      ) : null}
-      {error ? (
-        <p className="field-hint" role="status">
-          {error}
-        </p>
-      ) : null}
+      {notes}
+
 
       {photos.length > 0 ? (
         <>
@@ -412,7 +580,7 @@ export default function ListingPhotosEditor({
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={photos.map((photo) => photo.id)} strategy={rectSortingStrategy}>
-              <div className="preview-grid">
+              <div className={`preview-grid${slots ? ' photo-slots__grid' : ''}`}>
                 {photos.map((photo, index) => (
                   <PhotoTile
                     key={photo.id}
@@ -433,8 +601,10 @@ export default function ListingPhotosEditor({
                     }}
                     onUndoCrop={photoIsCropped(photo) ? () => undoCrop(photo) : undefined}
                     onRemove={() => removeAt(index)}
+                    quickRemove={!slots}
                   />
                 ))}
+                {emptyTiles}
               </div>
             </SortableContext>
             <DragOverlay>

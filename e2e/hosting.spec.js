@@ -286,24 +286,40 @@ test.describe('listing spots', () => {
     await expect(page).toHaveURL(/\/$/)
 
     await page.goto(`/edit-listing/${listing.id}`)
+    // The overview lists every section with what is in it now.
+    const sections = page.getByRole('navigation', { name: 'Listing sections' })
+    await expect(sections.getByRole('link', { name: /^Price and time/ })).toBeVisible()
+    await expect(sections.getByRole('link', { name: /^Location/ })).toContainText('Tiong Bahru')
+
+    await sections.getByRole('link', { name: /^Location/ }).click()
+    await expect(page.getByRole('heading', { name: 'Location', level: 2 })).toBeVisible()
     await expect(page.getByText('12 Coffee Road')).toBeVisible()
     await expect(page.getByText('Hidden from guests until they book.')).toBeVisible()
-    await expect(page.getByLabel('Spots per session')).toHaveValue('6')
 
-    // Price and spots share a row. On a phone the spots field used to run past
-    // the right edge of the card.
-    const card = await page.locator('.form-card').boundingBox()
-    const spots = await page.getByLabel('Spots per session').boundingBox()
-    const price = await page.getByLabel('Price per person (SGD)').boundingBox()
-    expect(spots.x + spots.width).toBeLessThanOrEqual(card.x + card.width)
-    expect(price.x + price.width).toBeLessThanOrEqual(spots.x)
+    // Phones show one screen at a time; desktop keeps the list beside the form.
+    if (page.viewportSize().width < 1024) {
+      await expect(sections).toBeHidden()
+      await page.getByRole('link', { name: 'All sections' }).click()
+    }
+    await sections.getByRole('link', { name: /^Price and time/ }).click()
+    await expect(page.getByLabel('Spots per session')).toHaveText('6')
+    await expect(page.getByLabel('Your price per guest')).toHaveValue('45')
 
-    await page.getByLabel('Spots per session').fill('4')
+    // Nothing in the section runs off a phone screen.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      page.viewportSize().width,
+    )
+
+    await page.getByRole('button', { name: 'Fewer spots' }).click()
+    await page.getByRole('button', { name: 'Fewer spots' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes' })).toBeVisible()
     await page.getByRole('button', { name: 'Save changes' }).click()
 
-    await expect(page).toHaveURL(new RegExp(`/u/${SIGNED_IN_USER.id}\\?tab=hosting`))
-    await expect(page.getByText(/Updated 1 future session/)).toBeVisible()
+    // Saving keeps the host on the section, with a note of what changed.
+    await expect(page.getByText(/Saved\. Updated 1 future session/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save changes' })).toBeDisabled()
 
+    await page.goto('/hosting')
     await page.getByRole('button', { name: 'Add sessions' }).click()
     await expect(page.getByText('4 spots per session ·')).toBeVisible()
 

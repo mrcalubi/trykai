@@ -5,10 +5,17 @@ import UnsavedChangesDialog from '../components/UnsavedChangesDialog'
 /**
  * Warn before leaving a dirty form. In-app navigation uses the shared confirm
  * dialog; tab close / refresh uses the browser's beforeunload wording.
+ *
+ * `samePageOk`: moving within the same page (only the ?query changes, like
+ * Edit listing's sections) keeps the edits in memory, so it is not a leave.
  */
-export function useUnsavedChangesGuard(isDirty) {
+export function useUnsavedChangesGuard(isDirty, { samePageOk = false } = {}) {
   const dirty = Boolean(isDirty)
-  const blocker = useBlocker(dirty)
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (!dirty) return false
+    if (samePageOk && currentLocation.pathname === nextLocation.pathname) return false
+    return true
+  })
 
   useEffect(() => {
     if (!dirty) return undefined

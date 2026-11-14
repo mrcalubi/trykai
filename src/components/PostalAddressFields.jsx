@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { acceptedPlanningAreaFromLookup } from '../lib/areaSearch'
+import { tidyAddressForDisplay } from '../lib/addressDisplay'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import { composeFullAddress, isValidPostal } from '../../supabase/functions/_shared/onemap.ts'
 import PlanningAreaSelect from './PlanningAreaSelect'
@@ -145,7 +146,7 @@ export default function PostalAddressFields({
         <div className="postal-address__card">
           <Icon name="check" size={16} className="postal-address__card-check" />
           <div className="postal-address__card-body">
-            <p className="postal-address__card-address">{value}</p>
+            <p className="postal-address__card-address">{tidyAddressForDisplay(value)}</p>
             <p className="hint">{ADDRESS_PRIVACY}</p>
           </div>
           {allowChangeAddress && !postalOpen ? (
