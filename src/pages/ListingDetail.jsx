@@ -63,7 +63,8 @@ import Icon from '../components/ui/Icon'
 import { formatCents } from '../lib/cancellationPolicy'
 import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
-import { ClassCards, ClassDateList } from '../components/ListingClasses'
+import { ClassCards, ClassDatePicker } from '../components/ListingClasses'
+import { datesInMonth, firstOfDay, isBookable, landingFor, sessionsOfClass } from '../lib/classCalendar'
 import { sessionDayLabel, sessionTimeRange } from '../lib/hostSessions'
 import { usePageTitle } from '../lib/pageTitle'
 import { MOSAIC_VISIBLE_PHOTOS } from '../lib/listingPhotos'
@@ -217,9 +218,12 @@ export default function ListingDetail() {
   const [listingAddons, setListingAddons] = useState([])
   const [sessionTypes, setSessionTypes] = useState({ active: [], byId: {} })
   const [typeFilter, setTypeFilter] = useState(null)
-  // A listing with classes lists every upcoming date instead of a month grid.
+  // A listing with classes loads every upcoming date, so its calendar opens on
+  // a real date and the class filter can jump to that class's next one.
   const [classSessions, setClassSessions] = useState(null)
-  const [pickedSessionId, setPickedSessionId] = useState(null)
+  // { monthKey, dateKey, pickedId } once the guest moves; until then the
+  // calendar sits on the first date they can book.
+  const [classView, setClassView] = useState(null)
   const hasClasses = sessionTypes.active.length > 0
   const [addonsAvailable, setAddonsAvailable] = useState(false)
   const [addonQuantities, setAddonQuantities] = useState({})
@@ -724,12 +728,36 @@ export default function ListingDetail() {
     daySessions.find((session) => session.id === checkoutSessionId) ??
     (classSessions ?? []).find((session) => session.id === checkoutSessionId) ??
     null
-  const pickedSession = (classSessions ?? []).find((session) => session.id === pickedSessionId) ?? null
+  const cutoffHours = listing.booking_cutoff_hours
+  const landing = classSessions ? landingFor(classSessions, typeFilter, { cutoffHours }) : null
+  const classCalendar = classView ?? {
+    monthKey: landing?.monthKey ?? null,
+    dateKey: landing?.dateKey ?? null,
+    pickedId: landing?.session?.id ?? null,
+  }
+  const pickedSession = (classSessions ?? []).find((session) => session.id === classCalendar.pickedId) ?? null
   const pickedClassName = sessionTypes.byId[pickedSession?.type_id]?.name ?? ''
 
+  /** Cards and chips: show a class's dates, keeping a picked time that fits. */
   function filterClass(nextId) {
     setTypeFilter(nextId)
-    if (nextId && pickedSession && pickedSession.type_id !== nextId) setPickedSessionId(null)
+    const land = landingFor(classSessions ?? [], nextId, { keepId: pickedSession?.id, cutoffHours })
+    setClassView({ monthKey: land.monthKey, dateKey: land.dateKey, pickedId: land.session?.id ?? null })
+  }
+
+  function pickClassDay(dateKey) {
+    const day = datesInMonth(sessionsOfClass(classSessions, typeFilter), classCalendar.monthKey)[dateKey]
+    setClassView({ ...classCalendar, dateKey, pickedId: firstOfDay(day, cutoffHours)?.id ?? null })
+  }
+
+  function showClassMonth(monthKey) {
+    const byDay = datesInMonth(sessionsOfClass(classSessions, typeFilter), monthKey)
+    const first = Object.keys(byDay).sort()[0] ?? null
+    setClassView({
+      monthKey,
+      dateKey: first,
+      pickedId: first ? (firstOfDay(byDay[first], cutoffHours)?.id ?? null) : null,
+    })
   }
   const checkoutTypeName = sessionTypes.byId[checkoutSession?.type_id]?.name ?? ''
   const paynowBlocked =
@@ -1339,29 +1367,45 @@ export default function ListingDetail() {
             {publicSessionRange && !checkoutSessionId && hasClasses ? (
               classSessions ? (
                 <>
-                  <ClassDateList
+                  <ClassDatePicker
                     listing={listing}
                     classes={activeTypes}
                     classById={sessionTypes.byId}
                     sessions={classSessions}
                     filterId={typeFilter}
                     onFilter={filterClass}
-                    pickedId={pickedSessionId}
-                    onPick={setPickedSessionId}
+                    monthKey={classCalendar.monthKey}
+                    onMonth={showClassMonth}
+                    dateKey={classCalendar.dateKey}
+                    onDate={pickClassDay}
+                    pickedId={classCalendar.pickedId}
+                    onPick={(sessionId) => setClassView({ ...classCalendar, pickedId: sessionId })}
                     disabled={!canTakePayments || isOwnListing}
                   />
                   <Button
                     className="class-dates__book"
-                    disabled={!pickedSession || !canTakePayments || isOwnListing}
+                    disabled={
+                      !pickedSession || !isBookable(pickedSession, cutoffHours) || !canTakePayments || isOwnListing
+                    }
                     onClick={() => handleBook(pickedSession.id)}
                   >
-                    {pickedSession
-                      ? `Book ${sessionDayLabel(pickedSession.starts_at)} · ${
-                          pickedClassName ? `${pickedClassName} · ` : ''
-                        }${sessionTimeRange(pickedSession, listing)}`
-                      : 'Pick a date'}
+                    {pickedSession ? (
+                      <span className="class-dates__book-text">
+                        <span className="class-dates__book-main">
+                          Book {sessionDayLabel(pickedSession.starts_at)}
+                        </span>
+                        <span className="class-dates__book-sub">
+                          {[pickedClassName, sessionTimeRange(pickedSession, listing)].filter(Boolean).join(' · ')}
+                        </span>
+                      </span>
+                    ) : (
+                      'Pick a date'
+                    )}
                   </Button>
-                  <p className="class-dates__next">You&apos;ll choose guests and extras next.</p>
+                  <p className="class-dates__next">
+                    You&apos;ll choose guests and extras next. Move your booking once, free, up to 48 hours
+                    before.
+                  </p>
                 </>
               ) : (
                 <p className="hint">Loading dates…</p>

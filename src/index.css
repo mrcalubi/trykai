@@ -14861,125 +14861,6 @@ body.add-dates-open {
   opacity: 0.75;
 }
 
-.class-dates__month + .class-dates__month {
-  margin-top: 16px;
-}
-
-.class-dates__heading {
-  margin: 0 0 8px;
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.class-dates__list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.class-date {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 64px;
-  padding: 10px 12px;
-  font: inherit;
-  text-align: left;
-  color: var(--navy);
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.class-date:hover:enabled {
-  border-color: var(--border-strong);
-}
-
-.class-date--on,
-.class-date--on:hover:enabled {
-  border-color: var(--navy);
-  box-shadow: inset 0 0 0 1px var(--navy);
-}
-
-.class-date:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.class-date:focus-visible {
-  outline: 2px solid var(--navy);
-  outline-offset: 2px;
-}
-
-.class-date__tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 46px;
-  height: 46px;
-  background: var(--sand);
-  border-radius: 10px;
-}
-
-.class-date--on .class-date__tile {
-  color: var(--cream);
-  background: var(--navy);
-}
-
-.class-date__weekday {
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.class-date__day {
-  font-family: var(--display);
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.class-date__text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.class-date__time {
-  font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.class-date__class {
-  font-size: 13px;
-  color: var(--navy);
-}
-
-.class-date__spots {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-}
-
-.class-date__spots--low {
-  color: var(--coral-ink);
-}
-
 .class-dates__empty {
   margin: 0;
   font-size: 14px;
@@ -14997,17 +14878,6 @@ body.add-dates-open {
   cursor: pointer;
 }
 
-/* Beside the page the list scrolls on its own, so Book stays in view. */
-@media (min-width: 1024px) {
-  .class-dates__scroll {
-    max-height: min(360px, calc(100svh - 420px));
-    margin-right: -6px;
-    padding-right: 6px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-}
-
 .class-dates__book {
   width: 100%;
   min-height: 52px;
@@ -15020,4 +14890,294 @@ body.add-dates-open {
   font-size: 12px;
   text-align: center;
   color: var(--muted);
+}
+
+/* The class calendar: only days with dates can be tapped; a dot marks a day
+   with more than one class. That day's times sit underneath. */
+.class-cal {
+  padding: 12px 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.class-cal__head {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.class-cal__nav {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.class-cal__nav:hover:not(:disabled) {
+  background: var(--sand);
+}
+
+.class-cal__nav:disabled {
+  color: var(--disabled);
+  cursor: default;
+}
+
+.class-cal__title {
+  text-align: center;
+}
+
+.class-cal__month {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.class-cal__count {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.class-cal__weekdays,
+.class-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.class-cal__weekdays {
+  margin-bottom: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.class-cal__day {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 44px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  background: #fff;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.class-cal__day:hover {
+  border-color: var(--navy);
+}
+
+.class-cal__day--on,
+.class-cal__day--on:hover {
+  color: var(--cream);
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.class-cal__day:focus-visible,
+.class-cal__nav:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.class-cal__day--off {
+  font-weight: 400;
+  color: var(--disabled);
+  background: none;
+  border-color: transparent;
+  cursor: default;
+}
+
+.class-cal__day--off:hover {
+  border-color: transparent;
+}
+
+.class-cal__dot {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+.class-times {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin: 16px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.class-times__title {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.class-time {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.class-time:hover {
+  border-color: var(--border-strong);
+}
+
+.class-time--on,
+.class-time--on:hover {
+  border-color: var(--navy);
+  box-shadow: inset 0 0 0 1px var(--navy);
+}
+
+.class-time--off {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.class-time:has(.class-time__radio:focus-visible) {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.class-time__radio {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--navy);
+}
+
+.class-time__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.class-time__range {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--navy);
+}
+
+.class-time__class {
+  font-size: 13px;
+  color: var(--navy);
+}
+
+.class-time__spots {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.class-time__spots--low {
+  color: var(--coral-ink);
+}
+
+.class-dates__book-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.25;
+}
+
+.class-dates__book-main {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.class-dates__book-sub {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+/* Beside the page, with a mouse: a tighter calendar so the whole panel,
+   Book included, fits a laptop screen. */
+@media (min-width: 1024px) {
+  .detail-sidebar .class-dates__chips {
+    margin: 10px 0 12px;
+  }
+
+  .detail-sidebar .class-dates__chip {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .detail-sidebar .class-cal {
+    padding: 8px 10px 10px;
+  }
+
+  .detail-sidebar .class-cal__head {
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    margin-bottom: 4px;
+  }
+
+  .detail-sidebar .class-cal__nav {
+    width: 36px;
+    height: 36px;
+  }
+
+  .detail-sidebar .class-cal__day {
+    min-height: 34px;
+    font-size: 13px;
+  }
+
+  .detail-sidebar .class-cal__grid {
+    gap: 3px;
+  }
+
+  .detail-sidebar .class-times {
+    margin-top: 12px;
+  }
+
+  .detail-sidebar .class-times__title {
+    margin-bottom: 6px;
+  }
+
+  .detail-sidebar .class-time {
+    min-height: 50px;
+    padding: 8px 12px;
+  }
+
+  .detail-sidebar .class-dates__book {
+    min-height: 50px;
+    margin-top: 12px;
+  }
 }
