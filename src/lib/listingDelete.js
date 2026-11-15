@@ -2,6 +2,7 @@ export const HOST_SESSIONS_SELECT = `
           id,
           starts_at,
           duration_mins,
+          spots_total,
           listing_id,
           status,
           held_by_session_id,

@@ -57,7 +57,7 @@ test.describe('host add sessions', () => {
     const card = page.locator('.hosting-listing-card').filter({ hasText: 'Learn latte art with me' })
     await expect(card).toBeVisible()
 
-    await card.getByRole('button', { name: 'Add sessions' }).click()
+    await card.getByRole('button', { name: 'Add dates' }).click()
     const sheet = page.getByRole('dialog', { name: 'Add dates' })
     await expect(sheet).toBeVisible()
     await expect(sheet.getByText('Learn latte art with me · No dates yet')).toBeVisible()
@@ -99,7 +99,7 @@ test.describe('host add sessions', () => {
 
     await page.keyboard.press('Escape')
     await expect(sheet).toBeHidden()
-    await expect(card.getByRole('button', { name: 'Add sessions' })).toBeFocused()
+    await expect(card.getByRole('button', { name: 'Add dates' })).toBeFocused()
   })
 })
 
@@ -328,7 +328,7 @@ test.describe('listing spots', () => {
     await expect(page.getByRole('button', { name: 'Save changes' })).toBeDisabled()
 
     await page.goto('/hosting')
-    await page.getByRole('button', { name: 'Add sessions' }).click()
+    await page.getByRole('button', { name: 'Add dates' }).click()
     await page.getByRole('button', { name: 'Sat', exact: true }).click()
     await page.getByRole('button', { name: '10:00 am' }).click()
     await expect(page.getByText('16 spots for guests to book')).toBeVisible()

@@ -4,6 +4,9 @@ import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError'
 import AddSessionsForm from '../components/AddSessionsForm'
+import HostListingDates from '../components/HostListingDates'
+import HostNextUp from '../components/HostNextUp'
+import HostSessionPage from '../components/HostSessionPage'
 import { querySessionTypes, typesByListing } from '../lib/sessionTypes'
 import {
   clearSessionDraft,
@@ -11,15 +14,13 @@ import {
   writeOpenSessionForm,
 } from '../lib/sessionFormDraft'
 import { hostBannerLine, hostInterestById, keenNotifiedLine, listingsWithOpenUpcoming } from '../lib/keen'
-import { heldByTitleMap, heldSessionLine, isHeld, sharedBatchLine } from '../lib/sharedAvailability'
-import Button from '../components/ui/Button'
+import { heldByTitleMap, isHeld, sharedBatchLine } from '../lib/sharedAvailability'
 import PageLoader from '../components/PageLoader'
 import WaitingState from '../components/WaitingState'
 import OverflowMenu from '../components/ui/OverflowMenu'
 import Icon from '../components/ui/Icon'
-import { hostCancelWarning } from '../lib/hostCancelCopy'
+import { hostCancelGuestPhrase } from '../lib/hostCancelCopy'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
-import { formatSessionDateTime } from '../lib/sessionDate'
 import {
   SESSION_HAS_BOOKINGS_MESSAGE,
   isSessionHasBookingsError,
@@ -58,26 +59,19 @@ import {
   listingDeleteErrorMessage,
   listingUpcomingStats,
 } from '../lib/listingDelete'
-import {
-  addonLineLabel,
-  loadBookingAddonRows,
-  loadBookingNotes,
-  sessionPrepareBoxes,
-} from '../lib/bookingAddons'
+import { loadBookingAddonRows, loadBookingNotes } from '../lib/bookingAddons'
 import { HostReviewsDueList } from '../components/HostReviewForm'
-import { groupGuestsBySession, sessionGuestsLine } from '../lib/companions'
+import { groupGuestsBySession } from '../lib/companions'
+import { bookedSeats, confirmedBookings, sessionDayLabel, sessionTimeRange } from '../lib/hostSessions'
 
-function activeBookingsOn(session) {
-  // Pending rows are unpaid checkouts, not guests the host has to refund.
-  return (session.bookings ?? []).filter((b) => b.status === 'confirmed')
-}
+// Pending rows are unpaid checkouts, not guests the host has to refund.
+const activeBookingsOn = confirmedBookings
+
+/** How long a removed date can be brought back before it is deleted. */
+export const REMOVE_UNDO_MS = 6000
 
 function firstRow(data) {
   return firstAccountRow(data)
-}
-
-function emptySessionLabel(count) {
-  return count === 1 ? '1 open session' : `${count} open sessions`
 }
 
 export default function Hosting({ embedded = false, onListingDeleted, onSessionsChange }) {
@@ -88,7 +82,8 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   const [listings, setListings] = useState([])
   const [hostSessions, setHostSessions] = useState([])
   const [sessionTypeRows, setSessionTypeRows] = useState([])
-  const [prepareBySession, setPrepareBySession] = useState({})
+  const [addonsByBooking, setAddonsByBooking] = useState({})
+  const [notesByBooking, setNotesByBooking] = useState({})
   const [monthSessions, setMonthSessions] = useState([])
   const [verificationStatus, setVerificationStatus] = useState(null)
   const [draft, setDraft] = useState(() => {
@@ -108,13 +103,15 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   const restoredFormId = useRef(activeFormId)
   const [selectedEmptyIds, setSelectedEmptyIds] = useState(() => new Set())
   const [expandedEmptyListingIds, setExpandedEmptyListingIds] = useState(() => new Set())
-  const [confirmBulkDeleteListingId, setConfirmBulkDeleteListingId] = useState(null)
+  const [selectingListingId, setSelectingListingId] = useState(null)
+  // A removed date waits here so it can be undone, then is deleted.
+  const [pendingRemoval, setPendingRemoval] = useState(null)
+  const pendingRemovalRef = useRef(null)
+  const removalTimerRef = useRef(0)
 
   const [confirmCancelSessionId, setConfirmCancelSessionId] = useState(null)
-  const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState(null)
   const [confirmDeleteListingId, setConfirmDeleteListingId] = useState(null)
   const [cancelLoading, setCancelLoading] = useState(false)
-  const [deleteSessionLoading, setDeleteSessionLoading] = useState(false)
   const [editingSessionId, setEditingSessionId] = useState(null)
   const [editDate, setEditDate] = useState('')
   const [editTime, setEditTime] = useState('')
@@ -187,6 +184,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   const loadData = useCallback(async () => {
     const listingColumns =
       'id, title, area, category, photo_urls, price_per_person, max_guests, review_status, review_note'
+    const extraColumns = 'duration_mins, booking_cutoff_hours'
     const [profileResult, adminResult] = await Promise.all([
       withIssuedAtRetry(() => supabase.rpc('my_account')),
       supabase.rpc('my_verification'),
@@ -195,15 +193,15 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
     let listingsResult = await withIssuedAtRetry(() =>
       supabase
         .from('listings')
-        .select(`${listingColumns}, duration_mins`)
+        .select(`${listingColumns}, ${extraColumns}`)
         .eq('host_id', userId)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
     )
 
-    // 00018 adds duration_mins. Until that migration is applied, asking for
-    // the column fails the whole listings read and the host cannot add a session.
-    if (listingsResult.error && /duration_mins/.test(listingsResult.error.message ?? '')) {
+    // 00018 adds duration_mins and 00046 booking_cutoff_hours. Until those are
+    // applied, asking for them fails the whole read and the host cannot add a session.
+    if (listingsResult.error && /duration_mins|booking_cutoff_hours/.test(listingsResult.error.message ?? '')) {
       listingsResult = await supabase
         .from('listings')
         .select(listingColumns)
@@ -281,29 +279,24 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
             .filter((booking) => booking.status === 'confirmed')
             .map((booking) => booking.id),
         )
-        const { rows: addonRows, available } = await loadBookingAddonRows(supabase, confirmedIds)
-        if (!available) {
-          setPrepareBySession({})
-        } else {
-          const { notes } = await loadBookingNotes(supabase, confirmedIds)
-          const guestIds = [...new Set(Object.values(notes).map((row) => row.guestId).filter(Boolean))]
-          const names = {}
-          if (guestIds.length) {
-            const { data: guests } = await supabase
-              .from('users')
-              .select('id, display_name')
-              .in('id', guestIds)
-            for (const guest of guests ?? []) {
-              names[guest.id] = guest.display_name
-            }
+        const [{ rows: addonRows, available }, { notes }] = await Promise.all([
+          loadBookingAddonRows(supabase, confirmedIds),
+          loadBookingNotes(supabase, confirmedIds),
+        ])
+        const grouped = {}
+        if (available) {
+          for (const row of addonRows) {
+            grouped[row.booking_id] = [...(grouped[row.booking_id] ?? []), row]
           }
-          setPrepareBySession(sessionPrepareBoxes(upcoming, addonRows, notes, names))
         }
+        setAddonsByBooking(grouped)
+        setNotesByBooking(notes)
       }
     } else {
       hostSessionsRef.current = []
       setHostSessions([])
-      setPrepareBySession({})
+      setAddonsByBooking({})
+      setNotesByBooking({})
       setMonthSessions([])
       onSessionsChangeRef.current?.([])
     }
@@ -550,6 +543,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   async function handleHostCancelSession(session) {
     setCancelError('')
     setCancelLoading(true)
+    const guests = bookedSeats(session)
 
     const { data, error: fnError } = await invokeAuthed('cancel-booking', {
       session_id: session.id,
@@ -563,63 +557,70 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
     }
 
     setConfirmCancelSessionId(null)
+    setBookingStatusMessage(`Session cancelled. We're refunding ${hostCancelGuestPhrase(guests)} in full.`)
+    leaveSessionPage()
     await loadData()
   }
 
-  async function handleDeleteEmptySession(session) {
-    setDeleteSessionError('')
-    setDeleteSessionLoading(true)
-
-    const { error: rpcError } = await supabase.rpc('delete_empty_session', {
-      p_session_id: session.id,
-    })
-
-    setDeleteSessionLoading(false)
-
-    if (rpcError) {
-      setDeleteSessionError(rpcError.message)
-      return
-    }
-
-    setConfirmDeleteSessionId(null)
-    setSelectedEmptyIds((prev) => {
-      const next = new Set(prev)
-      next.delete(session.id)
-      return next
-    })
-    setHostSessions((prev) => prev.filter((s) => s.id !== session.id))
-    setMonthSessions((prev) => prev.filter((s) => s.id !== session.id))
-  }
-
-  async function handleDeleteSelectedEmpty(sessions) {
-    setDeleteSessionError('')
-    setDeleteSessionLoading(true)
-
-    const failed = []
+  /** Delete dates that were removed and not undone. */
+  const commitRemoval = useCallback(async (removal) => {
     const removedIds = []
-    for (const session of sessions) {
-      if (activeBookingsOn(session).length > 0) continue
+    const failed = []
+    for (const session of removal.sessions) {
       const { error: rpcError } = await supabase.rpc('delete_empty_session', {
         p_session_id: session.id,
       })
       if (rpcError) failed.push(rpcError.message)
       else removedIds.push(session.id)
     }
-
-    setDeleteSessionLoading(false)
-
-    if (failed.length > 0) {
-      setDeleteSessionError(failed[0])
-    }
-
-    setConfirmBulkDeleteListingId(null)
-    setSelectedEmptyIds((prev) => {
-      const next = new Set(prev)
-      for (const id of removedIds) next.delete(id)
-      return next
-    })
+    if (failed.length > 0) setDeleteSessionError(failed[0])
+    if (removedIds.length === 0) return
+    hostSessionsRef.current = hostSessionsRef.current.filter((s) => !removedIds.includes(s.id))
     setHostSessions((prev) => prev.filter((s) => !removedIds.includes(s.id)))
     setMonthSessions((prev) => prev.filter((s) => !removedIds.includes(s.id)))
+  }, [])
+
+  const flushRemoval = useCallback(() => {
+    window.clearTimeout(removalTimerRef.current)
+    const current = pendingRemovalRef.current
+    pendingRemovalRef.current = null
+    setPendingRemoval(null)
+    if (current) void commitRemoval(current)
+  }, [commitRemoval])
+
+  // Leaving the page deletes what is waiting rather than dropping it.
+  useEffect(() => flushRemoval, [flushRemoval])
+
+  function removeDates(listingId, sessions) {
+    flushRemoval()
+    setDeleteSessionError('')
+    const removable = sessions.filter((session) => activeBookingsOn(session).length === 0)
+    if (removable.length === 0) return
+    const [only] = removable
+    const label =
+      removable.length === 1
+        ? `Removed ${sessionDayLabel(only.starts_at)}, ${sessionTimeRange(
+            only,
+            listings.find((listing) => listing.id === listingId),
+          )}.`
+        : `Removed ${removable.length} dates.`
+    const removal = { listingId, sessions: removable, label }
+    pendingRemovalRef.current = removal
+    setPendingRemoval(removal)
+    setSelectedEmptyIds((prev) => {
+      const next = new Set(prev)
+      for (const session of removable) next.delete(session.id)
+      return next
+    })
+    setSelectingListingId(null)
+    setEditingSessionId(null)
+    removalTimerRef.current = window.setTimeout(flushRemoval, REMOVE_UNDO_MS)
+  }
+
+  function undoRemoval() {
+    window.clearTimeout(removalTimerRef.current)
+    pendingRemovalRef.current = null
+    setPendingRemoval(null)
   }
 
   function toggleEmptySession(sessionId) {
@@ -631,17 +632,43 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
     })
   }
 
+  function toggleSelecting(listingId) {
+    setEditingSessionId(null)
+    setSelectedEmptyIds(new Set())
+    setSelectingListingId((current) => (current === listingId ? null : listingId))
+  }
+
   function clearSessionConfirms() {
     setConfirmCancelSessionId(null)
-    setConfirmDeleteSessionId(null)
-    setConfirmBulkDeleteListingId(null)
     setEditingSessionId(null)
     setEditError('')
   }
 
+  function sessionHref(sessionId) {
+    const params = new URLSearchParams(searchParams)
+    params.set('session', sessionId)
+    return `${location.pathname}?${params.toString()}`
+  }
+
+  function hostingHref() {
+    const params = new URLSearchParams(searchParams)
+    params.delete('session')
+    const query = params.toString()
+    return `${location.pathname}${query ? `?${query}` : ''}`
+  }
+
+  function leaveSessionPage() {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('session')
+        return next
+      },
+      { replace: true },
+    )
+  }
+
   function openSessionEdit(session) {
-    setConfirmDeleteSessionId(null)
-    setConfirmBulkDeleteListingId(null)
     setEditError('')
     setEditingSessionId(session.id)
     setEditDate(singaporeDateKey(session.starts_at))
@@ -739,7 +766,9 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
     : null
   const activeTypesByListing = typesByListing(sessionTypeRows)
   const typeNameById = Object.fromEntries(sessionTypeRows.map((row) => [row.id, row.name]))
-  const bookedHostSessions = hostSessions
+  const removingIds = new Set(pendingRemoval?.sessions.map((session) => session.id) ?? [])
+  const visibleSessions = hostSessions.filter((session) => !removingIds.has(session.id))
+  const bookedHostSessions = visibleSessions
     .filter((session) => activeBookingsOn(session).length > 0)
     .slice()
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
@@ -751,6 +780,40 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   const stats = monthStats(monthSessions)
   const sessionsNote = monthSessionsNote(stats)
   const TitleTag = embedded ? 'h2' : 'h1'
+  const sessionParam = searchParams.get('session')
+
+  if (sessionParam) {
+    const session = hostSessions.find((item) => item.id === sessionParam) ?? null
+    return (
+      <div className={embedded ? 'hosting' : 'page hosting'}>
+        <HostSessionPage
+          session={session}
+          listing={listings.find((listing) => listing.id === session?.listing_id)}
+          guestRows={guestsBySession[sessionParam] ?? []}
+          addonsByBooking={addonsByBooking}
+          notesByBooking={notesByBooking}
+          backHref={hostingHref()}
+          TitleTag={TitleTag}
+          confirmCancel={confirmCancelSessionId === sessionParam}
+          cancelLoading={cancelLoading}
+          cancelError={cancelError}
+          onAskCancel={() => {
+            setCancelError('')
+            setConfirmCancelSessionId(sessionParam)
+          }}
+          onKeep={clearSessionConfirms}
+          onCancelSession={handleHostCancelSession}
+        />
+      </div>
+    )
+  }
+
+  const nextUp = bookedHostSessions[0] ?? null
+  const nextUpNote = nextUp
+    ? activeBookingsOn(nextUp)
+        .map((booking) => notesByBooking[booking.id]?.note)
+        .find(Boolean) ?? ''
+    : ''
 
   const setupSteps = [
     verificationStatus === 'approved'
@@ -926,6 +989,16 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
           </section>
         )}
 
+        {nextUp ? (
+          <HostNextUp
+            session={nextUp}
+            listing={listings.find((listing) => listing.id === nextUp.listing_id)}
+            guestRows={guestsBySession[nextUp.id] ?? []}
+            note={nextUpNote}
+            href={sessionHref(nextUp.id)}
+          />
+        ) : null}
+
         <section className="hosting-month" aria-labelledby="hosting-month-title">
           <h2 id="hosting-month-title" className="hosting__section-title">
             This month
@@ -947,68 +1020,6 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
           </dl>
         </section>
 
-        {bookedHostSessions.length > 0 ? (
-          <section className="hosting-upcoming" aria-labelledby="hosting-upcoming-title">
-            <h2 id="hosting-upcoming-title" className="hosting__section-title">
-              Upcoming bookings
-            </h2>
-            <div className="dashboard-list">
-              {bookedHostSessions.map((session) => (
-                <div key={session.id} className="dashboard-card">
-                  <SessionRow
-                    session={session}
-                    typeName={typeNameById[session.type_id] ?? ''}
-                    showListing
-                    selectable={false}
-                    selected={false}
-                    confirmCancel={confirmCancelSessionId === session.id}
-                    confirmDelete={false}
-                    cancelLoading={cancelLoading}
-                    deleteSessionLoading={deleteSessionLoading}
-                    onAskCancel={(sessionId) => {
-                      setCancelError('')
-                      setConfirmDeleteSessionId(null)
-                      setConfirmBulkDeleteListingId(null)
-                      setConfirmCancelSessionId(sessionId)
-                    }}
-                    onAskDelete={() => {}}
-                    onCancelSession={handleHostCancelSession}
-                    onDeleteSession={handleDeleteEmptySession}
-                    onKeep={clearSessionConfirms}
-                  />
-                  {sessionGuestsLine(guestsBySession[session.id]) ? (
-                    <p className="hosting-guests">{sessionGuestsLine(guestsBySession[session.id])}</p>
-                  ) : null}
-                  {prepareBySession[session.id] ? (
-                    <div className="hosting-prepare">
-                      {prepareBySession[session.id].lines.length > 0 ? (
-                        <>
-                          <p className="hosting-prepare__title">Prepare</p>
-                          <ul className="hosting-prepare__list">
-                            {prepareBySession[session.id].lines.map((line) => (
-                              <li key={line.name}>{addonLineLabel(line.name, line.quantity)}</li>
-                            ))}
-                          </ul>
-                        </>
-                      ) : null}
-                      {prepareBySession[session.id].notes.length > 0 ? (
-                        <>
-                          <p className="hosting-prepare__title">Notes from guests</p>
-                          {prepareBySession[session.id].notes.map((row) => (
-                            <p key={`${row.name}-${row.note}`} className="hosting-prepare__note">
-                              Note from {row.name}: {row.note}
-                            </p>
-                          ))}
-                        </>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
         <HostReviewsDueList rows={reviewsDue} />
 
         <section className="hosting-listings" aria-labelledby="hosting-listings-title">
@@ -1023,13 +1034,15 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
           ) : (
             <div className="dashboard-list dashboard-list--listings">
               {listings.map((listing) => {
-                const upcoming = hostSessions.filter(
+                const upcoming = visibleSessions.filter(
                   (session) => session.listing_id === listing.id,
                 )
                 const bookedCount = upcoming.filter(
                   (session) => activeBookingsOn(session).length > 0,
                 ).length
-                const heldCount = upcoming.filter(isHeld).length
+                const heldCount = upcoming.filter(
+                  (session) => activeBookingsOn(session).length === 0 && isHeld(session),
+                ).length
                 const openCount = upcoming.length - bookedCount - heldCount
                 const hasDates = openCount + bookedCount > 0
                 const formOpen = activeFormId === listing.id
@@ -1041,25 +1054,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                     className="dashboard-card hosting-listing-card"
                   >
                     <div className="hosting-listing">
-                      <OverflowMenu
-                        className="ui-overflow--quiet hosting-listing__menu"
-                        items={[
-                          { label: 'View listing', to: `/listings/${listing.id}` },
-                          { label: 'Edit', to: `/edit-listing/${listing.id}` },
-                          {
-                            label: 'Delete',
-                            destructive: true,
-                            onSelect: () => {
-                              setDeleteError('')
-                              setConfirmDeleteListingId(listing.id)
-                            },
-                          },
-                        ]}
-                      />
-                      <Link
-                        to={`/edit-listing/${listing.id}`}
-                        className="hosting-listing__main"
-                      >
+                      <div className="hosting-listing__main">
                         {listing.photo_urls?.[0] ? (
                           <img
                             src={listing.photo_urls[0]}
@@ -1099,25 +1094,29 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                             }) || listingCategoryAreaLine(listing.category, listing.area)}
                           </p>
                         </div>
-                      </Link>
-                      <div className="hosting-listing__foot">
-                        <p
-                          className={
-                            hasDates
-                              ? 'hosting-listing__status'
-                              : 'hosting-listing__status hosting-listing__status--empty'
-                          }
-                        >
-                          {listingDatesLine(openCount, bookedCount)}
-                        </p>
-                        <Button
-                          className="hosting-listing__add"
-                          variant={hasDates ? 'secondary' : 'primary'}
-                          aria-haspopup="dialog"
-                          onClick={() => openSessionForm(listing.id)}
-                        >
-                          Add sessions
-                        </Button>
+                        <div className="hosting-listing__tools">
+                          <Link
+                            to={`/edit-listing/${listing.id}`}
+                            className="btn btn--secondary hosting-listing__edit"
+                          >
+                            Edit listing
+                          </Link>
+                          <OverflowMenu
+                            className="ui-overflow--quiet hosting-listing__menu"
+                            label={`More for ${listing.title}`}
+                            items={[
+                              { label: 'View listing', to: `/listings/${listing.id}` },
+                              {
+                                label: 'Delete',
+                                destructive: true,
+                                onSelect: () => {
+                                  setDeleteError('')
+                                  setConfirmDeleteListingId(listing.id)
+                                },
+                              },
+                            ]}
+                          />
+                        </div>
                       </div>
                       {listing.review_status === 'pending' ? (
                         <p className="hosting-review" role="status">
@@ -1156,19 +1155,14 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                       />
                     ) : null}
 
-                    <ListingSessions
-                      listingId={listing.id}
+                    <HostListingDates
+                      listing={listing}
+                      sessions={upcoming}
                       typeNameById={typeNameById}
                       heldByTitles={heldByTitles}
-                      sessions={upcoming.filter(
-                        (session) => activeBookingsOn(session).length === 0,
-                      )}
-                      selectedIds={selectedEmptyIds}
+                      guestsBySession={guestsBySession}
+                      sessionHref={sessionHref}
                       expanded={expandedEmptyListingIds.has(listing.id)}
-                      confirmDeleteSessionId={confirmDeleteSessionId}
-                      confirmBulkDelete={confirmBulkDeleteListingId}
-                      deleteSessionLoading={deleteSessionLoading}
-                      onToggleSelect={toggleEmptySession}
                       onExpand={() =>
                         setExpandedEmptyListingIds((prev) => new Set(prev).add(listing.id))
                       }
@@ -1179,21 +1173,21 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                           return next
                         })
                       }
-                      onAskDelete={(sessionId) => {
-                        setDeleteSessionError('')
-                        setConfirmCancelSessionId(null)
-                        setConfirmBulkDeleteListingId(null)
-                        setConfirmDeleteSessionId(sessionId)
-                      }}
-                      onAskBulkDelete={(listingId) => {
-                        setDeleteSessionError('')
-                        setConfirmCancelSessionId(null)
-                        setConfirmDeleteSessionId(null)
-                        setConfirmBulkDeleteListingId(listingId)
-                      }}
-                      onDeleteSession={handleDeleteEmptySession}
-                      onBulkDelete={handleDeleteSelectedEmpty}
-                      onKeep={clearSessionConfirms}
+                      selecting={selectingListingId === listing.id}
+                      selectedIds={selectedEmptyIds}
+                      onToggleSelecting={() => toggleSelecting(listing.id)}
+                      onToggleSelect={toggleEmptySession}
+                      onRemove={(sessions) => removeDates(listing.id, sessions)}
+                      undo={
+                        pendingRemoval?.listingId === listing.id
+                          ? {
+                              label: pendingRemoval.label,
+                              onUndo: undoRemoval,
+                              onDismiss: flushRemoval,
+                            }
+                          : null
+                      }
+                      onAddDates={() => openSessionForm(listing.id)}
                       editingSessionId={editingSessionId}
                       editDate={editDate}
                       editTime={editTime}
@@ -1203,6 +1197,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                       onEditDate={setEditDate}
                       onEditTime={setEditTime}
                       onSaveEdit={handleEditOpenSession}
+                      onCancelEdit={clearSessionConfirms}
                     />
                   </article>
                 )
@@ -1281,291 +1276,5 @@ function DraftListingCard({ draft, onDiscard }) {
         </div>
       </div>
     </article>
-  )
-}
-
-function ListingSessions({
-  listingId,
-  typeNameById = {},
-  heldByTitles = {},
-  sessions,
-  selectedIds,
-  expanded,
-  confirmDeleteSessionId,
-  confirmBulkDelete,
-  deleteSessionLoading,
-  onToggleSelect,
-  onExpand,
-  onCollapse,
-  onAskDelete,
-  onAskBulkDelete,
-  onDeleteSession,
-  onBulkDelete,
-  onKeep,
-  editingSessionId,
-  editDate,
-  editTime,
-  editError,
-  editLoading,
-  onAskEdit,
-  onEditDate,
-  onEditTime,
-  onSaveEdit,
-}) {
-  const empty = sessions.filter((session) => activeBookingsOn(session).length === 0)
-  const shownEmpty = expanded ? empty : empty.slice(0, 3)
-  const selectedHere = empty.filter((session) => selectedIds.has(session.id))
-
-  if (empty.length === 0) return null
-
-  return (
-    <div className="hosting-sessions">
-      {shownEmpty.map((session) => (
-        <SessionRow
-          key={session.id}
-          session={session}
-          typeName={typeNameById[session.type_id] ?? ''}
-          heldNote={isHeld(session) ? heldSessionLine(heldByTitles[session.held_by_session_id]) : ''}
-          selectable
-          selected={selectedIds.has(session.id)}
-          confirmCancel={false}
-          confirmDelete={confirmDeleteSessionId === session.id}
-          cancelLoading={false}
-          deleteSessionLoading={deleteSessionLoading}
-          onToggleSelect={onToggleSelect}
-          onAskCancel={() => {}}
-          onAskDelete={onAskDelete}
-          onCancelSession={() => {}}
-          onDeleteSession={onDeleteSession}
-          onKeep={onKeep}
-          editing={editingSessionId === session.id}
-          editDate={editDate}
-          editTime={editTime}
-          editError={editingSessionId === session.id ? editError : ''}
-          editLoading={editLoading}
-          onAskEdit={onAskEdit}
-          onEditDate={onEditDate}
-          onEditTime={onEditTime}
-          onSaveEdit={onSaveEdit}
-        />
-      ))}
-      {empty.length > 3 ? (
-        <button
-          type="button"
-          className="btn btn--ghost hosting-sessions__more"
-          onClick={expanded ? onCollapse : onExpand}
-        >
-          {expanded ? 'Show fewer' : `Show all ${empty.length} open sessions`}
-        </button>
-      ) : null}
-      {selectedHere.length > 0 ? (
-        confirmBulkDelete === listingId ? (
-          <div className="cancel-confirm">
-            <p className="cancel-confirm__warning">
-              Delete {emptySessionLabel(selectedHere.length)}? Guests will not be able to book
-              them.
-            </p>
-            <div className="hosting-sessions__confirm-actions">
-              <Button
-                variant="primary"
-                loading={deleteSessionLoading}
-                loadingLabel="Deleting"
-                onClick={() => onBulkDelete(selectedHere)}
-                className="hosting-sessions__danger"
-              >
-                Confirm delete
-              </Button>
-              <button type="button" onClick={onKeep} className="btn btn--ghost">
-                Keep sessions
-              </button>
-            </div>
-          </div>
-        ) : (
-          <Button type="button" variant="secondary" onClick={() => onAskBulkDelete(listingId)}>
-            Delete selected
-          </Button>
-        )
-      ) : null}
-    </div>
-  )
-}
-
-function SessionRow({
-  session,
-  typeName = '',
-  heldNote = '',
-  showListing = false,
-  selectable,
-  selected,
-  confirmCancel,
-  confirmDelete,
-  cancelLoading,
-  deleteSessionLoading,
-  onToggleSelect,
-  onAskCancel,
-  onAskDelete,
-  onCancelSession,
-  onDeleteSession,
-  onKeep,
-  editing = false,
-  editDate = '',
-  editTime = '',
-  editError = '',
-  editLoading = false,
-  onAskEdit,
-  onEditDate,
-  onEditTime,
-  onSaveEdit,
-}) {
-  const activeBookings = activeBookingsOn(session)
-  const hasActiveBookings = activeBookings.length > 0
-  const hasBlockingBookings = (session.bookings ?? []).some(
-    (booking) => booking.status === 'pending' || booking.status === 'confirmed',
-  )
-  const guestTotal = activeBookings.reduce(
-    (sum, booking) => sum + (booking.guests_count || 0),
-    0,
-  )
-  const when = session.starts_at ? formatSessionDateTime(session.starts_at) : 'Date TBC'
-  const title = showListing ? session.listings?.title || 'Unknown listing' : when
-  const guestLabel = guestTotal === 1 ? '1 guest booked' : `${guestTotal} guests booked`
-
-  return (
-    <div className="hosting-session">
-      <div className="hosting-session__main">
-        {selectable ? (
-          <label className="hosting-session__select">
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={() => onToggleSelect(session.id)}
-              aria-label={`Select ${when}`}
-            />
-          </label>
-        ) : null}
-        {selectable && editing ? (
-          <div className="hosting-session__edit">
-            <label className="label">
-              Date
-              <input
-                type="date"
-                className="input"
-                value={editDate}
-                onChange={(event) => onEditDate(event.target.value)}
-              />
-            </label>
-            <label className="label">
-              Time
-              <input
-                type="time"
-                className="input"
-                value={editTime}
-                onChange={(event) => onEditTime(event.target.value)}
-              />
-            </label>
-          </div>
-        ) : (
-          <div className="hosting-session__text">
-            <p className="dashboard-card__title">{title}</p>
-            {typeName ? <p className="hosting-session__type">{typeName}</p> : null}
-            {heldNote ? <p className="hosting-session__held">{heldNote}</p> : null}
-            {showListing ? (
-              <p className="dashboard-card__meta">
-                {when} · {guestLabel}
-              </p>
-            ) : null}
-          </div>
-        )}
-      </div>
-      <div className="booking-card__actions">
-        {hasActiveBookings && !confirmCancel ? (
-          <button
-            type="button"
-            onClick={() => onAskCancel(session.id)}
-            className="btn btn--ghost hosting-session__action hosting-session__action--danger"
-          >
-            Cancel session
-          </button>
-        ) : null}
-        {!hasBlockingBookings && selectable && !editing && onAskEdit ? (
-          <button
-            type="button"
-            onClick={() => onAskEdit(session)}
-            className="btn btn--ghost hosting-session__action"
-          >
-            Edit
-          </button>
-        ) : null}
-        {selectable && editing ? (
-          <>
-            <Button
-              variant="secondary"
-              loading={editLoading}
-              loadingLabel="Saving"
-              onClick={() => onSaveEdit(session)}
-              className="hosting-session__action"
-            >
-              Save
-            </Button>
-            <button type="button" onClick={onKeep} className="btn btn--ghost hosting-session__action">
-              Cancel
-            </button>
-          </>
-        ) : null}
-        {!hasActiveBookings && !confirmDelete && !editing ? (
-          <button
-            type="button"
-            onClick={() => onAskDelete(session.id)}
-            className="btn btn--ghost hosting-session__action hosting-session__action--danger"
-          >
-            Delete
-          </button>
-        ) : null}
-      </div>
-      {editError ? <p className="error-message">{editError}</p> : null}
-
-      {confirmCancel ? (
-        <div className="cancel-confirm">
-          <p className="cancel-confirm__warning">{hostCancelWarning(guestTotal)}</p>
-          <div className="hosting-sessions__confirm-actions">
-            <Button
-              variant="primary"
-              loading={cancelLoading}
-              loadingLabel="Cancelling"
-              onClick={() => onCancelSession(session)}
-              className="hosting-sessions__danger"
-            >
-              Confirm cancellation
-            </Button>
-            <button type="button" onClick={onKeep} className="btn btn--ghost">
-              Keep session
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {confirmDelete ? (
-        <div className="cancel-confirm">
-          <p className="cancel-confirm__warning">
-            Are you sure? This will hide the session from your listing. Guests will not be able
-            to book it.
-          </p>
-          <div className="hosting-sessions__confirm-actions">
-            <Button
-              variant="primary"
-              loading={deleteSessionLoading}
-              loadingLabel="Deleting"
-              onClick={() => onDeleteSession(session)}
-              className="hosting-sessions__danger"
-            >
-              Confirm delete
-            </Button>
-            <button type="button" onClick={onKeep} className="btn btn--ghost">
-              Keep session
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </div>
   )
 }
