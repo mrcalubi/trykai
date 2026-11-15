@@ -10822,8 +10822,13 @@ body:has(.edit-profile__bar) .site-footer {
 }
 
 /* Listing page add-ons: one card read like a menu. Every row has the same
-   thumbnail slot, the price sits on the name row, and how it's charged and
-   any limit sit underneath. */
+   tile, a photo or an icon. On a phone the price sits under the description
+   with any limit beside it; with room, the price takes its own column on the
+   right and the limit drops under the description. */
+.extras-menu {
+  container-type: inline-size;
+}
+
 .extras-menu__intro {
   margin: 0 0 16px;
   color: var(--muted);
@@ -10839,10 +10844,16 @@ body:has(.edit-profile__bar) .site-footer {
 }
 
 .extras-menu__item {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 14px 0;
+  display: grid;
+  grid-template-columns: 56px auto minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas:
+    'thumb name name'
+    'thumb desc desc'
+    'thumb price limit';
+  column-gap: 14px;
+  align-items: start;
+  padding: 16px 0;
 }
 
 .extras-menu__item + .extras-menu__item {
@@ -10850,80 +10861,113 @@ body:has(.edit-profile__bar) .site-footer {
 }
 
 .extras-menu__thumb {
+  grid-area: thumb;
   width: 56px;
   height: 56px;
-  flex-shrink: 0;
   object-fit: cover;
-  border-radius: var(--radius);
+  border-radius: 12px;
   background: var(--bg-subtle);
 }
 
+/* No photo: a calm tile with an icon for what the extra is. */
 .extras-menu__thumb--empty {
   display: grid;
   place-items: center;
-  color: var(--coral-ink);
+  color: var(--navy);
   background: var(--sand);
 }
 
-.extras-menu__body {
-  flex: 1;
-  min-width: 0;
-}
-
-.extras-menu__top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .extras-menu__name {
+  grid-area: name;
   min-width: 0;
   margin: 0;
+  font-size: 17px;
   font-weight: 700;
   line-height: 1.35;
   color: var(--navy);
-}
-
-.extras-menu__price {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  flex-shrink: 0;
-  margin: 0;
-  text-align: right;
-}
-
-.extras-menu__amount {
-  font-family: var(--mono);
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.35;
-  color: var(--navy);
-}
-
-.extras-menu__unit {
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
 }
 
 .extras-menu__desc {
+  grid-area: desc;
   margin: 4px 0 0;
   font-size: 14px;
   line-height: 1.45;
   color: var(--muted);
 }
 
+.extras-menu__price {
+  grid-area: price;
+  display: flex;
+  align-items: baseline;
+  align-self: center;
+  margin: 10px 0 0;
+  white-space: nowrap;
+}
+
+.extras-menu__amount {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--navy);
+}
+
+.extras-menu__unit {
+  padding-left: 4px;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .extras-menu__limit {
-  display: inline-block;
-  margin: 8px 0 0;
-  padding: 3px 9px;
+  grid-area: limit;
+  justify-self: start;
+  align-self: center;
+  margin: 10px 0 0;
+  padding: 3px 10px;
   font-size: 12px;
   font-weight: 700;
   color: var(--coral-ink);
   background: var(--coral-soft);
   border-radius: 999px;
+}
+
+@container (min-width: 520px) {
+  .extras-menu__list {
+    padding: 0 20px;
+  }
+
+  .extras-menu__item {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'thumb name price'
+      'thumb desc price'
+      'thumb limit price';
+    column-gap: 16px;
+    padding: 18px 0;
+  }
+
+  .extras-menu__thumb {
+    width: 64px;
+    height: 64px;
+  }
+
+  .extras-menu__price {
+    flex-direction: column;
+    align-items: flex-end;
+    align-self: start;
+    margin: 0;
+    padding-left: 12px;
+    text-align: right;
+  }
+
+  .extras-menu__amount {
+    font-size: 16px;
+  }
+
+  .extras-menu__unit {
+    padding-left: 0;
+  }
 }
 
 /* Session types (00056): the listing page cards double as a filter. */

@@ -21,11 +21,28 @@ export function guestAddonPriceParts(addon) {
   }
 }
 
-/** "Only 6 per session", or nothing when the host set no limit. */
+/** "6 per session", or nothing when the host set no limit. */
 export function addonLimitLabel(addon) {
   const limit = Number(addon.session_limit)
   if (addon.session_limit == null || !Number.isInteger(limit) || limit < 1) return ''
-  return `Only ${limit} per session`
+  return `${limit} per session`
+}
+
+const ADDON_TILE_ICONS = [
+  ['chat', /\b(help|plan|planning|guid|tips?|advice|lesson|coach|consult|proposal|surprise|chat)/],
+  ['camera', /\b(photo|picture|camera|video|film|portrait)/],
+  ['food', /\b(food|drink|snack|tea|coffee|latte|cake|lunch|dinner|meal|wine|beer|dessert|treat|cookie)/],
+  ['arts', /\b(material|paint|colou?r|clay|yarn|ink|brush|canvas|bloom|flower|stem|rose|kit|suppl)/],
+]
+
+/**
+ * The icon on an add-on's tile when the host added no photo: a guess from
+ * its name, and a gift for anything else, since every add-on is a little extra.
+ */
+export function addonTileIcon(addon) {
+  const name = String(addon?.name ?? '').toLowerCase()
+  const match = ADDON_TILE_ICONS.find(([, pattern]) => pattern.test(name))
+  return match ? match[0] : 'gift'
 }
 
 export function remainingForAddon(addon, remainingById) {

@@ -40,6 +40,7 @@ import {
   checkoutAddonPayload,
   clampAddonQuantities,
   addonLimitLabel,
+  addonTileIcon,
   guestAddonPriceParts,
   pickedAddonLines,
 } from '../lib/bookingAddons'
@@ -1376,9 +1377,7 @@ export default function ListingDetail() {
           {addonsAvailable && listingAddons.length > 0 ? (
             <section className="detail-section extras-menu">
               <h2 className="detail-section__title">Add a little extra</h2>
-              <p className="extras-menu__intro">
-                Optional extras from {hostName}. Add them at checkout.
-              </p>
+              <p className="extras-menu__intro">Optional. Pick any of these when you book.</p>
               <ul className="extras-menu__list">
                 {listingAddons.map((addon) => {
                   const price = guestAddonPriceParts(addon)
@@ -1389,22 +1388,18 @@ export default function ListingDetail() {
                         <img src={addon.photo.remoteUrl} alt="" className="extras-menu__thumb" />
                       ) : (
                         <span className="extras-menu__thumb extras-menu__thumb--empty" aria-hidden="true">
-                          <Icon name="sparkle" size={22} />
+                          <Icon name={addonTileIcon(addon)} size={24} />
                         </span>
                       )}
-                      <div className="extras-menu__body">
-                        <div className="extras-menu__top">
-                          <p className="extras-menu__name">{addon.name}</p>
-                          <p className="extras-menu__price">
-                            <span className="extras-menu__amount">{price.amount}</span>
-                            <span className="extras-menu__unit"> {price.unit}</span>
-                          </p>
-                        </div>
-                        {addon.description ? (
-                          <p className="extras-menu__desc">{addon.description}</p>
-                        ) : null}
-                        {limit ? <p className="extras-menu__limit">{limit}</p> : null}
-                      </div>
+                      <p className="extras-menu__name">{addon.name}</p>
+                      {addon.description ? (
+                        <p className="extras-menu__desc">{addon.description}</p>
+                      ) : null}
+                      <p className="extras-menu__price">
+                        <span className="extras-menu__amount">{price.amount}</span>
+                        <span className="extras-menu__unit"> {price.unit}</span>
+                      </p>
+                      {limit ? <p className="extras-menu__limit">{limit}</p> : null}
                     </li>
                   )
                 })}
