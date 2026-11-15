@@ -681,7 +681,7 @@ describe('Profile own tabs', () => {
       await screen.findByRole('heading', { name: 'Your listings' })
     ).closest('section')
     const card = within(listingsSection).getByText('fr').closest('.hosting-listing-card')
-    await user.click(within(card).getByRole('button', { name: 'More actions' }))
+    await user.click(within(card).getByRole('button', { name: /^More for / }))
     await user.click(within(card).getByRole('menuitem', { name: 'Delete' }))
     await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
 

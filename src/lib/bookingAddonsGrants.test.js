@@ -98,12 +98,14 @@ describe('stripe-webhook add-ons', () => {
   })
 })
 
-describe('Hosting Prepare box', () => {
-  it('renders summed add-ons and guest notes on upcoming booked sessions', () => {
-    expect(hosting).toContain('hosting-prepare')
-    expect(hosting).toContain('sessionPrepareBoxes')
-    expect(hosting).toContain('Prepare')
-    expect(hosting).toContain('Notes from guests')
-    expect(hosting).toContain('Note from')
+describe('Hosting session page add-ons and notes', () => {
+  it('loads each booking\'s add-ons and note and shows them per guest', () => {
+    const sessionPage = read('src/components/HostSessionPage.jsx')
+    expect(hosting).toContain('loadBookingAddonRows')
+    expect(hosting).toContain('loadBookingNotes')
+    expect(hosting).toContain('addonsByBooking={addonsByBooking}')
+    expect(hosting).toContain('notesByBooking={notesByBooking}')
+    expect(sessionPage).toContain('sessionGuestCards')
+    expect(sessionPage).toContain('Note from')
   })
 })
