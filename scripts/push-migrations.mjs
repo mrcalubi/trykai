@@ -63,15 +63,20 @@ export function listLocalMigrations(migrationsDir) {
 }
 
 /**
- * Reads the table printed by `supabase migration list`. Each data row holds
- * the local version and the remote version; either may be blank.
+ * Reads the table printed by `supabase migration list`. The CLI builds a
+ * markdown table with every value in a code span (|`00001`|` `|`00001`|) and
+ * renders it with glamour's ASCII style, which keeps the backticks. Each data
+ * row holds the local version and the remote version; either may be blank.
  */
 export function parseMigrationList(text) {
   const rows = []
   // eslint-disable-next-line no-control-regex
   const plain = text.replace(/\u001b\[[0-9;]*m/g, '')
   for (const line of plain.split(/\r?\n/)) {
-    const cells = line.split(/[|│]/).map((cell) => cell.trim())
+    const trimmed = line.trim()
+    const cells = trimmed.split(/[|│┃]/).map((cell) => cell.replaceAll('`', '').trim())
+    // An outer border has a separator at both ends; a blank first cell only at the start.
+    if (/^[|│┃].*[|│┃]$/.test(trimmed)) cells.shift()
     if (cells.length < 2) continue
     const [local, remote] = cells
     if (!/^\d*$/.test(local) || !/^\d*$/.test(remote)) continue
@@ -221,6 +226,9 @@ export function runPush({
   if (plan.errors.length > 0) {
     stderr(`Migration push to ${projectRef} refused:`)
     for (const error of plan.errors) stderr(`  ${error}`)
+    // Versions and timestamps only; safe to print, and needed to debug a parse failure.
+    stderr('Output of `supabase migration list`:')
+    stderr(`${list.stdout ?? ''}${list.stderr ?? ''}`.trim() || '(empty)')
     return 1
   }
 

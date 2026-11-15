@@ -15,12 +15,14 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const STAGING_REF = 'hzgybclfvpuxkmytdoos'
 const LOCAL = listLocalMigrations(path.join(repoRoot, 'supabase', 'migrations'))
 
+// The shape supabase CLI 2.121.0 prints: glamour's ASCII style keeps the
+// code-span backticks from list.go's |`local`|`remote`|`time`| rows.
 function listOutput(appliedCount) {
   const rows = LOCAL.map(
     (version, index) =>
-      `   ${version} | ${index < appliedCount ? version : '     '} | ${version}`,
+      `  \`${version}\` | \`${index < appliedCount ? version : ' '}\` | \`${version}\``,
   )
-  return ['   Local | Remote | Time (UTC)', '  -------|--------|-----------', ...rows].join('\n')
+  return ['  Local   | Remote  | Time (UTC)', '  --------|---------|-----------', ...rows].join('\n')
 }
 
 function harness({ listStdout, listStatus = 0, pushStatus = 0, env = {}, argv = [] } = {}) {
@@ -74,6 +76,27 @@ describe('parseMigrationList', () => {
       { local: '00001', remote: '00001' },
       { local: '00002', remote: '' },
       { local: '', remote: '00003' },
+    ])
+  })
+
+  it('strips the code-span backticks the CLI prints, including blank cells', () => {
+    const text = [
+      '  Local   | Remote  | Time (UTC)',
+      '  --------|---------|-----------',
+      '  `00001` | `00001` | `00001`',
+      '  `00002` | ` `     | `00002`',
+      '  ` `     | `00003` | `00003`',
+    ].join('\n')
+    expect(parseMigrationList(text)).toEqual([
+      { local: '00001', remote: '00001' },
+      { local: '00002', remote: '' },
+      { local: '', remote: '00003' },
+    ])
+  })
+
+  it('handles a leading border', () => {
+    expect(parseMigrationList('| `00001` | ` ` | `00001` |')).toEqual([
+      { local: '00001', remote: '' },
     ])
   })
 
@@ -152,6 +175,13 @@ describe('runPush', () => {
     expect(result.code).toBe(1)
     expect(result.push).toBeUndefined()
     expect(result.err).toMatch(/migration repair --status applied/)
+  })
+
+  it('prints the raw CLI output when it cannot read the list', () => {
+    const result = harness({ listStdout: 'something unexpected' })
+    expect(result.code).toBe(1)
+    expect(result.push).toBeUndefined()
+    expect(result.err).toContain('something unexpected')
   })
 
   it('passes --dry-run through', () => {
