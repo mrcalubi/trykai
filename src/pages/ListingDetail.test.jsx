@@ -2063,34 +2063,53 @@ describe('ListingDetail session types', () => {
     vi.useRealTimers()
   })
 
-  it('shows the active types and labels each session, removed types included', async () => {
+  const dateRows = () => [...document.querySelectorAll('.class-date')]
+
+  it('shows the active classes as cards and every date with its class, removed classes included', async () => {
     renderPage()
-    expect(await screen.findByRole('heading', { name: 'Choose your session' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Old wreath/ })).not.toBeInTheDocument()
-    const day = document.querySelector('.session-day')
-    await waitFor(() => expect(within(day).getAllByRole('button', { name: 'Book' })).toHaveLength(3))
-    expect(within(day).getByText('Hand-tied bouquet')).toBeInTheDocument()
-    expect(within(day).getByText('Old wreath')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: "Pick what you'll make" })).toBeInTheDocument()
+    expect(screen.getByText('2 classes · same price')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Hand-tied bouquet' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Old wreath' })).not.toBeInTheDocument()
+    expect(screen.getByText('Booking fee included. Same price for both classes.')).toBeInTheDocument()
+    await waitFor(() => expect(dateRows()).toHaveLength(3))
+    const classNames = dateRows().map((row) => row.querySelector('.class-date__class')?.textContent)
+    expect(classNames).toEqual(['Hand-tied bouquet', 'Table centrepiece', 'Old wreath'])
+    // A list, not a month grid that can open on an empty month.
+    expect(document.querySelector('.detail-calendar')).not.toBeInTheDocument()
   })
 
-  it('filters dates by type from the chips and the cards', async () => {
+  it('keeps the class cards and the chips as one filter', async () => {
     const { user } = renderPage()
-    const day = await waitFor(() => {
-      const node = document.querySelector('.session-day')
-      expect(within(node).getAllByRole('button', { name: 'Book' })).toHaveLength(3)
-      return node
-    })
-    const filter = screen.getByRole('group', { name: 'Session type' })
-    await user.click(within(filter).getByRole('button', { name: 'Table centrepiece' }))
-    expect(within(day).getAllByRole('button', { name: 'Book' })).toHaveLength(1)
-    expect(within(day).getByText('Table centrepiece')).toBeInTheDocument()
+    await waitFor(() => expect(dateRows()).toHaveLength(3))
+    const chips = screen.getByRole('group', { name: 'Class' })
 
-    await user.click(within(filter).getByRole('button', { name: 'All' }))
-    expect(within(day).getAllByRole('button', { name: 'Book' })).toHaveLength(3)
+    await user.click(within(chips).getByRole('button', { name: 'Table centrepiece' }))
+    expect(dateRows()).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Showing Table centrepiece dates' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
 
-    await user.click(screen.getByRole('button', { name: /Hand-tied bouquet.*See dates/ }))
-    expect(within(day).getAllByRole('button', { name: 'Book' })).toHaveLength(1)
-    expect(within(filter).getByRole('button', { name: 'Hand-tied bouquet' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(chips).getByRole('button', { name: 'All classes' }))
+    expect(dateRows()).toHaveLength(3)
+
+    await user.click(screen.getByRole('button', { name: 'See Hand-tied bouquet dates' }))
+    expect(dateRows()).toHaveLength(1)
+    expect(within(chips).getByRole('button', { name: 'Hand-tied bouquet' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('names the picked date and class on the button, then opens checkout', async () => {
+    givenSignedIn()
+    const { user } = renderPage()
+    await waitFor(() => expect(dateRows()).toHaveLength(3))
+    expect(screen.getByRole('button', { name: 'Pick a date' })).toBeDisabled()
+
+    await user.click(dateRows()[0])
+    const book = screen.getByRole('button', { name: /^Book .* · Hand-tied bouquet · / })
+    expect(book).toBeEnabled()
+    await user.click(book)
+    expect(await screen.findByRole('button', { name: 'Add a note for Mei' })).toBeInTheDocument()
   })
 
   it('reads sessions without type_id before 00056', async () => {
@@ -2110,6 +2129,6 @@ describe('ListingDetail session types', () => {
     })
     renderPage()
     expect(await screen.findByRole('button', { name: 'Book' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Choose your session' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: "Pick what you'll make" })).not.toBeInTheDocument()
   })
 })

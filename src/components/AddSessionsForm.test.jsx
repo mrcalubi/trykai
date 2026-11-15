@@ -160,7 +160,7 @@ describe('Every week', () => {
     await user.click(screen.getByRole('button', { name: 'Sun' }))
     await user.click(screen.getByRole('button', { name: '10:00 am' }))
     expect(rows()).toHaveLength(5)
-    await user.click(screen.getByRole('button', { name: 'See all 8 sessions' }))
+    await user.click(screen.getByRole('button', { name: 'See all 8' }))
     expect(rows()).toHaveLength(8)
     await user.click(screen.getByRole('button', { name: 'Show fewer' }))
     expect(rows()).toHaveLength(5)
@@ -393,14 +393,14 @@ describe('Add dates session types', () => {
 
   it('shows no type picker for a listing without types', () => {
     renderForm()
-    expect(screen.queryByRole('group', { name: 'Which type?' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Which class?' })).not.toBeInTheDocument()
   })
 
   it('asks for a type, then sends it with the batch', async () => {
     const { user, onCreated } = renderForm({ sessionTypes: TYPES })
     await fillOneDate(user)
     await user.click(addButton())
-    expect(screen.getByRole('alert')).toHaveTextContent('Pick a session type for these dates.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Pick a class for these dates.')
 
     await user.click(screen.getByRole('radio', { name: 'Table centrepiece' }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()

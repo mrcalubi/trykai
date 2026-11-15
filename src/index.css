@@ -3457,7 +3457,11 @@ body.lightbox-open {
 .extras-menu__name,
 .extras-menu__desc,
 .edit-summary__title,
-.edit-head__title {
+.edit-head__title,
+.class-card__name,
+.class-card__desc,
+.class-pick__name,
+.class-pick__desc {
   overflow-wrap: break-word;
 }
 
@@ -14203,4 +14207,817 @@ body.add-dates-open {
   top: 8px;
   right: 8px;
   z-index: 20;
+}
+
+/* Add dates: which class this batch is. */
+.add-dates__legend {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  float: none;
+}
+
+.add-dates__class-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.add-dates__class {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 14px 10px 10px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.add-dates__class:hover {
+  border-color: var(--border-strong);
+}
+
+.add-dates__class--on,
+.add-dates__class--on:hover {
+  border-color: var(--navy);
+}
+
+.add-dates__class:has(input:focus-visible) {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.add-dates__class-thumb {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.add-dates__class-thumb--empty {
+  display: grid;
+  place-items: center;
+  color: var(--navy);
+  background: var(--sand);
+}
+
+.add-dates__class-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.add-dates__class-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.add-dates__class-detail {
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-dates__class-mark {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--cream);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+.add-dates__class--on .add-dates__class-mark {
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.add-dates__new-class-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 8px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  background: transparent;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.add-dates__new-class-btn:hover {
+  background: var(--surface);
+}
+
+.add-dates__new-class {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--navy);
+  border-radius: var(--radius-lg);
+}
+
+.add-dates__new-class .label {
+  margin: 0;
+}
+
+.add-dates__new-class .add-dates__hint {
+  margin-top: 0;
+}
+
+.add-dates__new-class-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.add-dates__classes-none {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--muted);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.add-dates__classes-none a {
+  font-weight: 700;
+  color: var(--navy);
+}
+
+/* A date the batch skips: struck through, with why. */
+.add-dates__row--skipped .add-dates__row-day,
+.add-dates__row--skipped .add-dates__row-time {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.add-dates__row--skipped {
+  padding-bottom: 10px;
+}
+
+.add-dates__row-note--skip {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  font-weight: 600;
+  color: var(--coral-ink);
+}
+
+.success-message__action {
+  margin-left: 10px;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* Edit listing → Classes: one card per class, edited in place. */
+.classes-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.classes-editor__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.classes-editor__price {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.classes-editor__count {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.classes-editor__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.class-card {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-areas:
+    'thumb text'
+    'actions actions';
+  gap: 12px 14px;
+  align-items: center;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.class-card__thumb {
+  grid-area: thumb;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.class-card__thumb--empty {
+  display: grid;
+  place-items: center;
+  color: var(--navy);
+  background: var(--sand);
+}
+
+.class-card__text {
+  grid-area: text;
+  min-width: 0;
+}
+
+.class-card__name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.class-card__desc {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.class-card__dates {
+  margin: 4px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.class-card__actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.class-card__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.class-card__edit,
+.class-card__link {
+  min-height: 44px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.class-card__edit:hover,
+.class-card__link:hover {
+  background: var(--sand);
+}
+
+.class-card--editing {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  border: 1.5px solid var(--navy);
+}
+
+.class-card__edit-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.class-card__edit-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.class-card__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.class-card__photo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.class-card__thumb--large {
+  width: 110px;
+  height: 110px;
+}
+
+.class-card__photo-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.class-card__add-photo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 120px;
+  min-height: 110px;
+  padding: 10px;
+  text-align: center;
+  color: var(--navy);
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.class-card__add-photo-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.class-card__add-photo-hint,
+.class-card__hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.class-card__hint {
+  margin: 4px 0 0;
+}
+
+.class-card__inputs {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.class-card__inputs .label {
+  margin: 0;
+}
+
+.class-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.class-card__remove-btn {
+  min-height: 36px;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--coral-ink);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.class-card__remove-ask {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.class-card__remove-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.class-card__save {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.classes-editor__add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+  background: transparent;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.classes-editor__add:hover {
+  background: var(--surface);
+}
+
+.classes-editor__how {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--navy);
+  background: var(--sand);
+  border-radius: var(--radius-lg);
+}
+
+.classes-editor__how-title {
+  margin: 0 0 6px;
+  font-weight: 700;
+}
+
+.classes-editor__how ol {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.6;
+}
+
+@container (min-width: 560px) {
+  .class-card {
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    grid-template-areas: 'thumb text actions';
+  }
+
+  .class-card__thumb {
+    width: 72px;
+    height: 72px;
+  }
+
+  .class-card__fields {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .class-card__photo {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.classes-editor {
+  container-type: inline-size;
+}
+
+/* Listing page: "Pick what you'll make". The cards and the chips by the
+   dates are one filter. */
+.class-pick__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.class-pick__meta {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.class-pick__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.class-pick__card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.class-pick__card--on {
+  border-color: var(--navy);
+}
+
+.class-pick__photo {
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  object-fit: cover;
+}
+
+.class-pick__photo--empty {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--muted);
+  background: var(--sand);
+}
+
+.class-pick__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px 16px;
+}
+
+.class-pick__name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.class-pick__desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.class-pick__dates {
+  margin: 6px 0 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.class-pick__see {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  margin-top: auto;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  background: var(--sand);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.class-pick__see[aria-pressed='true'] {
+  color: var(--cream);
+  background: var(--navy);
+}
+
+/* Booking card: every upcoming date of the listing, by month. */
+.class-dates__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.class-dates__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  background: transparent;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.class-dates__chip--on {
+  color: var(--cream);
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.class-dates__chip-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.class-dates__month + .class-dates__month {
+  margin-top: 16px;
+}
+
+.class-dates__heading {
+  margin: 0 0 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.class-dates__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.class-date {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 12px;
+  font: inherit;
+  text-align: left;
+  color: var(--navy);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.class-date:hover:enabled {
+  border-color: var(--border-strong);
+}
+
+.class-date--on,
+.class-date--on:hover:enabled {
+  border-color: var(--navy);
+  box-shadow: inset 0 0 0 1px var(--navy);
+}
+
+.class-date:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.class-date:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.class-date__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  background: var(--sand);
+  border-radius: 10px;
+}
+
+.class-date--on .class-date__tile {
+  color: var(--cream);
+  background: var(--navy);
+}
+
+.class-date__weekday {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.class-date__day {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.class-date__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.class-date__time {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.class-date__class {
+  font-size: 13px;
+  color: var(--navy);
+}
+
+.class-date__spots {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.class-date__spots--low {
+  color: var(--coral-ink);
+}
+
+.class-dates__empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.class-dates__all {
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--navy);
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* Beside the page the list scrolls on its own, so Book stays in view. */
+@media (min-width: 1024px) {
+  .class-dates__scroll {
+    max-height: min(360px, calc(100svh - 420px));
+    margin-right: -6px;
+    padding-right: 6px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+.class-dates__book {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 16px;
+  font-size: 15px;
+}
+
+.class-dates__next {
+  margin: 8px 0 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--muted);
 }

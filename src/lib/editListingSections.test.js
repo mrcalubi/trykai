@@ -58,7 +58,7 @@ describe('edit listing sections', () => {
     expect(summaries.basics.text).toBe('Arts · Flower arranging')
     expect(summaries.price.text).toBe('Guests pay S$37 · 4 spots · 2 hr')
     expect(summaries.addons.text).toBe('1 add-on · Take-home glass vase')
-    expect(summaries.types.text).toBe('2 types · Hand-tied bouquet, Table centrepiece')
+    expect(summaries.types.text).toBe('2 classes · Hand-tied bouquet, Table centrepiece')
     expect(summaries.notice.text).toBe('Guests can book until 3 hr before')
     expect(summaries.provided.text).toBe('Materials, Food & drinks')
     expect(summaries.bring.text).toBe('Comfortable clothes, Water bottle')

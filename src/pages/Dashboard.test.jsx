@@ -883,13 +883,131 @@ describe('Dashboard add session', () => {
     expect(screen.queryByText(/who were keen|who was keen/)).not.toBeInTheDocument()
   })
 
-  it('previews a clash with an existing session instead of merging spots', async () => {
+  it('adds spots when the same time is already on, as the database does', async () => {
     const dateKey = dateKeyFromToday(1)
     givenData({
       listings: [makeMyListing()],
       hostSessions: [
         makeHostSession({
           starts_at: `${dateKey}T02:30:00.000Z`,
+          duration_mins: 90,
+          status: 'open',
+          bookings: [],
+        }),
+      ],
+    })
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+    await fillSession(user, { time: '10:30' })
+
+    expect(screen.getByText('Already on: adds 4 more spots')).toBeInTheDocument()
+    await reviewAndCreate(user)
+    await waitFor(() =>
+      expect(supabase.rpc).toHaveBeenCalledWith('add_listing_session', {
+        p_listing_id: 'listing-1',
+        p_starts_at: `${dateKey}T02:30:00.000Z`,
+        p_spots: 4,
+      }),
+    )
+  })
+
+  it('skips a date that overlaps another class, and says why', async () => {
+    const dateKey = dateKeyFromToday(1)
+    supabase.__on('listing_session_types', 'select', {
+      data: [
+        { id: 't1', listing_id: 'listing-1', name: 'Hand-tied bouquet', description: '', photo_url: null, position: 0, is_active: true },
+        { id: 't2', listing_id: 'listing-1', name: 'Table centrepiece', description: '', photo_url: null, position: 1, is_active: true },
+      ],
+      error: null,
+    })
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({ starts_at: `${dateKey}T02:00:00.000Z`, duration_mins: 90, type_id: 't2', bookings: [] }),
+      ],
+    })
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+    await user.click(screen.getByRole('radio', { name: 'Hand-tied bouquet' }))
+    expect(screen.getByRole('heading', { name: 'Adding · Hand-tied bouquet' })).toBeInTheDocument()
+    await fillSession(user, { time: '10:30' })
+
+    expect(screen.getByText('Skipped: Table centrepiece runs then')).toBeInTheDocument()
+    expect(
+      screen.getByText('You can only teach one class at a time, so dates that overlap another class are skipped.'),
+    ).toBeInTheDocument()
+  })
+
+  function givenTwoClasses() {
+    supabase.__on('listing_session_types', 'select', {
+      data: [
+        { id: 't1', listing_id: 'listing-1', name: 'Hand-tied bouquet', description: '', photo_url: null, position: 0, is_active: true },
+        { id: 't2', listing_id: 'listing-1', name: 'Table centrepiece', description: '', photo_url: null, position: 1, is_active: true },
+      ],
+      error: null,
+    })
+  }
+
+  it('offers the next class once a batch is added', async () => {
+    givenTwoClasses()
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+    await user.click(screen.getByRole('radio', { name: 'Hand-tied bouquet' }))
+    await fillSession(user)
+    await reviewAndCreate(user)
+
+    const offer = await screen.findByRole('button', { name: 'Add dates for Table centrepiece' })
+    await user.click(offer)
+    expect(screen.getByRole('radio', { name: 'Table centrepiece' })).toBeChecked()
+    expect(screen.getByRole('heading', { name: 'Adding · Table centrepiece' })).toBeInTheDocument()
+  })
+
+  it('opens Add dates on a class from Edit listing', async () => {
+    givenTwoClasses()
+    const { currentSearch } = await renderHosting({ route: '/hosting?add=listing-1&class=t2' })
+
+    expect(await screen.findByRole('dialog', { name: 'Add dates' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Table centrepiece' })).toBeChecked()
+    await waitFor(() => expect(currentSearch()).not.toContain('add='))
+  })
+
+  it('makes a new class without leaving the sheet', async () => {
+    givenTwoClasses()
+    supabase.__on('listing_session_types', 'insert', {
+      data: { id: 't3', listing_id: 'listing-1', name: 'Wreath', description: '', photo_url: null, position: 2, is_active: true },
+      error: null,
+    })
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+    await user.click(screen.getByRole('button', { name: 'New class' }))
+    await user.type(screen.getByLabelText('Class name'), 'Wreath')
+    await user.click(screen.getByRole('button', { name: 'Add class' }))
+
+    expect(await screen.findByRole('radio', { name: 'Wreath' })).toBeChecked()
+    expect(supabase.__lastCall('listing_session_types', 'insert').payload).toMatchObject({
+      listing_id: 'listing-1',
+      name: 'Wreath',
+      position: 2,
+    })
+  })
+
+  it('points a listing without classes to where they are set up', async () => {
+    const { user } = await renderHosting()
+    await openSessionForm(user)
+    expect(screen.getByText('Teach more than one class here?')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Set up classes' })).toHaveAttribute(
+      'href',
+      '/edit-listing/listing-1?section=types',
+    )
+  })
+
+  it('skips a date that overlaps an existing session of its own', async () => {
+    const dateKey = dateKeyFromToday(1)
+    givenData({
+      listings: [makeMyListing()],
+      hostSessions: [
+        makeHostSession({
+          starts_at: `${dateKey}T02:00:00.000Z`,
           duration_mins: 90,
           bookings: [],
         }),
@@ -899,8 +1017,7 @@ describe('Dashboard add session', () => {
     await openSessionForm(user)
     await fillSession(user, { time: '10:30' })
 
-    expect(screen.getByText('1 won’t be added')).toBeInTheDocument()
-    expect(screen.getByText(/clashes with an existing session/)).toBeInTheDocument()
+    expect(screen.getByText('Skipped: clashes with an existing session')).toBeInTheDocument()
     expect(screen.getByText('No sessions yet')).toBeInTheDocument()
     await user.click(within(sheet()).getByRole('button', { name: 'Add sessions' }))
     expect(screen.getByRole('alert')).toHaveTextContent('None of these can be added.')
@@ -1001,8 +1118,7 @@ describe('Dashboard add session', () => {
     await fillSession(user, { time: '10:00' })
     await addOtherTime(user, '10:30')
 
-    expect(screen.getByText('1 won’t be added')).toBeInTheDocument()
-    expect(screen.getByText(/clashes with another session in this batch/)).toBeInTheDocument()
+    expect(screen.getByText('Skipped: clashes with another session in this batch')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Add 1 session' }))
 
@@ -1026,7 +1142,7 @@ describe('Dashboard add session', () => {
 
     expect(screen.getByRole('button', { name: 'Add 8 sessions' })).toBeInTheDocument()
     expect(screen.getByText('32 spots for guests to book')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'See all 8 sessions' }))
+    await user.click(screen.getByRole('button', { name: 'See all 8' }))
     expect(sheet().querySelectorAll('.add-dates__row-day')).toHaveLength(8)
 
     await user.click(screen.getByRole('button', { name: 'Add 8 sessions' }))

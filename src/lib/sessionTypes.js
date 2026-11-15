@@ -1,9 +1,10 @@
 import { photoFromRemote, uploadListingPhotos } from './listingPhotos'
 
 /**
- * Session types (00056). A listing can offer up to 4 types; the host picks a
- * type for each batch of dates, and guests pick a type by picking a date.
- * Every type costs the listing's price for now.
+ * Session types (00056), called "classes" wherever hosts and guests see them:
+ * "session" already means a date. A listing can offer up to 4; the host picks
+ * a class for each batch of dates, and guests pick a class by picking a date.
+ * Every class costs the listing's price for now.
  */
 
 export const MAX_SESSION_TYPES = 4
@@ -11,11 +12,11 @@ export const SESSION_TYPE_NAME_MAX = 40
 export const SESSION_TYPE_DESCRIPTION_MAX = 140
 
 export const SESSION_TYPE_HINTS = {
-  name: 'Give this type a name.',
+  name: 'Give this class a name.',
 }
 
 export const SESSION_TYPES_NOT_SAVED_MESSAGE =
-  "Your listing saved, but your session types didn't. Try Save again."
+  "Your listing saved, but your classes didn't. Try Save again."
 
 export function isMissingSessionTypes(error) {
   const code = String(error?.code ?? '')
@@ -193,4 +194,34 @@ export async function saveSessionTypes({ client, listingId, types, existing = []
     }
   }
   return { error: null, insertedIds }
+}
+
+/**
+ * Add dates: make a class without leaving the sheet. Name and an optional
+ * description; a photo can come later in Edit listing. Returns the new row.
+ */
+export async function createSessionType(client, listingId, { name, description = '' }, position = 0) {
+  const { data, error } = await client
+    .from('listing_session_types')
+    .insert({
+      listing_id: listingId,
+      name: String(name ?? '').trim().slice(0, SESSION_TYPE_NAME_MAX),
+      description: String(description ?? '').trim().slice(0, SESSION_TYPE_DESCRIPTION_MAX),
+      position,
+    })
+    .select(COLUMNS)
+    .single()
+  return { row: data ?? null, error }
+}
+
+/** Upcoming sessions of one class: how many, and the first. */
+export function classDates(sessions, typeId, now = Date.now()) {
+  const upcoming = (sessions ?? [])
+    .filter((session) => session.type_id === typeId && new Date(session.starts_at).getTime() > now)
+    .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
+  return { count: upcoming.length, next: upcoming[0] ?? null }
+}
+
+export function datesLabel(count) {
+  return `${count} ${count === 1 ? 'date' : 'dates'}`
 }
