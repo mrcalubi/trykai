@@ -6471,61 +6471,6 @@ body.lightbox-open {
   border-radius: var(--radius);
 }
 
-@media (min-width: 1024px) {
-  .dashboard-card.hosting-listing-card:has(.add-sessions) {
-    grid-column: 1 / -1;
-  }
-}
-
-.add-sessions__legend {
-  padding: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-.add-sessions__quickfill {
-  margin: 0 0 16px;
-  padding: 0;
-  border: 0;
-}
-
-.add-sessions__weekdays {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 8px 0 12px;
-}
-
-.add-sessions__chip {
-  min-width: 44px;
-  min-height: 36px;
-  padding: 6px 10px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.add-sessions__chip--on,
-.add-sessions__chip--on:hover {
-  color: var(--cream);
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
-.add-sessions__chip:hover {
-  border-color: var(--primary);
-}
-
-.add-sessions__repeat select.input {
-  padding-right: 42px;
-}
-
 .add-sessions__times {
   display: flex;
   flex-direction: column;
@@ -6542,10 +6487,6 @@ body.lightbox-open {
 .add-sessions__time-row .label {
   flex: 1;
   min-width: 0;
-}
-
-.add-sessions__per-date {
-  margin: 16px 0;
 }
 
 .add-sessions__per-date-list {
@@ -6583,52 +6524,6 @@ body.lightbox-open {
   font-size: 14px;
   font-weight: 700;
   color: var(--navy);
-}
-
-.add-sessions__preview-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.add-sessions__preview-day {
-  margin: 0 0 4px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--navy);
-}
-
-.add-sessions__preview-group .add-sessions__preview-list {
-  margin: 0;
-}
-
-.add-sessions__preview {
-  margin: 16px 0;
-  padding: 16px;
-  background: var(--bg-subtle);
-  border-radius: var(--radius-sm);
-}
-
-.add-sessions__preview-title {
-  margin: 0 0 8px;
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-.add-sessions__preview-list {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.add-sessions__preview-list--skipped {
-  margin-top: 8px;
-  color: var(--muted);
-}
-
-.add-sessions__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
 }
 
 .hosting-sessions {
@@ -10358,19 +10253,6 @@ body:has(.edit-profile__bar) .site-footer {
   color: var(--muted);
 }
 
-.add-sessions__also {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.add-sessions__shared {
-  color: var(--muted);
-}
-
 /* Host-only notice on their own listing while it waits for review (00036). */
 .detail-review-banner {
   margin: 0 0 16px;
@@ -11026,12 +10908,6 @@ body:has(.edit-profile__bar) .site-footer {
   font-size: 13px;
   font-weight: 600;
   color: var(--coral-ink);
-}
-
-.add-sessions__types {
-  margin: 0 0 16px;
-  padding: 0;
-  border: 0;
 }
 
 /* Checkout extras: one row on the checkout ("Make it extra · from $9")
@@ -12950,5 +12826,630 @@ body.extras-sheet-open {
     padding: 0;
     font-size: 13px;
     border: 0;
+  }
+}
+
+/* Add dates: which days, what time, then what it adds. Full screen on a
+   phone, a panel from 768px. The header and the bar with the one main
+   button stay put while the middle scrolls. */
+body.add-dates-open {
+  overflow: hidden;
+}
+
+.add-dates {
+  position: fixed;
+  inset: 0;
+  z-index: 360;
+  display: flex;
+  background: rgb(22 34 66 / 0.45);
+}
+
+.add-dates__panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: var(--cream);
+}
+
+.add-dates__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px var(--gutter, 16px);
+  border-bottom: 1px solid var(--border);
+}
+
+.add-dates__close {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-left: -10px;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.add-dates__close:hover {
+  background: var(--sand);
+}
+
+.add-dates__close:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.add-dates__heading {
+  min-width: 0;
+}
+
+.add-dates__title {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--navy);
+}
+
+.add-dates__sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.add-dates__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 28px;
+  min-height: 0;
+  padding: 20px var(--gutter, 16px) 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.add-dates__section {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.add-dates__h {
+  margin: 0 0 12px;
+  padding: 0;
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--navy);
+}
+
+.add-dates__h:focus {
+  outline: none;
+}
+
+.add-dates__hint {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.add-dates__hint--top {
+  margin: -6px 0 12px;
+}
+
+/* Every week | Pick dates */
+.add-dates__switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 4px;
+  background: var(--sand);
+  border-radius: 14px;
+}
+
+.add-dates__seg {
+  min-height: 44px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+  background: transparent;
+  border: 0;
+  border-radius: 11px;
+  cursor: pointer;
+}
+
+.add-dates__seg--on {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.add-dates__days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.add-dates__day,
+.add-dates__pill,
+.add-dates__time {
+  font: inherit;
+  color: var(--navy);
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.add-dates__day {
+  min-width: 0;
+  min-height: 48px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 12px;
+}
+
+.add-dates__weeks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-top: 16px;
+}
+
+.add-dates__weeks-label {
+  font-size: 15px;
+  color: var(--navy);
+}
+
+.add-dates__pills {
+  display: flex;
+  gap: 8px;
+}
+
+.add-dates__pill {
+  min-width: 60px;
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.add-dates__day:hover,
+.add-dates__pill:hover,
+.add-dates__time:hover {
+  border-color: var(--navy);
+}
+
+.add-dates__day--on,
+.add-dates__pill--on,
+.add-dates__time--on,
+.add-dates__day--on:hover,
+.add-dates__pill--on:hover,
+.add-dates__time--on:hover {
+  color: var(--cream);
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.add-dates__day:focus-visible,
+.add-dates__pill:focus-visible,
+.add-dates__time:focus-visible,
+.add-dates__seg:focus-visible,
+.add-dates__remove:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+/* The calendar: bookable days are white tiles, picked days navy, past days
+   plain grey numbers, and today a small coral dot. */
+.add-dates .session-calendar {
+  margin: 0;
+  padding: 14px 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.add-dates .session-calendar__header {
+  margin-bottom: 14px;
+}
+
+.add-dates .session-calendar__month {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.add-dates .session-calendar__nav {
+  font-size: 26px;
+  color: var(--navy);
+  border: 0;
+}
+
+.add-dates .session-calendar__nav:hover:not(:disabled) {
+  background: var(--sand);
+}
+
+.add-dates .session-calendar__weekdays {
+  margin-bottom: 8px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.add-dates .session-calendar__grid {
+  gap: 6px 4px;
+}
+
+.add-dates .session-calendar__day {
+  position: relative;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--disabled);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+
+.add-dates .session-calendar__day:enabled {
+  font-weight: 700;
+  color: var(--navy);
+  background: #fff;
+  border-color: var(--border);
+}
+
+.add-dates .session-calendar__day:enabled:hover {
+  border-color: var(--navy);
+}
+
+.add-dates .session-calendar__day--selected,
+.add-dates .session-calendar__day--selected:enabled,
+.add-dates .session-calendar__day--selected:enabled:hover {
+  color: var(--cream);
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.add-dates .session-calendar__day--today::after {
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: var(--coral);
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+.add-dates .session-calendar__day:focus-visible {
+  outline: 2px solid var(--navy);
+}
+
+/* Start times: tap one or more. */
+.add-dates__times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.add-dates__time {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 14px;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: 12px;
+}
+
+.add-dates__time--other {
+  font-family: inherit;
+  text-transform: none;
+  background: transparent;
+  border-style: dashed;
+}
+
+.add-dates__other {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.add-dates__other-input {
+  width: 9.5em;
+  min-height: 48px;
+}
+
+.add-dates__other-add,
+.add-dates__text-btn,
+.add-dates__link {
+  min-height: 44px;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.add-dates__other-add {
+  padding: 0 14px;
+  color: var(--cream);
+  background: var(--navy);
+  border-radius: 12px;
+}
+
+.add-dates__text-btn {
+  align-self: flex-start;
+}
+
+.add-dates__link {
+  margin-top: 10px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.add-dates__duration {
+  margin-bottom: 16px;
+}
+
+.add-dates .add-sessions__times {
+  margin-bottom: 0;
+}
+
+/* Also offer on another listing */
+.add-dates__also {
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.add-dates__also-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.add-dates__also-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 44px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.add-dates__also-name {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--navy);
+}
+
+.add-dates__also .add-dates__hint {
+  margin-top: 4px;
+}
+
+/* You're adding */
+.add-dates__adding-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.add-dates__count {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.add-dates__empty {
+  margin: 0;
+  padding: 16px;
+  font-size: 14px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.add-dates__empty--warn {
+  color: var(--coral-ink);
+  background: var(--coral-soft);
+  border: 0;
+}
+
+.add-dates__list {
+  margin: 0;
+  padding: 0 16px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.add-dates__row {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) minmax(0, 1fr) 44px;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 52px;
+}
+
+.add-dates__row + .add-dates__row {
+  border-top: 1px solid var(--border);
+}
+
+.add-dates__row-day {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+  white-space: nowrap;
+}
+
+.add-dates__row-time {
+  font-family: var(--mono);
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.add-dates__row-note {
+  grid-column: 2 / -1;
+  margin: -8px 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.add-dates__remove {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
+  justify-self: end;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.add-dates__remove:hover {
+  background: var(--sand);
+}
+
+.add-dates__row--more {
+  display: block;
+  min-height: 0;
+  padding: 2px 0 6px;
+}
+
+.add-dates__row--more .add-dates__link {
+  margin: 0;
+}
+
+.add-dates__skipped {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.add-dates__skipped-title {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.add-dates__skipped ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+/* The bar: what it adds and the one main button. */
+.add-dates__bar {
+  padding: 12px var(--gutter, 16px) calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.add-dates__error {
+  margin: 0 0 10px;
+}
+
+.add-dates__bar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.add-dates__total {
+  min-width: 0;
+}
+
+.add-dates__total-count {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.add-dates__total-note {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.add-dates__total-note--warn {
+  font-weight: 700;
+  color: var(--coral-ink);
+}
+
+.add-dates__submit {
+  flex-shrink: 0;
+  min-height: 52px;
+  padding: 0 22px;
+  font-size: 16px;
+  border-radius: 14px;
+}
+
+@media (min-width: 768px) {
+  .add-dates {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .add-dates__panel {
+    max-width: 560px;
+    height: min(880px, 92dvh);
+    overflow: hidden;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+  }
+
+  .add-dates__head {
+    padding: 14px 24px;
+  }
+
+  .add-dates__body {
+    padding: 24px 24px 32px;
+  }
+
+  .add-dates__bar {
+    padding: 14px 24px;
   }
 }

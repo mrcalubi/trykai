@@ -1,60 +1,72 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { formatDuration } from '../lib/duration'
 import { formatDayTitle } from '../lib/sessionCalendar'
-import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
+import { formatSessionTime } from '../lib/sessionDate'
 import {
   SESSION_BATCH_MAX,
   WEEKDAYS,
-  formatBatchWhen,
+  buildSessionStarts,
   generateRecurringDates,
   isSelectableDateKey,
   monthKeysInWindow,
   previewSessionBatch,
   selectableDateWindow,
+  singaporeDateTime,
   singaporeMonthKey,
-  timesByDateFromLists,
 } from '../lib/sessionBatch'
 import { readSessionDraft, writeSessionDraft } from '../lib/sessionFormDraft'
 import Button from './ui/Button'
+import Icon from './ui/Icon'
 import DateMultiSelectCalendar from './DateMultiSelectCalendar'
+
+/** Start times most hosts reach for. Any other time the host adds joins them. */
+const PRESET_TIMES = ['09:00', '10:00', '14:00', '19:30']
+const WEEK_CHOICES = [2, 4, 8]
+const COLLAPSED_ROWS = 5
+const SPOTS_ERROR = 'spots'
 
 function toggleInList(list, value) {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
-}
-
-function copyTimes(times) {
-  return times.length > 0 ? [...times] : ['']
 }
 
 function filledTimes(times) {
   return (times ?? []).filter(Boolean)
 }
 
-function dateErrorLabel(dateKey) {
+function copyTimes(times) {
+  const filled = filledTimes(times)
+  return filled.length > 0 ? [...filled] : ['']
+}
+
+/** "Sat 21 Nov". */
+function dayLabel(dateKey) {
   return formatDayTitle(dateKey).replace(',', '')
 }
 
-function missingTimesMessage(dateKeys) {
-  const labels = dateKeys.map(dateErrorLabel)
-  const dates = labels.join(', ')
-  const remove = labels.length === 1 ? 'that date' : 'those dates'
-  return `Add a time for ${dates}, or remove ${remove}.`
+/** "4 Feb". */
+function shortDate(dateKey) {
+  return formatDayTitle(dateKey).split(', ').pop()
 }
 
-function groupItemsByDate(items) {
-  const groups = []
-  const indexByKey = {}
-  for (const item of items) {
-    let index = indexByKey[item.dateKey]
-    if (index === undefined) {
-      index = groups.length
-      indexByKey[item.dateKey] = index
-      groups.push({ dateKey: item.dateKey, items: [] })
-    }
-    groups[index].items.push(item)
-  }
-  return groups
+/** "10:00 am" for an `HH:MM` start. */
+function clockLabel(time) {
+  return formatSessionTime(singaporeDateTime('2026-01-05', time))
+}
+
+function slotKey(dateKey, time) {
+  return `${dateKey} ${time}`
+}
+
+function sessionsLabel(count) {
+  return `${count} ${count === 1 ? 'session' : 'sessions'}`
+}
+
+function missingTimesMessage(dateKeys) {
+  const labels = dateKeys.map(dayLabel)
+  const remove = labels.length === 1 ? 'that date' : 'those dates'
+  return `Add a time for ${labels.join(', ')}, or remove ${remove}.`
 }
 
 function TimeFields({ times, onChangeTime, onRemoveTime, onAddTime }) {
@@ -82,67 +94,42 @@ function TimeFields({ times, onChangeTime, onRemoveTime, onAddTime }) {
           ) : null}
         </div>
       ))}
-      <button type="button" className="btn btn--ghost" onClick={onAddTime}>
-        + add time
+      <button type="button" className="add-dates__text-btn" onClick={onAddTime}>
+        + Add a time
       </button>
     </div>
   )
 }
 
-function PreviewSessionList({ items, skipped = false }) {
-  if (items.length === 0) return null
-
-  if (skipped) {
-    return (
-      <ul className="add-sessions__preview-list add-sessions__preview-list--skipped">
-        {items.map((item) => (
-          <li key={`skip-${item.dateKey}-${item.time}`}>
-            {formatBatchWhen(item.startsAt)} ({item.reason})
-          </li>
-        ))}
-      </ul>
-    )
-  }
-
-  return (
-    <div className="add-sessions__preview-groups">
-      {groupItemsByDate(items).map((group) => (
-        <div key={group.dateKey} className="add-sessions__preview-group">
-          <p className="add-sessions__preview-day">{formatSessionDay(group.items[0].startsAt)}</p>
-          <ul className="add-sessions__preview-list">
-            {group.items.map((item) => (
-              <li key={`${item.dateKey}-${item.time}`} className="add-sessions__preview-session">
-                {formatSessionTime(item.startsAt)}
-                {item.sharedWith?.length ? (
-                  <span className="add-sessions__shared">
-                    {' '}
-                    · shared with {item.sharedWith.join(', ')}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </div>
-  )
-}
-
+/**
+ * Add dates: which days, what time, then the sessions it makes, in one sheet.
+ * Full screen on a phone, a panel on a computer. One way out (×) and one main
+ * button, which names how many sessions it adds as the host picks.
+ */
 export default function AddSessionsForm({
   listing,
   existingSessions,
   otherListings = [],
   sessionTypes = [],
+  subtitle = '',
   onCancel,
   onCreated,
 }) {
+  const titleId = useId()
   const dateWindow = selectableDateWindow()
   const monthKeys = monthKeysInWindow()
   const usesListingDuration =
     Number.isInteger(listing.duration_mins) && listing.duration_mins >= 1
 
-  // A host who leaves (e.g. "change in listing settings") comes back to the same form.
+  // A host who leaves (e.g. to change spots) comes back to the same picks.
   const [restored] = useState(() => readSessionDraft(listing.id))
+  const [mode, setMode] = useState(() => {
+    if (restored?.mode) return restored.mode
+    if (restored && restored.weekdays.length === 0 && restored.selectedDateKeys.length > 0) {
+      return 'dates'
+    }
+    return 'weekly'
+  })
   const [monthKey, setMonthKey] = useState(() =>
     singaporeMonthKey(
       `${restored?.selectedDateKeys[0] ?? dateWindow.minDateKey}T12:00:00+08:00`,
@@ -150,14 +137,16 @@ export default function AddSessionsForm({
   )
   const [selectedDateKeys, setSelectedDateKeys] = useState(restored?.selectedDateKeys ?? [])
   const [weekdays, setWeekdays] = useState(restored?.weekdays ?? [])
-  const [everyWeeks, setEveryWeeks] = useState(restored?.everyWeeks ?? 1)
-  const [forWeeks, setForWeeks] = useState(restored?.forWeeks ?? 2)
-  const [times, setTimes] = useState(restored?.times ?? [''])
+  const [forWeeks, setForWeeks] = useState(restored?.forWeeks ?? 4)
+  const [times, setTimes] = useState(() => filledTimes(restored?.times).sort())
   const [timesByDate, setTimesByDate] = useState(restored?.timesByDate ?? {})
   const [perDateTimes, setPerDateTimes] = useState(restored?.perDateTimes ?? false)
+  const [removedSlots, setRemovedSlots] = useState(restored?.removedSlots ?? [])
   const [durationMins, setDurationMins] = useState(restored?.durationMins ?? '')
+  const [otherTimeOpen, setOtherTimeOpen] = useState(false)
+  const [otherTime, setOtherTime] = useState('')
+  const [showAll, setShowAll] = useState(false)
   const [error, setError] = useState('')
-  const [preview, setPreview] = useState(null)
   const [saving, setSaving] = useState(false)
   const [alsoListingIds, setAlsoListingIds] = useState(() => {
     const otherIds = new Set(otherListings.map((other) => other.id))
@@ -169,53 +158,102 @@ export default function AddSessionsForm({
   const [typeId, setTypeId] = useState(() => (sessionTypes.length === 1 ? sessionTypes[0].id : null))
   const chosenType = sessionTypes.find((type) => type.id === typeId) ?? null
   const dateRowRefs = useRef({})
+  const closeRef = useRef(null)
+  const listRef = useRef(null)
+  const addingRef = useRef(null)
+  const onCancelRef = useRef(onCancel)
+  const focusRemoveRef = useRef(null)
 
   const monthIndex = monthKeys.indexOf(monthKey)
 
   useEffect(() => {
+    onCancelRef.current = onCancel
+  })
+
+  // Once per opening: focus Close, keep the page still under the sheet, let
+  // Escape close it, and hand focus back to whatever opened it.
+  useEffect(() => {
+    const opener = document.activeElement
+    closeRef.current?.focus()
+    document.body.classList.add('add-dates-open')
+    function onKey(event) {
+      if (event.key === 'Escape') onCancelRef.current?.()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.body.classList.remove('add-dates-open')
+      document.removeEventListener('keydown', onKey)
+      if (opener && opener.isConnected && typeof opener.focus === 'function') opener.focus()
+    }
+  }, [])
+
+  useEffect(() => {
     writeSessionDraft(listing.id, {
+      mode,
       selectedDateKeys,
       weekdays,
-      everyWeeks,
+      everyWeeks: 1,
       forWeeks,
       times,
       timesByDate,
       perDateTimes,
+      removedSlots,
       durationMins,
       alsoListingIds,
     })
   }, [
     listing.id,
+    mode,
     selectedDateKeys,
     weekdays,
-    everyWeeks,
     forWeeks,
     times,
     timesByDate,
     perDateTimes,
+    removedSlots,
     durationMins,
     alsoListingIds,
   ])
-  const duration = usesListingDuration ? listing.duration_mins : parseInt(durationMins, 10)
 
-  const selectedLabel = useMemo(() => {
-    if (selectedDateKeys.length === 0) return 'No dates selected'
-    if (selectedDateKeys.length === 1) return '1 date selected'
-    return `${selectedDateKeys.length} dates selected`
-  }, [selectedDateKeys])
+  const parsedDuration = parseInt(durationMins, 10)
+  const duration = usesListingDuration ? listing.duration_mins : parsedDuration
+  const durationOk = usesListingDuration || (Number.isInteger(parsedDuration) && parsedDuration >= 1)
+  const spots = Number(listing.max_guests)
+  const spotsOk = Number.isInteger(spots) && spots >= 1
 
-  const countsByDate = useMemo(() => {
-    const counts = {}
-    if (perDateTimes) {
-      for (const key of selectedDateKeys) {
-        counts[key] = filledTimes(timesByDate[key]).length
-      }
-    } else {
-      const n = filledTimes(times).length
-      for (const key of selectedDateKeys) counts[key] = n
+  const timesMap = useMemo(() => {
+    const removed = new Set(removedSlots)
+    const map = {}
+    for (const dateKey of selectedDateKeys) {
+      const list = perDateTimes ? filledTimes(timesByDate[dateKey]) : times
+      const kept = [...new Set(list)].filter((time) => !removed.has(slotKey(dateKey, time))).sort()
+      if (kept.length > 0) map[dateKey] = kept
     }
-    return counts
-  }, [perDateTimes, selectedDateKeys, timesByDate, times])
+    return map
+  }, [selectedDateKeys, perDateTimes, timesByDate, times, removedSlots])
+
+  const startCount = useMemo(() => buildSessionStarts(timesMap).length, [timesMap])
+  const overLimit = startCount > SESSION_BATCH_MAX
+
+  const preview = useMemo(() => {
+    if (!durationOk || overLimit) return null
+    return previewSessionBatch({
+      timesByDate: timesMap,
+      durationMins: duration,
+      existingSessions,
+      listingId: listing.id,
+    })
+  }, [durationOk, overLimit, timesMap, duration, existingSessions, listing.id])
+
+  const accepted = useMemo(
+    () => [...(preview?.accepted ?? [])].sort((a, b) => a.startsAt - b.startsAt),
+    [preview],
+  )
+  const skipped = preview?.skipped ?? []
+  const sessionCount = overLimit ? startCount : accepted.length
+  const visibleRows =
+    showAll || accepted.length <= COLLAPSED_ROWS + 1 ? accepted : accepted.slice(0, COLLAPSED_ROWS)
+  const chipTimes = [...new Set([...PRESET_TIMES, ...times])].sort()
 
   useLayoutEffect(() => {
     if (!focusDateKey) return
@@ -226,13 +264,25 @@ export default function AddSessionsForm({
     setFocusDateKey(null)
   }, [focusDateKey, timesByDate, selectedDateKeys])
 
-  function applyQuickFill(nextWeekdays, nextEvery, nextFor) {
-    const dates = generateRecurringDates({
-      weekdays: nextWeekdays,
-      everyWeeks: nextEvery,
-      forWeeks: nextFor,
-    })
+  // After an × the row is gone: focus the next one, or the list's heading.
+  useLayoutEffect(() => {
+    const index = focusRemoveRef.current
+    if (index === null) return
+    focusRemoveRef.current = null
+    const buttons = listRef.current?.querySelectorAll('.add-dates__remove') ?? []
+    const next = buttons[Math.min(index, buttons.length - 1)]
+    if (next) next.focus()
+    else addingRef.current?.focus()
+  }, [accepted])
+
+  function edited() {
+    setError('')
+  }
+
+  function applyWeekly(nextWeekdays, nextWeeks) {
+    const dates = generateRecurringDates({ weekdays: nextWeekdays, everyWeeks: 1, forWeeks: nextWeeks })
     setSelectedDateKeys(dates)
+    setRemovedSlots([])
     if (perDateTimes) {
       setTimesByDate((prev) => {
         const next = {}
@@ -242,47 +292,46 @@ export default function AddSessionsForm({
         return next
       })
     }
-    if (dates[0]) {
-      setMonthKey(singaporeMonthKey(`${dates[0]}T12:00:00+08:00`))
-    }
+    if (dates[0]) setMonthKey(singaporeMonthKey(`${dates[0]}T12:00:00+08:00`))
   }
 
   function toggleWeekday(id) {
+    edited()
     const next = toggleInList(weekdays, id).sort((a, b) => a - b)
     setWeekdays(next)
-    if (next.length > 0) applyQuickFill(next, everyWeeks, forWeeks)
+    applyWeekly(next, forWeeks)
   }
 
-  function changeEveryWeeks(value) {
-    const next = Number(value) === 2 ? 2 : 1
-    setEveryWeeks(next)
-    if (weekdays.length > 0) applyQuickFill(weekdays, next, forWeeks)
-  }
-
-  function changeForWeeks(value) {
-    const next = Math.max(1, Math.min(12, parseInt(value, 10) || 1))
-    setForWeeks(next)
-    if (weekdays.length > 0) applyQuickFill(weekdays, everyWeeks, next)
+  function changeForWeeks(weeks) {
+    edited()
+    setForWeeks(weeks)
+    if (weekdays.length > 0) applyWeekly(weekdays, weeks)
   }
 
   function toggleDate(dateKey) {
     if (!isSelectableDateKey(dateKey)) return
-    setPreview(null)
+    edited()
     const isSelected = selectedDateKeys.includes(dateKey)
     if (perDateTimes && isSelected) {
       setFocusDateKey(dateKey)
       return
     }
-    setSelectedDateKeys((prev) => toggleInList(prev, dateKey).sort())
-    if (perDateTimes && !isSelected) {
+    if (isSelected) {
+      unpickDate(dateKey)
+      return
+    }
+    setSelectedDateKeys((prev) => [...prev, dateKey].sort())
+    setRemovedSlots((prev) => prev.filter((slot) => !slot.startsWith(`${dateKey} `)))
+    if (perDateTimes) {
       setTimesByDate((prev) => ({ ...prev, [dateKey]: copyTimes(times) }))
       setFocusDateKey(dateKey)
     }
   }
 
   function unpickDate(dateKey) {
-    setPreview(null)
+    edited()
     setSelectedDateKeys((prev) => prev.filter((key) => key !== dateKey))
+    setRemovedSlots((prev) => prev.filter((slot) => !slot.startsWith(`${dateKey} `)))
     setTimesByDate((prev) => {
       const next = { ...prev }
       delete next[dateKey]
@@ -290,15 +339,48 @@ export default function AddSessionsForm({
     })
   }
 
+  function removeSession(item, index) {
+    edited()
+    focusRemoveRef.current = index
+    const left = (timesMap[item.dateKey] ?? []).filter((time) => time !== item.time)
+    if (left.length === 0) {
+      unpickDate(item.dateKey)
+      return
+    }
+    if (perDateTimes) {
+      setTimesByDate((prev) => ({
+        ...prev,
+        [item.dateKey]: filledTimes(prev[item.dateKey]).filter((time) => time !== item.time),
+      }))
+    } else {
+      setRemovedSlots((prev) => [...prev, slotKey(item.dateKey, item.time)])
+    }
+  }
+
+  function toggleTime(time) {
+    edited()
+    if (times.includes(time)) {
+      setTimes((prev) => prev.filter((item) => item !== time))
+      return
+    }
+    setTimes((prev) => [...prev, time].sort())
+    setRemovedSlots((prev) => prev.filter((slot) => !slot.endsWith(` ${time}`)))
+  }
+
+  function addOtherTime() {
+    if (!/^\d{2}:\d{2}$/.test(otherTime)) return
+    if (!times.includes(otherTime)) toggleTime(otherTime)
+    setOtherTime('')
+    setOtherTimeOpen(false)
+  }
+
   function setPerDateMode(on) {
-    setPreview(null)
+    edited()
     if (on) {
       setTimesByDate((prev) => {
         const next = { ...prev }
         for (const key of selectedDateKeys) {
-          if (filledTimes(next[key]).length === 0) {
-            next[key] = copyTimes(times)
-          }
+          if (filledTimes(next[key]).length === 0) next[key] = copyTimes(timesMap[key] ?? times)
         }
         return next
       })
@@ -306,61 +388,38 @@ export default function AddSessionsForm({
       return
     }
     const firstKey = selectedDateKeys[0]
-    const firstTimes = firstKey ? timesByDate[firstKey] : times
-    setTimes(copyTimes(firstTimes ?? times))
+    const firstTimes = firstKey ? filledTimes(timesByDate[firstKey]) : []
+    setTimes((firstTimes.length > 0 ? [...new Set(firstTimes)] : times).sort())
+    setRemovedSlots([])
     setPerDateTimes(false)
   }
 
-  function changeSharedTime(index, value) {
-    setPreview(null)
-    setTimes((prev) => prev.map((item, itemIndex) => (itemIndex === index ? value : item)))
-  }
-
-  function removeSharedTime(index) {
-    setPreview(null)
-    setTimes((prev) => prev.filter((_, itemIndex) => itemIndex !== index))
-  }
-
-  function addSharedTime() {
-    setTimes((prev) => [...prev, ''])
-  }
-
   function changeDateTime(dateKey, index, value) {
-    setPreview(null)
+    edited()
     setTimesByDate((prev) => ({
       ...prev,
-      [dateKey]: (prev[dateKey] ?? ['']).map((item, itemIndex) =>
-        itemIndex === index ? value : item,
-      ),
+      [dateKey]: (prev[dateKey] ?? ['']).map((item, itemIndex) => (itemIndex === index ? value : item)),
     }))
   }
 
   function removeDateTime(dateKey, index) {
-    setPreview(null)
+    edited()
     setTimesByDate((prev) => {
-      const current = prev[dateKey] ?? ['']
-      const nextTimes = current.filter((_, itemIndex) => itemIndex !== index)
+      const nextTimes = (prev[dateKey] ?? ['']).filter((_, itemIndex) => itemIndex !== index)
       return { ...prev, [dateKey]: nextTimes.length > 0 ? nextTimes : [''] }
     })
   }
 
   function addDateTime(dateKey) {
-    setTimesByDate((prev) => ({
-      ...prev,
-      [dateKey]: [...(prev[dateKey] ?? ['']), ''],
-    }))
+    setTimesByDate((prev) => ({ ...prev, [dateKey]: [...(prev[dateKey] ?? ['']), ''] }))
   }
 
-  function review(event) {
-    event.preventDefault()
+  async function submit() {
     setError('')
-    setPreview(null)
-
     if (sessionTypes.length > 0 && !chosenType) {
       setError('Pick a session type for these dates.')
       return
     }
-
     if (perDateTimes) {
       const missing = selectedDateKeys.filter((key) => filledTimes(timesByDate[key]).length === 0)
       if (missing.length > 0) {
@@ -368,62 +427,30 @@ export default function AddSessionsForm({
         return
       }
     }
-
-    const map = perDateTimes
-      ? Object.fromEntries(
-          selectedDateKeys.map((key) => [key, filledTimes(timesByDate[key])]),
-        )
-      : timesByDateFromLists(selectedDateKeys, filledTimes(times))
-
-    if (selectedDateKeys.length === 0 || Object.keys(map).length === 0) {
-      setError('Please enter a date and time.')
+    if (!durationOk) {
+      setError('Add how long each session runs.')
+      return
+    }
+    if (!spotsOk) {
+      setError(SPOTS_ERROR)
+      return
+    }
+    if (overLimit) {
+      setError(`You can add up to ${SESSION_BATCH_MAX} sessions at a time. Pick fewer days or weeks.`)
+      return
+    }
+    if (!preview || accepted.length === 0) {
+      const allPast = skipped.length > 0 && skipped.every((item) => item.reason === 'in the past')
+      if (allPast) setError('Choose a time in the future.')
+      else if (skipped.length > 0) setError('None of these can be added. You can see why under You’re adding.')
+      else setError('Pick at least one day and a start time.')
       return
     }
 
-    if (!usesListingDuration && (Number.isNaN(duration) || duration < 1)) {
-      setError('Duration must be at least 1 minute.')
-      return
-    }
-
-    const spots = Number(listing.max_guests)
-    if (!Number.isInteger(spots) || spots < 1) {
-      setError('Set spots per session in listing settings first.')
-      return
-    }
-
-    const next = previewSessionBatch({
-      timesByDate: map,
-      durationMins: duration,
-      existingSessions,
-      listingId: listing.id,
-    })
-
-    if (!next.ok) {
-      setError(next.error)
-      return
-    }
-
-    if (next.accepted.length === 0 && next.skipped.length === 0) {
-      setError('Please enter a date and time.')
-      return
-    }
-
-    if (next.accepted.length === 0 && next.skipped.every((item) => item.reason === 'in the past')) {
-      setError('Choose a time in the future.')
-      return
-    }
-
-    setPreview(next)
-  }
-
-  async function confirm() {
-    if (!preview) return
-    const spots = Number(listing.max_guests)
     setSaving(true)
-    setError('')
     const result = await onCreated({
-      accepted: preview.accepted,
-      skipped: preview.skipped,
+      accepted,
+      skipped,
       spots,
       duration,
       usesListingDuration,
@@ -431,258 +458,446 @@ export default function AddSessionsForm({
       typeId: chosenType?.id ?? null,
     })
     setSaving(false)
-    if (result?.error) {
-      setError(result.error)
-    }
+    if (result?.error) setError(result.error)
   }
 
-  return (
-    <form onSubmit={review} className="dashboard-card__form form add-sessions">
-      {sessionTypes.length > 0 ? (
-        <fieldset className="add-sessions__types">
-          <legend className="add-sessions__legend">Session type</legend>
-          <div className="choice-chips">
-            {sessionTypes.map((type) => (
-              <label
-                key={type.id}
-                className={`choice-chip${typeId === type.id ? ' choice-chip--on' : ''}`}
-              >
-                <input
-                  type="radio"
-                  name={`session-type-${listing.id}`}
-                  checked={typeId === type.id}
-                  onChange={() => {
-                    setTypeId(type.id)
-                    setPreview(null)
-                  }}
-                  className="visually-hidden"
-                />
-                {type.name}
-              </label>
-            ))}
+  function sessionEnd(item) {
+    return new Date(item.startsAt.getTime() + duration * 60_000)
+  }
+
+  let barNote = 'Pick days and a start time'
+  if (overLimit) barNote = `Up to ${SESSION_BATCH_MAX} at a time`
+  else if (sessionCount > 0 && spotsOk) {
+    const spotsTotal = sessionCount * spots
+    barNote = `${spotsTotal} ${spotsTotal === 1 ? 'spot' : 'spots'} for guests to book`
+    if (alsoListingIds.length > 0) barNote += ` · on ${alsoListingIds.length + 1} listings`
+  } else if (sessionCount > 0) barNote = ''
+
+  const oneOther = otherListings.length === 1
+
+  return createPortal(
+    <div
+      className="add-dates"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onCancel()
+      }}
+    >
+      <form
+        className="add-dates__panel add-sessions"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onSubmit={(event) => event.preventDefault()}
+      >
+        <div className="add-dates__head">
+          <button
+            ref={closeRef}
+            type="button"
+            className="add-dates__close"
+            aria-label="Close"
+            onClick={onCancel}
+          >
+            <Icon name="close" size={22} />
+          </button>
+          <div className="add-dates__heading">
+            <h2 id={titleId} className="add-dates__title">
+              Add dates
+            </h2>
+            {subtitle ? <p className="add-dates__sub">{subtitle}</p> : null}
           </div>
-          <p className="hint">Every date you add now gets this type. Add the other type in a second go.</p>
-        </fieldset>
-      ) : null}
-
-      <fieldset className="add-sessions__quickfill">
-        <legend className="add-sessions__legend">Quick fill</legend>
-        <p className="hint">
-          Every weekday, every 1 or 2 weeks. This only pre-selects dates — you can still
-          untick any.
-        </p>
-        <div className="add-sessions__weekdays" role="group" aria-label="Weekdays">
-          {WEEKDAYS.map((day) => (
-            <button
-              key={day.id}
-              type="button"
-              className={
-                weekdays.includes(day.id)
-                  ? 'add-sessions__chip add-sessions__chip--on'
-                  : 'add-sessions__chip'
-              }
-              aria-pressed={weekdays.includes(day.id)}
-              onClick={() => toggleWeekday(day.id)}
-            >
-              {day.label}
-            </button>
-          ))}
         </div>
-        <div className="form__row add-sessions__repeat">
-          <label className="label">
-            Every
-            <select
-              className="input"
-              value={everyWeeks}
-              onChange={(event) => changeEveryWeeks(event.target.value)}
-            >
-              <option value={1}>1 week</option>
-              <option value={2}>2 weeks</option>
-            </select>
-          </label>
-          <label className="label">
-            For
-            <select
-              className="input"
-              value={forWeeks}
-              onChange={(event) => changeForWeeks(event.target.value)}
-            >
-              {Array.from({ length: 12 }, (_, index) => index + 1).map((weeks) => (
-                <option key={weeks} value={weeks}>
-                  {weeks} {weeks === 1 ? 'week' : 'weeks'}
-                </option>
+
+        <div className="add-dates__body">
+          {sessionTypes.length > 0 ? (
+            <fieldset className="add-dates__section">
+              <legend className="add-dates__h">Which type?</legend>
+              <div className="choice-chips">
+                {sessionTypes.map((type) => (
+                  <label
+                    key={type.id}
+                    className={`choice-chip${typeId === type.id ? ' choice-chip--on' : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name={`session-type-${listing.id}`}
+                      checked={typeId === type.id}
+                      onChange={() => {
+                        setTypeId(type.id)
+                        edited()
+                      }}
+                      className="visually-hidden"
+                    />
+                    {type.name}
+                  </label>
+                ))}
+              </div>
+              <p className="add-dates__hint">
+                Every date you add now gets this type. Add the other type in a second go.
+              </p>
+            </fieldset>
+          ) : null}
+
+          <section className="add-dates__section" aria-labelledby={`${titleId}-days`}>
+            <h3 id={`${titleId}-days`} className="add-dates__h">
+              Which days?
+            </h3>
+            <div className="add-dates__switch" role="group" aria-labelledby={`${titleId}-days`}>
+              {[
+                ['weekly', 'Every week'],
+                ['dates', 'Pick dates'],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`add-dates__seg${mode === id ? ' add-dates__seg--on' : ''}`}
+                  aria-pressed={mode === id}
+                  onClick={() => setMode(id)}
+                >
+                  {label}
+                </button>
               ))}
-            </select>
-          </label>
-        </div>
-      </fieldset>
+            </div>
 
-      <p className="hint">{selectedLabel}. Dates from tomorrow up to 80 days ahead.</p>
+            {mode === 'weekly' ? (
+              <>
+                <div className="add-dates__days" role="group" aria-label="Days of the week">
+                  {WEEKDAYS.map((day) => (
+                    <button
+                      key={day.id}
+                      type="button"
+                      className={`add-dates__day${weekdays.includes(day.id) ? ' add-dates__day--on' : ''}`}
+                      aria-pressed={weekdays.includes(day.id)}
+                      onClick={() => toggleWeekday(day.id)}
+                    >
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="add-dates__weeks">
+                  <span id={`${titleId}-weeks`} className="add-dates__weeks-label">
+                    For the next
+                  </span>
+                  <div className="add-dates__pills" role="group" aria-labelledby={`${titleId}-weeks`}>
+                    {WEEK_CHOICES.map((weeks) => (
+                      <button
+                        key={weeks}
+                        type="button"
+                        className={`add-dates__pill${forWeeks === weeks ? ' add-dates__pill--on' : ''}`}
+                        aria-pressed={forWeeks === weeks}
+                        aria-label={`${weeks} weeks`}
+                        onClick={() => changeForWeeks(weeks)}
+                      >
+                        {weeks} wks
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="add-dates__hint">
+                  Starting {dayLabel(dateWindow.minDateKey)}. You can remove single dates below.
+                </p>
+              </>
+            ) : (
+              <>
+                <DateMultiSelectCalendar
+                  monthKey={monthKey}
+                  selectedDateKeys={selectedDateKeys}
+                  minDateKey={dateWindow.minDateKey}
+                  maxDateKey={dateWindow.maxDateKey}
+                  todayKey={dateWindow.todayKey}
+                  canGoPrev={monthIndex > 0}
+                  canGoNext={monthIndex >= 0 && monthIndex < monthKeys.length - 1}
+                  onToggleDate={toggleDate}
+                  onPrevMonth={() => setMonthKey(monthKeys[monthIndex - 1])}
+                  onNextMonth={() => setMonthKey(monthKeys[monthIndex + 1])}
+                />
+                <p className="add-dates__hint">
+                  Tap dates to add them. Bookable from tomorrow to {shortDate(dateWindow.maxDateKey)}.
+                </p>
+              </>
+            )}
+          </section>
 
-      <DateMultiSelectCalendar
-        monthKey={monthKey}
-        selectedDateKeys={selectedDateKeys}
-        minDateKey={dateWindow.minDateKey}
-        maxDateKey={dateWindow.maxDateKey}
-        todayKey={dateWindow.todayKey}
-        countsByDate={countsByDate}
-        canGoPrev={monthIndex > 0}
-        canGoNext={monthIndex >= 0 && monthIndex < monthKeys.length - 1}
-        onToggleDate={toggleDate}
-        onPrevMonth={() => setMonthKey(monthKeys[monthIndex - 1])}
-        onNextMonth={() => setMonthKey(monthKeys[monthIndex + 1])}
-      />
+          <section className="add-dates__section" aria-labelledby={`${titleId}-time`}>
+            <h3 id={`${titleId}-time`} className="add-dates__h">
+              What time?
+            </h3>
+            {usesListingDuration ? (
+              <p className="add-dates__hint add-dates__hint--top">
+                Each session runs {formatDuration(listing.duration_mins)}. Pick one or more start
+                times.
+              </p>
+            ) : (
+              <>
+                <label className="label add-dates__duration">
+                  How long is each session? (mins)
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={durationMins}
+                    onChange={(event) => {
+                      setDurationMins(event.target.value)
+                      edited()
+                    }}
+                    min="1"
+                    placeholder="60"
+                    className="input"
+                  />
+                </label>
+                <p className="add-dates__hint add-dates__hint--top">Pick one or more start times.</p>
+              </>
+            )}
 
-      <label className="toggle-card add-sessions__per-date">
-        <input
-          type="checkbox"
-          checked={perDateTimes}
-          onChange={(event) => setPerDateMode(event.target.checked)}
-        />
-        <span className="toggle-card__copy">
-          <span className="toggle-card__title">Set times per date</span>
-          <span className="toggle-card__hint">
-            {perDateTimes ? 'Each picked date has its own times.' : 'Same times for every date.'}
-          </span>
-        </span>
-      </label>
-
-      {perDateTimes ? (
-        <div className="add-sessions__per-date-list">
-          {selectedDateKeys.map((dateKey) => {
-            const dateTimes = timesByDate[dateKey] ?? ['']
-            const dateTitle = formatDayTitle(dateKey)
-            return (
-              <div
-                key={dateKey}
-                className="add-sessions__date-times"
-                role="group"
-                aria-label={dateTitle}
-                ref={(el) => {
-                  if (el) dateRowRefs.current[dateKey] = el
-                  else delete dateRowRefs.current[dateKey]
-                }}
-              >
-                <div className="add-sessions__date-heading-row">
-                  <p className="add-sessions__date-heading">{dateTitle}</p>
+            {perDateTimes ? (
+              <div className="add-sessions__per-date-list">
+                {selectedDateKeys.length === 0 ? (
+                  <p className="add-dates__hint">Pick some days first.</p>
+                ) : null}
+                {selectedDateKeys.map((dateKey) => {
+                  const dateTitle = formatDayTitle(dateKey)
+                  return (
+                    <div
+                      key={dateKey}
+                      className="add-sessions__date-times"
+                      role="group"
+                      aria-label={dateTitle}
+                      ref={(el) => {
+                        if (el) dateRowRefs.current[dateKey] = el
+                        else delete dateRowRefs.current[dateKey]
+                      }}
+                    >
+                      <div className="add-sessions__date-heading-row">
+                        <p className="add-sessions__date-heading">{dateTitle}</p>
+                        <button
+                          type="button"
+                          className="add-dates__text-btn"
+                          onClick={() => unpickDate(dateKey)}
+                        >
+                          Remove date
+                        </button>
+                      </div>
+                      <TimeFields
+                        times={timesByDate[dateKey] ?? ['']}
+                        onChangeTime={(index, value) => changeDateTime(dateKey, index, value)}
+                        onRemoveTime={(index) => removeDateTime(dateKey, index)}
+                        onAddTime={() => addDateTime(dateKey)}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="add-dates__times" role="group" aria-label="Start times">
+                {chipTimes.map((time) => {
+                  const on = times.includes(time)
+                  return (
+                    <button
+                      key={time}
+                      type="button"
+                      className={`add-dates__time${on ? ' add-dates__time--on' : ''}`}
+                      aria-pressed={on}
+                      onClick={() => toggleTime(time)}
+                    >
+                      {clockLabel(time)}
+                      {on ? <Icon name="check" size={16} strokeWidth={2.4} /> : null}
+                    </button>
+                  )
+                })}
+                {otherTimeOpen ? (
+                  <span className="add-dates__other">
+                    <input
+                      type="time"
+                      className="input add-dates__other-input"
+                      aria-label="Other start time"
+                      value={otherTime}
+                      autoFocus
+                      onChange={(event) => setOtherTime(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          addOtherTime()
+                        }
+                        if (event.key === 'Escape') {
+                          event.stopPropagation()
+                          setOtherTimeOpen(false)
+                        }
+                      }}
+                    />
+                    <button type="button" className="add-dates__other-add" onClick={addOtherTime}>
+                      Add
+                    </button>
+                  </span>
+                ) : (
                   <button
                     type="button"
-                    className="btn btn--ghost add-sessions__remove-date"
-                    onClick={() => unpickDate(dateKey)}
+                    className="add-dates__time add-dates__time--other"
+                    onClick={() => setOtherTimeOpen(true)}
                   >
-                    Remove date
+                    <Icon name="plus" size={16} strokeWidth={2.2} />
+                    Other time
                   </button>
-                </div>
-                <TimeFields
-                  times={dateTimes}
-                  onChangeTime={(index, value) => changeDateTime(dateKey, index, value)}
-                  onRemoveTime={(index) => removeDateTime(dateKey, index)}
-                  onAddTime={() => addDateTime(dateKey)}
-                />
+                )}
               </div>
-            )
-          })}
-        </div>
-      ) : (
-        <TimeFields
-          times={times}
-          onChangeTime={changeSharedTime}
-          onRemoveTime={removeSharedTime}
-          onAddTime={addSharedTime}
-        />
-      )}
+            )}
 
-      {usesListingDuration ? (
-        <p className="hint">Each session is {formatDuration(listing.duration_mins)}.</p>
-      ) : (
-        <label className="label">
-          Duration (mins)
-          <input
-            type="number"
-            value={durationMins}
-            onChange={(event) => setDurationMins(event.target.value)}
-            min="1"
-            placeholder="60"
-            required
-            className="input"
-          />
-        </label>
-      )}
+            <button
+              type="button"
+              className="add-dates__link"
+              onClick={() => setPerDateMode(!perDateTimes)}
+            >
+              {perDateTimes ? 'Use the same times every day' : 'Different times on different days?'}
+            </button>
+          </section>
 
-      <p className="hint">
-        {Number.isInteger(Number(listing.max_guests)) && Number(listing.max_guests) >= 1
-          ? `${listing.max_guests} spots per session · `
-          : ''}
-        <Link to={`/edit-listing/${listing.id}`}>change in listing settings</Link>
-      </p>
+          {otherListings.length > 0 ? (
+            <div className="add-dates__also">
+              {oneOther ? null : <p className="add-dates__also-title">Also offer these times on</p>}
+              {otherListings.map((other) => (
+                <label key={other.id} className="add-dates__also-row">
+                  <span className="add-dates__also-name">
+                    {oneOther ? `Also offer these times on ${other.title}` : other.title}
+                  </span>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    className="switch"
+                    checked={alsoListingIds.includes(other.id)}
+                    onChange={() => {
+                      setAlsoListingIds((ids) =>
+                        ids.includes(other.id) ? ids.filter((id) => id !== other.id) : [...ids, other.id],
+                      )
+                      edited()
+                    }}
+                  />
+                </label>
+              ))}
+              <p className="add-dates__hint">
+                {oneOther
+                  ? 'Whichever gets booked first takes the slot. The other closes, and reopens if that booking is cancelled.'
+                  : 'Whichever gets booked first takes the slot. The others close, and reopen if that booking is cancelled.'}
+              </p>
+            </div>
+          ) : null}
 
-      {otherListings.length > 0 ? (
-        <fieldset className="add-sessions__also">
-          <legend className="add-sessions__legend">Also offer these times on</legend>
-          <p className="hint">
-            The first booking takes the time. Your other listings at that time close automatically,
-            and reopen if that booking is cancelled.
-          </p>
-          {otherListings.map((other) => (
-            <label key={other.id} className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={alsoListingIds.includes(other.id)}
-                onChange={() => {
-                  setAlsoListingIds((ids) =>
-                    ids.includes(other.id) ? ids.filter((id) => id !== other.id) : [...ids, other.id]
+          <section className="add-dates__section" aria-labelledby={`${titleId}-adding`}>
+            <div className="add-dates__adding-head">
+              <h3
+                id={`${titleId}-adding`}
+                ref={addingRef}
+                tabIndex={-1}
+                className="add-dates__h"
+              >
+                You&apos;re adding
+              </h3>
+              {sessionCount > 0 ? (
+                <span className="add-dates__count">{sessionsLabel(sessionCount)}</span>
+              ) : null}
+            </div>
+
+            {overLimit ? (
+              <p className="add-dates__empty add-dates__empty--warn" role="status">
+                That&apos;s {startCount} sessions. You can add up to {SESSION_BATCH_MAX} at a time, so
+                pick fewer days or weeks.
+              </p>
+            ) : !durationOk ? (
+              <p className="add-dates__empty">Add how long each session runs to see them here.</p>
+            ) : accepted.length === 0 ? (
+              <p className="add-dates__empty">Pick days and a start time to see your sessions here.</p>
+            ) : (
+              <ul className="add-dates__list" ref={listRef}>
+                {visibleRows.map((item, index) => {
+                  const day = dayLabel(item.dateKey)
+                  const start = formatSessionTime(item.startsAt)
+                  return (
+                    <li key={`${item.dateKey}-${item.time}`} className="add-dates__row">
+                      <span className="add-dates__row-day">{day}</span>
+                      <span className="add-dates__row-time">
+                        {start} – {formatSessionTime(sessionEnd(item))}
+                      </span>
+                      <button
+                        type="button"
+                        className="add-dates__remove"
+                        aria-label={`Remove ${day}, ${start}`}
+                        onClick={() => removeSession(item, index)}
+                      >
+                        <Icon name="close" size={18} />
+                      </button>
+                      {item.sharedWith?.length ? (
+                        <span className="add-dates__row-note">
+                          Shared with {item.sharedWith.join(', ')}
+                        </span>
+                      ) : null}
+                    </li>
                   )
-                  setPreview(null)
-                }}
-              />
-              {other.title}
-            </label>
-          ))}
-        </fieldset>
-      ) : null}
+                })}
+                {accepted.length > COLLAPSED_ROWS + 1 ? (
+                  <li className="add-dates__row add-dates__row--more">
+                    <button
+                      type="button"
+                      className="add-dates__link"
+                      onClick={() => setShowAll((value) => !value)}
+                    >
+                      {showAll ? 'Show fewer' : `See all ${sessionsLabel(accepted.length)}`}
+                    </button>
+                  </li>
+                ) : null}
+              </ul>
+            )}
 
-      {error ? <p className="error-message">{error}</p> : null}
-
-      {preview ? (
-        <div className="add-sessions__preview" role="status">
-          <p className="add-sessions__preview-title">
-            This creates {preview.accepted.length}{' '}
-            {preview.accepted.length === 1 ? 'session' : 'sessions'}
-            {chosenType ? ` of ${chosenType.name}` : ''}
-            {alsoListingIds.length > 0
-              ? ` on each of ${alsoListingIds.length + 1} listings`
-              : ''}
-            {preview.skipped.length > 0
-              ? `. ${preview.skipped.length} will be skipped.`
-              : '.'}
-          </p>
-          <PreviewSessionList items={preview.accepted} />
-          <PreviewSessionList items={preview.skipped} skipped />
+            {skipped.length > 0 && !overLimit ? (
+              <div className="add-dates__skipped">
+                <p className="add-dates__skipped-title">
+                  {skipped.length === 1 ? '1 won’t be added' : `${skipped.length} won’t be added`}
+                </p>
+                <ul>
+                  {skipped.map((item) => (
+                    <li key={`skip-${item.dateKey}-${item.time}`}>
+                      {dayLabel(item.dateKey)}, {formatSessionTime(item.startsAt)}: {item.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </section>
         </div>
-      ) : null}
 
-      <div className="add-sessions__actions">
-        {preview ? (
-          <Button
-            type="button"
-            variant="primary"
-            disabled={preview.accepted.length === 0}
-            loading={saving}
-            loadingLabel="Creating"
-            onClick={confirm}
-          >
-            Create sessions
-          </Button>
-        ) : (
-          <Button type="submit" variant="primary">
-            Review sessions
-          </Button>
-        )}
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-      <p className="hint">At most {SESSION_BATCH_MAX} sessions per batch.</p>
-    </form>
+        <div className="add-dates__bar">
+          {error ? (
+            <p className="error-message add-dates__error" role="alert">
+              {error === SPOTS_ERROR ? (
+                <>
+                  Set spots per session in listing settings first.{' '}
+                  <Link to={`/edit-listing/${listing.id}?section=price`}>Change spots</Link>
+                </>
+              ) : (
+                error
+              )}
+            </p>
+          ) : null}
+          <div className="add-dates__bar-row">
+            <div className="add-dates__total" aria-live="polite">
+              <p className="add-dates__total-count">
+                {sessionCount > 0 ? sessionsLabel(sessionCount) : 'No sessions yet'}
+              </p>
+              {barNote ? (
+                <p className={`add-dates__total-note${overLimit ? ' add-dates__total-note--warn' : ''}`}>
+                  {barNote}
+                </p>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              variant="primary"
+              className="add-dates__submit"
+              loading={saving}
+              loadingLabel="Adding"
+              onClick={submit}
+            >
+              {sessionCount > 0 && !overLimit ? `Add ${sessionsLabel(sessionCount)}` : 'Add sessions'}
+            </Button>
+          </div>
+        </div>
+      </form>
+    </div>,
+    document.body,
   )
 }
