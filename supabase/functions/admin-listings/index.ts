@@ -67,6 +67,9 @@ async function listQueue() {
       'id, title, description, category, area, price_per_person, duration_mins, photo_urls, whats_provided, what_to_bring, review_status, review_note, review_requested_at, users!host_id (id, full_name, display_name, email, verification_method, verified_name, teaching_plan)',
     )
     .in('review_status', ['pending', 'changes_requested'])
+    // delete_listing only sets is_active = false, so a listing the host
+    // deleted keeps its review_status. Leave those out of the queue.
+    .eq('is_active', true)
     .order('review_requested_at', { ascending: true, nullsFirst: true })
     .limit(100)
   if (error) return jsonResponse({ error: error.message }, 500)
@@ -142,10 +145,13 @@ async function review(reviewerId: string, body: Record<string, unknown>) {
   const admin = adminClient()
   const { data: listing } = await admin
     .from('listings')
-    .select('id, title, review_status, users!host_id (full_name, display_name, email)')
+    .select('id, title, review_status, is_active, users!host_id (full_name, display_name, email)')
     .eq('id', listingId)
     .maybeSingle()
   if (!listing) return jsonResponse({ error: 'Listing not found' }, 404)
+  if (listing.is_active === false) {
+    return jsonResponse({ error: 'The host has deleted this listing.' }, 409)
+  }
 
   // A second click on the same decision is a no-op, and sends no second email.
   if (listing.review_status === prepared.decision && prepared.decision === 'approved') {
