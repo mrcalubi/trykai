@@ -75,7 +75,15 @@ checks(migration, what, applied) as (
     ('00053', 'day_one_guests table', to_regclass('public.day_one_guests') is not null),
     ('00054', 'users.marketing_opt_in', exists (select 1 from c where table_name = 'users' and column_name = 'marketing_opt_in')),
     ('00055', 'review_replies table', to_regclass('public.review_replies') is not null),
-    ('00056', 'sessions.type_id', exists (select 1 from c where table_name = 'sessions' and column_name = 'type_id'))
+    ('00056', 'sessions.type_id', exists (select 1 from c where table_name = 'sessions' and column_name = 'type_id')),
+    ('00057', 'add_listing_session refuses a repeat time', exists (
+      select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public'
+        and p.proname = 'add_listing_session'
+        and pg_get_functiondef(p.oid) like '%already on%'
+    ))
 )
 select migration, case when applied then 'applied' else 'MISSING' end as status, what
 from checks

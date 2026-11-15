@@ -992,11 +992,6 @@ export default function AddSessionsForm({
                         >
                           <Icon name="close" size={18} />
                         </button>
-                        {item.mergeInto ? (
-                          <span className="add-dates__row-note">
-                            Already on: adds {spotsOk ? `${spots} more ${spots === 1 ? 'spot' : 'spots'}` : 'more spots'}
-                          </span>
-                        ) : null}
                         {item.sharedWith?.length ? (
                           <span className="add-dates__row-note">
                             Shared with {item.sharedWith.join(', ')}
