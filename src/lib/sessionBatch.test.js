@@ -21,6 +21,7 @@ import {
   skipReasonFromRpcMessage,
   timesByDateFromLists,
   SKIP_BOOKED,
+  classClashReason,
 } from './sessionBatch'
 
 const NOW = Date.parse('2026-10-17T04:00:00.000Z') // Sat 17 Oct 2026, 12:00 in Singapore
@@ -364,5 +365,62 @@ describe('previewSessionBatch with shared availability (listingId)', () => {
   it('does not mark a free time as shared', () => {
     const result = previewSessionBatch({ ...base, listingId: 'l-1', existingSessions: [] })
     expect(result.accepted[0].sharedWith).toBeUndefined()
+  })
+})
+
+describe('previewSessionBatch with classes', () => {
+  const durationMins = 90
+  const own = (overrides) => ({
+    id: 'existing',
+    listing_id: 'listing-1',
+    starts_at: '2026-10-18T02:00:00.000Z', // Sun 18 Oct, 10:00 in Singapore
+    duration_mins: 90,
+    status: 'open',
+    type_id: 't2',
+    bookings: [],
+    ...overrides,
+  })
+  const preview = (existing, options = {}) =>
+    previewSessionBatch({
+      timesByDate: { '2026-10-18': ['10:00'] },
+      durationMins,
+      existingSessions: [existing],
+      listingId: 'listing-1',
+      classNameById: { t1: 'Hand-tied bouquet', t2: 'Table centrepiece' },
+      now: NOW,
+      ...options,
+    })
+
+  it('adds spots to the same class at the same start and length', () => {
+    const result = preview(own(), { typeId: 't2' })
+    expect(result.accepted).toHaveLength(1)
+    expect(result.accepted[0].mergeInto).toBe('existing')
+    expect(result.skipped).toHaveLength(0)
+  })
+
+  it('adds spots on a listing without classes too, even when that date is booked', () => {
+    const booked = own({ type_id: null, bookings: [{ status: 'confirmed' }] })
+    const result = preview(booked)
+    expect(result.accepted[0].mergeInto).toBe('existing')
+  })
+
+  it('skips another class at that time, and names it', () => {
+    const result = preview(own(), { typeId: 't1' })
+    expect(result.accepted).toHaveLength(0)
+    expect(result.skipped[0]).toMatchObject({
+      reason: classClashReason('Table centrepiece'),
+      otherClass: 'Table centrepiece',
+    })
+    expect(classClashReason('Table centrepiece')).toBe('Table centrepiece runs then')
+  })
+
+  it('still skips an overlap that does not start at the same time', () => {
+    const result = preview(own({ starts_at: '2026-10-18T01:30:00.000Z' }), { typeId: 't2' })
+    expect(result.skipped[0].reason).toBe(SKIP_EXISTING)
+  })
+
+  it('does not add spots to a different length or a held session', () => {
+    expect(preview(own({ duration_mins: 60 }), { typeId: 't2' }).skipped[0].reason).toBe(SKIP_EXISTING)
+    expect(preview(own({ status: 'held' }), { typeId: 't2' }).skipped[0].reason).toBe(SKIP_EXISTING)
   })
 })

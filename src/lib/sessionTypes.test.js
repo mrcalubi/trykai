@@ -15,6 +15,9 @@ import {
   sessionTypeNamesById,
   sessionsOfType,
   typesByListing,
+  classDates,
+  createSessionType,
+  datesLabel,
 } from './sessionTypes'
 
 vi.mock('./supabase')
@@ -64,7 +67,7 @@ describe('session type helpers', () => {
       photo: { id: 'p', remoteUrl: null, file: 'a.jpg:3:9' },
     })
     expect(sessionTypeFieldHints([emptySessionType({ name: ' ' }), emptySessionType({ name: 'B' })])).toEqual({
-      'type-0-name': 'Give this type a name.',
+      'type-0-name': 'Give this class a name.',
     })
     expect(sessionTypeFieldHints(null)).toEqual({})
     expect(emptySessionType().key).toBeTruthy()
@@ -205,5 +208,37 @@ describe('session type reads and writes', () => {
       },
     })
     expect(result.error).toBeInstanceOf(Error)
+  })
+})
+
+describe('classes', () => {
+  it('counts upcoming dates of a class and finds the next', () => {
+    const now = Date.parse('2026-11-16T00:00:00Z')
+    const sessions = [
+      { id: 'past', type_id: 't1', starts_at: '2026-11-10T02:00:00Z' },
+      { id: 'later', type_id: 't1', starts_at: '2026-11-28T02:00:00Z' },
+      { id: 'sooner', type_id: 't1', starts_at: '2026-11-21T02:00:00Z' },
+      { id: 'other', type_id: 't2', starts_at: '2026-11-20T02:00:00Z' },
+    ]
+    expect(classDates(sessions, 't1', now)).toEqual({ count: 2, next: sessions[2] })
+    expect(classDates(sessions, 't3', now)).toEqual({ count: 0, next: null })
+    expect(datesLabel(1)).toBe('1 date')
+    expect(datesLabel(3)).toBe('3 dates')
+  })
+
+  it('creates a class from Add dates with a trimmed name and description', async () => {
+    supabase.__on('listing_session_types', 'insert', {
+      data: { id: 'new', listing_id: 'listing-1', name: 'Wreath', description: '', position: 2, is_active: true },
+      error: null,
+    })
+    const { row, error } = await createSessionType(supabase, 'listing-1', { name: '  Wreath ', description: '  ' }, 2)
+    expect(error).toBeNull()
+    expect(row.id).toBe('new')
+    expect(supabase.__lastCall('listing_session_types', 'insert').payload).toEqual({
+      listing_id: 'listing-1',
+      name: 'Wreath',
+      description: '',
+      position: 2,
+    })
   })
 })

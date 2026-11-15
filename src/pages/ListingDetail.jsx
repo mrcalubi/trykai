@@ -63,6 +63,8 @@ import Icon from '../components/ui/Icon'
 import { formatCents } from '../lib/cancellationPolicy'
 import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
+import { ClassCards, ClassDateList } from '../components/ListingClasses'
+import { sessionDayLabel, sessionTimeRange } from '../lib/hostSessions'
 import { usePageTitle } from '../lib/pageTitle'
 import { MOSAIC_VISIBLE_PHOTOS } from '../lib/listingPhotos'
 import { hostRatingFromRpc } from '../lib/twoWayReviews'
@@ -215,6 +217,10 @@ export default function ListingDetail() {
   const [listingAddons, setListingAddons] = useState([])
   const [sessionTypes, setSessionTypes] = useState({ active: [], byId: {} })
   const [typeFilter, setTypeFilter] = useState(null)
+  // A listing with classes lists every upcoming date instead of a month grid.
+  const [classSessions, setClassSessions] = useState(null)
+  const [pickedSessionId, setPickedSessionId] = useState(null)
+  const hasClasses = sessionTypes.active.length > 0
   const [addonsAvailable, setAddonsAvailable] = useState(false)
   const [addonQuantities, setAddonQuantities] = useState({})
   const [addonNote, setAddonNote] = useState('')
@@ -392,6 +398,22 @@ export default function ListingDetail() {
     fetchMonth()
   }, [id, visibleMonth])
 
+  useEffect(() => {
+    if (!hasClasses) return undefined
+    let cancelled = false
+    void withIssuedAtRetry(() =>
+      upcomingSessions(id, 'id, starts_at, duration_mins, spots_remaining, type_id')
+        .order('starts_at', { ascending: true })
+        .limit(200)
+    ).then(({ data, error: fetchError }) => {
+      if (cancelled) return
+      setClassSessions(fetchError ? [] : (data ?? []))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [id, hasClasses])
+
   // On phones checkout covers the screen, so the page behind it must not scroll.
   useEffect(() => {
     if (!checkoutSessionId) return undefined
@@ -515,7 +537,9 @@ export default function ListingDetail() {
       return
     }
 
-    const chosen = (monthSessions ?? []).find((row) => row.id === sessionId)
+    const chosen =
+      (monthSessions ?? []).find((row) => row.id === sessionId) ??
+      (classSessions ?? []).find((row) => row.id === sessionId)
     if (chosen && isBookingClosed(chosen.starts_at, listing?.booking_cutoff_hours)) {
       setPaymentError(bookingClosedMessage(listing?.booking_cutoff_hours))
       return
@@ -556,6 +580,8 @@ export default function ListingDetail() {
 
   function findCachedSession(sessionId) {
     if (!sessionId) return null
+    const fromList = (classSessions ?? []).find((row) => row.id === sessionId)
+    if (fromList) return fromList
     for (const rows of Object.values(sessionsByMonth)) {
       const found = rows?.find((row) => row.id === sessionId)
       if (found) return found
@@ -694,7 +720,17 @@ export default function ListingDetail() {
     ? selectedDateKey
     : (Object.keys(sessionsByDay).sort()[0] ?? null)
   const daySessions = activeDateKey ? sessionsByDay[activeDateKey] : []
-  const checkoutSession = daySessions.find((session) => session.id === checkoutSessionId) ?? null
+  const checkoutSession =
+    daySessions.find((session) => session.id === checkoutSessionId) ??
+    (classSessions ?? []).find((session) => session.id === checkoutSessionId) ??
+    null
+  const pickedSession = (classSessions ?? []).find((session) => session.id === pickedSessionId) ?? null
+  const pickedClassName = sessionTypes.byId[pickedSession?.type_id]?.name ?? ''
+
+  function filterClass(nextId) {
+    setTypeFilter(nextId)
+    if (nextId && pickedSession && pickedSession.type_id !== nextId) setPickedSessionId(null)
+  }
   const checkoutTypeName = sessionTypes.byId[checkoutSession?.type_id]?.name ?? ''
   const paynowBlocked =
     payNowBlockedByServer || isPayNowTooFarAhead(checkoutSession?.starts_at)
@@ -1218,41 +1254,18 @@ export default function ListingDetail() {
             <p className="detail-description">{listing.description}</p>
           </section>
 
-          {activeTypes.length > 0 ? (
-            <section className="detail-section listing-extras session-types">
-              <h2 className="detail-section__title">Choose your session</h2>
-              <p className="listing-extras__intro">
-                Each date is one of these. Same price for all of them.
-              </p>
-              <ul className="listing-extras__list">
-                {activeTypes.map((type) => (
-                  <li key={type.id}>
-                    <button
-                      type="button"
-                      className={`listing-extras__card session-types__card${
-                        typeFilter === type.id ? ' session-types__card--on' : ''
-                      }`}
-                      aria-pressed={typeFilter === type.id}
-                      onClick={() => {
-                        if (activeTypes.length > 1) setTypeFilter(type.id)
-                        bookingRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
-                      }}
-                    >
-                      {type.photoUrl ? (
-                        <img src={type.photoUrl} alt="" className="listing-extras__photo" />
-                      ) : null}
-                      <span className="listing-extras__copy">
-                        <span className="listing-extras__name">{type.name}</span>
-                        {type.description ? (
-                          <span className="listing-extras__desc">{type.description}</span>
-                        ) : null}
-                        <span className="session-types__see">See dates</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
+          {hasClasses ? (
+            <ClassCards
+              classes={activeTypes}
+              sessions={classSessions ?? []}
+              filterId={typeFilter}
+              onPick={(nextId) => {
+                filterClass(nextId)
+                if (window.matchMedia?.('(max-width: 1023px)').matches) {
+                  bookingRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+                }
+              }}
+            />
           ) : null}
 
           {listing.whats_provided?.length > 0 || listing.what_to_bring?.length > 0 ? (
@@ -1294,7 +1307,11 @@ export default function ListingDetail() {
               {!checkoutSessionId && <span className="detail-booking-card__unit"> / person</span>}
             </p>
             {!checkoutSessionId && publicSessionRange && (
-              <p className="detail-booking-card__note">Pick a date, then a time</p>
+              <p className="detail-booking-card__note">
+                {hasClasses
+                  ? `Booking fee included. Same price for ${activeTypes.length === 2 ? 'both classes' : 'every class'}.`
+                  : 'Pick a date, then a time'}
+              </p>
             )}
             {!checkoutSessionId && publicSessionRange && canBringFriend && !isOwnListing && (
               <p className="bring-friend">
@@ -1319,25 +1336,40 @@ export default function ListingDetail() {
               <KeenPanel listingId={id} hostName={hostName} viewerId={viewerId} />
             )}
 
-            {publicSessionRange && !checkoutSessionId && (
+            {publicSessionRange && !checkoutSessionId && hasClasses ? (
+              classSessions ? (
+                <>
+                  <ClassDateList
+                    listing={listing}
+                    classes={activeTypes}
+                    classById={sessionTypes.byId}
+                    sessions={classSessions}
+                    filterId={typeFilter}
+                    onFilter={filterClass}
+                    pickedId={pickedSessionId}
+                    onPick={setPickedSessionId}
+                    disabled={!canTakePayments || isOwnListing}
+                  />
+                  <Button
+                    className="class-dates__book"
+                    disabled={!pickedSession || !canTakePayments || isOwnListing}
+                    onClick={() => handleBook(pickedSession.id)}
+                  >
+                    {pickedSession
+                      ? `Book ${sessionDayLabel(pickedSession.starts_at)} · ${
+                          pickedClassName ? `${pickedClassName} · ` : ''
+                        }${sessionTimeRange(pickedSession, listing)}`
+                      : 'Pick a date'}
+                  </Button>
+                  <p className="class-dates__next">You&apos;ll choose guests and extras next.</p>
+                </>
+              ) : (
+                <p className="hint">Loading dates…</p>
+              )
+            ) : null}
+
+            {publicSessionRange && !checkoutSessionId && !hasClasses && (
               <>
-                {activeTypes.length > 1 ? (
-                  <div className="session-type-filter" role="group" aria-label="Session type">
-                    {[{ id: null, name: 'All' }, ...activeTypes].map((type) => (
-                      <button
-                        key={type.id ?? 'all'}
-                        type="button"
-                        className={`add-sessions__chip${
-                          (typeFilter ?? null) === type.id ? ' add-sessions__chip--on' : ''
-                        }`}
-                        aria-pressed={(typeFilter ?? null) === type.id}
-                        onClick={() => setTypeFilter(type.id)}
-                      >
-                        {type.name}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
                 <div className="detail-calendar">
                   <SessionCalendar
                     monthKey={visibleMonth}
