@@ -9,7 +9,7 @@ import {
 } from './support/fixtures'
 
 test.describe('host add sessions', () => {
-  test('quick-fills Sat and Sun for 2 weeks at two times into 8 sessions', async ({ page }) => {
+  test('adds Sat and Sun for 2 weeks at two times as 8 sessions', async ({ page }) => {
     await stubAllExternalCalls(
       page,
       {
@@ -58,40 +58,48 @@ test.describe('host add sessions', () => {
     await expect(card).toBeVisible()
 
     await card.getByRole('button', { name: 'Add sessions' }).click()
-    await page.getByRole('button', { name: 'Sat', exact: true }).click()
-    await page.getByRole('button', { name: 'Sun', exact: true }).click()
-    await page.getByLabel('Time', { exact: true }).fill('10:00')
-    await page.getByRole('button', { name: '+ add time' }).click()
-    await page.getByLabel('Time 2').fill('14:00')
-    await expect(page.getByText('4 spots per session ·')).toBeVisible()
-    await expect(page.getByRole('link', { name: 'change in listing settings' })).toHaveAttribute(
-      'href',
-      `/edit-listing/${LATTE_ART.id}`,
-    )
-    await expect(page.getByLabel('Spots total')).toHaveCount(0)
-    const repeatSelects = page.locator('.add-sessions__repeat select')
-    await expect(repeatSelects).toHaveCount(2)
-    for (const index of [0, 1]) {
-      const style = await repeatSelects.nth(index).evaluate((el) => {
-        const computed = getComputedStyle(el)
-        return {
-          appearance: computed.appearance,
-          paddingRight: computed.paddingRight,
-          backgroundImage: computed.backgroundImage,
-        }
-      })
-      expect(style.appearance).toBe('none')
-      expect(parseFloat(style.paddingRight)).toBeGreaterThanOrEqual(36)
-      expect(style.backgroundImage).toContain('data:image/svg+xml')
+    const sheet = page.getByRole('dialog', { name: 'Add dates' })
+    await expect(sheet).toBeVisible()
+    await expect(sheet.getByText('Learn latte art with me · No dates yet')).toBeVisible()
+    await expect(sheet.getByText('Each session runs 1 hr. Pick one or more start times.')).toBeVisible()
+
+    await sheet.getByRole('button', { name: 'Sat', exact: true }).click()
+    await sheet.getByRole('button', { name: 'Sun', exact: true }).click()
+    await sheet.getByRole('button', { name: '2 weeks' }).click()
+    await sheet.getByRole('button', { name: '10:00 am' }).click()
+    await sheet.getByRole('button', { name: '2:00 pm' }).click()
+
+    // The bar counts as the host picks; the list shows five, then the rest.
+    await expect(sheet.locator('.add-dates__total')).toContainText('8 sessions')
+    await expect(sheet.locator('.add-dates__total')).toContainText('32 spots for guests to book')
+    await expect(sheet.getByRole('button', { name: 'Add 8 sessions' })).toBeVisible()
+    await expect(sheet.locator('.add-dates__row-day')).toHaveCount(5)
+    await sheet.getByRole('button', { name: 'See all 8 sessions' }).click()
+    await expect(sheet.locator('.add-dates__row-day')).toHaveCount(8)
+
+    // Dropping one session keeps the date's other time.
+    const firstRemove = sheet.getByRole('button', { name: /^Remove / }).first()
+    await firstRemove.click()
+    await expect(sheet.getByRole('button', { name: 'Add 7 sessions' })).toBeVisible()
+
+    // Pick dates shows the calendar with the picked days.
+    await sheet.getByRole('button', { name: 'Pick dates' }).click()
+    await expect(sheet.locator('.session-calendar__day--selected').first()).toBeVisible()
+
+    // Every control is easy to tap, the bar stays on screen, nothing runs off a phone.
+    for (const control of await sheet.locator('.add-dates__time, .add-dates__seg, .add-dates__remove, .add-dates__close').all()) {
+      const box = await control.boundingBox()
+      expect(box.height).toBeGreaterThanOrEqual(44)
     }
+    const bar = await sheet.locator('.add-dates__bar').boundingBox()
+    expect(bar.y + bar.height).toBeLessThanOrEqual(page.viewportSize().height + 1)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      page.viewportSize().width,
+    )
 
-    // Count every picked date, not the highlighted days: from a Saturday, the
-    // fourth date falls in next month and is off the calendar on screen.
-    await expect(page.getByText(/^4 dates selected\./)).toBeVisible()
-
-    await page.getByRole('button', { name: 'Review sessions' }).click()
-    await expect(page.getByText('This creates 8 sessions.')).toBeVisible()
-    await expect(page.locator('.add-sessions__preview-list li')).toHaveCount(8)
+    await page.keyboard.press('Escape')
+    await expect(sheet).toBeHidden()
+    await expect(card.getByRole('button', { name: 'Add sessions' })).toBeFocused()
   })
 })
 
@@ -321,7 +329,9 @@ test.describe('listing spots', () => {
 
     await page.goto('/hosting')
     await page.getByRole('button', { name: 'Add sessions' }).click()
-    await expect(page.getByText('4 spots per session ·')).toBeVisible()
+    await page.getByRole('button', { name: 'Sat', exact: true }).click()
+    await page.getByRole('button', { name: '10:00 am' }).click()
+    await expect(page.getByText('16 spots for guests to book')).toBeVisible()
 
     await page.goto(`/listings/${listing.id}`)
     await expect(page.getByText(/4 spots left/)).toBeVisible()

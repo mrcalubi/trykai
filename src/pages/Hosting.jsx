@@ -1112,12 +1112,11 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                         </p>
                         <Button
                           className="hosting-listing__add"
-                          variant={hasDates || formOpen ? 'secondary' : 'primary'}
-                          onClick={() =>
-                            formOpen ? closeSessionForm() : openSessionForm(listing.id)
-                          }
+                          variant={hasDates ? 'secondary' : 'primary'}
+                          aria-haspopup="dialog"
+                          onClick={() => openSessionForm(listing.id)}
                         >
-                          {formOpen ? 'Cancel' : 'Add sessions'}
+                          Add sessions
                         </Button>
                       </div>
                       {listing.review_status === 'pending' ? (
@@ -1151,6 +1150,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                         existingSessions={hostSessions}
                         otherListings={listings.filter((other) => other.id !== listing.id)}
                         sessionTypes={activeTypesByListing[listing.id] ?? []}
+                        subtitle={`${listing.title} · ${listingDatesLine(openCount, bookedCount).replace(' · ', ', ')}`}
                         onCancel={closeSessionForm}
                         onCreated={(payload) => handleCreateSessions(listing.id, payload)}
                       />
