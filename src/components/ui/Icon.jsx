@@ -211,6 +211,8 @@ const PATHS = {
       <path d="M8 12h.01M12 12h.01M16 12h.01" strokeWidth="2.6" />
     </>
   ),
+  'chevron-left': <path d="M15 5l-7 7 7 7" />,
+  'chevron-right': <path d="M9 5l7 7-7 7" />,
   chat: (
     <>
       <path d="M12 4c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.1-2.9-.4L5 19.5l1.2-3.6C4.5 14.6 3.5 12.9 3.5 11 3.5 7.1 7.3 4 12 4z" />

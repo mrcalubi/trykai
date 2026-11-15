@@ -102,6 +102,8 @@ async function loadProfileRow(userId) {
 function tabSearch(searchParams, tab) {
   const params = new URLSearchParams(searchParams)
   params.set('tab', tab)
+  // A session page belongs to Hosting; another tab starts at its own top.
+  params.delete('session')
   return `?${params.toString()}`
 }
 
