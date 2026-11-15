@@ -466,7 +466,6 @@ describe('Dashboard listings', () => {
     expect(foot?.[0]).toMatch(/justify-content:\s*space-between/)
     expect(listings?.[0]).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/)
     expect(listings?.[0]).toMatch(/align-items:\s*start/)
-    expect(css).toMatch(/\.add-sessions__repeat select\.input \{[^}]*padding-right:\s*42px/)
     expect(css).not.toMatch(
       /@media \(min-width: 1024px\) \{\s*\.dashboard-list--listings \{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
     )
@@ -654,17 +653,25 @@ describe('Dashboard add session', () => {
     await user.click(screen.getByRole('button', { name: 'Add sessions' }))
   }
 
+  async function addOtherTime(user, time) {
+    await user.click(screen.getByRole('button', { name: 'Other time' }))
+    fireEvent.change(screen.getByLabelText('Other start time'), { target: { value: time } })
+    await user.click(screen.getByRole('button', { name: 'Add', exact: true }))
+  }
+
   async function fillSession(user, { daysAhead = 1, time = '10:30' } = {}) {
     const dateKey = dateKeyFromToday(daysAhead)
+    await user.click(screen.getByRole('button', { name: 'Pick dates' }))
     await selectCalendarDate(user, dateKey)
-    fireEvent.change(screen.getByLabelText('Time'), { target: { value: time } })
+    await addOtherTime(user, time)
     return dateKey
   }
 
   async function reviewAndCreate(user) {
-    await user.click(screen.getByRole('button', { name: 'Review sessions' }))
-    await user.click(screen.getByRole('button', { name: 'Create sessions' }))
+    await user.click(screen.getByRole('button', { name: /^Add \d+ sessions?$/ }))
   }
+
+  const sheet = () => screen.queryByRole('dialog', { name: 'Add dates' })
 
   it('still lists the host listings when duration_mins is not in the database yet', async () => {
     supabase.__on('listings', 'select', (call) => {
@@ -682,8 +689,8 @@ describe('Dashboard add session', () => {
     expect(listingCard('Latte art')).toBeInTheDocument()
 
     await openSessionForm(user)
-    expect(screen.getByLabelText('Duration (mins)')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Duration (mins)'), { target: { value: '60' } })
+    expect(screen.getByLabelText(/How long is each session/)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/How long is each session/), { target: { value: '60' } })
     await fillSession(user)
 
     await reviewAndCreate(user)
@@ -708,13 +715,15 @@ describe('Dashboard add session', () => {
 
     const { user } = await renderHosting()
 
-    expect(await screen.findByLabelText('Time')).toHaveValue('14:15')
-    expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(1)
+    expect(await screen.findByRole('button', { name: '2:15 pm' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Pick dates' })).toHaveAttribute('aria-pressed', 'true')
+    expect(
+      screen.getByRole('button', { name: new RegExp(formatDayLabel(dateKeyFromToday(2))) }),
+    ).toHaveAttribute('aria-pressed', 'true')
     await waitFor(() => expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled())
 
-    const cancels = within(listingCard('Latte art')).getAllByRole('button', { name: 'Cancel' })
-    await user.click(cancels[cancels.length - 1])
-    expect(screen.queryByLabelText('Time')).not.toBeInTheDocument()
+    await user.click(within(sheet()).getByRole('button', { name: 'Close' }))
+    expect(sheet()).not.toBeInTheDocument()
     expect(window.sessionStorage.getItem('trykai:add-sessions:listing-1')).toBeNull()
     expect(window.sessionStorage.getItem('trykai:add-sessions:open')).toBeNull()
     delete HTMLElement.prototype.scrollIntoView
@@ -727,20 +736,17 @@ describe('Dashboard add session', () => {
     await waitFor(() =>
       expect(window.sessionStorage.getItem('trykai:add-sessions:open')).toBeNull(),
     )
-    expect(screen.queryByLabelText('Time')).not.toBeInTheDocument()
+    expect(sheet()).not.toBeInTheDocument()
   })
 
   it('shows the listing duration and does not ask for one', async () => {
     const { user } = await renderHosting()
     await openSessionForm(user)
 
-    expect(screen.getByText('Each session is 1 hr 30 min.')).toBeInTheDocument()
-    expect(screen.getByText(/4 spots per session/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'change in listing settings' })).toHaveAttribute(
-      'href',
-      '/edit-listing/listing-1'
-    )
-    expect(screen.queryByLabelText('Duration (mins)')).not.toBeInTheDocument()
+    expect(
+      screen.getByText('Each session runs 1 hr 30 min. Pick one or more start times.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByLabelText(/How long is each session/)).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Spots total')).not.toBeInTheDocument()
   })
 
@@ -816,10 +822,9 @@ describe('Dashboard add session', () => {
     const { user } = await renderHosting()
     await user.click(within(listingCard('Latte art')).getByRole('button', { name: 'Add sessions' }))
     const dateKey = await fillSession(user, { time: '10:30' })
-    await user.click(screen.getByRole('checkbox', { name: 'Pottery' }))
-    await user.click(screen.getByRole('button', { name: 'Review sessions' }))
-    expect(screen.getByText(/on each of 2 listings/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Create sessions' }))
+    await user.click(screen.getByRole('switch', { name: 'Also offer these times on Pottery' }))
+    expect(screen.getByText(/on 2 listings/)).toBeInTheDocument()
+    await reviewAndCreate(user)
 
     await waitFor(() =>
       expect(supabase.rpc).toHaveBeenCalledWith('add_listing_session', {
@@ -853,7 +858,7 @@ describe('Dashboard add session', () => {
     const { user } = await renderHosting()
     await user.click(within(listingCard('Latte art')).getByRole('button', { name: 'Add sessions' }))
     await fillSession(user)
-    await user.click(screen.getByRole('checkbox', { name: 'Pottery' }))
+    await user.click(screen.getByRole('switch', { name: /Pottery/ }))
     await reviewAndCreate(user)
 
     expect(await screen.findByText(/None added on Pottery/)).toBeInTheDocument()
@@ -862,7 +867,7 @@ describe('Dashboard add session', () => {
   it('does not offer other listings when the host has only one', async () => {
     const { user } = await renderHosting()
     await openSessionForm(user)
-    expect(screen.queryByText('Also offer these times on')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Also offer these times on/)).not.toBeInTheDocument()
   })
 
   it('emails keen guests after sessions are added and says how many', async () => {
@@ -912,26 +917,27 @@ describe('Dashboard add session', () => {
     await openSessionForm(user)
     await fillSession(user, { time: '10:30' })
 
-    await user.click(screen.getByRole('button', { name: 'Review sessions' }))
-
-    expect(screen.getByText('This creates 0 sessions. 1 will be skipped.')).toBeInTheDocument()
+    expect(screen.getByText('1 won’t be added')).toBeInTheDocument()
     expect(screen.getByText(/clashes with an existing session/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Create sessions' })).toBeDisabled()
+    expect(screen.getByText('No sessions yet')).toBeInTheDocument()
+    await user.click(within(sheet()).getByRole('button', { name: 'Add sessions' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('None of these can be added.')
     expect(supabase.rpc.mock.calls.some(([name]) => name === 'add_listing_session')).toBe(false)
   })
 
   it('rejects a session with no date or time', async () => {
     const { user } = await renderHosting()
     await openSessionForm(user)
-    fireEvent.submit(document.querySelector('.dashboard-card__form'))
+    await user.click(within(sheet()).getByRole('button', { name: 'Add sessions' }))
 
-    expect(await screen.findByText('Please enter a date and time.')).toBeInTheDocument()
+    expect(await screen.findByText('Pick at least one day and a start time.')).toBeInTheDocument()
     expect(supabase.rpc.mock.calls.some(([name]) => name === 'add_listing_session')).toBe(false)
   })
 
   it('does not let the host pick today or a date 81 days out', async () => {
     const { user } = await renderHosting()
     await openSessionForm(user)
+    await user.click(screen.getByRole('button', { name: 'Pick dates' }))
 
     const todayButton = screen.queryByRole('button', {
       name: new RegExp(formatDayLabel(dateKeyFromToday(0))),
@@ -961,11 +967,15 @@ describe('Dashboard add session', () => {
     const { user } = await renderHosting()
     await openSessionForm(user)
     await fillSession(user)
-    fireEvent.submit(document.querySelector('.dashboard-card__form'))
+    await reviewAndCreate(user)
 
-    expect(
-      await screen.findByText('Set spots per session in listing settings first.')
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Set spots per session in listing settings first.',
+    )
+    expect(screen.getByRole('link', { name: 'Change spots' })).toHaveAttribute(
+      'href',
+      '/edit-listing/listing-1?section=price',
+    )
   })
 
   it('closes the form after a successful save', async () => {
@@ -975,7 +985,7 @@ describe('Dashboard add session', () => {
 
     await reviewAndCreate(user)
 
-    await waitFor(() => expect(screen.queryByLabelText('Time')).not.toBeInTheDocument())
+    await waitFor(() => expect(sheet()).not.toBeInTheDocument())
   })
 
   it('puts a server overlap into the skipped summary instead of a generic error', async () => {
@@ -1007,15 +1017,12 @@ describe('Dashboard add session', () => {
     const { user } = await renderHosting()
     await openSessionForm(user)
     await fillSession(user, { time: '10:00' })
-    await user.click(screen.getByRole('button', { name: '+ add time' }))
-    fireEvent.change(screen.getByLabelText('Time 2'), { target: { value: '10:30' } })
+    await addOtherTime(user, '10:30')
 
-    await user.click(screen.getByRole('button', { name: 'Review sessions' }))
-
-    expect(screen.getByText('This creates 1 session. 1 will be skipped.')).toBeInTheDocument()
+    expect(screen.getByText('1 won’t be added')).toBeInTheDocument()
     expect(screen.getByText(/clashes with another session in this batch/)).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Create sessions' }))
+    await user.click(screen.getByRole('button', { name: 'Add 1 session' }))
 
     await waitFor(() =>
       expect(
@@ -1025,20 +1032,25 @@ describe('Dashboard add session', () => {
     expect(await screen.findByText(/Created 1 session\. Skipped 1:/)).toBeInTheDocument()
   })
 
-  it('quick-fills Sat and Sun for two weeks at two times', async () => {
+  it('adds Sat and Sun every week for two weeks at two times', async () => {
     const { user } = await renderHosting()
     await openSessionForm(user)
 
     await user.click(screen.getByRole('button', { name: 'Sat' }))
     await user.click(screen.getByRole('button', { name: 'Sun' }))
-    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '10:00' } })
-    await user.click(screen.getByRole('button', { name: '+ add time' }))
-    fireEvent.change(screen.getByLabelText('Time 2'), { target: { value: '14:00' } })
+    await user.click(screen.getByRole('button', { name: '2 weeks' }))
+    await user.click(screen.getByRole('button', { name: '10:00 am' }))
+    await user.click(screen.getByRole('button', { name: '2:00 pm' }))
 
-    await user.click(screen.getByRole('button', { name: 'Review sessions' }))
+    expect(screen.getByRole('button', { name: 'Add 8 sessions' })).toBeInTheDocument()
+    expect(screen.getByText('32 spots for guests to book')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'See all 8 sessions' }))
+    expect(sheet().querySelectorAll('.add-dates__row-day')).toHaveLength(8)
 
-    expect(screen.getByText('This creates 8 sessions.')).toBeInTheDocument()
-    expect(listingCard('Latte art').querySelectorAll('.add-sessions__preview-list li')).toHaveLength(8)
+    await user.click(screen.getByRole('button', { name: 'Add 8 sessions' }))
+    await waitFor(() =>
+      expect(supabase.rpc.mock.calls.filter(([name]) => name === 'add_listing_session')).toHaveLength(8),
+    )
   })
 
   it('creates the per-date starts, not a shared time on every date', async () => {
@@ -1046,12 +1058,12 @@ describe('Dashboard add session', () => {
     await openSessionForm(user)
     const first = dateKeyFromToday(1)
     const second = dateKeyFromToday(2)
+    await user.click(screen.getByRole('button', { name: 'Pick dates' }))
     await selectCalendarDate(user, first)
     await selectCalendarDate(user, second)
-    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '10:00' } })
-    await user.click(screen.getByRole('button', { name: '+ add time' }))
-    fireEvent.change(screen.getByLabelText('Time 2'), { target: { value: '14:00' } })
-    await user.click(screen.getByRole('checkbox', { name: /Set times per date/ }))
+    await user.click(screen.getByRole('button', { name: '10:00 am' }))
+    await user.click(screen.getByRole('button', { name: '2:00 pm' }))
+    await user.click(screen.getByRole('button', { name: 'Different times on different days?' }))
     const secondRow = screen.getByRole('group', { name: formatDayTitle(second) })
     fireEvent.change(within(secondRow).getByLabelText('Time'), { target: { value: '15:00' } })
     const timeRemoves = within(secondRow).getAllByRole('button', { name: 'Remove' })
@@ -1621,8 +1633,8 @@ describe('Hosting setup checklist', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add your first session' }))
 
-    expect(within(listingCard('Boxing')).getByLabelText('Time')).toBeInTheDocument()
-    expect(within(listingCard('Latte art')).queryByLabelText('Time')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Add dates' })).toHaveTextContent('Boxing · No dates yet')
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
   })
 
   it('goes away once all four steps are done', async () => {
