@@ -6,6 +6,7 @@ export const LISTING_FIELD_HINTS = {
   category: 'Pick the category that fits best. Guests browse by these.',
   price: `Set what you earn per guest, up to $${MAX_PRICE_PER_PERSON_CENTS / 100}. Most sessions are $10 to $40.`,
   spots: 'At least one guest per session.',
+  priceWhole: 'Use whole dollars, like 33.',
   duration: "Choose how long you'll spend with guests.",
   area: 'Pick the area guests will see before they book.',
   fullAddress: 'Look up the postal code. We only send the full address after a booking is confirmed.',

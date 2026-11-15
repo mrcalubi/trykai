@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addonLimitLabel,
+  addonTileIcon,
   checkoutExtrasSummary,
   addonLineLabel,
   clampAddonQuantities,
@@ -55,9 +56,16 @@ describe('booking addon helpers', () => {
   it('labels guest prices and prepare lines', () => {
     expect(guestAddonPriceParts(blooms)).toEqual({ amount: '+$17', unit: 'per person' })
     expect(guestAddonPriceParts(wrap)).toEqual({ amount: '+$9', unit: 'once per group' })
-    expect(addonLimitLabel(blooms)).toBe('Only 4 per session')
+    expect(addonLimitLabel(blooms)).toBe('4 per session')
     expect(addonLimitLabel(wrap)).toBe('')
     expect(addonLimitLabel({ session_limit: 0 })).toBe('')
+    expect(addonTileIcon({ name: 'Proposal help' })).toBe('chat')
+    expect(addonTileIcon({ name: 'Premium materials' })).toBe('arts')
+    expect(addonTileIcon({ name: 'Photos of your session' })).toBe('camera')
+    expect(addonTileIcon({ name: 'Iced latte' })).toBe('food')
+    expect(addonTileIcon({ name: 'Take-home glass vase' })).toBe('gift')
+    expect(addonTileIcon({ name: 'Shipping' })).toBe('gift')
+    expect(addonTileIcon({})).toBe('gift')
     expect(addonLineLabel('Premium blooms', 1)).toBe('Premium blooms × 1')
     expect(prepareAddonsSentence([{ name: 'Premium blooms', quantity: 1 }, { name: 'Gift wrap', quantity: 2 }])).toBe(
       'Add-ons to prepare: Premium blooms × 1, Gift wrap × 2.',

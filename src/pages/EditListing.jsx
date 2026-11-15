@@ -1,23 +1,31 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import PostalAddressFields from '../components/PostalAddressFields'
-import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
 import { revokePhotoUrls } from '../lib/coverCrop'
 import { MAX_PHOTOS, photosFromUrls, uploadListingPhotos } from '../lib/listingPhotos'
-import ListingPricePanel from '../components/ListingPricePanel'
 import ListingAddonsEditor from '../components/ListingAddonsEditor'
 import SessionTypesEditor from '../components/SessionTypesEditor'
 import WhatsProvidedFields from '../components/WhatsProvidedFields'
 import WhatToBringFields from '../components/WhatToBringFields'
 import FieldHint from '../components/FieldHint'
 import Button from '../components/ui/Button'
+import Card from '../components/ui/Card'
+import Icon from '../components/ui/Icon'
 import PageLoader from '../components/PageLoader'
 import { foundingHostFromRpc } from '../lib/foundingHost'
-import { groupDiscountExampleLine, hostPriceBreakdown, parsePriceInputCents } from '../lib/pricing'
+import {
+  GROUP_DISCOUNT_TIERS,
+  MAX_PRICE_PER_PERSON_CENTS,
+  discountedLessonCents,
+  guestFacingPriceCents,
+  hostPriceBreakdown,
+  parsePriceInputCents,
+} from '../lib/pricing'
+import { formatSgd } from '../lib/hostingDashboard'
 import {
   LISTING_FIELD_HINTS,
   PHOTO_UPLOAD_ERROR,
@@ -61,6 +69,18 @@ import {
   bookingCutoffHours,
   isMissingCutoffColumn,
 } from '../lib/bookingCutoff'
+import {
+  EDIT_SECTION_GROUPS,
+  editSection,
+  listingStatusLabel,
+  nextDateLine,
+  quickWinCount,
+  sectionForHint,
+  sectionSummaries,
+  stepPriceDollars,
+} from '../lib/editListingSections'
+import { PHOTO_LIGHT_TIP, PHOTO_SLOTS } from '../lib/photoTips'
+import { formatSessionDay } from '../lib/sessionDate'
 
 const LISTING_SELECT = `
   id,
@@ -76,8 +96,32 @@ const LISTING_SELECT = `
   what_to_bring,
   booking_cutoff_hours,
   photo_urls,
+  review_status,
   host_id
 `
+
+const DURATION_CHOICES = [
+  { mins: 60, label: '1 hr' },
+  { mins: 90, label: '1.5 hr' },
+  { mins: 120, label: '2 hr' },
+  { mins: 180, label: '3 hr' },
+]
+const MIN_SPOTS = 1
+const MAX_SPOTS = 50
+const MAX_PRICE_DOLLARS = MAX_PRICE_PER_PERSON_CENTS / 100
+
+/** One line under each section's title, saying what changing it does. */
+const SECTION_INTROS = {
+  basics: 'What guests read first when they find your session.',
+  price: 'Changes apply to new bookings. Existing bookings keep their price.',
+  addons: 'Extras guests can add when they book.',
+  types: 'Different versions of the session. Each date is one of these.',
+  notice: 'How close to the start guests can still book.',
+  location: 'Guests see only the area until they book.',
+  photos: 'Real photos of your session, taken on your phone, are perfect.',
+  provided: 'What guests get from you on the day.',
+  bring: 'What guests should bring along.',
+}
 
 function centsToDollars(cents) {
   const dollars = cents / 100
@@ -88,6 +132,7 @@ export default function EditListing() {
   const { id } = useParams()
   const navigate = useNavigate()
   const userId = useAuthedUserId()
+  const [searchParams] = useSearchParams()
 
   const [fetching, setFetching] = useState(true)
   const [title, setTitle] = useState('')
@@ -96,6 +141,7 @@ export default function EditListing() {
   const [price, setPrice] = useState('')
   const [maxGuests, setMaxGuests] = useState('')
   const [durationMins, setDurationMins] = useState('')
+  const [otherDuration, setOtherDuration] = useState(false)
   const [groupPricing, setGroupPricing] = useState(true)
   const [area, setArea] = useState('')
   const [fullAddress, setFullAddress] = useState('')
@@ -120,8 +166,12 @@ export default function EditListing() {
   const [error, setError] = useState('')
   const [photoError, setPhotoError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [savedDraft, setSavedDraft] = useState(null)
+  // The values as last loaded or saved: Discard goes back to these, and the
+  // save bar compares against them.
+  const [saved, setSaved] = useState(null)
+  const [savedNote, setSavedNote] = useState('')
   const [listingTitle, setListingTitle] = useState('')
+  const [reviewStatus, setReviewStatus] = useState(null)
   const [upcomingSessions, setUpcomingSessions] = useState([])
   const [sessionsFailed, setSessionsFailed] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -131,13 +181,46 @@ export default function EditListing() {
   const priceCents = parsePriceInputCents(price)
   const guests = parseInt(maxGuests, 10)
   const guestCount = Number.isInteger(guests) ? guests : 1
-  const breakdown = hostPriceBreakdown(
-    priceCents,
-    isFoundingHost,
-    guestCount,
+  const breakdown = hostPriceBreakdown(priceCents, isFoundingHost, guestCount, groupPricing)
+
+  const values = {
+    title,
+    description,
+    category,
+    price,
+    maxGuests,
+    durationMins,
     groupPricing,
-  )
-  const discountExample = groupPricing ? groupDiscountExampleLine(priceCents, guestCount) : ''
+    area,
+    fullAddress,
+    arrivalInstructions,
+    bookingCutoffHours: bookingCutoff,
+    whatsProvided,
+    whatToBring,
+    photos,
+    addons,
+    sessionTypes,
+  }
+
+  function applyValues(next) {
+    setTitle(next.title)
+    setDescription(next.description)
+    setCategory(next.category)
+    setPrice(next.price)
+    setMaxGuests(next.maxGuests)
+    setDurationMins(next.durationMins)
+    setOtherDuration(false)
+    setGroupPricing(next.groupPricing)
+    setArea(next.area)
+    setFullAddress(next.fullAddress)
+    setArrivalInstructions(next.arrivalInstructions)
+    setBookingCutoff(next.bookingCutoffHours)
+    setWhatsProvided(next.whatsProvided)
+    setWhatToBring(next.whatToBring)
+    setPhotos(next.photos)
+    setAddons(next.addons)
+    setSessionTypes(next.sessionTypes)
+  }
 
   useEffect(() => {
     photosRef.current = photos
@@ -191,6 +274,7 @@ export default function EditListing() {
 
       setIsFoundingHost(foundingHostFromRpc(founding.data, founding.error))
       setListingTitle(data.title)
+      setReviewStatus(data.review_status ?? null)
       if (sessionsResult.error) {
         setUpcomingSessions([])
         setSessionsFailed(true)
@@ -199,67 +283,36 @@ export default function EditListing() {
         setSessionsFailed(false)
       }
 
-      const nextTitle = data.title
-      const nextDescription = data.description
-      const nextCategory = data.category
-      const nextPrice = centsToDollars(data.price_per_person)
-      const nextMaxGuests = String(data.max_guests)
-      const nextDurationMins = data.duration_mins != null ? String(data.duration_mins) : ''
-      const nextGroupPricing = data.group_pricing !== false
-      const nextArea = data.area ?? ''
-      const nextAddress = typeof addressResult.data === 'string' ? addressResult.data : ''
-      const nextArrival =
-        !arrivalResult.error && typeof arrivalResult.data === 'string' ? arrivalResult.data : ''
-      const nextCutoff = bookingCutoffHours(data.booking_cutoff_hours)
-      const nextProvided = data.whats_provided?.length ? data.whats_provided : []
-      const nextBring = data.what_to_bring?.length ? data.what_to_bring : []
-      const nextPhotos = photosFromUrls(data.photo_urls)
       const addonResult = await loadListingAddons(supabase, id)
-      const nextAddons = addonResult.addons
       setAddonsAvailable(addonResult.available)
       setAddonsLoaded(addonResult.loaded)
-      setSavedAddons(nextAddons)
+      setSavedAddons(addonResult.addons)
       const typeResult = await loadSessionTypesForEditor(supabase, id)
-      const nextTypes = typeResult.types
       setTypesAvailable(typeResult.available)
       setTypesLoaded(typeResult.loaded)
-      setSavedSessionTypes(nextTypes)
-      setSessionTypes(nextTypes)
-      setTitle(nextTitle)
-      setDescription(nextDescription)
-      setCategory(nextCategory)
-      setPrice(nextPrice)
-      setMaxGuests(nextMaxGuests)
-      setDurationMins(nextDurationMins)
-      setGroupPricing(nextGroupPricing)
-      setArea(nextArea)
-      setFullAddress(nextAddress)
-      setArrivalInstructions(nextArrival)
-      setBookingCutoff(nextCutoff)
-      setWhatsProvided(nextProvided)
-      setWhatToBring(nextBring)
-      setPhotos(nextPhotos)
-      setAddons(nextAddons)
-      setSavedDraft(
-        listingEditorDraft({
-          title: nextTitle,
-          description: nextDescription,
-          category: nextCategory,
-          price: nextPrice,
-          maxGuests: nextMaxGuests,
-          durationMins: nextDurationMins,
-          groupPricing: nextGroupPricing,
-          area: nextArea,
-          fullAddress: nextAddress,
-          arrivalInstructions: nextArrival,
-          bookingCutoffHours: nextCutoff,
-          whatsProvided: nextProvided,
-          whatToBring: nextBring,
-          photos: nextPhotos,
-          addons: nextAddons,
-          sessionTypes: nextTypes,
-        }),
-      )
+      setSavedSessionTypes(typeResult.types)
+
+      const loaded = {
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        price: centsToDollars(data.price_per_person),
+        maxGuests: String(data.max_guests),
+        durationMins: data.duration_mins != null ? String(data.duration_mins) : '',
+        groupPricing: data.group_pricing !== false,
+        area: data.area ?? '',
+        fullAddress: typeof addressResult.data === 'string' ? addressResult.data : '',
+        arrivalInstructions:
+          !arrivalResult.error && typeof arrivalResult.data === 'string' ? arrivalResult.data : '',
+        bookingCutoffHours: bookingCutoffHours(data.booking_cutoff_hours),
+        whatsProvided: data.whats_provided?.length ? data.whats_provided : [],
+        whatToBring: data.what_to_bring?.length ? data.what_to_bring : [],
+        photos: photosFromUrls(data.photo_urls),
+        addons: addonResult.addons,
+        sessionTypes: typeResult.types,
+      }
+      applyValues(loaded)
+      setSaved(loaded)
       setFetching(false)
     }
 
@@ -272,12 +325,31 @@ export default function EditListing() {
     }
   }, [])
 
+  function sectionShown(sectionId) {
+    if (sectionId === 'addons') return addonsAvailable
+    if (sectionId === 'types') return typesAvailable
+    return Boolean(editSection(sectionId))
+  }
+
+  const requested = searchParams.get('section')
+  // On phones no section means the overview; on desktop the overview is the
+  // list on the left and the first section is open beside it.
+  const sectionId = requested && sectionShown(requested) ? requested : null
+  const activeId = sectionId ?? 'basics'
+
+  function openSection(next) {
+    navigate({ search: `?section=${next}` })
+  }
+
   function collectHints() {
     const hints = {}
     if (!title.trim()) hints.title = LISTING_FIELD_HINTS.title
     if (!description.trim()) hints.description = LISTING_FIELD_HINTS.description
     if (!category) hints.category = LISTING_FIELD_HINTS.category
     if (priceCents == null) hints.price = LISTING_FIELD_HINTS.price
+    else if (price !== saved?.price && priceCents % 100 !== 0) {
+      hints.price = LISTING_FIELD_HINTS.priceWhole
+    }
     if (Number.isNaN(guests) || guests < 1) hints.spots = LISTING_FIELD_HINTS.spots
     const duration = parseInt(durationMins, 10)
     if (Number.isNaN(duration) || duration < 1) hints.duration = LISTING_FIELD_HINTS.duration
@@ -290,13 +362,17 @@ export default function EditListing() {
 
   function showSaveProblem(saveError) {
     const problem = listingSaveProblem(saveError)
-    if (problem.field) setFieldHints({ [problem.field]: problem.hint })
+    if (problem.field) {
+      setFieldHints({ [problem.field]: problem.hint })
+      if (sectionForHint(problem.field) !== activeId) openSection(sectionForHint(problem.field))
+    }
     setError(problem.message)
   }
 
   async function saveListing() {
     setError('')
     setPhotoError('')
+    setSavedNote('')
     setFieldHints({})
     const duration = parseInt(durationMins, 10)
     const provided = providedForSave(whatsProvided)
@@ -311,6 +387,7 @@ export default function EditListing() {
       console.error('Listing photo upload failed', uploadError)
       setLoading(false)
       setPhotoError(PHOTO_UPLOAD_ERROR)
+      if (activeId !== 'photos') openSection('photos')
       return
     }
 
@@ -372,6 +449,7 @@ export default function EditListing() {
       return
     }
 
+    let nextAddons = addons
     if (addonsAvailable && addonsLoaded) {
       const { error: addonError, insertedIds } = await saveListingAddons({
         client: supabase,
@@ -381,13 +459,12 @@ export default function EditListing() {
         userId,
         storage: supabase.storage,
       })
+      nextAddons = addons.map((addon) =>
+        insertedIds?.[addon.key] ? { ...addon, id: insertedIds[addon.key] } : addon,
+      )
       if (addonError && !isMissingAddonsTable(addonError)) {
         // Keep what did save, so pressing Save again updates instead of duplicating.
-        setAddons((prev) =>
-          prev.map((addon) =>
-            insertedIds?.[addon.key] ? { ...addon, id: insertedIds[addon.key] } : addon,
-          ),
-        )
+        setAddons(nextAddons)
         const fresh = await loadListingAddons(supabase, id)
         if (fresh.loaded) setSavedAddons(fresh.addons)
         setLoading(false)
@@ -396,6 +473,7 @@ export default function EditListing() {
       }
     }
 
+    let nextTypes = sessionTypes
     if (typesAvailable && typesLoaded) {
       const { error: typesError, insertedIds } = await saveSessionTypes({
         client: supabase,
@@ -405,11 +483,12 @@ export default function EditListing() {
         userId,
         storage: supabase.storage,
       })
+      nextTypes = sessionTypes.map((type) =>
+        insertedIds?.[type.key] ? { ...type, id: insertedIds[type.key] } : type,
+      )
       if (typesError && !isMissingSessionTypes(typesError)) {
         // Keep what did save, so pressing Save again updates instead of duplicating.
-        setSessionTypes((prev) =>
-          prev.map((type) => (insertedIds?.[type.key] ? { ...type, id: insertedIds[type.key] } : type)),
-        )
+        setSessionTypes(nextTypes)
         const fresh = await loadSessionTypesForEditor(supabase, id)
         if (fresh.loaded) setSavedSessionTypes(fresh.types)
         setLoading(false)
@@ -418,30 +497,53 @@ export default function EditListing() {
       }
     }
 
-    // Stay "saving" so the unsaved-changes guard does not fire on this leave.
+    // Stay on the page: the saved photos are now the uploaded ones, and what
+    // was inserted carries its id, so the next save updates rather than adds.
+    const savedPhotos = photosFromUrls(photoUrls)
+    photos.forEach(revokePhotoUrls)
+    const nextSaved = { ...values, photos: savedPhotos, addons: nextAddons, sessionTypes: nextTypes }
+    setPhotos(savedPhotos)
+    setAddons(nextAddons)
+    setSessionTypes(nextTypes)
+    setSavedAddons(nextAddons)
+    setSavedSessionTypes(nextTypes)
+    setSaved(nextSaved)
+    setListingTitle(title.trim())
+    setSavedNote(`Saved. ${formatListingSpotsMessage(spotsData)}`.trim())
+    setLoading(false)
     // Only does anything when this edit put the listing back in the queue.
-    photosRef.current.forEach(revokePhotoUrls)
     void notifyListingSubmitted()
-    navigate('/hosting', {
-      replace: true,
-      state: {
-        message: `Listing updated successfully. ${formatListingSpotsMessage(spotsData)}`,
-      },
-    })
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault()
+  async function handleSubmit(event) {
+    event.preventDefault()
     const hints = collectHints()
-    if (Object.keys(hints).length) {
+    const keys = Object.keys(hints)
+    if (keys.length) {
       setFieldHints(hints)
+      setSavedNote('')
+      const target = sectionForHint(keys[0])
+      setError(target === activeId ? '' : `Check ${editSection(target).label} before saving.`)
+      if (target !== activeId) openSection(target)
       return
     }
-    if (photos.length === 0) {
+    // Only when this edit took the last photo away; a listing that never had
+    // photos is nudged by the Photos dot instead of at every save.
+    if (photos.length === 0 && saved?.photos.length > 0) {
       setPhotoSkipOpen(true)
       return
     }
     await saveListing()
+  }
+
+  function discardChanges() {
+    if (!saved) return
+    photos.filter((photo) => !saved.photos.includes(photo)).forEach(revokePhotoUrls)
+    applyValues(saved)
+    setFieldHints({})
+    setError('')
+    setPhotoError('')
+    setSavedNote('')
   }
 
   async function handleDeleteListing() {
@@ -464,34 +566,20 @@ export default function EditListing() {
     navigate('/hosting', { replace: true })
   }
 
-  const currentDraft = listingEditorDraft({
-    title,
-    description,
-    category,
-    price,
-    maxGuests,
-    durationMins,
-    groupPricing,
-    area,
-    fullAddress,
-    arrivalInstructions,
-    bookingCutoffHours: bookingCutoff,
-    whatsProvided,
-    whatToBring,
-    photos,
-    addons,
-    sessionTypes,
-  })
   const isDirty =
-    !fetching && !loading && !leaving && savedDraft != null && currentDraft !== savedDraft
+    !fetching &&
+    !loading &&
+    !leaving &&
+    saved != null &&
+    listingEditorDraft(values) !== listingEditorDraft(saved)
   const deleteStats = listingUpcomingStats(id, upcomingSessions)
-  const unsavedGuard = useUnsavedChangesGuard(isDirty)
+  const unsavedGuard = useUnsavedChangesGuard(isDirty, { samePageOk: true })
 
   if (fetching) {
     return <PageLoader />
   }
 
-  if (error && !title) {
+  if (error && !saved) {
     return (
       <div className="page page--narrow page--centered">
         <p className="error-message">{error}</p>
@@ -499,44 +587,277 @@ export default function EditListing() {
     )
   }
 
-  return (
-    <div className="page page--form">
-      {unsavedGuard}
-      <div className="form-card form-card--wide">
-        <h1 className="form-card__title">Edit listing</h1>
-        <p className="form-card__subtitle">Update your experience details</p>
+  const summaries = sectionSummaries(values)
+  const wins = quickWinCount(summaries)
+  const status = listingStatusLabel(reviewStatus)
+  const nextLine = nextDateLine(upcomingSessions, maxGuests)
+  const nextSession = upcomingSessions[0]
+  const name = listingTitle || title
+  const activeLabel = editSection(activeId)?.label ?? ''
+  const durationChoice = DURATION_CHOICES.some((choice) => String(choice.mins) === durationMins)
+    ? Number(durationMins)
+    : otherDuration || durationMins
+      ? 'other'
+      : null
 
-        <form onSubmit={handleSubmit} className="form" noValidate>
-          <h2 className="form-section__title">The basics</h2>
+  function statusBadge() {
+    return status ? (
+      <span className={`edit-status edit-status--${status.tone}`}>{status.label}</span>
+    ) : null
+  }
+
+  function renderPrice() {
+    const wholeDollars = Number.parseFloat(price)
+    return (
+      <>
+        <div className="edit-price">
+          <div className="edit-field">
+            <p className="edit-field__label" id="edit-price-label">
+              Your price per guest
+            </p>
+            <p className="edit-field__hint">
+              What you receive. Most sessions on TryKai are S$10 to S$40 a guest.
+            </p>
+            <div className="price-stepper" role="group" aria-label="Change your price">
+              <button
+                type="button"
+                className="price-stepper__btn"
+                aria-label="Lower price by S$1"
+                disabled={!(wholeDollars > 1)}
+                onClick={() => setPrice(stepPriceDollars(price, -1, { max: MAX_PRICE_DOLLARS }))}
+              >
+                −
+              </button>
+              <label className="price-stepper__box">
+                <span className="price-stepper__currency" aria-hidden="true">
+                  S$
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  max={MAX_PRICE_DOLLARS}
+                  step="1"
+                  value={price}
+                  onChange={(event) => setPrice(event.target.value)}
+                  className="price-stepper__input"
+                  aria-label="Your price per guest"
+                />
+              </label>
+              <button
+                type="button"
+                className="price-stepper__btn"
+                aria-label="Raise price by S$1"
+                disabled={wholeDollars >= MAX_PRICE_DOLLARS}
+                onClick={() => setPrice(stepPriceDollars(price, 1, { max: MAX_PRICE_DOLLARS }))}
+              >
+                +
+              </button>
+            </div>
+            <FieldHint>{fieldHints.price}</FieldHint>
+          </div>
+
+          {breakdown ? (
+            <dl className="edit-earnings" aria-live="polite">
+              <div className="edit-earnings__row edit-earnings__row--lead">
+                <dt>Guests see</dt>
+                <dd>
+                  {formatSgd(breakdown.guestsPayCents)} <span>/person</span>
+                </dd>
+              </div>
+              {breakdown.afterFeeCents != null ? (
+                <div className="edit-earnings__row">
+                  <dt>
+                    You get from your {ordinal(breakdown.feeFreeBookings + 1)} booking (
+                    {breakdown.feePercent}% fee)
+                  </dt>
+                  <dd>{formatSgd(breakdown.afterFeeCents)}</dd>
+                </div>
+              ) : null}
+              {breakdown.isFoundingHost ? (
+                <div className="edit-earnings__row">
+                  <dt>You get, as a founding host (no fee)</dt>
+                  <dd>{formatSgd(breakdown.youReceiveCents)}</dd>
+                </div>
+              ) : null}
+              <div className="edit-earnings__row edit-earnings__row--total">
+                <dt>Full session of {guestCount}</dt>
+                <dd>{formatSgd(breakdown.fullSessionCents)}</dd>
+              </div>
+            </dl>
+          ) : null}
+        </div>
+
+        <div className="edit-split">
+          <div className="edit-field">
+            <div className="edit-field__row">
+              <div>
+                <p className="edit-field__label" id="edit-spots-label">
+                  Spots per session
+                </p>
+                <p className="edit-field__hint">The most guests in one session.</p>
+              </div>
+              <div className="guest-stepper__controls" role="group" aria-label="Change spots">
+                <button
+                  type="button"
+                  className="guest-stepper__btn"
+                  aria-label="Fewer spots"
+                  disabled={!(guests > MIN_SPOTS)}
+                  onClick={() => setMaxGuests(String(Math.max(MIN_SPOTS, guestCount - 1)))}
+                >
+                  −
+                </button>
+                <output className="guest-stepper__count" aria-live="polite" aria-label="Spots per session">
+                  {maxGuests}
+                </output>
+                <button
+                  type="button"
+                  className="guest-stepper__btn"
+                  aria-label="More spots"
+                  disabled={guests >= MAX_SPOTS}
+                  onClick={() => setMaxGuests(String(Math.min(MAX_SPOTS, guestCount + 1)))}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            <FieldHint>{fieldHints.spots}</FieldHint>
+          </div>
+
+          <fieldset className="wizard-fieldset edit-field">
+            <legend className="edit-field__label">Session length</legend>
+            <p className="edit-field__hint">Dates you&apos;ve already added keep their length.</p>
+            <div className="choice-chips edit-duration">
+              {DURATION_CHOICES.map((choice) => (
+                <label
+                  key={choice.mins}
+                  className={`choice-chip${durationChoice === choice.mins ? ' choice-chip--on' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="edit-duration"
+                    checked={durationChoice === choice.mins}
+                    onChange={() => {
+                      setOtherDuration(false)
+                      setDurationMins(String(choice.mins))
+                    }}
+                    className="visually-hidden"
+                  />
+                  {choice.label}
+                </label>
+              ))}
+              <label className={`choice-chip${durationChoice === 'other' ? ' choice-chip--on' : ''}`}>
+                <input
+                  type="radio"
+                  name="edit-duration"
+                  checked={durationChoice === 'other'}
+                  onChange={() => {
+                    setOtherDuration(true)
+                    setDurationMins('')
+                  }}
+                  className="visually-hidden"
+                />
+                Other
+              </label>
+            </div>
+            {durationChoice === 'other' ? (
+              <label className="label wizard-other">
+                Minutes
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  value={durationMins}
+                  onChange={(event) => setDurationMins(event.target.value)}
+                  placeholder="45"
+                  className="input"
+                />
+              </label>
+            ) : null}
+            <FieldHint>{fieldHints.duration}</FieldHint>
+          </fieldset>
+        </div>
+
+        <div className="edit-field">
+          <div className="edit-field__row">
+            <div>
+              <p className="edit-field__label" id="edit-discounts-label">
+                Group discounts
+              </p>
+              <p className="edit-field__hint">
+                Friends and couples get a little off when they book together. Never applies to
+                add-ons.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              role="switch"
+              className="switch"
+              aria-labelledby="edit-discounts-label"
+              checked={groupPricing}
+              onChange={(event) => setGroupPricing(event.target.checked)}
+            />
+          </div>
+          {groupPricing ? (
+            <>
+              <table className="discount-table">
+                <caption className="visually-hidden">Group discount by group size</caption>
+                <tbody>
+                  {GROUP_DISCOUNT_TIERS.map((tier) => (
+                    <tr key={tier.guests}>
+                      <th scope="row">
+                        {tier.guests === '5+' ? '5 or more' : `${tier.guests} guests`}
+                      </th>
+                      <td>−{tier.percent}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {priceCents && guestCount > 1 ? (
+                <p className="edit-field__hint">
+                  A group of {guestCount} booking together pays you{' '}
+                  {formatSgd(discountedLessonCents(priceCents, guestCount, true))} instead of{' '}
+                  {formatSgd(priceCents * guestCount)}.
+                </p>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      </>
+    )
+  }
+
+  function renderSection(sectionKey) {
+    if (sectionKey === 'basics') {
+      return (
+        <>
           <label className="label">
             Title
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(event) => setTitle(event.target.value)}
               placeholder="e.g. Learn latte art with me"
               className="input"
             />
             <FieldHint>{fieldHints.title}</FieldHint>
           </label>
-
           <label className="label">
             Description
             <textarea
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(event) => setDescription(event.target.value)}
               placeholder="What will guests learn or experience?"
-              rows={4}
+              rows={5}
               className="input input--textarea"
             />
             <FieldHint>{fieldHints.description}</FieldHint>
           </label>
-
           <label className="label">
             Category
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(event) => setCategory(event.target.value)}
               className="input"
             >
               <option value="">Select a category</option>
@@ -548,82 +869,24 @@ export default function EditListing() {
             </select>
             <FieldHint>{fieldHints.category}</FieldHint>
           </label>
-
-          <h2 className="form-section__title">Price and time</h2>
-          <div className="form__row">
-            <div>
-              <label className="label">
-                Price per person (SGD)
-                <input
-                  type="number"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="20"
-                  min="1"
-                  step="0.01"
-                  className="input"
-                />
-              </label>
-              <FieldHint>{fieldHints.price}</FieldHint>
-            </div>
-
-            <label className="label">
-              Spots per session
-              <input
-                type="number"
-                value={maxGuests}
-                onChange={(e) => setMaxGuests(e.target.value)}
-                placeholder="4"
-                min="1"
-                className="input"
-              />
-              <FieldHint>{fieldHints.spots}</FieldHint>
-            </label>
-          </div>
-
-          <ListingPricePanel breakdown={breakdown} groupSize={guestCount} />
-
-          <label className="label">
-            Duration (mins)
-            <input
-              type="number"
-              value={durationMins}
-              onChange={(e) => setDurationMins(e.target.value)}
-              placeholder="60"
-              min="1"
-              className="input"
-            />
-          </label>
-          <span className="hint">
-            New sessions use this length. Sessions already added keep theirs.
-          </span>
-          <FieldHint>{fieldHints.duration}</FieldHint>
-
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={groupPricing}
-              onChange={(e) => setGroupPricing(e.target.checked)}
-            />
-            Offer group discounts
-          </label>
-          <span className="hint">
-            5% off for 2 guests, up to 20% for 5 or more. Applies to the lesson
-            price per person.
-          </span>
-          {discountExample ? <p className="hint group-discount-example">{discountExample}</p> : null}
-
-          {addonsAvailable ? (
-            <ListingAddonsEditor addons={addons} onChange={setAddons} fieldHints={fieldHints} />
-          ) : null}
-
-          {typesAvailable ? (
-            <SessionTypesEditor types={sessionTypes} onChange={setSessionTypes} fieldHints={fieldHints} />
-          ) : null}
-
-          <BookingCutoffFields value={bookingCutoff} onChange={setBookingCutoff} />
-
-          <h2 className="form-section__title">Location</h2>
+        </>
+      )
+    }
+    if (sectionKey === 'price') return renderPrice()
+    if (sectionKey === 'addons') {
+      return <ListingAddonsEditor addons={addons} onChange={setAddons} fieldHints={fieldHints} />
+    }
+    if (sectionKey === 'types') {
+      return (
+        <SessionTypesEditor types={sessionTypes} onChange={setSessionTypes} fieldHints={fieldHints} />
+      )
+    }
+    if (sectionKey === 'notice') {
+      return <BookingCutoffFields value={bookingCutoff} onChange={setBookingCutoff} />
+    }
+    if (sectionKey === 'location') {
+      return (
+        <>
           <PostalAddressFields
             value={fullAddress}
             onChange={setFullAddress}
@@ -634,53 +897,237 @@ export default function EditListing() {
           />
           <FieldHint>{fieldHints.fullAddress}</FieldHint>
           <ArrivalInstructionsField value={arrivalInstructions} onChange={setArrivalInstructions} />
-
-          <h2 className="form-section__title">Photos</h2>
-          <PhotoTips />
+        </>
+      )
+    }
+    if (sectionKey === 'photos') {
+      return (
+        <>
           <ListingPhotosEditor
             photos={photos}
             onChange={setPhotos}
             max={MAX_PHOTOS}
             pickerRef={photoPickerRef}
             error={photoError}
+            slots={PHOTO_SLOTS}
           />
+          <p className="edit-tip">
+            <Icon name="sparkle" size={18} />
+            {PHOTO_LIGHT_TIP}
+          </p>
+        </>
+      )
+    }
+    if (sectionKey === 'provided') {
+      return <WhatsProvidedFields value={whatsProvided} onChange={setWhatsProvided} showLegend={false} />
+    }
+    return <WhatToBringFields value={whatToBring} onChange={setWhatToBring} showLegend={false} />
+  }
 
-          <WhatsProvidedFields value={whatsProvided} onChange={setWhatsProvided} />
-          <WhatToBringFields value={whatToBring} onChange={setWhatToBring} />
+  const saveStatus = loading
+    ? photos.some((photo) => photo.file)
+      ? 'Uploading photos…'
+      : 'Saving…'
+    : error || (isDirty ? 'Unsaved changes' : savedNote || 'All changes saved')
 
-          {error ? (
-            <p className="wizard__note" role="status">
-              {error}
+  return (
+    <div className={`page edit-page${sectionId ? ' edit-page--section' : ' edit-page--overview'}`}>
+      {unsavedGuard}
+
+      <header className="edit-head">
+        <Link to="/hosting" className="edit-head__back">
+          <Icon name="chevronLeft" size={16} />
+          Back to hosting
+        </Link>
+        <div className="edit-head__name">
+          <h1 className="edit-head__title">{name}</h1>
+          {statusBadge()}
+        </div>
+        {/* Manage dates is about the schedule, so it sits with the next date. */}
+        <p className="edit-head__meta">
+          {nextLine ? <span className="edit-head__next">{nextLine}</span> : null}
+          <Link to="/hosting" className="edit-head__dates">
+            <Icon name="calendar" size={16} />
+            Manage dates
+          </Link>
+        </p>
+      </header>
+
+      <div className="edit-layout">
+        <div className="edit-overview">
+          <div className="edit-bar">
+            <Link to="/hosting" className="edit-bar__back" aria-label="Back to hosting">
+              <Icon name="chevronLeft" size={22} />
+            </Link>
+            <h1 className="edit-bar__title">Edit listing</h1>
+            <Link to={`/listings/${id}`} className="edit-bar__preview">
+              <Icon name="eye" size={18} />
+              Preview
+            </Link>
+          </div>
+
+          <div className="edit-summary">
+            {photos[0] ? (
+              <img src={photos[0].previewUrl} alt="" className="edit-summary__cover" />
+            ) : (
+              <span className="edit-summary__cover edit-summary__cover--empty" aria-hidden="true">
+                <Icon name="camera" size={22} />
+              </span>
+            )}
+            <div className="edit-summary__copy">
+              {statusBadge()}
+              <p className="edit-summary__title">{name}</p>
+              {nextLine ? <p className="edit-summary__next">{nextLine}</p> : null}
+            </div>
+            <Link to="/hosting" className="btn btn--secondary edit-summary__dates">
+              <Icon name="calendar" size={18} />
+              Manage dates
+            </Link>
+          </div>
+
+          {wins ? (
+            <p className="edit-wins">
+              <Icon name="star" size={18} />
+              <span>
+                <strong>
+                  {wins} quick win{wins === 1 ? '' : 's'}
+                </strong>{' '}
+                would make this listing easier to book. {wins === 1 ? "It's" : "They're"} marked
+                below.
+              </span>
             </p>
           ) : null}
 
-          <Button
-            type="submit"
-            variant="primary"
-            loading={loading}
-            loadingLabel={photos.some((photo) => photo.file) ? 'Uploading' : 'Saving'}
-          >
-            Save changes
-          </Button>
+          <nav className="edit-nav" aria-label="Listing sections">
+            {EDIT_SECTION_GROUPS.map((group) => {
+              const shown = group.sections.filter((section) => sectionShown(section.id))
+              if (!shown.length) return null
+              return (
+                <div key={group.label} className="edit-nav__group">
+                  <h2 className="edit-nav__heading">{group.label}</h2>
+                  <ul className="edit-nav__list">
+                    {shown.map((section) => {
+                      const summary = summaries[section.id]
+                      const on = section.id === activeId
+                      return (
+                        <li key={section.id}>
+                          <Link
+                            to={{ search: `?section=${section.id}` }}
+                            className={`edit-nav__row${on ? ' edit-nav__row--on' : ''}${
+                              summary.needsWork ? ' edit-nav__row--todo' : ''
+                            }`}
+                            aria-current={on ? 'page' : undefined}
+                          >
+                            <span className="edit-nav__copy">
+                              <span className="edit-nav__label">{section.label}</span>
+                              <span className="edit-nav__summary">{summary.text}</span>
+                            </span>
+                            {summary.needsWork ? (
+                              <span className="edit-nav__dot" aria-hidden="true" />
+                            ) : null}
+                            <Icon name="chevronRight" size={18} className="edit-nav__chevron" />
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )
+            })}
+          </nav>
+
+          <div className="edit-danger">
+            <h2 className="edit-nav__heading">Listing status</h2>
+            <button
+              type="button"
+              className="edit-danger__delete"
+              onClick={() => {
+                setDeleteError('')
+                setDeleteOpen(true)
+              }}
+            >
+              Delete listing
+            </button>
+            <p className="edit-field__hint">
+              You&apos;ll be asked to confirm first. A listing with upcoming bookings can&apos;t
+              be deleted until those sessions are cancelled.
+            </p>
+          </div>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className="edit-panel"
+          aria-labelledby="edit-section-title"
+          noValidate
+        >
+          <div className="edit-panel__bar">
+            <Link to={{ search: '' }} className="edit-panel__back" aria-label="All sections">
+              <Icon name="chevronLeft" size={22} />
+            </Link>
+            <div className="edit-panel__titles">
+              <p className="edit-panel__listing">{name}</p>
+              <h2 id="edit-section-title" className="edit-panel__title">
+                {activeLabel}
+              </h2>
+            </div>
+          </div>
+          <p className="edit-panel__intro">{SECTION_INTROS[activeId]}</p>
+          <div className="edit-panel__body">{renderSection(activeId)}</div>
+
+          <div className="edit-savebar">
+            <p
+              className={`edit-savebar__status${
+                error ? ' edit-savebar__status--error' : isDirty ? ' edit-savebar__status--dirty' : ''
+              }`}
+              role="status"
+            >
+              {saveStatus}
+            </p>
+            <div className="edit-savebar__actions">
+              <button
+                type="button"
+                className="btn btn--secondary"
+                disabled={!isDirty}
+                onClick={discardChanges}
+              >
+                Discard
+              </button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={!isDirty && !loading}
+                loading={loading}
+                loadingLabel={photos.some((photo) => photo.file) ? 'Uploading' : 'Saving'}
+              >
+                Save changes
+              </Button>
+            </div>
+          </div>
         </form>
 
-        <div className="edit-listing-delete">
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => {
-              setDeleteError('')
-              setDeleteOpen(true)
-            }}
-          >
-            Delete listing
-          </Button>
-        </div>
+        <aside className="edit-preview" aria-label="How guests see it">
+          <p className="edit-nav__heading">How guests see it</p>
+          <Card
+            mode="browse"
+            image={photos[0]?.previewUrl}
+            badge={category || 'Other'}
+            title={title.trim() || name}
+            titleLevel={3}
+            metaItems={[nextSession ? formatSessionDay(nextSession.starts_at) : '', area].filter(Boolean)}
+            price={priceCents ? `${formatSgd(guestFacingPriceCents(priceCents))}/person` : 'S$—/person'}
+          />
+          <p className="edit-field__hint">Updates as you edit. Only saved changes go live.</p>
+          <Link to={`/listings/${id}`} className="btn btn--secondary edit-preview__open">
+            <Icon name="eye" size={18} />
+            Preview full listing
+          </Link>
+        </aside>
       </div>
 
       {deleteOpen ? (
         <ListingDeleteDialog
-          listing={{ title: listingTitle || title }}
+          listing={{ title: name }}
           sessionCount={deleteStats.sessionCount}
           bookingCount={deleteStats.bookingCount}
           loading={deleteLoading}
@@ -695,6 +1142,7 @@ export default function EditListing() {
         <PhotoSkipDialog
           onAdd={() => {
             setPhotoSkipOpen(false)
+            if (activeId !== 'photos') openSection('photos')
             photoPickerRef.current?.click()
           }}
           onSkip={() => {
@@ -705,4 +1153,13 @@ export default function EditListing() {
       ) : null}
     </div>
   )
+}
+
+function ordinal(n) {
+  const rem10 = n % 10
+  const rem100 = n % 100
+  if (rem10 === 1 && rem100 !== 11) return `${n}st`
+  if (rem10 === 2 && rem100 !== 12) return `${n}nd`
+  if (rem10 === 3 && rem100 !== 13) return `${n}rd`
+  return `${n}th`
 }

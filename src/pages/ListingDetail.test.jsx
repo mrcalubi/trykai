@@ -1821,7 +1821,7 @@ describe('ListingDetail add-ons', () => {
     const section = (
       await screen.findByRole('heading', { name: 'Add a little extra' })
     ).closest('section')
-    expect(within(section).getByText('Optional extras from Mei. Add them at checkout.')).toBeInTheDocument()
+    expect(within(section).getByText('Optional. Pick any of these when you book.')).toBeInTheDocument()
     // After the booking card in the page, so on phones the dates come first.
     expect(
       document.getElementById('booking').compareDocumentPosition(section) &
@@ -1833,8 +1833,9 @@ describe('ListingDetail add-ons', () => {
     expect(within(blooms).getByText('+$17')).toBeInTheDocument()
     expect(within(blooms).getByText('per person')).toBeInTheDocument()
     expect(within(blooms).getByText('A better bunch')).toBeInTheDocument()
-    expect(within(blooms).getByText('Only 4 per session')).toBeInTheDocument()
-    expect(blooms.querySelector('.extras-menu__thumb--empty')).toBeInTheDocument()
+    expect(within(blooms).getByText('4 per session')).toBeInTheDocument()
+    // No photo: an icon tile picked from the name, never an empty or spinning one.
+    expect(blooms.querySelector('.extras-menu__thumb--empty svg')).toBeInTheDocument()
 
     expect(within(wrap).getByText('+$9')).toBeInTheDocument()
     expect(within(wrap).getByText('once per group')).toBeInTheDocument()

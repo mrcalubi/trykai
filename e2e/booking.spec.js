@@ -652,11 +652,11 @@ test('books with an add-on and shows it on the confirmation', async ({ page }) =
 
   await page.goto('/listings/listing-latte')
   await expect(page.getByRole('heading', { name: 'Add a little extra' })).toBeVisible()
-  // Read like a menu: every row has a thumbnail, the price sits on the name's
-  // line inside the card, and a long name wraps instead of pushing it out.
+  // Read like a menu: every row has a tile. On a phone the price sits under
+  // the description; with room it takes its own column beside the name.
   const extras = page.locator('.extras-menu__item')
   await expect(extras).toHaveCount(2)
-  await expect(extras.nth(0)).toContainText('Only 4 per session')
+  await expect(extras.nth(0)).toContainText('4 per session')
   await expect(extras.nth(1)).toContainText('once per group')
   const list = await page.locator('.extras-menu__list').boundingBox()
   if (page.viewportSize().width < 1024) {
@@ -664,12 +664,18 @@ test('books with an add-on and shows it on the confirmation', async ({ page }) =
     const calendar = await page.locator('.detail-calendar').boundingBox()
     expect(list.y).toBeGreaterThan(calendar.y + calendar.height)
   }
+  const besideName = list.width >= 520
   for (const row of [extras.nth(0), extras.nth(1)]) {
     await expect(row.locator('.extras-menu__thumb')).toBeVisible()
     const name = await row.locator('.extras-menu__name').boundingBox()
     const price = await row.locator('.extras-menu__price').boundingBox()
-    expect(Math.abs(price.y - name.y)).toBeLessThan(4)
-    expect(price.x).toBeGreaterThanOrEqual(name.x + name.width)
+    if (besideName) {
+      expect(Math.abs(price.y - name.y)).toBeLessThan(4)
+      expect(price.x).toBeGreaterThanOrEqual(name.x + name.width)
+    } else {
+      expect(price.y).toBeGreaterThanOrEqual(name.y + name.height)
+      expect(Math.abs(price.x - name.x)).toBeLessThan(2)
+    }
     expect(price.x + price.width).toBeLessThanOrEqual(list.x + list.width)
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(

@@ -211,6 +211,19 @@ const PATHS = {
       <path d="M8 12h.01M12 12h.01M16 12h.01" strokeWidth="2.6" />
     </>
   ),
+  chat: (
+    <>
+      <path d="M12 4c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.1-2.9-.4L5 19.5l1.2-3.6C4.5 14.6 3.5 12.9 3.5 11 3.5 7.1 7.3 4 12 4z" />
+      <path d="M8.5 11h.01M12 11h.01M15.5 11h.01" strokeWidth="2.4" />
+    </>
+  ),
+  gift: (
+    <>
+      <rect x="3.5" y="8" width="17" height="4" rx="1" />
+      <path d="M5 12v7a1.5 1.5 0 001.5 1.5h11A1.5 1.5 0 0019 19v-7M12 8v12.5" />
+      <path d="M12 8C10.5 5 7.5 4.5 7.5 6.3 7.5 7.6 9.5 8 12 8zM12 8c1.5-3 4.5-3.5 4.5-1.7 0 1.3-2 1.7-4.5 1.7z" />
+    </>
+  ),
 }
 
 export default function Icon({ name, size = 20, label, className = '', strokeWidth = 1.8 }) {
