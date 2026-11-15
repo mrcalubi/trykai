@@ -3,26 +3,17 @@ import { isBookingClosed } from '../lib/bookingCutoff'
 import { sessionDayLabel, sessionTimeRange } from '../lib/hostSessions'
 import { isLowSpots, spotsLabel } from '../lib/listingSpots'
 import { classDates, datesLabel } from '../lib/sessionTypes'
+import { formatMonthTitle, monthCells } from '../lib/sessionCalendar'
+import {
+  datesInMonth,
+  hasSeveralClasses,
+  isBookable,
+  monthDatesLabel,
+  monthsWithDates,
+  sessionsOfClass,
+} from '../lib/classCalendar'
 
-const TIME_ZONE = 'Asia/Singapore'
-
-function monthHeading(iso, now = Date.now()) {
-  const date = new Date(iso)
-  const sameYear =
-    new Intl.DateTimeFormat('en-SG', { year: 'numeric', timeZone: TIME_ZONE }).format(date) ===
-    new Intl.DateTimeFormat('en-SG', { year: 'numeric', timeZone: TIME_ZONE }).format(new Date(now))
-  return new Intl.DateTimeFormat('en-SG', {
-    month: 'long',
-    ...(sameYear ? {} : { year: 'numeric' }),
-    timeZone: TIME_ZONE,
-  }).format(date)
-}
-
-function tile(iso) {
-  const date = new Date(iso)
-  const part = (options) => new Intl.DateTimeFormat('en-SG', { ...options, timeZone: TIME_ZONE }).format(date)
-  return { weekday: part({ weekday: 'short' }).toUpperCase(), day: part({ day: 'numeric' }) }
-}
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 /**
  * "Pick what you'll make": one card per class. The cards and the chips above
@@ -86,28 +77,31 @@ export function ClassCards({ classes, sessions, filterId, onPick }) {
 }
 
 /**
- * The booking card for a listing with classes: chips that match the cards, and
- * every upcoming date in one list, so an empty month never shows.
+ * The booking card for a listing with classes: chips that match the cards, a
+ * calendar that only lets guests tap days with dates, and that day's times.
+ * It stays the same height however many weeks of dates the host adds.
  */
-export function ClassDateList({
+export function ClassDatePicker({
   listing,
   classes,
   classById,
   sessions,
   filterId,
   onFilter,
+  monthKey,
+  onMonth,
+  dateKey,
+  onDate,
   pickedId,
   onPick,
   disabled = false,
 }) {
-  const shown = filterId ? sessions.filter((session) => session.type_id === filterId) : sessions
-  const groups = []
-  for (const session of shown) {
-    const heading = monthHeading(session.starts_at)
-    const last = groups[groups.length - 1]
-    if (last?.heading === heading) last.sessions.push(session)
-    else groups.push({ heading, sessions: [session] })
-  }
+  const shown = sessionsOfClass(sessions, filterId)
+  const months = monthsWithDates(shown)
+  const monthIndex = months.indexOf(monthKey)
+  const byDay = datesInMonth(shown, monthKey)
+  const monthCount = Object.values(byDay).reduce((sum, list) => sum + list.length, 0)
+  const daySessions = byDay[dateKey] ?? []
   const filterName = classById[filterId]?.name
 
   return (
@@ -116,7 +110,7 @@ export function ClassDateList({
         <div className="class-dates__chips" role="group" aria-label="Class">
           {[{ id: null, name: 'All classes' }, ...classes].map((type) => {
             const on = (filterId ?? null) === type.id
-            const count = type.id ? sessions.filter((session) => session.type_id === type.id).length : sessions.length
+            const count = sessionsOfClass(sessions, type.id).length
             return (
               <button
                 key={type.id ?? 'all'}
@@ -135,7 +129,7 @@ export function ClassDateList({
         </div>
       ) : null}
 
-      {shown.length === 0 ? (
+      {shown.length === 0 || !monthKey ? (
         <p className="class-dates__empty">
           No {filterName ?? ''} dates yet.{' '}
           {filterId ? (
@@ -145,54 +139,110 @@ export function ClassDateList({
           ) : null}
         </p>
       ) : (
-        <div className="class-dates__scroll">
-        {groups.map((group) => (
-          <div key={group.heading} className="class-dates__month">
-            <p className="class-dates__heading">{group.heading}</p>
-            <ul className="class-dates__list">
-              {group.sessions.map((session) => {
-                const day = sessionDayLabel(session.starts_at)
-                const range = sessionTimeRange(session, listing)
-                const className = classById[session.type_id]?.name ?? ''
-                const closed = isBookingClosed(session.starts_at, listing.booking_cutoff_hours)
-                const full = Number(session.spots_remaining) <= 0
-                const { weekday, day: dayNumber } = tile(session.starts_at)
-                const on = pickedId === session.id
+        <>
+          <div className="class-cal">
+            <div className="class-cal__head">
+              <button
+                type="button"
+                className="class-cal__nav"
+                aria-label="Previous month"
+                disabled={monthIndex <= 0}
+                onClick={() => onMonth(months[monthIndex - 1])}
+              >
+                <Icon name="chevron-left" size={18} strokeWidth={2.2} />
+              </button>
+              <div className="class-cal__title">
+                <p className="class-cal__month" aria-live="polite">
+                  {formatMonthTitle(monthKey)}
+                </p>
+                <p className="class-cal__count">{monthDatesLabel(monthCount)}</p>
+              </div>
+              <button
+                type="button"
+                className="class-cal__nav"
+                aria-label="Next month"
+                disabled={monthIndex < 0 || monthIndex >= months.length - 1}
+                onClick={() => onMonth(months[monthIndex + 1])}
+              >
+                <Icon name="chevron-right" size={18} strokeWidth={2.2} />
+              </button>
+            </div>
+            <div className="class-cal__weekdays" aria-hidden="true">
+              {WEEKDAY_LABELS.map((label) => (
+                <span key={label}>{label}</span>
+              ))}
+            </div>
+            <div className="class-cal__grid" role="group" aria-label={formatMonthTitle(monthKey)}>
+              {monthCells(monthKey).map((cell, index) => {
+                if (!cell) return <span key={`blank-${index}`} />
+                const list = byDay[cell.dateKey]
+                if (!list) {
+                  return (
+                    <span key={cell.dateKey} className="class-cal__day class-cal__day--off">
+                      {cell.day}
+                    </span>
+                  )
+                }
+                const on = cell.dateKey === dateKey
+                const several = hasSeveralClasses(list)
                 return (
-                  <li key={session.id}>
-                    <button
-                      type="button"
-                      className={`class-date${on ? ' class-date--on' : ''}`}
-                      aria-pressed={on}
-                      aria-label={`${day}, ${range}${className ? `, ${className}` : ''}, ${
-                        closed ? 'booking closed' : spotsLabel(session.spots_remaining)
-                      }`}
-                      disabled={disabled || closed || full}
-                      onClick={() => onPick(session.id)}
-                    >
-                      <span className="class-date__tile" aria-hidden="true">
-                        <span className="class-date__weekday">{weekday}</span>
-                        <span className="class-date__day">{dayNumber}</span>
-                      </span>
-                      <span className="class-date__text">
-                        <span className="class-date__time">{range}</span>
-                        {className && !filterId ? <span className="class-date__class">{className}</span> : null}
-                      </span>
-                      <span
-                        className={`class-date__spots${
-                          !closed && isLowSpots(session.spots_remaining) ? ' class-date__spots--low' : ''
-                        }`}
-                      >
-                        {closed ? 'Booking closed' : spotsLabel(session.spots_remaining)}
-                      </span>
-                    </button>
-                  </li>
+                  <button
+                    key={cell.dateKey}
+                    type="button"
+                    className={`class-cal__day${on ? ' class-cal__day--on' : ''}`}
+                    aria-pressed={on}
+                    aria-label={`${sessionDayLabel(list[0].starts_at)}, ${list.length} ${
+                      list.length === 1 ? 'time' : 'times'
+                    }${several ? ', more than one class' : ''}`}
+                    onClick={() => onDate(cell.dateKey)}
+                  >
+                    {cell.day}
+                    {several ? <span className="class-cal__dot" aria-hidden="true" /> : null}
+                  </button>
                 )
               })}
-            </ul>
+            </div>
           </div>
-        ))}
-        </div>
+
+          {daySessions.length > 0 ? (
+            <fieldset className="class-times">
+              <legend className="class-times__title">{sessionDayLabel(daySessions[0].starts_at)}</legend>
+              {daySessions.map((session) => {
+                const className = classById[session.type_id]?.name ?? ''
+                const bookable = isBookable(session, listing.booking_cutoff_hours)
+                const on = pickedId === session.id
+                return (
+                  <label
+                    key={session.id}
+                    className={`class-time${on ? ' class-time--on' : ''}${bookable ? '' : ' class-time--off'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="class-time"
+                      className="class-time__radio"
+                      checked={on}
+                      disabled={disabled || !bookable}
+                      onChange={() => onPick(session.id)}
+                    />
+                    <span className="class-time__text">
+                      <span className="class-time__range">{sessionTimeRange(session, listing)}</span>
+                      {className ? <span className="class-time__class">{className}</span> : null}
+                    </span>
+                    <span
+                      className={`class-time__spots${
+                        bookable && isLowSpots(session.spots_remaining) ? ' class-time__spots--low' : ''
+                      }`}
+                    >
+                      {isBookingClosed(session.starts_at, listing.booking_cutoff_hours)
+                        ? 'Booking closed'
+                        : spotsLabel(session.spots_remaining)}
+                    </span>
+                  </label>
+                )
+              })}
+            </fieldset>
+          ) : null}
+        </>
       )}
     </div>
   )

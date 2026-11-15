@@ -73,25 +73,26 @@ async function stub(page) {
 }
 
 test.describe('classes', () => {
-  test('the listing page: class cards and one date list share a filter', async ({ page }) => {
+  test('the listing page: class cards and the calendar share a filter', async ({ page }) => {
     await stub(page)
     await page.goto(`/listings/${LISTING.id}`)
 
     await expect(page.getByRole('heading', { name: /Pick what you/ })).toBeVisible()
-    const rows = page.locator('.class-date')
-    await expect(rows).toHaveCount(4)
+    const calendar = page.locator('.class-cal')
+    await expect(calendar).toBeVisible()
     await expect(page.locator('.detail-calendar')).toHaveCount(0)
+    // Opens on a real date with a time already picked.
+    await expect(calendar.locator('.class-cal__day--on')).toHaveCount(1)
+    await expect(page.locator('.class-time__radio:checked')).toHaveCount(1)
+    await expect(page.getByRole('button', { name: /^Book / })).toBeEnabled()
 
     await page.getByRole('button', { name: 'See Table centrepiece dates' }).click()
-    await expect(rows).toHaveCount(2)
     await expect(page.getByRole('group', { name: 'Class' }).getByRole('button', { name: 'Table centrepiece' })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
-
-    await expect(page.getByRole('button', { name: 'Pick a date' })).toBeDisabled()
-    await rows.first().click()
-    await expect(page.getByRole('button', { name: /^Book .* · Table centrepiece · / })).toBeEnabled()
+    await expect(page.locator('.class-time__class')).toHaveText(['Table centrepiece'])
+    await expect(page.getByRole('button', { name: /^Book .*Table centrepiece · / })).toBeEnabled()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       page.viewportSize().width,
     )
