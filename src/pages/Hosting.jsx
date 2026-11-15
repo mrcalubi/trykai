@@ -82,6 +82,12 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   const [listings, setListings] = useState([])
   const [hostSessions, setHostSessions] = useState([])
   const [sessionTypeRows, setSessionTypeRows] = useState([])
+  const [classesAvailable, setClassesAvailable] = useState(false)
+  // Which class Add dates opens on, and the next class to offer after adding.
+  const [activeFormTypeId, setActiveFormTypeId] = useState(() =>
+    searchParams.get('add') ? searchParams.get('class') : null,
+  )
+  const [nextClassOffer, setNextClassOffer] = useState(null)
   const [addonsByBooking, setAddonsByBooking] = useState({})
   const [notesByBooking, setNotesByBooking] = useState({})
   const [monthSessions, setMonthSessions] = useState([])
@@ -99,7 +105,10 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   const [interestByListing, setInterestByListing] = useState({})
 
   // Reopens Add sessions after the host steps away (e.g. to change spots).
-  const [activeFormId, setActiveFormId] = useState(() => readOpenSessionForm())
+  // Edit listing's "Add dates" on a class lands here with ?add=<listing>&class=<class>.
+  const [activeFormId, setActiveFormId] = useState(
+    () => searchParams.get('add') || readOpenSessionForm(),
+  )
   const restoredFormId = useRef(activeFormId)
   const [selectedEmptyIds, setSelectedEmptyIds] = useState(() => new Set())
   const [expandedEmptyListingIds, setExpandedEmptyListingIds] = useState(() => new Set())
@@ -233,8 +242,9 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
     const loadedListings = listingsResult.error ? [] : (listingsResult.data ?? [])
     const listingIds = loadedListings.map((l) => l.id)
     // Session types (00056); none until it is applied.
-    const { rows: typeRows } = await querySessionTypes(supabase, listingIds)
+    const { rows: typeRows, available: typesOn } = await querySessionTypes(supabase, listingIds)
     setSessionTypeRows(typeRows)
+    setClassesAvailable(typesOn)
     // 00032. Until it is applied the RPC errors; the page simply shows no banner.
     const { data: interestRows } = await supabase.rpc('host_listing_interest')
     const interest = hostInterestById(interestRows)
@@ -422,10 +432,26 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
       ?.scrollIntoView?.({ block: 'start' })
   }, [loading, listings])
 
-  function openSessionForm(listingId) {
+  function openSessionForm(listingId, typeId = null) {
+    setNextClassOffer(null)
+    setActiveFormTypeId(typeId)
     setActiveFormId(listingId)
     writeOpenSessionForm(listingId)
   }
+
+  // The form opened from ?add= at load; take the link off the address.
+  useEffect(() => {
+    if (!searchParams.get('add')) return
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('add')
+        next.delete('class')
+        return next
+      },
+      { replace: true },
+    )
+  }, [searchParams, setSearchParams])
 
   /** Cancel, a successful create, or deleting the listing: the draft is done with. */
   function closeSessionForm() {
@@ -502,6 +528,10 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
     setBookingStatusMessage(summaries.join(' '))
     closeSessionForm()
     await loadData()
+    // One batch is one class: offer the next class while the host is here.
+    const classes = typesByListing(sessionTypeRows)[listingId] ?? []
+    const other = typeId && created > 0 ? classes.find((item) => item.id !== typeId) : null
+    setNextClassOffer(other ? { listingId, typeId: other.id, name: other.name } : null)
     return {}
   }
 
@@ -913,7 +943,18 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
       )}
 
       {bookingStatusMessage && (
-        <p className="success-message">{bookingStatusMessage}</p>
+        <p className="success-message">
+          {bookingStatusMessage}
+          {nextClassOffer ? (
+            <button
+              type="button"
+              className="success-message__action"
+              onClick={() => openSessionForm(nextClassOffer.listingId, nextClassOffer.typeId)}
+            >
+              Add dates for {nextClassOffer.name}
+            </button>
+          ) : null}
+        </p>
       )}
 
       {error && <p className="error-message error-message--spaced">{error}</p>}
@@ -1149,6 +1190,10 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                         existingSessions={hostSessions}
                         otherListings={listings.filter((other) => other.id !== listing.id)}
                         sessionTypes={activeTypesByListing[listing.id] ?? []}
+                        classNameById={typeNameById}
+                        classesAvailable={classesAvailable}
+                        initialTypeId={activeFormTypeId}
+                        onTypeCreated={(row) => setSessionTypeRows((prev) => [...prev, row])}
                         subtitle={`${listing.title} · ${listingDatesLine(openCount, bookedCount).replace(' · ', ', ')}`}
                         onCancel={closeSessionForm}
                         onCreated={(payload) => handleCreateSessions(listing.id, payload)}

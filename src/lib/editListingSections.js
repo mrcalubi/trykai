@@ -20,7 +20,7 @@ export const EDIT_SECTION_GROUPS = [
       { id: 'basics', label: 'The basics' },
       { id: 'price', label: 'Price and time' },
       { id: 'addons', label: 'Add-ons' },
-      { id: 'types', label: 'Session types' },
+      { id: 'types', label: 'Classes' },
     ],
   },
   {
@@ -63,7 +63,8 @@ function plural(count, one, many = `${one}s`) {
 function namesLine(count, noun, names) {
   if (!count) return { text: 'None yet' }
   const shown = names.filter(Boolean).join(', ')
-  return { text: shown ? `${plural(count, noun)} · ${shown}` : plural(count, noun) }
+  const label = plural(count, noun, noun.endsWith('s') ? `${noun}es` : `${noun}s`)
+  return { text: shown ? `${label} · ${shown}` : label }
 }
 
 /**
@@ -99,7 +100,7 @@ export function sectionSummaries(values) {
     ),
     types: namesLine(
       values.sessionTypes?.length ?? 0,
-      'type',
+      'class',
       (values.sessionTypes ?? []).map((type) => type.name?.trim()),
     ),
     notice: { text: `Guests can book until ${bookingCutoffLabel(values.bookingCutoffHours)} before` },

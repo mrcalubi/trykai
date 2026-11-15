@@ -115,7 +115,8 @@ const SECTION_INTROS = {
   basics: 'What guests read first when they find your session.',
   price: 'Changes apply to new bookings. Existing bookings keep their price.',
   addons: 'Extras guests can add when they book.',
-  types: 'Different versions of the session. Each date is one of these.',
+  types:
+    'Teach more than one class under this listing? Add each one here. Every date you add is one of these classes, and guests pick a class by picking a date.',
   notice: 'How close to the start guests can still book.',
   location: 'Guests see only the area until they book.',
   photos: 'Real photos of your session, taken on your phone, are perfect.',
@@ -341,7 +342,7 @@ export default function EditListing() {
     navigate({ search: `?section=${next}` })
   }
 
-  function collectHints() {
+  function collectHints(typesToCheck = sessionTypes) {
     const hints = {}
     if (!title.trim()) hints.title = LISTING_FIELD_HINTS.title
     if (!description.trim()) hints.description = LISTING_FIELD_HINTS.description
@@ -356,7 +357,7 @@ export default function EditListing() {
     if (!area) hints.area = LISTING_FIELD_HINTS.area
     if (!fullAddress.trim()) hints.fullAddress = LISTING_FIELD_HINTS.fullAddress
     if (addonsAvailable) Object.assign(hints, addonFieldHints(addons))
-    if (typesAvailable) Object.assign(hints, sessionTypeFieldHints(sessionTypes))
+    if (typesAvailable) Object.assign(hints, sessionTypeFieldHints(typesToCheck))
     return hints
   }
 
@@ -369,7 +370,8 @@ export default function EditListing() {
     setError(problem.message)
   }
 
-  async function saveListing() {
+  async function saveListing(overrides = {}) {
+    const typesToSave = overrides.sessionTypes ?? sessionTypes
     setError('')
     setPhotoError('')
     setSavedNote('')
@@ -388,7 +390,7 @@ export default function EditListing() {
       setLoading(false)
       setPhotoError(PHOTO_UPLOAD_ERROR)
       if (activeId !== 'photos') openSection('photos')
-      return
+      return false
     }
 
     const listingPayload = {
@@ -432,7 +434,7 @@ export default function EditListing() {
     if (updateError) {
       setLoading(false)
       showSaveProblem(updateError)
-      return
+      return false
     }
 
     // After the update, not before: set_listing_spots writes this same row, and
@@ -446,7 +448,7 @@ export default function EditListing() {
     if (spotsError) {
       setLoading(false)
       showSaveProblem(spotsError)
-      return
+      return false
     }
 
     let nextAddons = addons
@@ -469,21 +471,21 @@ export default function EditListing() {
         if (fresh.loaded) setSavedAddons(fresh.addons)
         setLoading(false)
         showSaveProblem(addonError)
-        return
+        return false
       }
     }
 
-    let nextTypes = sessionTypes
+    let nextTypes = typesToSave
     if (typesAvailable && typesLoaded) {
       const { error: typesError, insertedIds } = await saveSessionTypes({
         client: supabase,
         listingId: id,
-        types: sessionTypes,
+        types: typesToSave,
         existing: savedSessionTypes,
         userId,
         storage: supabase.storage,
       })
-      nextTypes = sessionTypes.map((type) =>
+      nextTypes = typesToSave.map((type) =>
         insertedIds?.[type.key] ? { ...type, id: insertedIds[type.key] } : type,
       )
       if (typesError && !isMissingSessionTypes(typesError)) {
@@ -493,7 +495,7 @@ export default function EditListing() {
         if (fresh.loaded) setSavedSessionTypes(fresh.types)
         setLoading(false)
         showSaveProblem(typesError)
-        return
+        return false
       }
     }
 
@@ -501,7 +503,7 @@ export default function EditListing() {
     // was inserted carries its id, so the next save updates rather than adds.
     const savedPhotos = photosFromUrls(photoUrls)
     photos.forEach(revokePhotoUrls)
-    const nextSaved = { ...values, photos: savedPhotos, addons: nextAddons, sessionTypes: nextTypes }
+    const nextSaved = { ...values, ...overrides, photos: savedPhotos, addons: nextAddons, sessionTypes: nextTypes }
     setPhotos(savedPhotos)
     setAddons(nextAddons)
     setSessionTypes(nextTypes)
@@ -513,6 +515,21 @@ export default function EditListing() {
     setLoading(false)
     // Only does anything when this edit put the listing back in the queue.
     void notifyListingSubmitted()
+    return true
+  }
+
+  /** A class card's Save (or Remove): the same save as the bar, from the card. */
+  async function saveFromCard(overrides = {}) {
+    const hints = collectHints(overrides.sessionTypes)
+    const keys = Object.keys(hints)
+    if (keys.length) {
+      setFieldHints(hints)
+      setSavedNote('')
+      const target = sectionForHint(keys[0])
+      setError(target === activeId ? '' : `Check ${editSection(target).label} before saving.`)
+      return false
+    }
+    return saveListing(overrides)
   }
 
   async function handleSubmit(event) {
@@ -878,7 +895,17 @@ export default function EditListing() {
     }
     if (sectionKey === 'types') {
       return (
-        <SessionTypesEditor types={sessionTypes} onChange={setSessionTypes} fieldHints={fieldHints} />
+        <SessionTypesEditor
+          types={sessionTypes}
+          savedTypes={savedSessionTypes}
+          onChange={setSessionTypes}
+          onSave={saveFromCard}
+          saving={loading}
+          fieldHints={fieldHints}
+          upcomingSessions={upcomingSessions}
+          listingId={id}
+          priceLabel={priceCents ? formatSgd(guestFacingPriceCents(priceCents)) : ''}
+        />
       )
     }
     if (sectionKey === 'notice') {

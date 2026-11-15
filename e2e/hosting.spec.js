@@ -74,7 +74,7 @@ test.describe('host add sessions', () => {
     await expect(sheet.locator('.add-dates__total')).toContainText('32 spots for guests to book')
     await expect(sheet.getByRole('button', { name: 'Add 8 sessions' })).toBeVisible()
     await expect(sheet.locator('.add-dates__row-day')).toHaveCount(5)
-    await sheet.getByRole('button', { name: 'See all 8 sessions' }).click()
+    await sheet.getByRole('button', { name: 'See all 8' }).click()
     await expect(sheet.locator('.add-dates__row-day')).toHaveCount(8)
 
     // Dropping one session keeps the date's other time.

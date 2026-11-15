@@ -79,9 +79,11 @@ begin
     if (select type_id from public.sessions where id = v_session) is distinct from t_bouquet then
       raise exception 'the new session should carry its type';
     end if;
-    -- Same time, same type: spots are added.
-    v_result := public.add_listing_session(v_listing, v_at, 2, t_bouquet);
-    if v_result->>'action' <> 'merged' then raise exception 'same type at the same time should merge'; end if;
+    -- Same time, same type: refused, so spots never stack past the listing's (00057).
+    v_failed := false;
+    begin perform public.add_listing_session(v_listing, v_at, 2, t_bouquet);
+    exception when others then v_failed := true; end;
+    if not v_failed then raise exception 'the same type at the same time should be refused'; end if;
     -- Same time, different type: refused.
     v_failed := false;
     begin perform public.add_listing_session(v_listing, v_at, 2, t_centre);

@@ -17,6 +17,15 @@ import {
   singaporeMonthKey,
 } from '../lib/sessionBatch'
 import { readSessionDraft, writeSessionDraft } from '../lib/sessionFormDraft'
+import { supabase } from '../lib/supabase'
+import {
+  MAX_SESSION_TYPES,
+  SESSION_TYPE_DESCRIPTION_MAX,
+  SESSION_TYPE_NAME_MAX,
+  classDates,
+  createSessionType,
+  datesLabel,
+} from '../lib/sessionTypes'
 import Button from './ui/Button'
 import Icon from './ui/Icon'
 import DateMultiSelectCalendar from './DateMultiSelectCalendar'
@@ -111,6 +120,10 @@ export default function AddSessionsForm({
   existingSessions,
   otherListings = [],
   sessionTypes = [],
+  classNameById = {},
+  classesAvailable = false,
+  initialTypeId = null,
+  onTypeCreated,
   subtitle = '',
   onCancel,
   onCreated,
@@ -155,7 +168,15 @@ export default function AddSessionsForm({
   const [focusDateKey, setFocusDateKey] = useState(null)
   // Session types (00056): one type for the whole batch. One type is picked
   // for the host; with more, they choose.
-  const [typeId, setTypeId] = useState(() => (sessionTypes.length === 1 ? sessionTypes[0].id : null))
+  const [typeId, setTypeId] = useState(() => {
+    if (initialTypeId && sessionTypes.some((type) => type.id === initialTypeId)) return initialTypeId
+    return sessionTypes.length === 1 ? sessionTypes[0].id : null
+  })
+  const [newClassOpen, setNewClassOpen] = useState(false)
+  const [newClassName, setNewClassName] = useState('')
+  const [newClassDescription, setNewClassDescription] = useState('')
+  const [newClassError, setNewClassError] = useState('')
+  const [newClassSaving, setNewClassSaving] = useState(false)
   const chosenType = sessionTypes.find((type) => type.id === typeId) ?? null
   const dateRowRefs = useRef({})
   const closeRef = useRef(null)
@@ -242,8 +263,10 @@ export default function AddSessionsForm({
       durationMins: duration,
       existingSessions,
       listingId: listing.id,
+      typeId: chosenType?.id ?? null,
+      classNameById,
     })
-  }, [durationOk, overLimit, timesMap, duration, existingSessions, listing.id])
+  }, [durationOk, overLimit, timesMap, duration, existingSessions, listing.id, chosenType, classNameById])
 
   const accepted = useMemo(
     () => [...(preview?.accepted ?? [])].sort((a, b) => a.startsAt - b.startsAt),
@@ -251,8 +274,14 @@ export default function AddSessionsForm({
   )
   const skipped = preview?.skipped ?? []
   const sessionCount = overLimit ? startCount : accepted.length
-  const visibleRows =
-    showAll || accepted.length <= COLLAPSED_ROWS + 1 ? accepted : accepted.slice(0, COLLAPSED_ROWS)
+  // Added and skipped dates in one list, so a skipped date shows where it falls.
+  const rows = [
+    ...accepted.map((item) => ({ item, skipped: false })),
+    ...skipped.map((item) => ({ item, skipped: true })),
+  ].sort((a, b) => a.item.startsAt - b.item.startsAt)
+  const visibleRows = showAll || rows.length <= COLLAPSED_ROWS + 1 ? rows : rows.slice(0, COLLAPSED_ROWS)
+  const clashSkips = skipped.filter((item) => item.reason !== 'in the past').length
+  const classClash = skipped.some((item) => item.otherClass)
   const chipTimes = [...new Set([...PRESET_TIMES, ...times])].sort()
 
   useLayoutEffect(() => {
@@ -414,10 +443,38 @@ export default function AddSessionsForm({
     setTimesByDate((prev) => ({ ...prev, [dateKey]: [...(prev[dateKey] ?? ['']), ''] }))
   }
 
+  async function addClass(event) {
+    event?.preventDefault?.()
+    const name = newClassName.trim()
+    if (!name) {
+      setNewClassError('Give this class a name.')
+      return
+    }
+    setNewClassSaving(true)
+    setNewClassError('')
+    const { row, error: createError } = await createSessionType(
+      supabase,
+      listing.id,
+      { name, description: newClassDescription },
+      sessionTypes.length,
+    )
+    setNewClassSaving(false)
+    if (createError || !row) {
+      setNewClassError("We couldn't add that class. Try again.")
+      return
+    }
+    onTypeCreated?.(row)
+    setTypeId(row.id)
+    setNewClassOpen(false)
+    setNewClassName('')
+    setNewClassDescription('')
+    edited()
+  }
+
   async function submit() {
     setError('')
     if (sessionTypes.length > 0 && !chosenType) {
-      setError('Pick a session type for these dates.')
+      setError('Pick a class for these dates.')
       return
     }
     if (perDateTimes) {
@@ -467,6 +524,9 @@ export default function AddSessionsForm({
 
   let barNote = 'Pick days and a start time'
   if (overLimit) barNote = `Up to ${SESSION_BATCH_MAX} at a time`
+  else if (clashSkips > 0) {
+    barNote = `${datesLabel(clashSkips)} skipped for clashes`
+  }
   else if (sessionCount > 0 && spotsOk) {
     const spotsTotal = sessionCount * spots
     barNote = `${spotsTotal} ${spotsTotal === 1 ? 'spot' : 'spots'} for guests to book`
@@ -509,32 +569,129 @@ export default function AddSessionsForm({
 
         <div className="add-dates__body">
           {sessionTypes.length > 0 ? (
-            <fieldset className="add-dates__section">
-              <legend className="add-dates__h">Which type?</legend>
-              <div className="choice-chips">
-                {sessionTypes.map((type) => (
-                  <label
-                    key={type.id}
-                    className={`choice-chip${typeId === type.id ? ' choice-chip--on' : ''}`}
-                  >
-                    <input
-                      type="radio"
-                      name={`session-type-${listing.id}`}
-                      checked={typeId === type.id}
-                      onChange={() => {
-                        setTypeId(type.id)
-                        edited()
-                      }}
-                      className="visually-hidden"
-                    />
-                    {type.name}
-                  </label>
-                ))}
+            <fieldset className="add-dates__section add-dates__classes">
+              <legend className="add-dates__h add-dates__legend">
+                Which class?
+                <span className="add-dates__count" aria-hidden="true">
+                  {sessionTypes.length} of {MAX_SESSION_TYPES}
+                </span>
+              </legend>
+              <div className="add-dates__class-list">
+                {sessionTypes.map((type) => {
+                  const on = typeId === type.id
+                  const { count } = classDates(
+                    existingSessions.filter((session) => session.listing_id === listing.id),
+                    type.id,
+                  )
+                  const detail = [type.description, datesLabel(count)].filter(Boolean).join(' · ')
+                  return (
+                    <label key={type.id} className={`add-dates__class${on ? ' add-dates__class--on' : ''}`}>
+                      <input
+                        type="radio"
+                        name={`session-type-${listing.id}`}
+                        checked={on}
+                        aria-labelledby={`${titleId}-class-${type.id}`}
+                        aria-describedby={`${titleId}-class-${type.id}-detail`}
+                        onChange={() => {
+                          setTypeId(type.id)
+                          edited()
+                        }}
+                        className="visually-hidden"
+                      />
+                      {type.photoUrl ? (
+                        <img src={type.photoUrl} alt="" className="add-dates__class-thumb" />
+                      ) : (
+                        <span className="add-dates__class-thumb add-dates__class-thumb--empty" aria-hidden="true">
+                          <Icon name="layers" size={20} />
+                        </span>
+                      )}
+                      <span className="add-dates__class-text">
+                        <span id={`${titleId}-class-${type.id}`} className="add-dates__class-name">
+                          {type.name}
+                        </span>
+                        <span id={`${titleId}-class-${type.id}-detail`} className="add-dates__class-detail">
+                          {detail}
+                        </span>
+                      </span>
+                      <span className="add-dates__class-mark" aria-hidden="true">
+                        {on ? <Icon name="check" size={14} strokeWidth={3} /> : null}
+                      </span>
+                    </label>
+                  )
+                })}
               </div>
+              {newClassOpen ? (
+                <div className="add-dates__new-class" role="group" aria-label="New class">
+                  <label className="label">
+                    Class name
+                    <input
+                      type="text"
+                      className="input"
+                      value={newClassName}
+                      maxLength={SESSION_TYPE_NAME_MAX}
+                      autoFocus
+                      onChange={(event) => setNewClassName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') addClass(event)
+                      }}
+                    />
+                  </label>
+                  <label className="label">
+                    Short description · optional
+                    <input
+                      type="text"
+                      className="input"
+                      value={newClassDescription}
+                      maxLength={SESSION_TYPE_DESCRIPTION_MAX}
+                      onChange={(event) => setNewClassDescription(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') addClass(event)
+                      }}
+                    />
+                  </label>
+                  {newClassError ? <p className="error-message">{newClassError}</p> : null}
+                  <div className="add-dates__new-class-actions">
+                    <Button
+                      type="button"
+                      variant="primary"
+                      loading={newClassSaving}
+                      loadingLabel="Adding"
+                      onClick={addClass}
+                    >
+                      Add class
+                    </Button>
+                    <button
+                      type="button"
+                      className="add-dates__text-btn"
+                      onClick={() => {
+                        setNewClassOpen(false)
+                        setNewClassError('')
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <p className="add-dates__hint">You can add a photo later in Edit listing.</p>
+                </div>
+              ) : sessionTypes.length < MAX_SESSION_TYPES ? (
+                <button type="button" className="add-dates__new-class-btn" onClick={() => setNewClassOpen(true)}>
+                  <Icon name="plus" size={16} strokeWidth={2.4} />
+                  New class
+                </button>
+              ) : null}
               <p className="add-dates__hint">
-                Every date you add now gets this type. Add the other type in a second go.
+                Every date in this batch is this class, and that can&apos;t change later.
+                {sessionTypes.length > 1
+                  ? ` For your other ${sessionTypes.length === 2 ? 'class' : 'classes'}, add a second batch.`
+                  : ''}
               </p>
             </fieldset>
+          ) : classesAvailable ? (
+            <p className="add-dates__classes-none">
+              <Icon name="layers" size={18} />
+              <span>Teach more than one class here?</span>
+              <Link to={`/edit-listing/${listing.id}?section=types`}>Set up classes</Link>
+            </p>
           ) : null}
 
           <section className="add-dates__section" aria-labelledby={`${titleId}-days`}>
@@ -786,7 +943,7 @@ export default function AddSessionsForm({
                 tabIndex={-1}
                 className="add-dates__h"
               >
-                You&apos;re adding
+                {chosenType ? `Adding · ${chosenType.name}` : 'You’re adding'}
               </h3>
               {sessionCount > 0 ? (
                 <span className="add-dates__count">{sessionsLabel(sessionCount)}</span>
@@ -800,62 +957,68 @@ export default function AddSessionsForm({
               </p>
             ) : !durationOk ? (
               <p className="add-dates__empty">Add how long each session runs to see them here.</p>
-            ) : accepted.length === 0 ? (
+            ) : rows.length === 0 ? (
               <p className="add-dates__empty">Pick days and a start time to see your sessions here.</p>
             ) : (
               <ul className="add-dates__list" ref={listRef}>
-                {visibleRows.map((item, index) => {
-                  const day = dayLabel(item.dateKey)
-                  const start = formatSessionTime(item.startsAt)
-                  return (
-                    <li key={`${item.dateKey}-${item.time}`} className="add-dates__row">
-                      <span className="add-dates__row-day">{day}</span>
-                      <span className="add-dates__row-time">
-                        {start} – {formatSessionTime(sessionEnd(item))}
-                      </span>
-                      <button
-                        type="button"
-                        className="add-dates__remove"
-                        aria-label={`Remove ${day}, ${start}`}
-                        onClick={() => removeSession(item, index)}
-                      >
-                        <Icon name="close" size={18} />
-                      </button>
-                      {item.sharedWith?.length ? (
-                        <span className="add-dates__row-note">
-                          Shared with {item.sharedWith.join(', ')}
-                        </span>
-                      ) : null}
-                    </li>
-                  )
-                })}
-                {accepted.length > COLLAPSED_ROWS + 1 ? (
+                {(() => {
+                  let removeIndex = -1
+                  return visibleRows.map(({ item, skipped: isSkipped }) => {
+                    const day = dayLabel(item.dateKey)
+                    const start = formatSessionTime(item.startsAt)
+                    const range = `${start} – ${formatSessionTime(sessionEnd(item))}`
+                    if (isSkipped) {
+                      return (
+                        <li key={`skip-${item.dateKey}-${item.time}`} className="add-dates__row add-dates__row--skipped">
+                          <span className="add-dates__row-day">{day}</span>
+                          <span className="add-dates__row-time">{range}</span>
+                          <span className="add-dates__row-note add-dates__row-note--skip">
+                            Skipped: {item.reason}
+                          </span>
+                        </li>
+                      )
+                    }
+                    removeIndex += 1
+                    const index = removeIndex
+                    return (
+                      <li key={`${item.dateKey}-${item.time}`} className="add-dates__row">
+                        <span className="add-dates__row-day">{day}</span>
+                        <span className="add-dates__row-time">{range}</span>
+                        <button
+                          type="button"
+                          className="add-dates__remove"
+                          aria-label={`Remove ${day}, ${start}`}
+                          onClick={() => removeSession(item, index)}
+                        >
+                          <Icon name="close" size={18} />
+                        </button>
+                        {item.sharedWith?.length ? (
+                          <span className="add-dates__row-note">
+                            Shared with {item.sharedWith.join(', ')}
+                          </span>
+                        ) : null}
+                      </li>
+                    )
+                  })
+                })()}
+                {rows.length > COLLAPSED_ROWS + 1 ? (
                   <li className="add-dates__row add-dates__row--more">
                     <button
                       type="button"
                       className="add-dates__link"
                       onClick={() => setShowAll((value) => !value)}
                     >
-                      {showAll ? 'Show fewer' : `See all ${sessionsLabel(accepted.length)}`}
+                      {showAll ? 'Show fewer' : `See all ${rows.length}`}
                     </button>
                   </li>
                 ) : null}
               </ul>
             )}
 
-            {skipped.length > 0 && !overLimit ? (
-              <div className="add-dates__skipped">
-                <p className="add-dates__skipped-title">
-                  {skipped.length === 1 ? '1 won’t be added' : `${skipped.length} won’t be added`}
-                </p>
-                <ul>
-                  {skipped.map((item) => (
-                    <li key={`skip-${item.dateKey}-${item.time}`}>
-                      {dayLabel(item.dateKey)}, {formatSessionTime(item.startsAt)}: {item.reason}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            {classClash && !overLimit ? (
+              <p className="add-dates__hint">
+                You can only teach one class at a time, so dates that overlap another class are skipped.
+              </p>
             ) : null}
           </section>
         </div>

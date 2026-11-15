@@ -2063,34 +2063,75 @@ describe('ListingDetail session types', () => {
     vi.useRealTimers()
   })
 
-  it('shows the active types and labels each session, removed types included', async () => {
+  const times = () => screen.queryAllByRole('radio')
+  const timeNames = () => times().map((radio) => radio.closest('label').querySelector('.class-time__class')?.textContent)
+  const datedDays = () => [...document.querySelectorAll('.class-cal__grid button')]
+
+  it('shows the classes as cards and opens the calendar on the first date, already picked', async () => {
     renderPage()
-    expect(await screen.findByRole('heading', { name: 'Choose your session' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Old wreath/ })).not.toBeInTheDocument()
-    const day = document.querySelector('.session-day')
-    await waitFor(() => expect(within(day).getAllByRole('button', { name: 'Book' })).toHaveLength(3))
-    expect(within(day).getByText('Hand-tied bouquet')).toBeInTheDocument()
-    expect(within(day).getByText('Old wreath')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: "Pick what you'll make" })).toBeInTheDocument()
+    expect(screen.getByText('2 classes · same price')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Hand-tied bouquet' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Old wreath' })).not.toBeInTheDocument()
+    expect(screen.getByText('Booking fee included. Same price for both classes.')).toBeInTheDocument()
+
+    await waitFor(() => expect(times()).toHaveLength(3))
+    expect(screen.getByText('November 2026')).toBeInTheDocument()
+    expect(screen.getByText('3 dates this month')).toBeInTheDocument()
+    // Only a day with dates can be tapped, and it says it has several classes.
+    expect(datedDays()).toHaveLength(1)
+    expect(datedDays()[0]).toHaveAccessibleName('Thu 12 Nov, 3 times, more than one class')
+    expect(datedDays()[0]).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Previous month' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Next month' })).toBeDisabled()
+    // Removed classes still name their dates.
+    expect(timeNames()).toEqual(['Hand-tied bouquet', 'Table centrepiece', 'Old wreath'])
+    expect(times()[0]).toBeChecked()
+    expect(screen.getByRole('button', { name: /^Book Thu 12 Nov\s*Hand-tied bouquet · / })).toBeEnabled()
+    expect(document.querySelector('.detail-calendar')).not.toBeInTheDocument()
   })
 
-  it('filters dates by type from the chips and the cards', async () => {
+  it('opens on the next month that has dates, never an empty one', async () => {
+    givenSessions([makeSession({ id: 's9', starts_at: hoursFromNow(24 * 30), spots_remaining: 4, type_id: 't2' })])
+    renderPage()
+
+    expect(await screen.findByText('December 2026')).toBeInTheDocument()
+    expect(screen.getByText('1 date this month')).toBeInTheDocument()
+    expect(screen.queryByText(/No .*sessions in/)).not.toBeInTheDocument()
+  })
+
+  it('keeps the class cards and the chips as one filter, and keeps a picked time that fits', async () => {
     const { user } = renderPage()
-    const day = await waitFor(() => {
-      const node = document.querySelector('.session-day')
-      expect(within(node).getAllByRole('button', { name: 'Book' })).toHaveLength(3)
-      return node
-    })
-    const filter = screen.getByRole('group', { name: 'Session type' })
-    await user.click(within(filter).getByRole('button', { name: 'Table centrepiece' }))
-    expect(within(day).getAllByRole('button', { name: 'Book' })).toHaveLength(1)
-    expect(within(day).getByText('Table centrepiece')).toBeInTheDocument()
+    await waitFor(() => expect(times()).toHaveLength(3))
+    const chips = screen.getByRole('group', { name: 'Class' })
 
-    await user.click(within(filter).getByRole('button', { name: 'All' }))
-    expect(within(day).getAllByRole('button', { name: 'Book' })).toHaveLength(3)
+    await user.click(within(chips).getByRole('button', { name: 'Table centrepiece' }))
+    expect(timeNames()).toEqual(['Table centrepiece'])
+    expect(times()[0]).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Showing Table centrepiece dates' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
 
-    await user.click(screen.getByRole('button', { name: /Hand-tied bouquet.*See dates/ }))
-    expect(within(day).getAllByRole('button', { name: 'Book' })).toHaveLength(1)
-    expect(within(filter).getByRole('button', { name: 'Hand-tied bouquet' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(chips).getByRole('button', { name: 'All classes' }))
+    expect(times()).toHaveLength(3)
+    expect(times()[1]).toBeChecked()
+
+    await user.click(screen.getByRole('button', { name: 'See Hand-tied bouquet dates' }))
+    expect(timeNames()).toEqual(['Hand-tied bouquet'])
+    expect(within(chips).getByRole('button', { name: 'Hand-tied bouquet' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('names the picked day and class on the button, then opens checkout', async () => {
+    givenSignedIn()
+    const { user } = renderPage()
+    await waitFor(() => expect(times()).toHaveLength(3))
+
+    await user.click(times()[1])
+    const book = screen.getByRole('button', { name: /^Book Thu 12 Nov\s*Table centrepiece · / })
+    expect(book).toBeEnabled()
+    await user.click(book)
+    expect(await screen.findByRole('button', { name: 'Add a note for Mei' })).toBeInTheDocument()
   })
 
   it('reads sessions without type_id before 00056', async () => {
@@ -2110,6 +2151,6 @@ describe('ListingDetail session types', () => {
     })
     renderPage()
     expect(await screen.findByRole('button', { name: 'Book' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Choose your session' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: "Pick what you'll make" })).not.toBeInTheDocument()
   })
 })
