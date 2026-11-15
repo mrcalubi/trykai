@@ -883,7 +883,7 @@ describe('Dashboard add session', () => {
     expect(screen.queryByText(/who were keen|who was keen/)).not.toBeInTheDocument()
   })
 
-  it('adds spots when the same time is already on, as the database does', async () => {
+  it('skips a time that is already on instead of stacking its spots', async () => {
     const dateKey = dateKeyFromToday(1)
     givenData({
       listings: [makeMyListing()],
@@ -900,15 +900,11 @@ describe('Dashboard add session', () => {
     await openSessionForm(user)
     await fillSession(user, { time: '10:30' })
 
-    expect(screen.getByText('Already on: adds 4 more spots')).toBeInTheDocument()
-    await reviewAndCreate(user)
-    await waitFor(() =>
-      expect(supabase.rpc).toHaveBeenCalledWith('add_listing_session', {
-        p_listing_id: 'listing-1',
-        p_starts_at: `${dateKey}T02:30:00.000Z`,
-        p_spots: 4,
-      }),
-    )
+    expect(screen.getByText('Skipped: already on at this time')).toBeInTheDocument()
+    expect(screen.queryByText(/more spots/)).not.toBeInTheDocument()
+    expect(screen.getByText('No sessions yet')).toBeInTheDocument()
+    await user.click(within(sheet()).getByRole('button', { name: 'Add sessions' }))
+    expect(supabase.rpc.mock.calls.some(([name]) => name === 'add_listing_session')).toBe(false)
   })
 
   it('skips a date that overlaps another class, and says why', async () => {

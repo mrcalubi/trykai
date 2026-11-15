@@ -21,6 +21,7 @@ import {
   skipReasonFromRpcMessage,
   timesByDateFromLists,
   SKIP_BOOKED,
+  SKIP_ALREADY_ON,
   classClashReason,
 } from './sessionBatch'
 
@@ -391,17 +392,16 @@ describe('previewSessionBatch with classes', () => {
       ...options,
     })
 
-  it('adds spots to the same class at the same start and length', () => {
+  it('skips the same class at the same time as already on, never stacking spots', () => {
     const result = preview(own(), { typeId: 't2' })
-    expect(result.accepted).toHaveLength(1)
-    expect(result.accepted[0].mergeInto).toBe('existing')
-    expect(result.skipped).toHaveLength(0)
+    expect(result.accepted).toHaveLength(0)
+    expect(result.skipped[0].reason).toBe(SKIP_ALREADY_ON)
+    expect(result.skipped[0]).not.toHaveProperty('mergeInto')
   })
 
-  it('adds spots on a listing without classes too, even when that date is booked', () => {
-    const booked = own({ type_id: null, bookings: [{ status: 'confirmed' }] })
-    const result = preview(booked)
-    expect(result.accepted[0].mergeInto).toBe('existing')
+  it('skips a repeat time on a listing without classes too', () => {
+    const result = preview(own({ type_id: null }))
+    expect(result.skipped[0].reason).toBe(SKIP_ALREADY_ON)
   })
 
   it('skips another class at that time, and names it', () => {
@@ -419,8 +419,10 @@ describe('previewSessionBatch with classes', () => {
     expect(result.skipped[0].reason).toBe(SKIP_EXISTING)
   })
 
-  it('does not add spots to a different length or a held session', () => {
-    expect(preview(own({ duration_mins: 60 }), { typeId: 't2' }).skipped[0].reason).toBe(SKIP_EXISTING)
-    expect(preview(own({ status: 'held' }), { typeId: 't2' }).skipped[0].reason).toBe(SKIP_EXISTING)
+  it('reads the database refusing a repeat time or another class', () => {
+    expect(skipReasonFromRpcMessage('That time is already on.')).toBe(SKIP_ALREADY_ON)
+    expect(skipReasonFromRpcMessage('That time already has a session of another type.')).toBe(
+      'another class runs then',
+    )
   })
 })

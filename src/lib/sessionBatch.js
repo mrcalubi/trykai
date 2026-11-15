@@ -25,6 +25,7 @@ export const SKIP_EXISTING = 'clashes with an existing session'
 export const SKIP_BOOKED = 'clashes with a booked session'
 export const SKIP_BATCH = 'clashes with another session in this batch'
 export const SKIP_PAST = 'in the past'
+export const SKIP_ALREADY_ON = 'already on at this time'
 
 /** "Table centrepiece runs then": a host teaches one class at a time. */
 export function classClashReason(className) {
@@ -174,10 +175,10 @@ function hasConfirmedBooking(session) {
  * booking decides which listing gets it, so the item is kept and `sharedWith`
  * names those listings. Without `listingId`, any of the host's sessions clash.
  *
- * Classes (00056): `typeId` is the class being added. A session of the same
- * class at exactly the same start and length gets the new spots added
- * (`mergeInto`), as add_listing_session does. Another class at that time is
- * skipped, named from `classNameById` ("Table centrepiece runs then").
+ * Classes (00056): `typeId` is the class being added. The same class at
+ * exactly the same start is skipped as already on: spots come from the
+ * listing and never stack (00057). Another class at that time is skipped,
+ * named from `classNameById` ("Table centrepiece runs then").
  */
 export function previewSessionBatch({
   timesByDate,
@@ -223,26 +224,23 @@ export function previewSessionBatch({
       continue
     }
     const own = listingId ? overlapping.filter((session) => session.listing_id === listingId) : []
-    const mergeTarget =
-      own.length === 1 &&
-      new Date(own[0].starts_at).getTime() === startMs &&
-      existingDuration(own[0], duration) === duration &&
-      ['open', 'full', undefined].includes(own[0].status) &&
-      (own[0].type_id ?? null) === (typeId ?? null)
-        ? own[0]
-        : null
-    if (own.length > 0 && !mergeTarget) {
+    if (own.length > 0) {
       const otherClass = own.find(
         (session) => (session.type_id ?? null) !== (typeId ?? null) && classNameById[session.type_id],
+      )
+      const sameStart = own.some(
+        (session) =>
+          new Date(session.starts_at).getTime() === startMs &&
+          (session.type_id ?? null) === (typeId ?? null),
       )
       skipped.push(
         otherClass
           ? { ...item, reason: classClashReason(classNameById[otherClass.type_id]), otherClass: classNameById[otherClass.type_id] }
-          : { ...item, reason: SKIP_EXISTING },
+          : { ...item, reason: sameStart ? SKIP_ALREADY_ON : SKIP_EXISTING },
       )
       continue
     }
-    if (listingId && overlapping.some((session) => session !== mergeTarget && hasConfirmedBooking(session))) {
+    if (listingId && overlapping.some(hasConfirmedBooking)) {
       skipped.push({ ...item, reason: SKIP_BOOKED })
       continue
     }
@@ -250,7 +248,6 @@ export function previewSessionBatch({
       ? [
           ...new Set(
             overlapping
-              .filter((session) => session !== mergeTarget)
               .map((session) => session.listings?.title)
               .filter(Boolean),
           ),
@@ -265,11 +262,7 @@ export function previewSessionBatch({
       continue
     }
 
-    accepted.push({
-      ...item,
-      ...(sharedWith.length > 0 ? { sharedWith } : {}),
-      ...(mergeTarget ? { mergeInto: mergeTarget.id } : {}),
-    })
+    accepted.push(sharedWith.length > 0 ? { ...item, sharedWith } : item)
   }
 
   return { ok: true, error: null, accepted, skipped }
@@ -299,6 +292,8 @@ export function skipReasonFromRpcMessage(message) {
   const text = message ?? ''
   if (/overlaps/i.test(text) || /overlap/i.test(text)) return SKIP_EXISTING
   if (/in the future/i.test(text)) return SKIP_PAST
+  if (/already on/i.test(text)) return SKIP_ALREADY_ON
+  if (/another type/i.test(text)) return 'another class runs then'
   return text || SKIP_EXISTING
 }
 
