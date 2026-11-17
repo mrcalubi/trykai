@@ -2931,6 +2931,14 @@ input[type='password']::-webkit-password-reveal-button {
   white-space: nowrap;
 }
 
+.ui-card__price-note {
+  margin-left: 6px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
 .ui-card--browse .ui-card__rating {
   font-family: var(--sans);
   font-size: 13px;

@@ -193,7 +193,7 @@ describe('Home listing grid', () => {
 
     const card = await screen.findByRole('link', { name: /Latte art/ })
     // The length sits next to the price so a long session does not read as expensive.
-    expect(within(card).getByText('$51/person · 1 hr 30 min')).toBeInTheDocument()
+    expect(card.textContent).toContain('$51/personfor 1 hr 30 min')
     expect(card.textContent).not.toContain('★')
     // No stray separator where a rating would have been.
     expect(card.textContent.trim().endsWith('·')).toBe(false)
