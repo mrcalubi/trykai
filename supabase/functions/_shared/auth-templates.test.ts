@@ -22,7 +22,7 @@ describe('Confirm signup template', () => {
     expect(html.match(/\{\{ \.Token \}\}/g)).toHaveLength(2) // the code and the inbox preview
     expect(html).toContain('href="{{ .ConfirmationURL }}"')
     expect(html).toContain('href="{{ .SiteURL }}/terms"')
-    expect(html).toContain('href="https://www.instagram.com/trykaisg/"')
+    expect(html).toContain('href="https://www.instagram.com/trykai.sg/"')
     expect(html).toContain('href="https://www.tiktok.com/@trykaisg"')
     expect(html).toContain('src="https://trykai.sg/email/instagram.png"')
     expect(html).toContain('src="https://trykai.sg/email/tiktok.png"')

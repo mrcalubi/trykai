@@ -6,6 +6,6 @@
  * two copies in lockstep.
  */
 export const TRYKAI_SOCIALS = {
-  instagram: 'https://www.instagram.com/trykaisg/',
+  instagram: 'https://www.instagram.com/trykai.sg/',
   tiktok: 'https://www.tiktok.com/@trykaisg',
 }
