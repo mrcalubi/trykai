@@ -226,7 +226,7 @@ In this order after warm-contact launch:
 12. **`add_listing_session` should ignore client `p_spots`.** Hosting sends `listings.max_guests`, but the RPC still accepts any positive number. After launch, take spots from the locked listing row.
 13. **Add a Content Security Policy in vercel.json** (test against Stripe, Supabase, Resend links). Do not add `unsafe-eval`. Client image work stays on the main thread.
 
-14. **Move production to Singapore.** Production was created in Mumbai (`ap-south-1`) by accident. Supabase cannot move a project: create a new `ap-southeast-1` project and cut over the database and auth users, storage, Edge Function secrets, Vault and cron, Stripe webhook URLs, Vercel env, and `PRODUCTION_SUPABASE_PROJECT_REF`. Rui Heng's call on timing; a quiet week after the first bookings.
+14. **Move production to Singapore.** Production was created in Mumbai (`ap-south-1`) by accident. Supabase cannot move a project: create a new `ap-southeast-1` project and cut over the database and auth users, storage, Edge Function secrets, Vault and cron, Stripe webhook URLs, Vercel env, and `PRODUCTION_SUPABASE_PROJECT_REF`. Rui Heng's call on timing; a quiet week after the first bookings. Runbook: OPERATIONS.md, Move production to Singapore.
 15. **Propose a new time to guests.** Booked sessions cannot be edited. Let a host propose a new time that each guest accepts or declines (cancel with full refund).
 16. ~~**Auto-fill area from postal code.**~~ Done 25 October: postal lookup returns OneMap's planning area and fills Area guests see (DECISIONS.md, Postal code drives the listing address and Area).
 17. **Unit number formatted `#XX-XX`.**

@@ -321,6 +321,16 @@ test.describe('listing spots', () => {
     await page.getByRole('button', { name: 'Fewer spots' }).click()
     await page.getByRole('button', { name: 'Fewer spots' }).click()
     await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes' })).toBeVisible()
+
+    // On a 320px phone the status sits above the buttons, not under them.
+    const size = page.viewportSize()
+    await page.setViewportSize({ width: 320, height: 640 })
+    const status = await page.locator('.edit-savebar__status').boundingBox()
+    const actions = await page.locator('.edit-savebar__actions').boundingBox()
+    expect(status.y + status.height).toBeLessThanOrEqual(actions.y + 1)
+    expect(actions.x + actions.width).toBeLessThanOrEqual(320)
+    await page.setViewportSize(size)
+
     await page.getByRole('button', { name: 'Save changes' }).click()
 
     // Saving keeps the host on the section, with a note of what changed.

@@ -11971,6 +11971,28 @@ body.extras-sheet-open {
   min-height: 48px;
 }
 
+/* Narrow phones: the status gets its own line above the two buttons, which
+   share the width, so "Unsaved changes" never runs into them. */
+@media (max-width: 479px) {
+  .edit-savebar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .edit-savebar__status {
+    flex-basis: 100%;
+  }
+
+  .edit-savebar__actions {
+    flex: 1;
+  }
+
+  .edit-savebar__actions > * {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 /* Fields inside a section. */
 .edit-field {
   display: grid;
