@@ -9,7 +9,7 @@ import { categoryIconName } from '../components/ui/categoryIcon'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { browseFlag, keenCountsById } from '../lib/keen'
 import { formatGuestFacingPrice, guestFacingPriceCents } from '../lib/pricing'
-import { cardIncludedLabel, cardPriceLabel } from '../lib/cardExtras'
+import { cardLengthNote } from '../lib/cardExtras'
 import { formatCents } from '../lib/cancellationPolicy'
 import { listingsForGuestBrowse, sortListingsForBrowse } from '../lib/listingSort'
 import { filterNarrows, locationLabel, showLocationFilter, showNewFlags, visibleCategories } from '../lib/browseUi'
@@ -150,7 +150,6 @@ export default function Home() {
           area,
           price_per_person,
           duration_mins,
-          whats_provided,
           category,
           photo_urls,
           created_at,
@@ -489,9 +488,10 @@ export default function Home() {
                     titleLevel={3}
                     // No "No dates yet" here: a card with no dates should still invite a
                     // tap, and the listing page asks for interest instead.
-                    metaItems={[listing.area, nextSessionLabel(listing), cardIncludedLabel(listing.whats_provided)]}
+                    metaItems={[listing.area, nextSessionLabel(listing)]}
                     host={listingHost(listing)}
-                    price={cardPriceLabel(`${formatGuestFacingPrice(listing.price_per_person)}/person`, listing.duration_mins)}
+                    price={`${formatGuestFacingPrice(listing.price_per_person)}/person`}
+                    priceNote={cardLengthNote(listing.duration_mins)}
                     rating={ratings[listing.id]?.rating}
                     reviewCount={ratings[listing.id]?.reviewCount}
                     flag={browseFlag(listing, keenCounts[listing.id], undefined, showNew)}

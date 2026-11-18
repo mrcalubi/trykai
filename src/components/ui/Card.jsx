@@ -40,6 +40,7 @@ export default function Card({
   rating,
   reviewCount,
   price,
+  priceNote,
   metaItems,
   host,
   flag,
@@ -72,7 +73,12 @@ export default function Card({
   const browseMetaLine =
     price || showRating || flag ? (
       <p className="ui-card__meta-line">
-        {price ? <span className="ui-card__price-text">{price}</span> : null}
+        {price ? (
+          <span className="ui-card__price-text">
+            {price}
+            {priceNote ? <span className="ui-card__price-note">{priceNote}</span> : null}
+          </span>
+        ) : null}
         {showRating ? (
           <span className="ui-card__rating">
             <RatingMark rating={rating} reviewCount={reviewCount} />
