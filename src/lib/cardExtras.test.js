@@ -1,27 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { cardIncludedLabel, cardPriceLabel } from './cardExtras'
+import { cardLengthNote } from './cardExtras'
 
-describe('cardPriceLabel', () => {
-  it('adds the session length after the price', () => {
-    expect(cardPriceLabel('S$32/person', 120)).toBe('S$32/person · 2 hr')
-    expect(cardPriceLabel('S$18/person', 90)).toBe('S$18/person · 1 hr 30 min')
+describe('cardLengthNote', () => {
+  it('reads as a short note after the price', () => {
+    expect(cardLengthNote(120)).toBe('for 2 hr')
+    expect(cardLengthNote(90)).toBe('for 1 hr 30 min')
   })
 
-  it('keeps the price alone when the length is unknown', () => {
-    expect(cardPriceLabel('S$18/person', null)).toBe('S$18/person')
-    expect(cardPriceLabel('S$18/person', 0)).toBe('S$18/person')
-  })
-})
-
-describe('cardIncludedLabel', () => {
-  it('prefers food and drinks, then materials', () => {
-    expect(cardIncludedLabel(['Materials', 'Food & drinks'])).toBe('Food & drinks included')
-    expect(cardIncludedLabel(['Equipment', 'Materials'])).toBe('Materials included')
-  })
-
-  it('shows nothing for equipment only, none, or missing data', () => {
-    expect(cardIncludedLabel(['Equipment'])).toBeNull()
-    expect(cardIncludedLabel(['None'])).toBeNull()
-    expect(cardIncludedLabel(null)).toBeNull()
+  it('shows nothing when the length is unknown', () => {
+    expect(cardLengthNote(null)).toBeNull()
+    expect(cardLengthNote(0)).toBeNull()
   })
 })
