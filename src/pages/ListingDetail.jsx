@@ -47,6 +47,7 @@ import {
 import CheckoutAddons from '../components/CheckoutAddons'
 import { CheckoutHostNote } from '../components/BookingCutoffFields'
 import { bookingClosedMessage, isBookingClosed } from '../lib/bookingCutoff'
+import { shouldBringCheckoutIntoView } from '../lib/checkoutScroll'
 import { formatDuration } from '../lib/duration'
 import { edgeFunctionErrorMessage, isPayNowTooFarAheadError } from '../lib/edgeFunctionError'
 import { isLowSpots, spotsLabel } from '../lib/listingSpots'
@@ -213,6 +214,19 @@ export default function ListingDetail() {
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const [hostVerified, setHostVerified] = useState(false)
   const bookingRef = useRef(null)
+
+  // On desktop the booking card sticks while you browse, but checkout is taller
+  // than the screen and flows with the page. Opening it from far down left the
+  // guest looking at an empty column, with add-ons and the guest count above.
+  // Bring its top into view instead (phones show checkout full screen already).
+  useEffect(() => {
+    if (!checkoutSessionId) return
+    const card = bookingRef.current
+    const isDesktop = Boolean(window.matchMedia?.('(min-width: 1024px)')?.matches)
+    if (shouldBringCheckoutIntoView(isDesktop, card?.getBoundingClientRect?.().top)) {
+      card.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+    }
+  }, [checkoutSessionId])
   const [bookingInView, setBookingInView] = useState(false)
   const [shareNote, setShareNote] = useState('')
   const [listingAddons, setListingAddons] = useState([])

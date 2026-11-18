@@ -192,9 +192,11 @@ describe('Home listing grid', () => {
     renderWithRouter(<Home />)
 
     const card = await screen.findByRole('link', { name: /Latte art/ })
-    expect(within(card).getByText('$51/person')).toBeInTheDocument()
+    // The length sits next to the price so a long session does not read as expensive.
+    expect(card.textContent).toContain('$51/personfor 1 hr 30 min')
     expect(card.textContent).not.toContain('★')
-    expect(card.textContent).not.toContain('·')
+    // No stray separator where a rating would have been.
+    expect(card.textContent.trim().endsWith('·')).toBe(false)
   })
 
   it('shows the rating only when listing_ratings returns reviews', async () => {
@@ -210,10 +212,11 @@ describe('Home listing grid', () => {
     const latte = await screen.findByRole('link', { name: /Latte art/ })
     expect(latte.textContent).toContain('$51/person')
     expect(latte.textContent).toContain('★ 4.8 (12)')
-    expect(latte.textContent).not.toContain('·')
+    // The rating sits on its own, with no separator in front of it.
+    expect(latte.textContent).not.toContain('· ★')
     const boxing = screen.getByRole('link', { name: /Boxing basics/ })
     expect(boxing.textContent).not.toContain('★')
-    expect(within(boxing).getByText('$34/person')).toBeInTheDocument()
+    expect(boxing.textContent).toContain('$34/person')
   })
 
   it('asks listing_ratings once for every listing on the page', async () => {

@@ -2931,6 +2931,14 @@ input[type='password']::-webkit-password-reveal-button {
   white-space: nowrap;
 }
 
+.ui-card__price-note {
+  margin-left: 6px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
 .ui-card--browse .ui-card__rating {
   font-family: var(--sans);
   font-size: 13px;
@@ -8042,6 +8050,12 @@ body.lightbox-open {
   flex-direction: column;
   gap: 20px;
   min-width: 0;
+}
+
+/* The listing editor pins its preview because it is alone in its column.
+   Here other cards share the column, so a pinned preview slid over them. */
+.edit-profile__aside .edit-preview {
+  position: static;
 }
 
 .edit-card {

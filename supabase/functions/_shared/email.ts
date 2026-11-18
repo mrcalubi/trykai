@@ -48,7 +48,7 @@ export const EMAIL_SOCIAL_ICON_URLS = {
  * socials.test.js keeps the two copies in lockstep.
  */
 export const TRYKAI_SOCIALS = {
-  instagram: 'https://www.instagram.com/trykaisg/',
+  instagram: 'https://www.instagram.com/trykai.sg/',
   tiktok: 'https://www.tiktok.com/@trykaisg',
 } as const
 
