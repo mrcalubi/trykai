@@ -761,12 +761,16 @@ a {
 
 .home-hero {
   display: grid;
+  /* The column may shrink below the trust pills, which scroll inside it;
+     sized to them, a 320px phone scrolled the whole page sideways. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
   align-items: center;
   padding: 20px 0 24px;
 }
 
 .home-hero__copy {
+  min-width: 0;
   max-width: 640px;
 }
 

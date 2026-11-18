@@ -26,6 +26,19 @@ async function openLocation(page) {
 }
 
 test.describe('browsing listings', () => {
+  test('never scrolls sideways on a 320px phone, however many filters show', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 })
+    await stubAllExternalCalls(page, { listings: [...ONE_PER_CATEGORY, ...WEST_FILLERS, LATTE_ART, BOXING] })
+    await page.goto('/')
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(page.locator('.trust-list__item').first()).toBeVisible()
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
+    // The trust pills scroll inside their own row instead.
+    const row = await page.locator('.trust-list').boundingBox()
+    expect(row.x + row.width).toBeLessThanOrEqual(320)
+  })
+
   test('shows the landing headline above the grid of every active listing', async ({ page }) => {
     await stubAllExternalCalls(page, { listings: [LATTE_ART, BOXING] })
     await page.goto('/')
