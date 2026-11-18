@@ -8052,6 +8052,12 @@ body.lightbox-open {
   min-width: 0;
 }
 
+/* The listing editor pins its preview because it is alone in its column.
+   Here other cards share the column, so a pinned preview slid over them. */
+.edit-profile__aside .edit-preview {
+  position: static;
+}
+
 .edit-card {
   display: flex;
   flex-direction: column;
