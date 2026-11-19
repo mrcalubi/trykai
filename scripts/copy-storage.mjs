@@ -1,8 +1,8 @@
 /**
  * Copies every Storage file from one Supabase project to another.
  *
- * Used for the move to Singapore (OPERATIONS.md, Move production to
- * Singapore). The database restore brings over `storage.buckets` and the
+ * Used for Supabase region moves (OPERATIONS.md, Supabase region move,
+ * step 3.10). The database restore brings over `storage.buckets` and the
  * `storage.objects` rows, but those are only metadata: the files live outside
  * Postgres. This walks each bucket on the old project, downloads every file
  * and uploads it to the same bucket and path on the new one with upsert, so

@@ -1,5 +1,5 @@
--- Point stored URLs at the new project after the Singapore restore.
--- OPERATIONS.md, Move production to Singapore.
+-- Point stored URLs at the new project after a region move.
+-- OPERATIONS.md, Supabase region move (step 3.9).
 --
 -- Profile photos, banners and listing photos are saved as full public URLs
 -- (https://<ref>.supabase.co/storage/v1/object/public/...), so after the
@@ -7,20 +7,47 @@
 -- This replaces "https://<old ref>.supabase.co/" with the new ref in every
 -- text, varchar, json, jsonb and text[] column of every public table.
 --
--- Run in the SQL Editor of the NEW project (check the ref in the URL).
---   1. Set new_ref below. Leave apply = false and run: the Messages tab lists
---      each column and how many rows it would change. Nothing is written.
---   2. Set apply = true and run again. Same list, now changed.
---   3. Run once more with apply = false: it should report 0 rows.
--- Triggers are skipped for the update (session_replication_role = replica),
--- so updated_at stamps, review-status resets and column guards do not fire.
--- Safe to run more than once.
+-- Run with psql against NEW. Inputs come from the environment:
+--   OLD_REF, NEW_REF   the two project refs
+--   APPLY=yes          to write; anything else (or unset) only reports
+-- Run it without APPLY first (lists each column and its row count), then with
+-- APPLY=yes, then without again: it must report 0.
+--
+-- Triggers are off for the update so updated_at stamps, review-status resets
+-- and column guards do not fire. Supabase lets postgres turn them off only
+-- with a plain top-level SET, not set_config() inside a function, hence the
+-- SET below. Safe to run more than once.
+
+\set ON_ERROR_STOP on
+\getenv old_ref OLD_REF
+\getenv new_ref NEW_REF
+\getenv apply_mode APPLY
+\if :{?old_ref}
+\else
+  \echo 'Set OLD_REF first.'
+  \quit
+\endif
+\if :{?new_ref}
+\else
+  \echo 'Set NEW_REF first.'
+  \quit
+\endif
+\if :{?apply_mode}
+\else
+  \set apply_mode no
+\endif
+
+SET session_replication_role = replica;
+
+select set_config('region_move.old_ref', :'old_ref', false),
+  set_config('region_move.new_ref', :'new_ref', false),
+  set_config('region_move.apply', :'apply_mode', false);
 
 do $$
 declare
-  old_ref constant text := 'dqqlwofluvhikebtjune';
-  new_ref constant text := 'PASTE_NEW_REF';
-  apply constant boolean := false;
+  old_ref constant text := current_setting('region_move.old_ref');
+  new_ref constant text := current_setting('region_move.new_ref');
+  apply constant boolean := current_setting('region_move.apply') = 'yes';
   old_host text := 'https://' || old_ref || '.supabase.co/';
   new_host text := 'https://' || new_ref || '.supabase.co/';
   col record;
@@ -28,12 +55,8 @@ declare
   total bigint := 0;
   auth_hits bigint;
 begin
-  if new_ref !~ '^[a-z]{20}$' or new_ref = old_ref then
-    raise exception 'Set new_ref to the new project ref (20 lowercase letters).';
-  end if;
-
-  if apply then
-    perform set_config('session_replication_role', 'replica', true);
+  if old_ref !~ '^[a-z]{20}$' or new_ref !~ '^[a-z]{20}$' or new_ref = old_ref then
+    raise exception 'OLD_REF and NEW_REF must be two different project refs (20 lowercase letters).';
   end if;
 
   for col in

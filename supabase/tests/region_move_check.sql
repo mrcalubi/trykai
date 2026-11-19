@@ -1,4 +1,4 @@
--- Region move check (read only). OPERATIONS.md, Move production to Singapore.
+-- Region move check (read only). OPERATIONS.md, Supabase region move (steps 1.10, 3.7).
 --
 -- Run in the SQL Editor on the OLD project, then on the NEW one, right after
 -- the restore. Download each result as CSV and compare them (any diff tool,
