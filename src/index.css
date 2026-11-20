@@ -761,12 +761,16 @@ a {
 
 .home-hero {
   display: grid;
+  /* The column may shrink below the trust pills, which scroll inside it;
+     sized to them, a 320px phone scrolled the whole page sideways. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
   align-items: center;
   padding: 20px 0 24px;
 }
 
 .home-hero__copy {
+  min-width: 0;
   max-width: 640px;
 }
 
@@ -11969,6 +11973,28 @@ body.extras-sheet-open {
 
 .edit-savebar__actions .btn {
   min-height: 48px;
+}
+
+/* Narrow phones: the status gets its own line above the two buttons, which
+   share the width, so "Unsaved changes" never runs into them. */
+@media (max-width: 479px) {
+  .edit-savebar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .edit-savebar__status {
+    flex-basis: 100%;
+  }
+
+  .edit-savebar__actions {
+    flex: 1;
+  }
+
+  .edit-savebar__actions > * {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 /* Fields inside a section. */
