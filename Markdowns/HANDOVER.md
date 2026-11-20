@@ -45,8 +45,8 @@ Sole proprietorship, UEN 53526159D, owned by Ong Kai Le Caleb. **Hosts so far:**
 
 | | Staging | Production |
 |---|---|---|
-| Supabase project | `trykai-staging` (Free plan) | "Kai" (Pro, Mumbai `ap-south-1`) |
-| Project ref | `hzgybclfvpuxkmytdoos` | `dqqlwofluvhikebtjune` |
+| Supabase project | `trykai-staging` (Free plan) | "TryKai Production" (Pro, Singapore `ap-southeast-1`, since 20 Nov 2026) |
+| Project ref | `hzgybclfvpuxkmytdoos` | `bovqdzfewsrgvjkegpzz` |
 | Site | trykai.vercel.app | trykai.sg |
 | Branch | `staging` | `main` |
 
