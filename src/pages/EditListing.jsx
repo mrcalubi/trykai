@@ -31,8 +31,7 @@ import {
   PHOTO_UPLOAD_ERROR,
   listingSaveProblem,
 } from '../lib/listingFieldHints'
-import { providedForSave } from '../lib/whatsProvided'
-import { whatToBringForSave } from '../lib/whatToBring'
+import { changedListingColumns, listingColumns, savedPhotoUrls } from '../lib/listingSaveColumns'
 import { formatListingSpotsMessage } from '../lib/listingSpots'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { LISTING_CATEGORIES } from '../lib/listingCategories'
@@ -65,7 +64,6 @@ import {
 } from '../components/BookingCutoffFields'
 import {
   DEFAULT_BOOKING_CUTOFF_HOURS,
-  arrivalInstructionsForSave,
   bookingCutoffHours,
   isMissingCutoffColumn,
 } from '../lib/bookingCutoff'
@@ -376,9 +374,6 @@ export default function EditListing() {
     setPhotoError('')
     setSavedNote('')
     setFieldHints({})
-    const duration = parseInt(durationMins, 10)
-    const provided = providedForSave(whatsProvided)
-    const bring = whatToBringForSave(whatToBring)
 
     setLoading(true)
 
@@ -393,26 +388,20 @@ export default function EditListing() {
       return false
     }
 
-    const listingPayload = {
-      title: title.trim(),
-      description: description.trim(),
-      category,
-      price_per_person: priceCents,
-      duration_mins: duration,
-      group_pricing: groupPricing,
-      area,
-      full_address: fullAddress.trim(),
-      arrival_instructions: arrivalInstructionsForSave(arrivalInstructions),
-      booking_cutoff_hours: bookingCutoffHours(bookingCutoff),
-      whats_provided: provided,
-      what_to_bring: bring,
-      photo_urls: photoUrls,
+    // Only what this host changed here, so a tab opened before another save
+    // cannot write that save's fixes (say a corrected title) back to the old text.
+    const listingPayload = changedListingColumns(
+      listingColumns(values, photoUrls),
+      saved ? listingColumns(saved, savedPhotoUrls(saved.photos)) : null,
+    )
+    let updateError = null
+    if (Object.keys(listingPayload).length > 0) {
+      ;({ error: updateError } = await supabase
+        .from('listings')
+        .update(listingPayload)
+        .eq('id', id)
+        .eq('host_id', userId))
     }
-    let { error: updateError } = await supabase
-      .from('listings')
-      .update(listingPayload)
-      .eq('id', id)
-      .eq('host_id', userId)
     if (
       updateError &&
       (/duration_mins|group_pricing|what_to_bring/.test(updateError.message ?? '') ||
