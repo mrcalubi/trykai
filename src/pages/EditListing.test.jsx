@@ -520,11 +520,11 @@ describe('EditListing prefill', () => {
     const { user } = await renderLoaded({ section: 'price' })
 
     expect(screen.getByLabelText('Your price per guest')).toHaveValue(19.99)
-    // Saving something else leaves the price as it was.
+    // Saving something else leaves the price as it was: it is not even sent.
     await user.click(screen.getByRole('button', { name: 'More spots' }))
     await user.click(saveButton())
-    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
-    expect(supabase.__lastCall('listings', 'update').payload.price_per_person).toBe(1999)
+    await waitFor(() => expect(saveStatus()).toHaveTextContent(/^Saved\./))
+    expect(supabase.__calls('listings', 'update')).toHaveLength(0)
   })
 
   it('ticks the saved "what is provided" options', async () => {
@@ -687,18 +687,11 @@ describe('EditListing saving', () => {
 
     await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
     const call = supabase.__lastCall('listings', 'update')
-    expect(call.payload).toMatchObject({
+    // Only what changed: an older tab saving its own edit cannot put back the
+    // fields another save corrected.
+    expect(call.payload).toEqual({
       title: 'Latte art, level two',
       price_per_person: 4600,
-      duration_mins: 90,
-      group_pricing: true,
-      area: 'Bedok',
-      full_address: '12 Coffee Road',
-    })
-    expect(call.payload).not.toHaveProperty('max_guests')
-    expect(call.payload).toMatchObject({
-      booking_cutoff_hours: 3,
-      arrival_instructions: null,
     })
     expect(call.filters).toContainEqual({ method: 'eq', column: 'host_id', value: HOST_ID })
   })
@@ -798,7 +791,8 @@ describe('EditListing saving', () => {
     )
     await waitFor(() => expect(saveStatus()).toHaveTextContent(/^Saved\. Updated 2 future sessions\./))
     expect(saveStatus()).toHaveTextContent(/kept 5 spots because of existing bookings/)
-    expect(supabase.__lastCall('listings', 'update').payload).not.toHaveProperty('max_guests')
+    // Spots go through set_listing_spots alone; nothing else on the row changed.
+    expect(supabase.__calls('listings', 'update')).toHaveLength(0)
     expect(currentPath()).toBe('/edit-listing/listing-1')
     expect(currentSearch()).toBe('?section=price')
     expect(saveButton()).toBeDisabled()
@@ -1019,6 +1013,20 @@ describe('EditListing photos', () => {
     expect(photoUrls[1]).toMatch(/^https:\/\/cdn\.test\/listing-photos\/host-9\/.+\.png$/)
   })
 
+  it('sends only the photos when only the photos changed', async () => {
+    // A tab opened before the host fixed the title must not put the old title
+    // back when it saves new photos.
+    const { user } = await renderLoaded({ section: 'photos' })
+    selectFiles([imageFile('two.png')])
+    await screen.findByText('2 of 8')
+
+    await user.click(saveButton())
+
+    await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(1))
+    const { payload } = supabase.__lastCall('listings', 'update')
+    expect(Object.keys(payload)).toEqual(['photo_urls'])
+  })
+
   it('does not upload a photo again on the next save', async () => {
     const { user } = await renderLoaded({ section: 'photos' })
     selectFiles([imageFile('two.png')])
@@ -1033,7 +1041,8 @@ describe('EditListing photos', () => {
 
     await waitFor(() => expect(supabase.__calls('listings', 'update')).toHaveLength(2))
     expect(supabase.__bucket('listing-photos').upload.mock.calls.length).toBe(uploads)
-    expect(supabase.__lastCall('listings', 'update').payload.photo_urls).toHaveLength(2)
+    // The photos are already saved, so the second save leaves them alone.
+    expect(supabase.__lastCall('listings', 'update').payload).not.toHaveProperty('photo_urls')
   })
 
   it('removes a photo from its ⋯ menu, not a quick ×', async () => {
