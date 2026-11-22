@@ -415,15 +415,15 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 
 | | Staging | Production |
 |---|---|---|
-| Supabase project | `trykai-staging` (Free plan, "TryKai Staging" org) | "Kai" (Pro, "TryKai" org, region Mumbai `ap-south-1`) |
-| Project ref | `hzgybclfvpuxkmytdoos` | `dqqlwofluvhikebtjune` |
-| Dashboard | https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos | https://supabase.com/dashboard/project/dqqlwofluvhikebtjune |
+| Supabase project | `trykai-staging` (Free plan, "TryKai Staging" org) | "TryKai Production" (Pro, "TryKai" org, region Singapore `ap-southeast-1`; moved from Mumbai 20 Nov 2026) |
+| Project ref | `hzgybclfvpuxkmytdoos` | `bovqdzfewsrgvjkegpzz` |
+| Dashboard | https://supabase.com/dashboard/project/hzgybclfvpuxkmytdoos | https://supabase.com/dashboard/project/bovqdzfewsrgvjkegpzz |
 | Site | trykai.vercel.app | trykai.sg |
 | Git branch | `staging` | `main` |
 | Edge Function deploy | Automatic on push to `staging` | Automatic on push to `main` (`PRODUCTION_SUPABASE_PROJECT_REF` GitHub secret, required) |
-| Migrations | By hand, SQL Editor, until `STAGING_SUPABASE_DB_PASSWORD` is set (Migration deploys) | By hand, SQL Editor, until `PRODUCTION_SUPABASE_DB_PASSWORD` is set (Migration deploys) |
+| Migrations | Automatic on push to `staging` (`STAGING_SUPABASE_DB_PASSWORD` is set; Migration deploys) | Automatic on push to `main` (`PRODUCTION_SUPABASE_DB_PASSWORD` is set; Migration deploys) |
 
-**Both dashboards show the "PRODUCTION" label.** It is not a guide. The ref in the URL is. The runbooks below are written against staging; for production, swap in `dqqlwofluvhikebtjune`.
+**Both dashboards show the "PRODUCTION" label.** It is not a guide. The ref in the URL is. The runbooks below are written against staging; for production, swap in `bovqdzfewsrgvjkegpzz`.
 
 Who does what: Caleb applies migrations and sets secrets. Claude and Cursor never hold a Supabase access token, and nobody pastes secrets into chat. `SUPABASE_ACCESS_TOKEN` lives only in GitHub Actions secrets.
 
@@ -433,10 +433,10 @@ Every migration, and any other SQL that writes on production.
 
 1. **Apply on staging first.** Open the SQL Editor, confirm the URL contains `hzgybclfvpuxkmytdoos`, run the migration, test the flows it touches.
 2. **Check production has a recent backup.** Production dashboard, Database, Backups: the latest daily backup should be from the last 24 hours. If there is none (still on the Free plan, or the backup failed), stop and do not run the SQL.
-3. **Apply on production in the same sitting.** Confirm the URL contains `dqqlwofluvhikebtjune`, then run.
+3. **Apply on production in the same sitting.** Confirm the URL contains `bovqdzfewsrgvjkegpzz`, then run.
 4. **Record it.** Update the migration table below.
 
-A manual dump gives a restore point from the minute before a risky change, newer than the daily backup. It is optional and needs Docker Desktop and the production database password, so it is for whoever has those set up (Rui Heng): `npx supabase link --project-ref dqqlwofluvhikebtjune`, then `npx supabase db dump -f prod-schema.sql` and `npx supabase db dump --data-only -f prod-data.sql`, run outside the repo folder. Dumps hold users' personal data: never commit them (`.gitignore` blocks `prod-*.sql`) and never upload them to chat.
+A manual dump gives a restore point from the minute before a risky change, newer than the daily backup. It is optional and needs Docker Desktop and the production database password, so it is for whoever has those set up (Rui Heng): `npx supabase link --project-ref bovqdzfewsrgvjkegpzz`, then `npx supabase db dump -f prod-schema.sql` and `npx supabase db dump --data-only -f prod-data.sql`, run outside the repo folder. Dumps hold users' personal data: never commit them (`.gitignore` blocks `prod-*.sql`) and never upload them to chat.
 
 ## Migration deploys
 
@@ -512,7 +512,7 @@ Merging `staging` into `main` so production runs the current tree. Owner: Rui He
 
 New accounts confirm their email before they can sign in (DECISIONS.md, 20 October). Supabase sends one email with a 6-digit code and a link; the site asks for the code in the same tab. The code ships first; the dashboard switch is last, so nothing breaks in between: with confirmation off, signup still signs people straight in.
 
-Do every step on **staging** (`hzgybclfvpuxkmytdoos`, site trykai.vercel.app), test, then repeat on **production** (`dqqlwofluvhikebtjune`, site trykai.sg) once the code is on `main`. Owner: Caleb.
+Do every step on **staging** (`hzgybclfvpuxkmytdoos`, site trykai.vercel.app), test, then repeat on **production** (`bovqdzfewsrgvjkegpzz`, site trykai.sg) once the code is on `main`. Owner: Caleb.
 
 1. **Send auth email through Resend.** Authentication, Emails, SMTP Settings, turn on custom SMTP:
    - Sender email `no-reply@trykai.sg`, sender name `TryKai`
@@ -870,7 +870,7 @@ The replacement is a Singapore bank account in the name on the Stripe account. T
 
 Reply when the request comes from the email on the TryKai account, or after you have confirmed another way that the sender is that person. Generating an update code in step 2 makes TryKai solely liable for a payout to the wrong account.
 
-Production hosts live on ref `dqqlwofluvhikebtjune`. Staging is `hzgybclfvpuxkmytdoos`. Confirm the ref in the SQL Editor URL, then run:
+Production hosts live on ref `bovqdzfewsrgvjkegpzz`. Staging is `hzgybclfvpuxkmytdoos`. Confirm the ref in the SQL Editor URL, then run:
 
 ```sql
 select id, email, full_name, display_name, phone,
@@ -1132,7 +1132,7 @@ Each project needs its **own bot** (Telegram allows one webhook per bot), so mak
    - `TELEGRAM_BOT_TOKEN`: the token from step 1
    - `TELEGRAM_BOT_USERNAME`: the username without `@`
    - `TELEGRAM_WEBHOOK_SECRET`: the string from step 3
-5. Point the bot at the webhook. Paste this in your browser address bar with your values filled in (staging ref `hzgybclfvpuxkmytdoos`, production ref `dqqlwofluvhikebtjune`):
+5. Point the bot at the webhook. Paste this in your browser address bar with your values filled in (staging ref `hzgybclfvpuxkmytdoos`, production ref `bovqdzfewsrgvjkegpzz`):
 
 ```
 https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<REF>.supabase.co/functions/v1/telegram-webhook&secret_token=<SECRET>&allowed_updates=["message"]
@@ -1373,7 +1373,7 @@ If the email says the host was **already paid**, decide with the team whether to
 
 Hosts email `hello@trykai.sg` within 7 days of the cancellation with their booking reference and what happened. There is no admin UI. A successful appeal removes the strike. It never undoes the guest's refund and never turns listings back on.
 
-Apply `00039` on this project before using the SQL below. Confirm the project ref in the URL first (`hzgybclfvpuxkmytdoos` staging, `dqqlwofluvhikebtjune` production).
+Apply `00039` on this project before using the SQL below. Confirm the project ref in the URL first (`hzgybclfvpuxkmytdoos` staging, `bovqdzfewsrgvjkegpzz` production).
 
 ## 0. Find the strike
 
@@ -1423,114 +1423,78 @@ It sets `removed_at` and `removed_note`, then sets `users.host_strikes` to the a
 
 ---
 
-# Move production to Singapore
+# Supabase region move
 
-Production was created in Mumbai (`ap-south-1`) by accident (DECISIONS.md, 19 October; BUILD_BACKLOG.md, 14). Supabase cannot move a project, so the move is a new project in Singapore (`ap-southeast-1`) and a one-off cutover to it. Owner: Rui Heng (has Docker Desktop and the database password). Caleb sets secrets. Nobody pastes a key, password or dump into chat.
+**Done for production on 19–20 November 2026:** Mumbai `dqqlwofluvhikebtjune` to Singapore `bovqdzfewsrgvjkegpzz` (DECISIONS.md, 20 November). This is the runbook as it actually worked that night, for the next move (staging, or a future production move). Supabase cannot move a project, so a move is a new project in the target region and a one-off cutover. Nobody pastes a key, password, connection string or dump into chat.
 
-**What changes:** the project ref, so every `https://<ref>.supabase.co` URL, the anon and service keys, and the database password. **What carries over:** every table, accounts and password hashes, storage metadata, migration history. **What does not:** Storage files, Edge Function secrets, Vault values, Auth dashboard settings. **Everyone is signed out once**; passwords keep working.
+**What changes:** the project ref, so every `https://<ref>.supabase.co` URL, the keys and the database password. **What a dump carries:** tables, accounts and password hashes, storage metadata, functions, policies on your own tables, the two database webhooks (still naming OLD). **What it does not:** Storage files, Edge Function secrets, Vault, cron jobs, Auth dashboard settings, the trigger on `auth.users`, policies on `storage.objects`, the migration history, and the right grants (see 3.7). **Everyone is signed out once**; passwords keep working.
 
-**Not affected:** Singpass. Its redirect URI is `https://trykai.sg/verify-identity/singpass`, on the site, not on Supabase, so the portal and the approved journey stay as they are. Only its secrets are copied.
+**Shell.** Everything runs from Windows PowerShell 5.1, with `psql` from Docker (`docker pull postgres:17`; Docker Desktop running). PowerShell strips double quotes inside a command it passes to Docker, so SQL goes in files (`-f`), never `-c "..."`. Secrets go into environment variables of one PowerShell window through a hidden prompt, and Docker reads them with `-e NAME`:
 
-Tools: `scripts/copy-storage.mjs` (files), `supabase/tests/region_move_check.sql` (compare old and new), `scripts/region-move-rewrite-urls.sql` (photo URLs are stored with the project ref in them).
+```powershell
+function Secret($p) { [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host $p -AsSecureString))) }
+$env:OLD_DB_URL = Secret 'OLD session pooler URI'
+```
 
-Below, `OLD` = `dqqlwofluvhikebtjune` and `NEW` = the new ref.
+Connection strings: each project, Connect, **Session pooler** (the direct one is IPv6 only). Use a database password of letters and digits only, or the URI breaks. `SUPABASE_ACCESS_TOKEN` comes from supabase.com/dashboard/account/tokens, short expiry.
 
-## 1. Prep (any day before)
+**Tools.** `scripts/copy-auth-config.mjs`, `scripts/compare-secrets.mjs`, `scripts/copy-storage.mjs`, `scripts/singpass-public-jwks.mjs`, `supabase/tests/region_move_check.sql`, and `scripts/region-move/` (each file says what it does in its header). Work in a folder **outside the repo** (dumps hold personal data; `prod-*.sql` is gitignored anyway). The node scripts need the repo's `node_modules`, so run them from the repo or give a folder of their own `npm install @supabase/supabase-js`.
 
-1. **Create the project.** Supabase, "TryKai" org, New project: name `Kai`, region **Southeast Asia (Singapore)**, same compute size as production. Save the database password in the password manager. Note `NEW`.
-2. **Extensions.** Database, Extensions: turn on `pg_cron` and `pg_net` (and anything else `region_move_check.sql` lists under `extension` on OLD).
-3. **Auth settings,** copied from OLD by hand, following Email confirmation at signup above:
-   - SMTP through Resend, with a new Resend key named "Supabase Auth production SG"
-   - Rate limits, the Confirm signup template from `supabase/templates/confirm-signup.html`, OTP length and expiry, Confirm email
-   - URL Configuration: Site URL `https://trykai.sg`, redirect URLs `https://trykai.sg/**`
-   - Also compare Authentication, Sign In / Providers and Database, Settings (SSL, network restrictions) page by page with OLD
-4. **Edge Function secrets** (Edge Functions, Secrets on NEW). Supabase never shows saved values, so take them from the password manager. Use the **same values** as OLD:
-   - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET` (same values work because step 3.4 edits the existing Stripe destinations)
-   - `RESEND_API_KEY`, `ADMIN_NOTIFY_EMAIL`, `SITE_URL` = `https://trykai.sg`
-   - `ADMIN_FUNCTION_SECRET`, `NOTIFY_FUNCTION_SECRET`, `CRON_SECRET`, `PAYOUT_CRON_SECRET`, `REMINDERS_CRON_SECRET`, `VERIFICATION_PURGE_SECRET`
-   - `ONEMAP_EMAIL`, `ONEMAP_PASSWORD`
-   - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET` (same production bot)
-   - `SINGPASS_CLIENT_ID`, `SINGPASS_ISSUER`, `SINGPASS_REDIRECT_URI`, `SINGPASS_SIGNING_KEY`, `SINGPASS_ENCRYPTION_KEY`, plus any other `SINGPASS_*` set on OLD
+Below, `OLD` and `NEW` are the two refs.
 
-   A lost value can be replaced with a new one, but then also change it everywhere it is sent (the cron secrets live in Vault too, step 3.8, and `PAYOUT_CRON_SECRET` in GitHub). `SUPABASE_URL` and the keys are set by Supabase itself.
-5. **Deploy the functions** from an up-to-date `main`: `SUPABASE_ACCESS_TOKEN=… node scripts/deploy-edge-functions.mjs --project-ref NEW`.
-6. **Postgres client for the restore.** `psql` is not on Windows by default. Either install the PostgreSQL command line tools, or use Docker: replace `psql` below with `docker run --rm -i -v "${PWD}:/w" -w /w postgres:17 psql`.
-7. **Connection strings.** On each project, Connect, **Session pooler** (the direct one is IPv6 only and usually fails from home). Put them in this shell only, as `OLD_DB_URL` and `NEW_DB_URL`. The commands below are for Git Bash (PowerShell writes `$env:OLD_DB_URL`).
+## 1. Prep (days before; nothing is down)
 
-## 2. Rehearse (a day or two before)
+1. **Create NEW.** Same org, target region, smallest compute. Data access: **Data API on, auto-grant tables off, auto-RLS off.** Save the database password.
+2. **Same Postgres major** as OLD (Settings, Infrastructure). Do not upgrade OLD for this.
+3. **Extensions.** `select extname, extversion, extnamespace::regnamespace from pg_extension` on both; turn on what NEW lacks (production needed `pg_cron` and `pg_net`). Turn on **Database Webhooks** on NEW (Database, Webhooks): without it the schema restore fails on the webhook triggers.
+4. **Auth settings.** `node scripts/copy-auth-config.mjs --from OLD --to NEW` lists every difference, never a secret. Set SMTP by hand first (Resend, with a new key for NEW), because rate limits need it, then run again with `--apply`, then again without: only `smtp_pass` remains.
+5. **Data API, Database and Storage settings** (exposed schemas, max rows, SSL, network restrictions, upload size limit): compare the pages by hand.
+6. **Edge Function secrets.** List them with `node scripts/compare-secrets.mjs --from OLD --to NEW` (names only). Write the values from the password manager into a temporary `.env` file outside the repo (JSON values in single quotes), `npx supabase@2.121.0 secrets set --env-file <file> --project-ref NEW`, delete the file, and compare again: it checks the stored digests and must say "All secrets match", apart from any you deliberately replaced.
+7. **Singpass keys.** Supabase never shows a saved secret, so if the private keys are not in the password manager, generate new ones on `/admin/singpass-keys`, put them on both projects, and paste the new public set into the Singpass portal (Production app, JWKS) at once: the old project uses them from that moment. `node scripts/singpass-public-jwks.mjs` rebuilds the public set from the private keys if box 3 was not saved. Singpass caches the encryption key for up to an hour.
+8. **Deploy the functions** from a clean `main` (a `git worktree add --detach <folder> origin/main` keeps your checkout untouched). On Windows `scripts/deploy-edge-functions.mjs` cannot start `npx`, so run the CLI directly from that folder: `npx supabase@2.121.0 functions deploy <all function names> --project-ref NEW --use-api --jobs 4`. Check the JWT setting matches: `Invoke-RestMethod` on `https://api.supabase.com/v1/projects/<ref>/functions` for both, `Compare-Object` on `slug, verify_jwt`.
+9. **Keys.** Check which kind each place uses before copying: production's Vercel `VITE_SUPABASE_ANON_KEY` was the **publishable** key, while Vault and anything sent as `Authorization: Bearer` need the **legacy anon JWT** (`eyJ…`, under View legacy API keys).
+10. **Baseline of OLD**, read only: `region_move_check.sql` to a CSV, plus the cron jobs and database webhooks. **Do not print cron commands**: dashboard-made jobs carry their secret inside the command. List names and schedules; read the commands only in the dashboard.
 
-Do steps 3.4 to 3.10 against a **throwaway** Singapore project (create it like 1.1, delete it after), with OLD left running normally. Skip the freeze, Stripe, Telegram, Vercel and GitHub steps. This proves the dump restores, shows how long the restore and the file copy take, and shows what the check query flags (auth trigger, cron jobs, webhooks). Fix the runbook here, not on the night. The throwaway costs cents per hour.
+## 2. Rehearse
 
-## 3. Cutover (a quiet hour, about 30 to 60 minutes)
+Recommended, skipped in November: the restore failed three times on the night (quoting, a storage table it cannot write, then the grants), each costing minutes with the site closed. A throwaway project in the target region finds these the day before.
 
-Work in a folder **outside the repo**, because the dumps land there. They hold personal data: they are named `prod-*.sql` so git ignores them anyway, and they are deleted when the move is signed off. Give the repo scripts by full path, for example `node ~/Documents/GitHub/trykai/scripts/copy-storage.mjs`.
+## 3. Cutover (about an hour with the site closed)
 
-1. **Write down T0**, the start time in UTC. Steps 3.13 and 3.14 use it.
-2. **Close the site.** Vercel, Firewall, a custom rule that denies every request to trykai.sg except your own IP. Pages already open in someone's browser can still write, which is why the hour is quiet and 3.14 exists.
-3. **Stop the hourly jobs on OLD.** SQL Editor on OLD:
-   ```sql
-   select cron.unschedule('invoke-release-payout-hourly');
-   select cron.unschedule('invoke-send-reminders-hourly');
-   select jobname from cron.job;  -- unschedule anything else listed here too, and note it for 3.8
-   ```
-   GitHub, Actions, Release host payouts, **Disable workflow**.
-4. **Point Stripe and Telegram at NEW.** Stripe (live mode), Developers, Webhooks: open the **Your account** destination and the **Connected accounts** destination and edit each URL to `https://NEW.supabase.co/functions/v1/stripe-webhook`. Editing the URL keeps the signing secret. Telegram: run the `setWebhook` address from Telegram host updates with `NEW`. Until the restore is done both get errors and retry; 3.13 catches anything left over.
-5. **Dump OLD** (Docker Desktop running):
-   ```bash
-   npx supabase@2.121.0 db dump --db-url "$OLD_DB_URL" -f prod-roles.sql --role-only
-   npx supabase@2.121.0 db dump --db-url "$OLD_DB_URL" -f prod-schema.sql
-   npx supabase@2.121.0 db dump --db-url "$OLD_DB_URL" -f prod-data.sql --use-copy --data-only
-   ```
-6. **Restore into NEW** (one transaction: it either all lands or nothing does):
-   ```bash
-   psql --single-transaction --variable ON_ERROR_STOP=1 --file prod-roles.sql --file prod-schema.sql --command "SET session_replication_role = replica" --file prod-data.sql --dbname "$NEW_DB_URL"
-   ```
-7. **Compare.** Run `supabase/tests/region_move_check.sql` on OLD and on NEW, download both as CSV, diff them. Every `rows`, `sequence`, `policies`, `functions`, `grants`, `triggers` and `bucket` line must match. Then:
-   - `auth trigger` missing on NEW: run `supabase/migrations/00004_create_profile_on_signup.sql` on NEW. Without it, new sign-ups get no profile row.
-   - `policies` for `storage.objects` missing or different: run the storage policy parts of `00026` and `00047` on NEW.
-   - `webhook` or `ref` naming OLD: recreate that database webhook (Database, Webhooks) or function with `NEW`.
-8. **Vault and cron on NEW.** Vault values are encrypted per project, so make them again. First remove any copies that came across, then create all six with the Session reminders and Host Transfers statements above, using `https://NEW.supabase.co/functions/v1/...`, NEW's anon key, and the same cron secrets as 1.4:
-   ```sql
-   delete from vault.secrets where name in ('release_payout_url', 'release_payout_anon_key', 'payout_cron_secret',
-     'send_reminders_url', 'send_reminders_anon_key', 'reminders_cron_secret');
-   ```
-   Then `select jobname, schedule, active from cron.job;`: if `invoke-release-payout-hourly` or `invoke-send-reminders-hourly` is missing, run `00010` and `00037` again (both are safe to rerun). Recreate any extra job noted in 3.3, with `NEW` in its URL. Run each job's function once by hand ("Run it once now" in those sections) and check the response.
-9. **Photo URLs.** Run `scripts/region-move-rewrite-urls.sql` on NEW: first as is (lists what it would change), then with `apply = true`, then as is again (should say 0).
-10. **Copy the files** (service keys from Settings, API Keys on each project; this shell only):
-    ```bash
-    FROM_SUPABASE_URL=https://OLD.supabase.co FROM_SUPABASE_SERVICE_ROLE_KEY=… TO_SUPABASE_URL=https://NEW.supabase.co TO_SUPABASE_SERVICE_ROLE_KEY=… node ~/Documents/GitHub/trykai/scripts/copy-storage.mjs --dry-run
-    ```
-    Counts and sizes per bucket should match the `bucket` lines from 3.7. Run again without `--dry-run`. If it lists failures, run it again; it overwrites, so reruns are safe.
-11. **Point the site and CI at NEW.**
-    - Vercel, Settings, Environment Variables, **Production**: `VITE_SUPABASE_URL` = `https://NEW.supabase.co`, `VITE_SUPABASE_ANON_KEY` = NEW's anon key. Redeploy production (the client and `api/` both read these).
-    - GitHub secrets: `PRODUCTION_SUPABASE_PROJECT_REF` = `NEW`, `PRODUCTION_SUPABASE_URL`, `PRODUCTION_SUPABASE_ANON_KEY`, and `PRODUCTION_SUPABASE_DB_PASSWORD` if it is set (Migration deploys).
-    - GitHub, Actions, Release host payouts, **Enable workflow**.
-12. **Smoke test on trykai.sg** (still closed to everyone but you), on a phone too:
-    - [ ] Log in with an existing account; profile photo and listing photos load, and the image address says `NEW`
-    - [ ] Browse and a listing page; I'm keen
-    - [ ] Upload a profile photo; open a verification document from the admin page
-    - [ ] One real card booking, then refund it (Stripe shows the webhook delivered to `NEW` with 200)
-    - [ ] Sign up a fresh email: the code email arrives and the profile row exists
-    - [ ] Telegram `getWebhookInfo`: URL has `NEW`, no `last_error_message`
-    - [ ] Singpass: Verify with Singpass up to "Check your details", then Cancel
-13. **Replay Stripe events since T0.** Stripe, Developers, Events, from T0: resend each `payment_intent.*`, `charge.*`, `identity.*` and `account.updated` event to its destination. The booking handlers only move a booking out of `pending` and only record a refund or chargeback once, so resending one already handled changes nothing (a repeated dispute may email ops twice).
-14. **Open the site** (remove the firewall rule). Then check nothing was written to OLD after the dump: on OLD, compare `auth.users`, `bookings`, `listings`, `sessions` and `listing_reviews` created after T0 against NEW, and copy by hand anything that is only on OLD.
+1. **T0**, the start time in UTC, written down.
+2. **Close the site.** Vercel, Firewall, custom rule: IP address not equal to yours, Deny, publish. Check from a phone on mobile data.
+3. **Pause the jobs on OLD** (pausing keeps them for a rollback): `select cron.alter_job(jobid, active := false) from cron.job;` in OLD's SQL Editor. GitHub, Actions, Release host payouts, Disable workflow.
+4. **Point Stripe and Telegram at NEW.** Stripe live, Developers, Webhooks: edit the URL of **both** destinations (Your account, Connected accounts) to `https://NEW.supabase.co/functions/v1/stripe-webhook`; the signing secrets stay. Telegram: `Invoke-RestMethod -Method Post "https://api.telegram.org/bot$tg/setWebhook" -Body @{ url = '...telegram-webhook'; secret_token = $tgs; allowed_updates = '["message"]' }` with the token and secret loaded through `Secret`.
+5. **Dump OLD:** `npx supabase@2.121.0 db dump --db-url "$env:OLD_DB_URL"` three times: `-f prod-roles.sql --role-only`, `-f prod-schema.sql`, `-f prod-data.sql --use-copy --data-only`. A warning about circular foreign keys is expected (3.6 handles it).
+6. **Restore into NEW.**
+   - Trim the data: `awk -f scripts/region-move/trim-data.awk prod-data.sql > prod-data-restore.sql` drops empty tables and the webhook log. Postgres cannot write some newer Supabase storage tables (`buckets_vectors` and similar), and they are empty anyway.
+   - Restore in one transaction (all or nothing), with `scripts/region-move/replica.sql` between schema and data:
+     `psql $NEW_DB_URL --single-transaction -v ON_ERROR_STOP=1 -q -f prod-roles.sql -f prod-schema.sql -f replica.sql -f prod-data-restore.sql`. It must end without `ERROR`.
+   - On OLD, `scripts/region-move/auth-storage-extras-gen.sql` with `-At -o post-restore-extras.sql`, then run that file on NEW in one transaction: the trigger on `auth.users` and the policies on `storage.objects`.
+7. **Grants, then compare.** On OLD, `scripts/region-move/grants-sync-gen.sql` with `-At -o grants-sync.sql`; run it on NEW in one transaction. Then `region_move_check.sql` on both, diff the CSVs. Everything must match except cron, Vault, the migration history and extension patch versions. **Do not reopen with a `grants` line different.**
+8. **Jobs, Vault, webhook.** Load `NEW_REF`, `NEW_ANON_KEY` (legacy), `REMINDERS_CRON_SECRET`, `NEW_PURGE_SECRET`, `NEW_PAYOUT_SECRET`, then `scripts/region-move/jobs-and-webhook.sql` on NEW. It checks the values without printing them, works in one transaction and lists four jobs, three Vault names and one webhook, flagging anything that names another project. Check it still matches OLD's jobs first.
+9. **Photo URLs.** `scripts/region-move/rewrite-urls.sql` on NEW with `OLD_REF` and `NEW_REF`: once as is, once with `APPLY=yes`, once more (must say 0). Production had 20 (listing photos, avatars, banners).
+10. **Files.** `FROM_SUPABASE_URL`, `FROM_SUPABASE_SERVICE_ROLE_KEY`, `TO_SUPABASE_URL`, `TO_SUPABASE_SERVICE_ROLE_KEY` (legacy service_role), then `node scripts/copy-storage.mjs --dry-run` and without. Production: 64 files, 22 MB, under a minute.
+11. **Point the site and CI at NEW.** Vercel Production: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (same kind of key as before), Redeploy without the build cache. GitHub: `PRODUCTION_SUPABASE_PROJECT_REF`, `PRODUCTION_SUPABASE_DB_PASSWORD`. (Production has no `PRODUCTION_SUPABASE_URL` or `_ANON_KEY` secret: the payout workflow skips production; payouts run from cron.) Enable the workflow again.
+12. **Smoke test** on the closed site: log in, photos load from NEW, upload a photo, admin opens a verification document, sign up a fresh address (code email, profile row), Singpass to "Check your details", and a checkout to the card form (no payment): the Stripe event shows **200** to NEW.
+13. **Stripe:** both destinations, Failed tab since T0: Resend each. The booking handlers ignore repeats.
+14. **Late writes, then open.** `scripts/region-move/late-writes.sql` on OLD with `T0`. Anything after T0 other than accounts: compare with NEW. For accounts, `scripts/region-move/auth-fingerprints.sql` on both and diff. Then remove the firewall rule and check from mobile data.
 
-**Rolling back**, if 3.12 fails and cannot be fixed in the hour: set the Vercel and GitHub values back to OLD and redeploy, set the Stripe and Telegram URLs back to OLD, run `00010` and `00037` on OLD again (reschedules both jobs), enable the workflow, open the site. OLD has not been changed except for its jobs, so nothing is lost. NEW can be deleted and the cutover tried again.
+**Rolling back** before step 14: Vercel and GitHub values back, Redeploy; Stripe and Telegram URLs back; `cron.alter_job(jobid, active := true)` on OLD; enable the workflow; open the site. OLD is untouched apart from its paused jobs.
 
 ## 4. Afterwards
 
-- **Docs:** replace `OLD` with `NEW` in the Environments table above, HANDOVER.md and any runbook that names it. Add a DECISIONS.md entry with the date. Strike BUILD_BACKLOG.md 14.
-- **OLD stays as it is for two weeks** as a fallback (it still bills by the hour), with its jobs off. Then take one last dump, keep it offline, and delete the project. Delete the cutover dumps once the move is signed off.
-- **Delete the old "Supabase Auth production" Resend key** once OLD is gone.
-- **Optional, later:** the Supabase custom domain add-on (for example `api.trykai.sg`) would keep Stripe, Telegram and the stored photo URLs unchanged through any future move.
+- **Migration history**, before anything merges to `main` (CI refuses to push 57 "pending" migrations): `pg_dump $OLD_DB_URL -n supabase_migrations --no-owner --no-privileges -f prod-migrations.sql`, restore it on NEW, check both have the same count and latest version.
+- **Replace any secret that was exposed** during the move, on NEW at once and on OLD as well.
+- **Keep OLD two weeks** with its jobs paused, then a last dump kept offline, then delete it. Delete the cutover dumps and the Resend key made for OLD's Auth.
+- **Legacy API keys** are retired by Supabase in early 2027: moving Vault, CI and the code to the new key types is a separate job for both projects.
+- **Optional:** a Supabase custom domain (`api.trykai.sg`) would keep Stripe, Telegram and stored photo URLs unchanged through any future move.
 
-| Step | Status |
+| Production move | Status |
 |---|---|
-| 1 Prep | Not started |
-| 2 Rehearsal | Not started |
-| 3 Cutover | Not started |
-| 4 Old project deleted | Not started |
+| Cutover | Done 20 November 2026, site reopened |
+| Migration history on NEW | Done |
+| Old project `dqqlwofluvhikebtjune` | Jobs paused; delete after 4 December 2026 |
 
 ---
 
