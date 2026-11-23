@@ -9,7 +9,7 @@ import { categoryIconName } from '../components/ui/categoryIcon'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { browseFlag, keenCountsById } from '../lib/keen'
 import { formatGuestFacingPrice, guestFacingPriceCents } from '../lib/pricing'
-import { cardLengthNote } from '../lib/cardExtras'
+import { formatDuration } from '../lib/duration'
 import { formatCents } from '../lib/cancellationPolicy'
 import { listingsForGuestBrowse, sortListingsForBrowse } from '../lib/listingSort'
 import { filterNarrows, locationLabel, showLocationFilter, showNewFlags, visibleCategories } from '../lib/browseUi'
@@ -490,8 +490,9 @@ export default function Home() {
                     // tap, and the listing page asks for interest instead.
                     metaItems={[listing.area, nextSessionLabel(listing)]}
                     host={listingHost(listing)}
-                    price={`${formatGuestFacingPrice(listing.price_per_person)}/person`}
-                    priceNote={cardLengthNote(listing.duration_mins)}
+                    price={`S${formatGuestFacingPrice(listing.price_per_person)}`}
+                    priceUnit="/person"
+                    length={formatDuration(listing.duration_mins)}
                     rating={ratings[listing.id]?.rating}
                     reviewCount={ratings[listing.id]?.reviewCount}
                     flag={browseFlag(listing, keenCounts[listing.id], undefined, showNew)}

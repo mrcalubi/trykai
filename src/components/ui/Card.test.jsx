@@ -124,7 +124,7 @@ describe('Card', () => {
     expect(screen.getByText(/5\.0/)).toBeInTheDocument()
   })
 
-  it('renders browse mode as a link with a badge and one price and rating line', () => {
+  it('renders browse mode as a link: length on the photo, then title, area and date, price and rating', () => {
     const { container } = render(
       <MemoryRouter>
         <Card
@@ -132,8 +132,11 @@ describe('Card', () => {
           to="/listings/latte"
           badge="Food"
           title="Learn latte art with me"
+          metaItems={['Changi', 'Sat, 5 Dec']}
           rating={4.8}
-          price="$20/person"
+          price="S$20"
+          priceUnit="/person"
+          length="1.5 hr"
         />
       </MemoryRouter>
     )
@@ -142,44 +145,108 @@ describe('Card', () => {
     expect(link).toHaveAttribute('href', '/listings/latte')
     expect(link.className).toContain('ui-card--browse')
     expect(screen.getByText('Food')).toBeInTheDocument()
-    expect(container.querySelectorAll('.ui-card__meta-line')).toHaveLength(1)
-    expect(container.querySelector('.ui-card__meta-line').textContent).toBe(
-      '$20/person★ 4.8'
-    )
-    expect(container.querySelector('.ui-card__price-text').textContent).toBe('$20/person')
-    expect(container.querySelector('.ui-card__rating').textContent).toBe('★ 4.8')
-    expect(container.querySelector('.ui-card__meta-line').className).toBe('ui-card__meta-line')
+
+    // The length sits on the photo, where a video shows its running time.
+    const length = container.querySelector('.ui-card__image-wrap > .ui-card__length')
+    expect(length.textContent).toBe('1.5 hr')
+    expect(length.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+
+    expect(container.querySelector('.ui-card__meta-inline').textContent).toBe('ChangiSat, 5 Dec')
+
+    const row = container.querySelector('.ui-card__price-row')
+    expect(row.textContent).toBe('S$20/person★ 4.8')
+    expect(row.querySelector('.ui-card__amount').textContent).toBe('S$20')
+    expect(row.querySelector('.ui-card__unit').textContent).toBe('/person')
+    expect(row.querySelector('.ui-card__rating').textContent).toBe('★ 4.8')
+    expect(row.querySelector('.ui-card__length')).toBeNull()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('appends the review count on the browse meta line when reviews exist', () => {
+  it('appends the review count beside the price when reviews exist', () => {
     const { container } = render(
       <MemoryRouter>
         <Card
           mode="browse"
           to="/listings/latte"
           title="Learn latte art with me"
+          metaItems={['Changi']}
           rating={4.8}
           reviewCount={12}
-          price="$28"
+          price="S$28"
         />
       </MemoryRouter>
     )
 
-    expect(container.querySelector('.ui-card__meta-line').textContent).toBe('$28★ 4.8 (12)')
+    expect(container.querySelector('.ui-card__price-row').textContent).toBe('S$28★ 4.8 (12)')
     expect(container.querySelector('.ui-card__star')).toBeInTheDocument()
     expect(container.querySelector('.ui-card__review-count').textContent).toBe(' (12)')
   })
 
-  it('drops the dot and the star in browse mode when there is no rating', () => {
+  it('drops the star in browse mode when there is no rating', () => {
     const { container } = render(
       <MemoryRouter>
-        <Card mode="browse" to="/listings/boxing" title="Boxing basics" price="$32/person" />
+        <Card
+          mode="browse"
+          to="/listings/boxing"
+          title="Boxing basics"
+          metaItems={['Bukit Merah']}
+          price="S$32"
+          priceUnit="/person"
+          length="1 hr"
+        />
       </MemoryRouter>
     )
 
-    expect(container.querySelector('.ui-card__meta-line').textContent).toBe('$32/person')
+    expect(container.querySelector('.ui-card__meta-inline').textContent).toBe('Bukit Merah')
     expect(container.querySelector('.ui-card__rating')).not.toBeInTheDocument()
+    expect(container.querySelector('.ui-card__price-row').textContent).toBe('S$32/person')
+  })
+
+  it('shows a flag where the rating would be', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Card mode="browse" to="/listings/new" title="Pottery" metaItems={['Bedok']} price="S$20" flag="New" />
+      </MemoryRouter>
+    )
+
+    expect(container.querySelector('.ui-card__price-row .ui-card__flag').textContent).toBe('New')
+  })
+
+  it('shows the length on the placeholder too, and leaves it out when unknown', () => {
+    const { container, rerender } = render(
+      <MemoryRouter>
+        <Card mode="browse" to="/listings/x" title="Pottery" price="S$20" length="2 hr" />
+      </MemoryRouter>
+    )
+    expect(container.querySelector('.ui-card__placeholder')).toBeInTheDocument()
+    expect(container.querySelector('.ui-card__image-wrap > .ui-card__length').textContent).toBe('2 hr')
+
+    rerender(
+      <MemoryRouter>
+        <Card mode="browse" to="/listings/x" title="Pottery" price="S$20" priceUnit="/person" />
+      </MemoryRouter>
+    )
+    expect(container.querySelector('.ui-card__length')).not.toBeInTheDocument()
+  })
+
+  it('keeps the length off booking cards', () => {
+    const { container } = render(<Card mode="booking" title="Pottery" length="2 hr" />)
+    expect(container.querySelector('.ui-card__length')).not.toBeInTheDocument()
+  })
+
+  it('pins the length to the bottom-right of the photo, and lets clicks reach the photo', () => {
+    const css = readFileSync(resolve(import.meta.dirname, '../../index.css'), 'utf8')
+    const rule = (selector) => {
+      const start = css.indexOf(`\n${selector} {`)
+      return start < 0 ? '' : css.slice(start, css.indexOf('}', start))
+    }
+    const length = rule('.ui-card__length')
+    expect(length).toMatch(/position:\s*absolute/)
+    expect(length).toMatch(/right:\s*10px/)
+    expect(length).toMatch(/bottom:\s*\d+px/)
+    expect(length).toMatch(/pointer-events:\s*none/)
+    expect(rule('.ui-card__price-row')).toMatch(/justify-content:\s*space-between/)
+    expect(rule('.ui-card__price-row')).toMatch(/flex-wrap:\s*wrap/)
   })
 
   it('does not reserve a second line under a one-line browse title', () => {
@@ -197,8 +264,8 @@ describe('Card', () => {
     const browseRating = css.match(/\.ui-card--browse \.ui-card__rating \{[\s\S]*?\n\}/)
     expect(browseRating?.[0]).toMatch(/font-family:\s*var\(--sans\)/)
     expect(css).toMatch(/\.ui-card--browse \.ui-card__review-count \{[\s\S]*?color:\s*var\(--muted\)/)
-    const metaLine = css.match(/\.ui-card__meta-line \{[\s\S]*?\n\}/)
-    expect(metaLine?.[0]).toMatch(/justify-content:\s*space-between/)
+    const row = css.match(/\.ui-card__price-row \{[\s\S]*?\n\}/)
+    expect(row?.[0]).toMatch(/justify-content:\s*space-between/)
   })
 
   it('shows the first letter of the host display name', () => {

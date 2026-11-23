@@ -39,16 +39,12 @@ export const SITE_NAME = 'TryKai'
 
 const TIME_ZONE = 'Asia/Singapore'
 
-/** Copy of formatDuration in src/lib/duration.js: 390 is "6 hr 30 min". */
+/** Copy of formatDuration in src/lib/duration.js: always hours, 90 is "1.5 hr". */
 export function formatDuration(mins) {
   const total = Number(mins)
   if (!Number.isFinite(total) || total < 1) return ''
-  const hours = Math.floor(total / 60)
-  const minutes = total % 60
-  const parts = []
-  if (hours) parts.push(`${hours} hr`)
-  if (minutes) parts.push(`${minutes} min`)
-  return parts.join(' ')
+  const hours = Math.round((total / 60) * 100) / 100
+  return `${hours} hr`
 }
 
 /** Copy of spotsLabel in src/lib/listingSpots.js. */

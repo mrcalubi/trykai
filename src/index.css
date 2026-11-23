@@ -2885,9 +2885,9 @@ input[type='password']::-webkit-password-reveal-button {
 .ui-card__meta-inline {
   display: flex;
   overflow: hidden;
-  margin-top: 3px;
-  font-size: 13px;
-  line-height: 1.35;
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -2911,43 +2911,74 @@ input[type='password']::-webkit-password-reveal-button {
   display: inline-block;
   width: 3px;
   height: 3px;
-  margin: 0 7px;
+  margin: 0 6px;
   vertical-align: middle;
   background: currentColor;
   border-radius: 50%;
 }
 
-.ui-card__meta-line {
+/* The all-in price left, the rating (or a "New" flag) right. When both do not
+   fit on the narrowest phones, the rating wraps under the price. */
+.ui-card__price-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 4px 8px;
-  margin-top: 6px;
-  font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.35;
-  color: var(--navy);
+  gap: 2px 8px;
+  margin: 6px 0 0;
 }
 
-.ui-card__meta-line > * {
+.ui-card__price-text {
   white-space: nowrap;
 }
 
-.ui-card__price-note {
-  margin-left: 6px;
+.ui-card__amount {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--navy);
+}
+
+.ui-card__unit {
+  margin-left: 3px;
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--muted);
 }
 
+/* The session length on the photo's bottom-right corner, like a video's running
+   time. Centred on the host's face (bottom-left), so the two read as one row.
+   Clicks pass through to the photo. */
+.ui-card__length {
+  position: absolute;
+  right: 10px;
+  bottom: 17px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 7px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--cream);
+  white-space: nowrap;
+  pointer-events: none;
+  background: rgb(22 38 75 / 0.82);
+  border-radius: 6px;
+}
+
 .ui-card--browse .ui-card__rating {
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
+  line-height: 1.4;
   color: var(--navy);
+  white-space: nowrap;
 }
 
 .ui-card--browse .ui-card__star {

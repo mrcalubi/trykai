@@ -172,7 +172,7 @@ describe('Home listing grid', () => {
     renderWithRouter(<Home />)
 
     expect(await screen.findByText('Latte art')).toBeInTheDocument()
-    expect(screen.getByText(/\$51\/person/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Latte art/ })).toHaveTextContent('S$51/person')
     expect(screen.getByText('Boxing basics')).toBeInTheDocument()
     expect(listingTitles()).toEqual(['Latte art', 'Boxing basics'])
   })
@@ -192,8 +192,9 @@ describe('Home listing grid', () => {
     renderWithRouter(<Home />)
 
     const card = await screen.findByRole('link', { name: /Latte art/ })
-    // The length sits next to the price so a long session does not read as expensive.
-    expect(card.textContent).toContain('$51/personfor 1 hr 30 min')
+    expect(card.querySelector('.ui-card__price-row').textContent).toBe('S$51/person')
+    // The length sits on the photo, so a long session does not read as expensive.
+    expect(card.querySelector('.ui-card__image-wrap .ui-card__length').textContent).toBe('1.5 hr')
     expect(card.textContent).not.toContain('★')
     // No stray separator where a rating would have been.
     expect(card.textContent.trim().endsWith('·')).toBe(false)

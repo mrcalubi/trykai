@@ -72,16 +72,15 @@ export function bookingReference(bookingId: string | null | undefined): string {
   return String(bookingId ?? '').slice(0, 8).toUpperCase()
 }
 
-/** Same wording as the listing page: "1 hr 30 min", never a raw minute count. */
+/**
+ * Same wording as the app (src/lib/duration.js): always hours, 90 is "1.5 hr",
+ * 45 is "0.75 hr", 80 is "1.33 hr". Never a minute count.
+ */
 export function formatDuration(mins: number | null | undefined): string {
   const total = Number(mins)
   if (!Number.isFinite(total) || total < 1) return ''
-  const hours = Math.floor(total / 60)
-  const minutes = total % 60
-  const parts: string[] = []
-  if (hours) parts.push(`${hours} hr`)
-  if (minutes) parts.push(`${minutes} min`)
-  return parts.join(' ')
+  const hours = Math.round((total / 60) * 100) / 100
+  return `${hours} hr`
 }
 
 export function emailSiteUrl(value?: string | null): string {

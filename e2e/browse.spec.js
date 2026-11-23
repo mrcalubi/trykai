@@ -21,6 +21,18 @@ const ONE_PER_CATEGORY = ['Food', 'Fitness', 'Arts', 'Music', 'Language', 'Other
   category,
 }))
 
+// A three-figure price and an odd length: the longest price row a card can get.
+const PRICEY = [0, 1].map((i) => ({
+  ...LATTE_ART,
+  id: `pricey-${i}`,
+  title: `Pricey session ${i}`,
+  price_per_person: 12197,
+  duration_mins: 200,
+}))
+
+// A typical card: S$51 for 1.5 hr.
+const TYPICAL = { ...LATTE_ART, id: 'typical', title: 'Typical session', duration_mins: 90 }
+
 async function openLocation(page) {
   await page.getByRole('button', { name: /Anywhere/ }).click()
 }
@@ -28,15 +40,34 @@ async function openLocation(page) {
 test.describe('browsing listings', () => {
   test('never scrolls sideways on a 320px phone, however many filters show', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 })
-    await stubAllExternalCalls(page, { listings: [...ONE_PER_CATEGORY, ...WEST_FILLERS, LATTE_ART, BOXING] })
+    await stubAllExternalCalls(page, {
+      listings: [TYPICAL, ...PRICEY, ...ONE_PER_CATEGORY, ...WEST_FILLERS, LATTE_ART, BOXING],
+    })
     await page.goto('/')
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     await expect(page.locator('.trust-list__item').first()).toBeVisible()
+    await expect(page.locator('.ui-card__length').first()).toBeVisible()
+    // Measure with the web fonts in, not the fallback the page paints first.
+    await page.evaluate(() => document.fonts.ready)
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
     // The trust pills scroll inside their own row instead.
     const row = await page.locator('.trust-list').boundingBox()
     expect(row.x + row.width).toBeLessThanOrEqual(320)
+    // Even the longest price and length stay inside their card.
+    for (const card of await page.locator('.listings-grid > a').all()) {
+      const box = await card.boundingBox()
+      const right = box.x + box.width + 0.5
+      const price = await card.locator('.ui-card__price-text').boundingBox()
+      expect(price.x + price.width).toBeLessThanOrEqual(right)
+      const tag = card.locator('.ui-card__length')
+      if ((await tag.count()) === 0) continue
+      const tagBox = await tag.boundingBox()
+      expect(tagBox.x + tagBox.width).toBeLessThanOrEqual(right)
+      // The length never covers the host's face on the other corner.
+      const face = await card.locator('.ui-card__host').boundingBox()
+      expect(tagBox.x).toBeGreaterThan(face.x + face.width)
+    }
   })
 
   test('shows the landing headline above the grid of every active listing', async ({ page }) => {
@@ -62,8 +93,54 @@ test.describe('browsing listings', () => {
 
     const card = page.getByRole('link', { name: /Learn latte art with me/ })
     await expect(card.getByText('Food')).toBeVisible()
-    await expect(card.getByText('$51/person')).toBeVisible()
+    await expect(card.locator('.ui-card__amount')).toHaveText('S$51')
+    await expect(card.locator('.ui-card__unit')).toHaveText('/person')
     await expect(card).not.toContainText('★')
+  })
+
+  test('shows the length on the photo and the rating on the price line', async ({ page }) => {
+    await stubAllExternalCalls(page, {
+      listings: [
+        { ...LATTE_ART, duration_mins: 90 },
+        {
+          ...BOXING,
+          title: 'Boxing basics for absolute beginners who have never thrown a single punch',
+          duration_mins: 60,
+        },
+      ],
+      'rpc/listing_ratings': [{ listing_id: LATTE_ART.id, average: 5, review_count: 1 }],
+    })
+    await page.goto('/')
+
+    const latte = page.getByRole('link', { name: /Learn latte art with me/ })
+    const boxing = page.getByRole('link', { name: /Boxing basics/ })
+    await expect(latte.locator('.ui-card__length')).toHaveText('1.5 hr')
+    await expect(boxing.locator('.ui-card__length')).toHaveText('1 hr')
+    await expect(latte.locator('.ui-card__price-row')).toHaveText('S$51/person★ 5.0 (1)')
+    // Measure with the web fonts in, not the fallback the page paints first.
+    await page.evaluate(() => document.fonts.ready)
+
+    // The length sits in the same spot on every card: the photo's bottom-right corner.
+    const spots = []
+    for (const card of [latte, boxing]) {
+      const photo = await card.locator('.ui-card__image-wrap').boundingBox()
+      const tag = await card.locator('.ui-card__length').boundingBox()
+      const right = photo.x + photo.width - (tag.x + tag.width)
+      const bottom = photo.y + photo.height - (tag.y + tag.height)
+      expect(right).toBeGreaterThan(0)
+      expect(bottom).toBeGreaterThan(0)
+      expect(bottom).toBeLessThan(photo.height / 3)
+      spots.push([right, bottom])
+    }
+    expect(Math.abs(spots[0][0] - spots[1][0])).toBeLessThan(1)
+    expect(Math.abs(spots[0][1] - spots[1][1])).toBeLessThan(1)
+
+    // The rating shares the price's line, on the right, on phones too.
+    const box = await latte.boundingBox()
+    const amount = await latte.locator('.ui-card__amount').boundingBox()
+    const rating = await latte.locator('.ui-card__rating').boundingBox()
+    expect(Math.abs(rating.y + rating.height / 2 - (amount.y + amount.height / 2))).toBeLessThan(3)
+    expect(Math.abs(rating.x + rating.width - (box.x + box.width))).toBeLessThan(1)
   })
 
   test('lays the grid out two across on a phone', async ({ page }, testInfo) => {

@@ -9,6 +9,7 @@ import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
 import PhotoLightbox from '../components/PhotoLightbox'
 import { revokePhotoUrls } from '../lib/coverCrop'
+import { formatDuration } from '../lib/duration'
 import { MAX_PHOTOS, uploadListingPhotos } from '../lib/listingPhotos'
 import PageLoader from '../components/PageLoader'
 import WaitingState from '../components/WaitingState'
@@ -440,7 +441,9 @@ export default function CreateListing() {
       title={title.trim() || 'Your listing title'}
       titleLevel={3}
       metaItems={[area || 'Your area']}
-      price={priceCents ? `${formatGuestFacingPrice(priceCents)}/person` : '$—/person'}
+      price={priceCents ? `S${formatGuestFacingPrice(priceCents)}` : 'S$—'}
+      priceUnit="/person"
+      length={formatDuration(durationMins)}
       flag="New"
       onImageClick={photos.length ? () => setPreviewLightbox(true) : undefined}
     />

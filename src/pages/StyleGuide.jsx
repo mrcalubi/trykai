@@ -245,23 +245,28 @@ export default function StyleGuide() {
           <article className="style-guide-card-example">
             <p className="style-guide-card__label">Browse card</p>
             <p className="style-guide-card__usage">
-              Category badge, title, then one meta line: price on the left and, when the
-              listing has reviews, ★ average (count) on the right. Whole card clickable.
+              Category badge and the session length on the photo (length bottom-right, like
+              a video&rsquo;s running time). Under it: title, area and next date, then the
+              all-in price with ★ average (count) on the right when the listing has reviews.
+              Whole card clickable.
             </p>
             <Card
               mode="browse"
               to="/listings/example"
               badge="Food"
               title="Learn latte art with me"
+              metaItems={['Changi', 'Sat, 5 Dec']}
               rating={4.8}
               reviewCount={12}
-              price="$20/person"
+              price="S$20"
+              priceUnit="/person"
+              length="1.5 hr"
             />
           </article>
           <article className="style-guide-card-example">
             <p className="style-guide-card__label">Browse card, no reviews yet</p>
             <p className="style-guide-card__usage">
-              A brand-new listing shows the price alone. No dot, no empty star, no
+              A listing with no reviews shows the price alone. No empty star, no
               &ldquo;0 reviews&rdquo;.
             </p>
             <Card
@@ -269,7 +274,10 @@ export default function StyleGuide() {
               to="/listings/example"
               badge="Fitness"
               title="Boxing basics for absolute beginners"
-              price="$32/person"
+              metaItems={['Bukit Merah']}
+              price="S$32"
+              priceUnit="/person"
+              length="1 hr"
             />
           </article>
           <article className="style-guide-card-example">

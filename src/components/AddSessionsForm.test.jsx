@@ -92,7 +92,7 @@ describe('Add dates sheet', () => {
     // The batch limit stays out of sight until the host goes over it.
     expect(within(sheet).queryByText(/40/)).not.toBeInTheDocument()
     // The length is said once.
-    expect(within(sheet).getAllByText(/1 hr 30 min/)).toHaveLength(1)
+    expect(within(sheet).getAllByText(/1\.5 hr/)).toHaveLength(1)
 
     await user.click(within(sheet).getByRole('button', { name: 'Close' }))
     expect(onCancel).toHaveBeenCalledTimes(1)
