@@ -40,7 +40,8 @@ export default function Card({
   rating,
   reviewCount,
   price,
-  priceNote,
+  priceUnit,
+  length,
   metaItems,
   host,
   flag,
@@ -70,14 +71,19 @@ export default function Card({
       : { className: classes, ...props }
 
   const browseMetaItems = Array.isArray(metaItems) ? metaItems.filter(Boolean) : []
-  const browseMetaLine =
-    price || showRating || flag ? (
-      <p className="ui-card__meta-line">
-        {price ? (
-          <span className="ui-card__price-text">
-            {price}
-            {priceNote ? <span className="ui-card__price-note">{priceNote}</span> : null}
-          </span>
+  // Area and date, with the rating (or a "New" flag) beside them. A narrow card
+  // gives the rating its own line; see .ui-card__info in index.css.
+  const browseInfo =
+    browseMetaItems.length > 0 || showRating || flag ? (
+      <div className="ui-card__info">
+        {browseMetaItems.length > 0 ? (
+          <p className="ui-card__meta-inline">
+            {browseMetaItems.map((item) => (
+              <span key={item} className="ui-card__meta-item">
+                {item}
+              </span>
+            ))}
+          </p>
         ) : null}
         {showRating ? (
           <span className="ui-card__rating">
@@ -85,6 +91,25 @@ export default function Card({
           </span>
         ) : flag ? (
           <span className="ui-card__flag">{flag}</span>
+        ) : null}
+      </div>
+    ) : null
+  // The all-in price on the left and the session length in a tag on the right,
+  // pinned to the bottom of the card so the rows line up across a grid row.
+  const browsePriceRow =
+    price || length ? (
+      <p className="ui-card__price-row">
+        {price ? (
+          <span className="ui-card__price-text">
+            <span className="ui-card__amount">{price}</span>
+            {priceUnit ? <span className="ui-card__unit">{priceUnit}</span> : null}
+          </span>
+        ) : null}
+        {length ? (
+          <span className="ui-card__length">
+            <Icon name="clock" size={12} strokeWidth={2.2} />
+            {length}
+          </span>
         ) : null}
       </p>
     ) : null
@@ -183,17 +208,9 @@ export default function Card({
       ) : null}
       <div className="ui-card__body">
         {title ? <Title className="ui-card__title">{title}</Title> : null}
-        {isBrowse && browseMetaItems.length > 0 ? (
-          <p className="ui-card__meta-inline">
-            {browseMetaItems.map((item) => (
-              <span key={item} className="ui-card__meta-item">
-                {item}
-              </span>
-            ))}
-          </p>
-        ) : null}
-        {isBrowse ? browseMetaLine : bookingMetaBlock}
+        {isBrowse ? browseInfo : bookingMetaBlock}
         {children}
+        {isBrowse ? browsePriceRow : null}
         {!isBrowse && footer ? <div className="ui-card__footer">{footer}</div> : null}
       </div>
     </Wrapper>

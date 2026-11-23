@@ -2652,6 +2652,8 @@ input[type='password']::-webkit-password-reveal-button {
 }
 
 .ui-card--browse {
+  /* The card's own width decides where the rating goes (.ui-card__info). */
+  container: ui-card / inline-size;
   color: inherit;
   text-decoration: none;
   cursor: pointer;
@@ -2881,11 +2883,31 @@ input[type='password']::-webkit-password-reveal-button {
   }
 }
 
+/* Area and next date with the rating beside them. When both do not fit, the
+   rating wraps to its own line; a phone-width card always gives it one. */
+.ui-card__info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 8px;
+  margin-top: 3px;
+}
+
+@container ui-card (max-width: 219px) {
+  .ui-card__info {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 /* Area and next date; the separator is drawn so it never lands in the text. */
 .ui-card__meta-inline {
   display: flex;
   overflow: hidden;
-  margin-top: 3px;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
   font-size: 13px;
   line-height: 1.35;
   color: var(--muted);
@@ -2917,37 +2939,93 @@ input[type='password']::-webkit-password-reveal-button {
   border-radius: 50%;
 }
 
-.ui-card__meta-line {
+/* The all-in price left, the session length right. margin-top: auto pins the
+   row to the bottom of the card, so rows line up even when a title wraps. */
+.ui-card__price-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 4px 8px;
-  margin-top: 6px;
+  margin: auto 0 0;
+  padding-top: 10px;
+}
+
+.ui-card__price-text {
+  white-space: nowrap;
+}
+
+.ui-card__amount {
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.35;
   color: var(--navy);
 }
 
-.ui-card__meta-line > * {
-  white-space: nowrap;
-}
-
-.ui-card__price-note {
-  margin-left: 6px;
+.ui-card__unit {
+  margin-left: 3px;
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--muted);
+}
+
+/* margin-left: auto keeps the tag on the right even when it wraps under the
+   price on the narrowest phones. */
+.ui-card__length {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  margin-left: auto;
+  padding: 0 7px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--navy);
+  white-space: nowrap;
+  background: var(--sand);
+  border-radius: var(--radius-sm);
+}
+
+/* Two-across phone cards: a little tighter, so the price and the tag share a
+   line from a 360px screen up. */
+@container ui-card (max-width: 179px) {
+  .ui-card__price-row {
+    column-gap: 6px;
+  }
+
+  .ui-card__amount {
+    font-size: 14px;
+  }
+
+  .ui-card__unit {
+    margin-left: 2px;
+    font-size: 11px;
+  }
+
+  .ui-card__length {
+    gap: 3px;
+    padding: 0 6px;
+  }
+}
+
+/* A 320px phone: the tag drops its clock so it still fits beside the price. */
+@container ui-card (max-width: 149px) {
+  .ui-card__length .ui-icon {
+    display: none;
+  }
 }
 
 .ui-card--browse .ui-card__rating {
   font-family: var(--sans);
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.35;
   color: var(--navy);
+  white-space: nowrap;
 }
 
 .ui-card--browse .ui-card__star {

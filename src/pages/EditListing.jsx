@@ -26,6 +26,7 @@ import {
   parsePriceInputCents,
 } from '../lib/pricing'
 import { formatSgd } from '../lib/hostingDashboard'
+import { cardLength } from '../lib/cardExtras'
 import {
   LISTING_FIELD_HINTS,
   PHOTO_UPLOAD_ERROR,
@@ -1131,7 +1132,9 @@ export default function EditListing() {
             title={title.trim() || name}
             titleLevel={3}
             metaItems={[nextSession ? formatSessionDay(nextSession.starts_at) : '', area].filter(Boolean)}
-            price={priceCents ? `${formatSgd(guestFacingPriceCents(priceCents))}/person` : 'S$—/person'}
+            price={priceCents ? formatSgd(guestFacingPriceCents(priceCents)) : 'S$—'}
+            priceUnit="/person"
+            length={cardLength(Number(durationMins))}
           />
           <p className="edit-field__hint">Updates as you edit. Only saved changes go live.</p>
           <Link to={`/listings/${id}`} className="btn btn--secondary edit-preview__open">

@@ -432,7 +432,7 @@ describe('Profile public content', () => {
       'href',
       '/listings/listing-9'
     )
-    expect(screen.getByText(/\$51\/person/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Latte art/ })).toHaveTextContent('S$51/person')
   })
 
   it('rates a listing card only when listing_ratings returns reviews', async () => {
