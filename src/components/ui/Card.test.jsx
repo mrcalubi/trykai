@@ -231,6 +231,10 @@ describe('Card', () => {
     }
     expect(rule('.ui-card__price-row')).toMatch(/margin:\s*auto 0 0/)
     expect(rule('.ui-card__price-row')).toMatch(/justify-content:\s*space-between/)
+    // The tag never wraps off the price's line; "/person" drops under the price instead.
+    expect(rule('.ui-card__price-row')).not.toMatch(/flex-wrap/)
+    expect(rule('.ui-card__price-text')).toMatch(/flex-wrap:\s*wrap/)
+    expect(rule('.ui-card__length')).toMatch(/flex-shrink:\s*0/)
     expect(rule('.ui-card--browse')).toMatch(/container:\s*ui-card \/ inline-size/)
     expect(css).toMatch(
       /@container ui-card \(max-width: 219px\) \{\s*\.ui-card__info \{\s*flex-direction:\s*column;/

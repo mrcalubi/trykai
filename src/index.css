@@ -2940,46 +2940,50 @@ input[type='password']::-webkit-password-reveal-button {
 }
 
 /* The all-in price left, the session length right. margin-top: auto pins the
-   row to the bottom of the card, so rows line up even when a title wraps. */
+   row to the bottom of the card, so rows line up even when a title wraps.
+   The row never wraps: on a narrow card "/person" drops under the price
+   (.ui-card__price-text wraps) and the tag keeps its place beside the price. */
 .ui-card__price-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 4px 8px;
+  gap: 8px;
   margin: auto 0 0;
   padding-top: 10px;
 }
 
 .ui-card__price-text {
-  white-space: nowrap;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 3px;
 }
 
+/* 22px lines, the tag's height, so the price and the tag share a centre line. */
 .ui-card__amount {
   font-family: var(--mono);
   font-size: 15px;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 22px;
   color: var(--navy);
+  white-space: nowrap;
 }
 
 .ui-card__unit {
-  margin-left: 3px;
   font-family: var(--sans);
   font-size: 12px;
   font-weight: 500;
+  line-height: 16px;
   color: var(--muted);
+  white-space: nowrap;
 }
 
-/* margin-left: auto keeps the tag on the right even when it wraps under the
-   price on the narrowest phones. */
 .ui-card__length {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
   gap: 4px;
   height: 22px;
-  margin-left: auto;
   padding: 0 7px;
   font-family: var(--mono);
   font-size: 11px;
@@ -2990,11 +2994,15 @@ input[type='password']::-webkit-password-reveal-button {
   border-radius: var(--radius-sm);
 }
 
-/* Two-across phone cards: a little tighter, so the price and the tag share a
-   line from a 360px screen up. */
+/* Two-across phone cards: a little tighter, so "/person" stays beside the
+   price on a typical card from a 320px screen up. */
 @container ui-card (max-width: 179px) {
   .ui-card__price-row {
-    column-gap: 6px;
+    gap: 4px;
+  }
+
+  .ui-card__price-text {
+    column-gap: 2px;
   }
 
   .ui-card__amount {
@@ -3002,17 +3010,16 @@ input[type='password']::-webkit-password-reveal-button {
   }
 
   .ui-card__unit {
-    margin-left: 2px;
     font-size: 11px;
   }
 
   .ui-card__length {
     gap: 3px;
-    padding: 0 6px;
+    padding: 0 5px;
   }
 }
 
-/* A 320px phone: the tag drops its clock so it still fits beside the price. */
+/* A 320px phone: the tag drops its clock to leave the price more room. */
 @container ui-card (max-width: 149px) {
   .ui-card__length .ui-icon {
     display: none;

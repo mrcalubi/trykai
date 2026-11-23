@@ -47,24 +47,24 @@ test.describe('browsing listings', () => {
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     await expect(page.locator('.trust-list__item').first()).toBeVisible()
     await expect(page.locator('.ui-card__length').first()).toBeVisible()
+    // Measure with the web fonts in, not the fallback the page paints first.
+    await page.evaluate(() => document.fonts.ready)
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
     // The trust pills scroll inside their own row instead.
     const row = await page.locator('.trust-list').boundingBox()
     expect(row.x + row.width).toBeLessThanOrEqual(320)
-    // The longest price row wraps inside its card rather than widening the page.
+    // Even the longest price row stays inside its card, with the tag on the price's line
+    // ("/person" drops under the price instead). This holds whatever the font metrics.
     for (const card of await page.locator('.listings-grid > a').all()) {
-      const box = await card.boundingBox()
       const tag = card.locator('.ui-card__length')
       if ((await tag.count()) === 0) continue
+      const box = await card.boundingBox()
       const tagBox = await tag.boundingBox()
+      const amount = await card.locator('.ui-card__amount').boundingBox()
       expect(tagBox.x + tagBox.width).toBeLessThanOrEqual(box.x + box.width + 0.5)
+      expect(Math.abs(tagBox.y + tagBox.height / 2 - (amount.y + amount.height / 2))).toBeLessThan(1)
     }
-    // A typical price and its length still share one line at this width.
-    const typical = page.getByRole('link', { name: /Typical session/ })
-    const amount = await typical.locator('.ui-card__amount').boundingBox()
-    const tag = await typical.locator('.ui-card__length').boundingBox()
-    expect(Math.abs(tag.y + tag.height / 2 - (amount.y + amount.height / 2))).toBeLessThan(3)
   })
 
   test('shows the landing headline above the grid of every active listing', async ({ page }) => {
@@ -115,19 +115,23 @@ test.describe('browsing listings', () => {
     const boxing = page.getByRole('link', { name: /Boxing basics/ })
     await expect(latte.locator('.ui-card__price-row')).toHaveText('S$51/person1.5 hr')
     await expect(boxing.locator('.ui-card__length')).toHaveText('1 hr')
+    // Measure with the web fonts in, not the fallback the page paints first.
+    await page.evaluate(() => document.fonts.ready)
 
     // A two-line title does not push one card's price row below its neighbour's.
     const latteRow = await latte.locator('.ui-card__price-row').boundingBox()
     const boxingRow = await boxing.locator('.ui-card__price-row').boundingBox()
     expect(Math.abs(latteRow.y - boxingRow.y)).toBeLessThan(1)
 
-    // The tag is right-aligned on the same line as the price.
+    // The tag is right-aligned on the same line as the price, with "/person" beside the price.
     for (const card of [latte, boxing]) {
       const box = await card.boundingBox()
       const amount = await card.locator('.ui-card__amount').boundingBox()
+      const unit = await card.locator('.ui-card__unit').boundingBox()
       const tag = await card.locator('.ui-card__length').boundingBox()
       expect(Math.abs(tag.x + tag.width - (box.x + box.width))).toBeLessThan(1)
-      expect(Math.abs(tag.y + tag.height / 2 - (amount.y + amount.height / 2))).toBeLessThan(3)
+      expect(Math.abs(tag.y + tag.height / 2 - (amount.y + amount.height / 2))).toBeLessThan(1)
+      expect(unit.x).toBeGreaterThan(amount.x + amount.width)
     }
 
     // On a phone the rating gets its own line; wider cards keep it beside the area.
