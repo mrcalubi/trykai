@@ -27,7 +27,7 @@ import {
 } from '../components/profile/ProfileSections'
 import { hasAvatarPhoto } from '../lib/avatarPhoto'
 import { formatGuestFacingPrice } from '../lib/pricing'
-import { cardLength } from '../lib/cardExtras'
+import { formatDuration } from '../lib/duration'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { hostEntry } from '../lib/hostEntry'
@@ -321,7 +321,7 @@ function ListingCards({ listings, ratings }) {
           titleLevel={3}
           price={`S${formatGuestFacingPrice(listing.price_per_person)}`}
           priceUnit="/person"
-          length={cardLength(listing.duration_mins)}
+          length={formatDuration(listing.duration_mins)}
           rating={ratings[listing.id]?.rating}
           reviewCount={ratings[listing.id]?.reviewCount}
         />

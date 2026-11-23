@@ -166,7 +166,7 @@ describe('index.html default preview', () => {
 
 describe('copies of app formatters', () => {
   it('formats durations the same as the app', () => {
-    for (const mins of [null, 0, 30, 60, 90, 120, 390, '45']) {
+    for (const mins of [null, 0, 30, 45, 60, 80, 90, 100, 120, 200, 390, '45']) {
       expect(previewFormatDuration(mins)).toBe(formatDuration(mins))
     }
   })

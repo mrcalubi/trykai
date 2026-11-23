@@ -245,10 +245,10 @@ export default function StyleGuide() {
           <article className="style-guide-card-example">
             <p className="style-guide-card__label">Browse card</p>
             <p className="style-guide-card__usage">
-              Category badge, title, area and next date with ★ average (count) beside
-              them when the listing has reviews, then the all-in price on the left and the
-              session length in a tag on the right, at the bottom of the card. Whole card
-              clickable.
+              Category badge and the session length on the photo (length bottom-right, like
+              a video&rsquo;s running time). Under it: title, area and next date, then the
+              all-in price with ★ average (count) on the right when the listing has reviews.
+              Whole card clickable.
             </p>
             <Card
               mode="browse"
@@ -266,8 +266,8 @@ export default function StyleGuide() {
           <article className="style-guide-card-example">
             <p className="style-guide-card__label">Browse card, no reviews yet</p>
             <p className="style-guide-card__usage">
-              A listing with no reviews shows no star and no &ldquo;0 reviews&rdquo;. The
-              price row stays the same.
+              A listing with no reviews shows the price alone. No empty star, no
+              &ldquo;0 reviews&rdquo;.
             </p>
             <Card
               mode="browse"

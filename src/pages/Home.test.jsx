@@ -192,8 +192,9 @@ describe('Home listing grid', () => {
     renderWithRouter(<Home />)
 
     const card = await screen.findByRole('link', { name: /Latte art/ })
-    // The length sits in a tag on the price row so a long session does not read as expensive.
-    expect(card.querySelector('.ui-card__price-row').textContent).toBe('S$51/person1.5 hr')
+    expect(card.querySelector('.ui-card__price-row').textContent).toBe('S$51/person')
+    // The length sits on the photo, so a long session does not read as expensive.
+    expect(card.querySelector('.ui-card__image-wrap .ui-card__length').textContent).toBe('1.5 hr')
     expect(card.textContent).not.toContain('★')
     // No stray separator where a rating would have been.
     expect(card.textContent.trim().endsWith('·')).toBe(false)

@@ -726,7 +726,7 @@ describe('Dashboard add session', () => {
     await openSessionForm(user)
 
     expect(
-      screen.getByText('Each session runs 1 hr 30 min. Pick one or more start times.'),
+      screen.getByText('Each session runs 1.5 hr. Pick one or more start times.'),
     ).toBeInTheDocument()
     expect(screen.queryByLabelText(/How long is each session/)).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Spots total')).not.toBeInTheDocument()
@@ -1992,7 +1992,7 @@ describe('Hosting listing cards', () => {
     const card = listingCard('Latte art')
     expect(within(card).getAllByText('No dates yet')).toHaveLength(2)
     expect(within(card).queryByText('Hidden: no sessions')).not.toBeInTheDocument()
-    expect(within(card).getByText('S$23 · 90 min · up to 4')).toBeInTheDocument()
+    expect(within(card).getByText('S$23 · 1.5 hr · up to 4')).toBeInTheDocument()
     expect(within(card).getByRole('button', { name: 'Add dates' }).className).toContain(
       'primary'
     )
@@ -2071,7 +2071,7 @@ describe('Hosting draft listing', () => {
 
     const card = listingCard('Bake a focaccia together')
     expect(within(card).getByText('Draft')).toBeInTheDocument()
-    expect(within(card).getByText('S$20 · 90 min · up to 4')).toBeInTheDocument()
+    expect(within(card).getByText('S$20 · 1.5 hr · up to 4')).toBeInTheDocument()
     expect(within(card).getByText('Step 3 of 5: price and group size')).toBeInTheDocument()
     expect(
       within(card).getByRole('link', { name: 'Continue Bake a focaccia together' })

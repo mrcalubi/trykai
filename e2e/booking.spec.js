@@ -47,7 +47,7 @@ test.describe('listing detail', () => {
     })
     await page.goto('/listings/listing-latte')
 
-    await expect(page.getByText(/1 hr 30 min · 3 spots left/)).toBeVisible()
+    await expect(page.getByText(/1\.5 hr · 3 spots left/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Book' })).toBeEnabled()
   })
 
@@ -110,8 +110,8 @@ test.describe('listing detail', () => {
 
     await page.getByRole('button', { name: /20 June, 1 session/ }).click()
     await expect(page.getByRole('heading', { name: /20 Jun · 1 session/ })).toBeVisible()
-    await expect(page.getByText(/45 min · 2 spots left/)).toBeVisible()
-    await expect(page.getByText(/1 hr 30 min · 3 spots left/)).toBeHidden()
+    await expect(page.getByText(/0\.75 hr · 2 spots left/)).toBeVisible()
+    await expect(page.getByText(/1\.5 hr · 3 spots left/)).toBeHidden()
 
     await page.getByRole('button', { name: 'Book' }).click()
     await expect(page).toHaveURL(/\/login$/)

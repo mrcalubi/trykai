@@ -9,7 +9,7 @@ import { categoryIconName } from '../components/ui/categoryIcon'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { browseFlag, keenCountsById } from '../lib/keen'
 import { formatGuestFacingPrice, guestFacingPriceCents } from '../lib/pricing'
-import { cardLength } from '../lib/cardExtras'
+import { formatDuration } from '../lib/duration'
 import { formatCents } from '../lib/cancellationPolicy'
 import { listingsForGuestBrowse, sortListingsForBrowse } from '../lib/listingSort'
 import { filterNarrows, locationLabel, showLocationFilter, showNewFlags, visibleCategories } from '../lib/browseUi'
@@ -492,7 +492,7 @@ export default function Home() {
                     host={listingHost(listing)}
                     price={`S${formatGuestFacingPrice(listing.price_per_person)}`}
                     priceUnit="/person"
-                    length={cardLength(listing.duration_mins)}
+                    length={formatDuration(listing.duration_mins)}
                     rating={ratings[listing.id]?.rating}
                     reviewCount={ratings[listing.id]?.reviewCount}
                     flag={browseFlag(listing, keenCounts[listing.id], undefined, showNew)}

@@ -71,19 +71,26 @@ export default function Card({
       : { className: classes, ...props }
 
   const browseMetaItems = Array.isArray(metaItems) ? metaItems.filter(Boolean) : []
-  // Area and date, with the rating (or a "New" flag) beside them. A narrow card
-  // gives the rating its own line; see .ui-card__info in index.css.
+  // Area and next date.
   const browseInfo =
-    browseMetaItems.length > 0 || showRating || flag ? (
-      <div className="ui-card__info">
-        {browseMetaItems.length > 0 ? (
-          <p className="ui-card__meta-inline">
-            {browseMetaItems.map((item) => (
-              <span key={item} className="ui-card__meta-item">
-                {item}
-              </span>
-            ))}
-          </p>
+    browseMetaItems.length > 0 ? (
+      <p className="ui-card__meta-inline">
+        {browseMetaItems.map((item) => (
+          <span key={item} className="ui-card__meta-item">
+            {item}
+          </span>
+        ))}
+      </p>
+    ) : null
+  // The all-in price on the left, the rating (or a "New" flag) on the right.
+  const browsePriceRow =
+    price || showRating || flag ? (
+      <p className="ui-card__price-row">
+        {price ? (
+          <span className="ui-card__price-text">
+            <span className="ui-card__amount">{price}</span>
+            {priceUnit ? <span className="ui-card__unit">{priceUnit}</span> : null}
+          </span>
         ) : null}
         {showRating ? (
           <span className="ui-card__rating">
@@ -92,26 +99,16 @@ export default function Card({
         ) : flag ? (
           <span className="ui-card__flag">{flag}</span>
         ) : null}
-      </div>
-    ) : null
-  // The all-in price on the left and the session length in a tag on the right,
-  // pinned to the bottom of the card so the rows line up across a grid row.
-  const browsePriceRow =
-    price || length ? (
-      <p className="ui-card__price-row">
-        {price ? (
-          <span className="ui-card__price-text">
-            <span className="ui-card__amount">{price}</span>
-            {priceUnit ? <span className="ui-card__unit">{priceUnit}</span> : null}
-          </span>
-        ) : null}
-        {length ? (
-          <span className="ui-card__length">
-            <Icon name="clock" size={12} strokeWidth={2.2} />
-            {length}
-          </span>
-        ) : null}
       </p>
+    ) : null
+  // The session length on the photo's bottom-right corner, where a video shows its
+  // running time: the same spot on every card.
+  const lengthTag =
+    isBrowse && length ? (
+      <span className="ui-card__length">
+        <Icon name="clock" size={11} strokeWidth={2.2} />
+        {length}
+      </span>
     ) : null
 
   const hostName = host?.name ?? ''
@@ -204,6 +201,7 @@ export default function Card({
             placeholder
           )}
           {hostFace}
+          {lengthTag}
         </div>
       ) : null}
       <div className="ui-card__body">
