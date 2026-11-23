@@ -54,7 +54,14 @@ import BioPreview from '../components/BioPreview'
 import ReviewForm from '../components/ReviewForm'
 import VerifiedBadge from '../components/VerifiedBadge'
 import HostRating from '../components/HostRating'
-import { firstRow, hostRatingFromRpc, reviewClosedOnLabel } from '../lib/twoWayReviews'
+import {
+  fetchMyReviews,
+  firstRow,
+  hostRatingFromRpc,
+  reviewClosedOnLabel,
+  reviewIsEditable,
+} from '../lib/twoWayReviews'
+import MyHiddenReview from '../components/MyHiddenReview'
 import { companionSeats } from '../lib/companions'
 import { sessionEndAt } from '../lib/reviewGate'
 import WhosComing from '../components/WhosComing'
@@ -242,6 +249,9 @@ export default function BookingDetail() {
   const [hostRating, setHostRating] = useState({ average: null, reviewCount: 0 })
   const [alreadyReviewed, setAlreadyReviewed] = useState(false)
   const [reviewState, setReviewState] = useState(null)
+  const [myReview, setMyReview] = useState(null)
+  const [editingReview, setEditingReview] = useState(false)
+  const [reviewNotice, setReviewNotice] = useState('')
   const [upcomingCount, setUpcomingCount] = useState(0)
   const [bringChecked, setBringChecked] = useState([])
   const [note, setNote] = useState('')
@@ -348,6 +358,12 @@ export default function BookingDetail() {
       : await supabase.rpc('my_review_state', { p_booking_id: data.id })
     const state = firstRow(stateRows)
     setReviewState(state)
+    if (state?.i_reviewed && !state.my_review_public) {
+      const [mine] = await fetchMyReviews([data.id], userId, 'guest')
+      setMyReview(mine ?? null)
+    } else {
+      setMyReview(null)
+    }
     if (companionView) {
       setAlreadyReviewed(false)
     } else if (state) {
@@ -839,23 +855,57 @@ export default function BookingDetail() {
                   booking={booking}
                   userId={userId}
                   closedOn={reviewClosedOnLabel(revealOn)}
-                  onSubmitted={() => {
+                  onSubmitted={(posted, saved) => {
+                    const revealed = Boolean(posted?.revealed)
                     setAlreadyReviewed(true)
                     setReviewState((current) => ({
                       ...(current ?? {}),
                       can_review: false,
                       i_reviewed: true,
-                      my_review_public: false,
+                      my_review_public: revealed,
+                      reveal_after: posted?.reveal_after ?? current?.reveal_after,
                     }))
+                    setMyReview(
+                      !revealed && posted?.review_id
+                        ? {
+                            id: posted.review_id,
+                            reveal_after: posted.reveal_after,
+                            revealed_at: null,
+                            ...saved,
+                          }
+                        : null,
+                    )
+                  }}
+                />
+              ) : waitingToReveal && editingReview && myReview ? (
+                <ReviewForm
+                  booking={booking}
+                  userId={userId}
+                  review={myReview}
+                  hostName={hostName}
+                  closedOn={reviewClosedOnLabel(revealOn)}
+                  onCancel={() => setEditingReview(false)}
+                  onRevealed={(message) => {
+                    setReviewNotice(message)
+                    setEditingReview(false)
+                    setMyReview(null)
+                    setReviewState((current) => ({ ...(current ?? {}), my_review_public: true }))
+                  }}
+                  onSubmitted={(_posted, saved) => {
+                    setMyReview((current) => ({ ...current, ...saved }))
+                    setEditingReview(false)
                   }}
                 />
               ) : waitingToReveal ? (
-                <p className="hint">
-                  Thanks for your review. It goes live when {hostLabel} reviews you too, or on{' '}
-                  {reviewClosedOnLabel(revealOn)}, whichever comes first.
-                </p>
+                <MyHiddenReview
+                  review={myReview}
+                  onEdit={
+                    reviewIsEditable(myReview, nowMs) ? () => setEditingReview(true) : undefined
+                  }
+                  hint={`Thanks for your review. You can change it until it goes live: when ${hostLabel} reviews you too, or on ${reviewClosedOnLabel(revealOn)}, whichever comes first.`}
+                />
               ) : alreadyReviewed ? (
-                <p className="hint">Review submitted</p>
+                <p className="hint">{reviewNotice || 'Review submitted'}</p>
               ) : null}
               {listing?.id ? (
                 <div className="booking-again">

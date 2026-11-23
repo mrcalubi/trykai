@@ -179,3 +179,90 @@ describe('HostReviewsDueList · friends on a booking', () => {
     expect(screen.queryByRole('heading', { name: 'How was Sam?' })).not.toBeInTheDocument()
   })
 })
+
+describe('HostReviewsDueList · editing a hidden review', () => {
+  const reviewed = { ...dueRow, host_reviewed: true, guest_reviewed: false }
+  const mine = {
+    id: 'r-host',
+    booking_id: 'booking-1',
+    reviewee_id: 'guest-1',
+    rating: 4,
+    comment: 'Sam was early.',
+    photo_paths: [],
+    reveal_after: hoursFromNow(24 * 5),
+    revealed_at: null,
+  }
+
+  beforeEach(() => {
+    supabase.__reset()
+    supabase.rpc.mockResolvedValue({ data: { review_id: 'r-host', revealed: false }, error: null })
+  })
+
+  it('offers Edit while hidden and saves through edit_review without emailing', async () => {
+    const { user } = renderWithRouter(
+      <HostReviewsDueList rows={[reviewed]} myReviews={[mine]} now={Date.now()} />,
+    )
+    expect(screen.queryByText('Done')).not.toBeInTheDocument()
+    expect(screen.getByText('You can change it until it goes live')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Edit review of Sam' }))
+    expect(screen.getByLabelText('Comment')).toHaveValue('Sam was early.')
+    expect(screen.queryByText('Anything TryKai should know?')).not.toBeInTheDocument()
+    await user.clear(screen.getByLabelText('Comment'))
+    await user.type(screen.getByLabelText('Comment'), 'Sam was early and kind.')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() =>
+      expect(supabase.rpc).toHaveBeenCalledWith('edit_review', {
+        p_review_id: 'r-host',
+        p_rating: 4,
+        p_comment: 'Sam was early and kind.',
+        p_photo_paths: [],
+      }),
+    )
+    expect(supabase.functions.invoke).not.toHaveBeenCalled()
+    expect(await screen.findByRole('button', { name: 'Edit review of Sam' })).toBeInTheDocument()
+  })
+
+  it('shows Done once the review is live', () => {
+    renderWithRouter(
+      <HostReviewsDueList
+        rows={[reviewed]}
+        myReviews={[{ ...mine, revealed_at: hoursFromNow(-1) }]}
+        now={Date.now()}
+      />,
+    )
+    expect(screen.getByText('Done')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Edit review/ })).not.toBeInTheDocument()
+  })
+
+  it('closes the form and explains when the guest posted first', async () => {
+    supabase.rpc.mockResolvedValue({ data: null, error: { message: 'review_revealed' } })
+    const { user } = renderWithRouter(
+      <HostReviewsDueList rows={[reviewed]} myReviews={[mine]} now={Date.now()} />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Edit review of Sam' }))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(
+      await screen.findByText("Sam reviewed you too, so your review is live now and can't be changed."),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Done')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument()
+  })
+
+  it('lets the host edit a review they just posted', async () => {
+    supabase.rpc.mockResolvedValue({
+      data: { review_id: 'r-new', revealed: false, reveal_after: hoursFromNow(24 * 5) },
+      error: null,
+    })
+    const { user } = renderWithRouter(<HostReviewsDueList rows={[dueRow]} now={Date.now()} />)
+    await user.click(screen.getByRole('button', { name: 'Review' }))
+    await user.click(screen.getByRole('button', { name: '5 stars' }))
+    await user.type(screen.getByLabelText('Comment'), 'Sam was early and kind.')
+    await user.click(screen.getByRole('button', { name: 'Post review' }))
+
+    await user.click(await screen.findByRole('button', { name: 'Edit review of Sam' }))
+    expect(screen.getByLabelText('Comment')).toHaveValue('Sam was early and kind.')
+  })
+})

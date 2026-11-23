@@ -15,7 +15,7 @@ function formatReviewDate(iso) {
   }).format(new Date(iso))
 }
 
-function StarDisplay({ rating }) {
+export function StarDisplay({ rating }) {
   return (
     <span className="star-display" aria-label={`${rating} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((star) => (

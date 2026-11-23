@@ -220,3 +220,94 @@ describe('ReviewForm', () => {
     expect(supabase.rpc.mock.calls[0][1].p_private_note).toBe('The kitchen was cold')
   })
 })
+
+describe('ReviewForm · editing a hidden review', () => {
+  const review = {
+    id: 'r1',
+    rating: 3,
+    comment: 'First go',
+    photo_paths: ['user-1/a.jpg', 'user-1/b.jpg'],
+    reveal_after: '2099-01-01T00:00:00Z',
+    revealed_at: null,
+  }
+
+  beforeEach(() => {
+    supabase.__reset()
+    compressImage.mockReset()
+    compressImage.mockImplementation(async () => new File(['jpg'], 'shot.jpg', { type: 'image/jpeg' }))
+    supabase.rpc.mockResolvedValue({ data: { review_id: 'r1', revealed: false }, error: null })
+  })
+
+  it('starts from the posted review, keeps photos in order and saves through edit_review', async () => {
+    const onSubmitted = vi.fn()
+    const { user, container } = renderWithRouter(
+      <ReviewForm booking={booking} userId={USER_ID} review={review} onSubmitted={onSubmitted} />,
+    )
+
+    expect(screen.getByLabelText('Comment')).toHaveValue('First go')
+    expect(screen.getByRole('button', { name: '3 stars' })).toHaveClass('star-picker__btn--active')
+    expect(screen.queryByText('Anything TryKai should know?')).not.toBeInTheDocument()
+    expect(container.querySelectorAll('.review-form__tile img')).toHaveLength(2)
+
+    await user.click(screen.getByRole('button', { name: 'Remove photo 1' }))
+    await user.upload(screen.getByLabelText('Add photos'), jpeg('new.jpg'))
+    await waitFor(() => expect(container.querySelectorAll('.review-form__tile img')).toHaveLength(2))
+    await user.click(screen.getByRole('button', { name: '5 stars' }))
+    await user.clear(screen.getByLabelText('Comment'))
+    await user.type(screen.getByLabelText('Comment'), '  Second go  ')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalled())
+    const uploaded = supabase.__bucket('review-photos').upload.mock.calls.map(([path]) => path)
+    expect(uploaded).toHaveLength(1)
+    expect(supabase.rpc).toHaveBeenCalledWith('edit_review', {
+      p_review_id: 'r1',
+      p_rating: 5,
+      p_comment: 'Second go',
+      p_photo_paths: ['user-1/b.jpg', uploaded[0]],
+    })
+    expect(supabase.rpc).not.toHaveBeenCalledWith('post_review', expect.anything())
+    expect(supabase.functions.invoke).not.toHaveBeenCalled()
+    expect(onSubmitted).toHaveBeenCalledWith(expect.anything(), {
+      rating: 5,
+      comment: 'Second go',
+      photo_paths: ['user-1/b.jpg', uploaded[0]],
+    })
+  })
+
+  it('hands back the reveal when the other side posted first', async () => {
+    supabase.rpc.mockResolvedValue({ data: null, error: { message: 'review_revealed' } })
+    const onRevealed = vi.fn()
+    const onSubmitted = vi.fn()
+    const { user } = renderWithRouter(
+      <ReviewForm
+        booking={booking}
+        userId={USER_ID}
+        review={review}
+        hostName="Aakash"
+        onRevealed={onRevealed}
+        onSubmitted={onSubmitted}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() =>
+      expect(onRevealed).toHaveBeenCalledWith(
+        "Aakash reviewed you too, so your review is live now and can't be changed.",
+      ),
+    )
+    expect(onSubmitted).not.toHaveBeenCalled()
+  })
+
+  it('shows the reveal message inline when nobody handles it, and offers Cancel', async () => {
+    supabase.rpc.mockResolvedValue({ data: null, error: { message: 'review_revealed' } })
+    const onCancel = vi.fn()
+    const { user } = renderWithRouter(
+      <ReviewForm booking={booking} userId={USER_ID} review={review} onCancel={onCancel} />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText("Your review is live now and can't be changed.")).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onCancel).toHaveBeenCalled()
+  })
+})
