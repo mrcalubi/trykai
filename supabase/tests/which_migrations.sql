@@ -83,7 +83,8 @@ checks(migration, what, applied) as (
       where n.nspname = 'public'
         and p.proname = 'add_listing_session'
         and pg_get_functiondef(p.oid) like '%already on%'
-    ))
+    )),
+    ('00058', 'reviews.edited_at', exists (select 1 from c where table_name = 'reviews' and column_name = 'edited_at'))
 )
 select migration, case when applied then 'applied' else 'MISSING' end as status, what
 from checks

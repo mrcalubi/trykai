@@ -5,7 +5,7 @@ export default function Terms() {
   return (
     <div className="page page--narrow policy-page">
       <h1>Terms of Service</h1>
-      <p className="policy-page__updated">Last updated: 4 November 2026</p>
+      <p className="policy-page__updated">Last updated: 23 November 2026</p>
 
       <p>
         These terms apply to everyone who uses TryKai. Part 1 applies to all
@@ -103,6 +103,10 @@ export default function Terms() {
         <li>
           Reviews stay hidden until both sides have posted, or until 7 days
           after the session ends, whichever comes first.
+        </li>
+        <li>
+          You can edit your review until it goes live. Once it is live, it is
+          final.
         </li>
         <li>Reviews must be honest and based on your own experience.</li>
         <li>Do not offer or accept anything in exchange for a review.</li>

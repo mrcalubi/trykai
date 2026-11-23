@@ -61,6 +61,7 @@ import {
 } from '../lib/listingDelete'
 import { loadBookingAddonRows, loadBookingNotes } from '../lib/bookingAddons'
 import { HostReviewsDueList } from '../components/HostReviewForm'
+import { fetchMyReviews } from '../lib/twoWayReviews'
 import { groupGuestsBySession } from '../lib/companions'
 import { bookedSeats, confirmedBookings, sessionDayLabel, sessionTimeRange } from '../lib/hostSessions'
 
@@ -139,6 +140,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   const [isAdmin, setIsAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [reviewsDue, setReviewsDue] = useState([])
+  const [myHostReviews, setMyHostReviews] = useState([])
   const [guestsBySession, setGuestsBySession] = useState({})
 
   // The profile's calendar mirrors this tab's sessions. Keep the callback in
@@ -313,6 +315,8 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
 
     const { data: dueRows } = await supabase.rpc('host_reviews_due')
     setReviewsDue(dueRows ?? [])
+    const reviewedBookingIds = (dueRows ?? []).filter((row) => row.host_reviewed).map((row) => row.booking_id)
+    setMyHostReviews(await fetchMyReviews(reviewedBookingIds, userId, 'host'))
 
     setLoading(false)
     // Emails can take a few seconds; never hold the Hosting page for them.
@@ -1061,7 +1065,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
           </dl>
         </section>
 
-        <HostReviewsDueList rows={reviewsDue} />
+        <HostReviewsDueList rows={reviewsDue} myReviews={myHostReviews} />
 
         <section className="hosting-listings" aria-labelledby="hosting-listings-title">
           <h2 id="hosting-listings-title" className="hosting__section-title">

@@ -444,9 +444,74 @@ describe('BookingDetail', () => {
     )
     renderDetail()
     expect(
-      await screen.findByText(/Thanks for your review. It goes live when Mei Ling reviews you too/),
+      await screen.findByText(
+        /Thanks for your review. You can change it until it goes live: when Mei Ling reviews you too/,
+      ),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Post review' })).not.toBeInTheDocument()
+  })
+
+  it('shows the hidden review with Edit, and saves the edit in place', async () => {
+    const revealAfter = hoursFromNow(72)
+    givenAddress('12 Club Street, Singapore 069410', {
+      reviewState: [
+        {
+          can_review: false,
+          i_reviewed: true,
+          my_review_public: false,
+          other_side_reviewed: false,
+          reveal_after: revealAfter,
+          deadline: revealAfter,
+        },
+      ],
+    })
+    const rpc = supabase.rpc.getMockImplementation()
+    supabase.rpc.mockImplementation(async (name, args) =>
+      name === 'edit_review' ? { data: { review_id: 'r-mine', revealed: false }, error: null } : rpc(name, args),
+    )
+    supabase.__on('reviews', 'select', (ctx) =>
+      ctx.single
+        ? { data: null, error: null }
+        : {
+            data: [
+              {
+                id: 'r-mine',
+                booking_id: BOOKING_ID,
+                role: 'guest',
+                rating: 4,
+                comment: 'Loved the pour',
+                photo_paths: [],
+                reveal_after: revealAfter,
+                revealed_at: null,
+              },
+            ],
+            error: null,
+          },
+    )
+    givenBooking(
+      detailBooking({
+        sessions: {
+          ...detailBooking().sessions,
+          starts_at: hoursFromNow(-5),
+        },
+      }),
+    )
+    const { user } = renderDetail()
+    expect(await screen.findByText('Loved the pour')).toBeInTheDocument()
+    expect(screen.getByLabelText('4 out of 5 stars')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Edit review' }))
+    expect(screen.getByLabelText('Comment')).toHaveValue('Loved the pour')
+    await user.clear(screen.getByLabelText('Comment'))
+    await user.type(screen.getByLabelText('Comment'), 'Loved the pour, will go again')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Loved the pour, will go again')).toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'edit_review',
+      expect.objectContaining({ p_review_id: 'r-mine', p_comment: 'Loved the pour, will go again' }),
+    )
+    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument()
   })
 
   it('shows the refund on a cancelled booking', async () => {

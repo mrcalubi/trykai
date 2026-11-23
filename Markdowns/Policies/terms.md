@@ -1,6 +1,6 @@
 # Terms of Service
 
-Last updated: 4 November 2026
+Last updated: 23 November 2026
 
 These terms apply to everyone who uses TryKai. Part 1 applies to all users. Part 2 applies when you host. Part 3 applies when you book.
 
@@ -53,6 +53,7 @@ You keep ownership of what you upload, such as photos and listing descriptions. 
 - Guests and Hosts can review after a confirmed booking, once the session has ended, until 7 days after it ends.
 - A Guest may leave one review per booking. A Host may leave one review per person on a booking.
 - Reviews stay hidden until both sides have posted, or until 7 days after the session ends, whichever comes first.
+- You can edit your review until it goes live. Once it is live, it is final.
 - Reviews must be honest and based on your own experience.
 - Do not offer or accept anything in exchange for a review.
 - We do not pre-screen reviews, but we may remove reviews that are abusive, defamatory or fraudulent.
