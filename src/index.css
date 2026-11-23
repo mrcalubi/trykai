@@ -3473,7 +3473,8 @@ body.lightbox-open {
 .class-card__name,
 .class-card__desc,
 .class-pick__name,
-.class-pick__desc {
+.class-pick__desc,
+.my-review__comment {
   overflow-wrap: break-word;
 }
 
@@ -11160,6 +11161,25 @@ body.extras-sheet-open {
   margin: 20px 0 0;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+}
+
+/* Your own review while it is hidden (00058): what you wrote, then Edit. */
+.my-review {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.my-review__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.my-review__comment {
+  margin: 0;
+  white-space: pre-line;
 }
 
 /* Space the open host review form from the guest row above it. */
