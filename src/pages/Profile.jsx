@@ -27,6 +27,7 @@ import {
 } from '../components/profile/ProfileSections'
 import { hasAvatarPhoto } from '../lib/avatarPhoto'
 import { formatGuestFacingPrice } from '../lib/pricing'
+import { cardLength } from '../lib/cardExtras'
 import { ratingsByListingId } from '../lib/listingRatings'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { hostEntry } from '../lib/hostEntry'
@@ -318,7 +319,9 @@ function ListingCards({ listings, ratings }) {
           badge={listing.category}
           title={listing.title}
           titleLevel={3}
-          price={`${formatGuestFacingPrice(listing.price_per_person)}/person`}
+          price={`S${formatGuestFacingPrice(listing.price_per_person)}`}
+          priceUnit="/person"
+          length={cardLength(listing.duration_mins)}
           rating={ratings[listing.id]?.rating}
           reviewCount={ratings[listing.id]?.reviewCount}
         />
@@ -514,7 +517,7 @@ export default function Profile() {
         await Promise.all([
           supabase
             .from('listings')
-            .select('id, title, area, price_per_person, category, photo_urls')
+            .select('id, title, area, price_per_person, duration_mins, category, photo_urls')
             .eq('host_id', id)
             .eq('is_active', true)
             .eq('review_status', 'approved')
