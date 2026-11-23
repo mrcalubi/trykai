@@ -5,7 +5,8 @@
  */
 
 import { bookingCutoffLabel } from './bookingCutoff'
-import { compactDuration, formatSgd } from './hostingDashboard'
+import { formatSgd } from './hostingDashboard'
+import { formatDuration } from './duration'
 import { providedItems } from './bookingPage'
 import { guestFacingPriceCents, parsePriceInputCents } from './pricing'
 import { formatSessionDay } from './sessionDate'
@@ -74,7 +75,7 @@ function namesLine(count, noun, names) {
 export function sectionSummaries(values) {
   const priceCents = parsePriceInputCents(values.price)
   const spots = parseInt(values.maxGuests, 10)
-  const duration = compactDuration(values.durationMins)
+  const duration = formatDuration(values.durationMins)
   const priceBits = [
     priceCents ? `Guests pay ${formatSgd(guestFacingPriceCents(priceCents))}` : 'No price yet',
     Number.isInteger(spots) && spots > 0 ? plural(spots, 'spot') : '',

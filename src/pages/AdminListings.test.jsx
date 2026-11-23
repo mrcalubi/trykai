@@ -70,7 +70,7 @@ describe('AdminListings', () => {
 
     expect(await screen.findByText('Latte art for beginners')).toBeInTheDocument()
     const card = cardFor('Latte art for beginners')
-    expect(within(card).getByText('Food · Tiong Bahru · S$45 per person · 1 hr 30 min')).toBeInTheDocument()
+    expect(within(card).getByText('Food · Tiong Bahru · S$45 per person · 1.5 hr')).toBeInTheDocument()
     expect(within(card).getByText('Pour hearts and tulips on your own flat white.')).toBeInTheDocument()
     expect(within(card).getByText('Provided: Milk, Espresso')).toBeInTheDocument()
     expect(within(card).getByText('What to bring: Apron')).toBeInTheDocument()

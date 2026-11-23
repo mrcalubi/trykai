@@ -826,7 +826,7 @@ describe('ListingDetail sessions', () => {
     givenSessions([makeSession({ duration_mins: 90, spots_remaining: 3 })])
     renderPage()
 
-    expect(await screen.findByText(/1 hr 30 min · 3 spots left/)).toBeInTheDocument()
+    expect(await screen.findByText(/1\.5 hr · 3 spots left/)).toBeInTheDocument()
     expect(screen.getByText('Pick a date, then a time')).toBeInTheDocument()
   })
 
@@ -886,9 +886,9 @@ describe('ListingDetail sessions', () => {
 
     expect(await screen.findByRole('heading', { name: /9 Oct · 2 sessions/ })).toBeInTheDocument()
     expect(screen.getByText('11:00 am')).toBeInTheDocument()
-    expect(screen.getByText(/33 min · 2 spots left/)).toBeInTheDocument()
+    expect(screen.getByText(/0\.55 hr · 2 spots left/)).toBeInTheDocument()
     expect(screen.getByText('11:00 pm')).toBeInTheDocument()
-    expect(screen.queryByText(/1 hr 51 min/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/1\.85 hr/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /9 October, 2 sessions/ })).toHaveAttribute(
       'aria-pressed',
       'true'
@@ -908,8 +908,8 @@ describe('ListingDetail sessions', () => {
     await user.click(screen.getByRole('button', { name: /27 October, 1 session/ }))
 
     expect(screen.getByRole('heading', { name: /27 Oct · 1 session/ })).toBeInTheDocument()
-    expect(screen.getByText(/1 hr 51 min/)).toBeInTheDocument()
-    expect(screen.queryByText(/33 min/)).not.toBeInTheDocument()
+    expect(screen.getByText(/1\.85 hr/)).toBeInTheDocument()
+    expect(screen.queryByText(/0\.55 hr/)).not.toBeInTheDocument()
   })
 
   it('loads each month once, bounded by Singapore midnights', async () => {
@@ -1003,7 +1003,7 @@ describe('ListingDetail sessions', () => {
     await user.click(screen.getByRole('button', { name: 'Next month' }))
 
     expect(await screen.findByRole('heading', { name: /2 Dec · 1 session/ })).toBeInTheDocument()
-    expect(screen.getByText(/40 min · 3 spots left/)).toBeInTheDocument()
+    expect(screen.getByText(/0\.67 hr · 3 spots left/)).toBeInTheDocument()
   })
 
   it('keeps the listing on screen when a month fails to load', async () => {
@@ -1034,7 +1034,7 @@ describe('ListingDetail sessions', () => {
 
     expect(screen.queryByRole('group', { name: 'October 2099' })).not.toBeInTheDocument()
     expect(screen.getByText(/9 Oct/)).toBeInTheDocument()
-    expect(screen.getByText(/11:00 am · 1 hr 30 min/)).toBeInTheDocument()
+    expect(screen.getByText(/11:00 am · 1\.5 hr/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
 

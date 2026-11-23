@@ -54,16 +54,19 @@ test.describe('browsing listings', () => {
     // The trust pills scroll inside their own row instead.
     const row = await page.locator('.trust-list').boundingBox()
     expect(row.x + row.width).toBeLessThanOrEqual(320)
-    // Even the longest price row stays inside its card, with the tag on the price's line
-    // ("/person" drops under the price instead). This holds whatever the font metrics.
+    // Even the longest price and length stay inside their card.
     for (const card of await page.locator('.listings-grid > a').all()) {
+      const box = await card.boundingBox()
+      const right = box.x + box.width + 0.5
+      const price = await card.locator('.ui-card__price-text').boundingBox()
+      expect(price.x + price.width).toBeLessThanOrEqual(right)
       const tag = card.locator('.ui-card__length')
       if ((await tag.count()) === 0) continue
-      const box = await card.boundingBox()
       const tagBox = await tag.boundingBox()
-      const amount = await card.locator('.ui-card__amount').boundingBox()
-      expect(tagBox.x + tagBox.width).toBeLessThanOrEqual(box.x + box.width + 0.5)
-      expect(Math.abs(tagBox.y + tagBox.height / 2 - (amount.y + amount.height / 2))).toBeLessThan(1)
+      expect(tagBox.x + tagBox.width).toBeLessThanOrEqual(right)
+      // The length never covers the host's face on the other corner.
+      const face = await card.locator('.ui-card__host').boundingBox()
+      expect(tagBox.x).toBeGreaterThan(face.x + face.width)
     }
   })
 
@@ -95,9 +98,7 @@ test.describe('browsing listings', () => {
     await expect(card).not.toContainText('★')
   })
 
-  test('lines the price rows up across a grid row, with the length in a tag on the right', async ({
-    page,
-  }, testInfo) => {
+  test('shows the length on the photo and the rating on the price line', async ({ page }) => {
     await stubAllExternalCalls(page, {
       listings: [
         { ...LATTE_ART, duration_mins: 90 },
@@ -113,37 +114,33 @@ test.describe('browsing listings', () => {
 
     const latte = page.getByRole('link', { name: /Learn latte art with me/ })
     const boxing = page.getByRole('link', { name: /Boxing basics/ })
-    await expect(latte.locator('.ui-card__price-row')).toHaveText('S$51/person1.5 hr')
+    await expect(latte.locator('.ui-card__length')).toHaveText('1.5 hr')
     await expect(boxing.locator('.ui-card__length')).toHaveText('1 hr')
+    await expect(latte.locator('.ui-card__price-row')).toHaveText('S$51/person★ 5.0 (1)')
     // Measure with the web fonts in, not the fallback the page paints first.
     await page.evaluate(() => document.fonts.ready)
 
-    // A two-line title does not push one card's price row below its neighbour's.
-    const latteRow = await latte.locator('.ui-card__price-row').boundingBox()
-    const boxingRow = await boxing.locator('.ui-card__price-row').boundingBox()
-    expect(Math.abs(latteRow.y - boxingRow.y)).toBeLessThan(1)
-
-    // The tag is right-aligned on the same line as the price, with "/person" beside the price.
+    // The length sits in the same spot on every card: the photo's bottom-right corner.
+    const spots = []
     for (const card of [latte, boxing]) {
-      const box = await card.boundingBox()
-      const amount = await card.locator('.ui-card__amount').boundingBox()
-      const unit = await card.locator('.ui-card__unit').boundingBox()
+      const photo = await card.locator('.ui-card__image-wrap').boundingBox()
       const tag = await card.locator('.ui-card__length').boundingBox()
-      expect(Math.abs(tag.x + tag.width - (box.x + box.width))).toBeLessThan(1)
-      expect(Math.abs(tag.y + tag.height / 2 - (amount.y + amount.height / 2))).toBeLessThan(1)
-      expect(unit.x).toBeGreaterThan(amount.x + amount.width)
+      const right = photo.x + photo.width - (tag.x + tag.width)
+      const bottom = photo.y + photo.height - (tag.y + tag.height)
+      expect(right).toBeGreaterThan(0)
+      expect(bottom).toBeGreaterThan(0)
+      expect(bottom).toBeLessThan(photo.height / 3)
+      spots.push([right, bottom])
     }
+    expect(Math.abs(spots[0][0] - spots[1][0])).toBeLessThan(1)
+    expect(Math.abs(spots[0][1] - spots[1][1])).toBeLessThan(1)
 
-    // On a phone the rating gets its own line; wider cards keep it beside the area.
-    const area = await latte.locator('.ui-card__meta-inline').boundingBox()
+    // The rating shares the price's line, on the right, on phones too.
+    const box = await latte.boundingBox()
+    const amount = await latte.locator('.ui-card__amount').boundingBox()
     const rating = await latte.locator('.ui-card__rating').boundingBox()
-    if (testInfo.project.name === 'mobile-chrome') {
-      expect(rating.y).toBeGreaterThanOrEqual(area.y + area.height - 1)
-      expect(Math.abs(rating.x - area.x)).toBeLessThan(1)
-    } else {
-      expect(Math.abs(rating.y - area.y)).toBeLessThan(3)
-      expect(rating.x).toBeGreaterThan(area.x + area.width)
-    }
+    expect(Math.abs(rating.y + rating.height / 2 - (amount.y + amount.height / 2))).toBeLessThan(3)
+    expect(Math.abs(rating.x + rating.width - (box.x + box.width))).toBeLessThan(1)
   })
 
   test('lays the grid out two across on a phone', async ({ page }, testInfo) => {

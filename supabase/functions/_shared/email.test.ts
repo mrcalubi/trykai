@@ -154,7 +154,7 @@ function guestReceipt(overrides = {}) {
     hostName: 'Mei Ling',
     guestName: 'caleb2',
     sessionDate: formatSessionDate(SESSION_STARTS),
-    duration: '1 hr 30 min',
+    duration: '1.5 hr',
     fullAddress: '12 Club Street, Singapore 069410',
     guestsCount: 4,
     pricePerPersonCents: 2500,
@@ -234,10 +234,11 @@ describe('bookingReference', () => {
 })
 
 describe('formatDuration', () => {
-  it('uses hours and minutes the way listing pages do', () => {
-    expect(formatDuration(90)).toBe('1 hr 30 min')
+  it('uses hours the way the app does, never minutes', () => {
+    expect(formatDuration(90)).toBe('1.5 hr')
     expect(formatDuration(60)).toBe('1 hr')
-    expect(formatDuration(45)).toBe('45 min')
+    expect(formatDuration(45)).toBe('0.75 hr')
+    expect(formatDuration(80)).toBe('1.33 hr')
   })
 
   it('returns empty for missing or invalid lengths', () => {
@@ -556,7 +557,7 @@ describe('booking confirmation emails', () => {
     expect(html).toContain("You're booked with Mei Ling. Here's everything you need.")
     expect(hasDetail(html, 'Booking reference', 'A1B2C3D4')).toBe(true)
     expect(hasDetail(html, 'Date and time', formatSessionDate(SESSION_STARTS))).toBe(true)
-    expect(hasDetail(html, 'Duration', '1 hr 30 min')).toBe(true)
+    expect(hasDetail(html, 'Duration', '1.5 hr')).toBe(true)
     expect(hasDetail(html, 'Address', '12 Club Street, Singapore 069410')).toBe(true)
     expect(hasDetail(html, 'Guests', '4 guests')).toBe(true)
     expect(hasDetail(html, "What&#39;s provided", 'Apron, Coffee beans')).toBe(true)
@@ -1876,7 +1877,7 @@ describe('session reminder emails', () => {
     expect(html).toContain('Hi Sam!')
     expect(html).toContain("Your session is tomorrow! We hope you're excited. Here's everything you need.")
     expect(hasDetail(html, 'Day and time', formatReminderSessionDate(NEXT_DAY_START))).toBe(true)
-    expect(hasDetail(html, 'Duration', '1 hr 30 min')).toBe(true)
+    expect(hasDetail(html, 'Duration', '1.5 hr')).toBe(true)
     expect(hasDetail(html, 'Address', '12 Club Street, Singapore 069410')).toBe(true)
     expect(hasDetail(html, "What&#39;s provided", 'Apron, Coffee beans')).toBe(true)
     expect(hasDetail(html, 'Host', 'Mei Ling')).toBe(true)
