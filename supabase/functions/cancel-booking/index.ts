@@ -19,6 +19,7 @@ import {
 import { emailCompanionsCancelled } from '../_shared/companions.ts'
 import { notifyUserTelegram, telegramGuestCancelled } from '../_shared/telegram.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
+import { loadSessionPlace, locationLine } from '../_shared/locations.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
   apiVersion: '2023-10-16',
@@ -151,9 +152,13 @@ async function notifyCancellation(
     paymentRail?: string | null
     stripePaymentId?: string | null
     hostPayoutAmount?: number | null
+    /** For a guest cancel: tells the host which of several locations (00059). */
+    sessionId?: string | null
   },
 ) {
   try {
+    const locationName =
+      options.cancelledBy === 'guest' ? locationLine(await loadSessionPlace(admin, options.sessionId)) : ''
     const [guestResult, hostResult] = await Promise.all([
       options.guestId
         ? admin.from('users').select('email, full_name, display_name').eq('id', options.guestId).maybeSingle()
@@ -194,6 +199,7 @@ async function notifyCancellation(
         options.hostPayoutAmount ?? 0,
         options.refundAmount,
       ),
+      locationName,
       siteUrl: Deno.env.get('SITE_URL'),
     })
     // Friends who took a seat (00050). A guest cancel names the booker; a host
@@ -218,6 +224,7 @@ async function notifyCancellation(
         listingTitle: options.listingTitle || 'your session',
         when: options.sessionStartsAt ? formatReminderSessionDate(options.sessionStartsAt) : '',
         siteUrl: Deno.env.get('SITE_URL'),
+        place: locationName,
       }))
     }
   } catch (err) {
@@ -415,6 +422,7 @@ Deno.serve(async (req) => {
         paymentRail: booking.payment_rail,
         stripePaymentId: booking.stripe_payment_id,
         hostPayoutAmount: booking.host_payout_amount,
+        sessionId: booking.session_id,
       })
     }
     return jsonResponse(result)

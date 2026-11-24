@@ -16,6 +16,7 @@ import {
   sendResendEmail,
 } from '../_shared/email.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
+import { loadListingPlaceNames } from '../_shared/locations.ts'
 import {
   isResubmission,
   MAX_SUBMITTED_NOTICES,
@@ -68,6 +69,8 @@ Deno.serve(async (req) => {
     if (due.length === 0) return jsonResponse({ ok: true, notified: 0 })
 
     const siteUrl = Deno.env.get('SITE_URL') ?? 'https://trykai.sg'
+    // Every location of a multi-location listing (00059), for the reviewer.
+    const placeNames = await loadListingPlaceNames(admin, due.map((row) => row.id))
     const to = Deno.env.get('ADMIN_NOTIFY_EMAIL') ?? 'calebong2002@gmail.com'
     const apiKey = Deno.env.get('RESEND_API_KEY')
 
@@ -105,6 +108,7 @@ Deno.serve(async (req) => {
           verifiedName: host.verified_name ?? null,
           verificationMethod: host.verification_method ?? null,
           resubmitted,
+          locationNames: placeNames.get(row.id) ?? [],
         }),
       })
       notified++
