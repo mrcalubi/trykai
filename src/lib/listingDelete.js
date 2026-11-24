@@ -7,6 +7,7 @@ export const HOST_SESSIONS_SELECT = `
           status,
           held_by_session_id,
           type_id,
+          location_id,
           listings (title),
           bookings (id, status, guests_count, total_amount, platform_fee, host_payout_amount)
         `

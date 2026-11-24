@@ -4,6 +4,7 @@
  */
 
 import { addonsHaveAnswers, draftAddons } from './listingAddons'
+import { draftLocations } from './listingLocations'
 
 export const LISTING_STEPS = [
   {
@@ -97,6 +98,9 @@ export function draftValues(draft) {
     whatsProvided: Array.isArray(draft?.whatsProvided) ? draft.whatsProvided : [],
     whatToBring: Array.isArray(draft?.whatToBring) ? draft.whatToBring : [],
     addons: draftAddons(draft?.addons),
+    multiLocation: draft?.multiLocation === true,
+    primaryLabel: text('primaryLabel'),
+    extraLocations: draftLocations(draft?.extraLocations),
   }
 }
 
@@ -115,6 +119,7 @@ export function isBlankDraft(draft) {
     values.bookingCutoffHours === 3 &&
     values.whatsProvided.length === 0 &&
     values.whatToBring.length === 0 &&
-    !addonsHaveAnswers(values.addons)
+    !addonsHaveAnswers(values.addons) &&
+    !values.multiLocation
   )
 }

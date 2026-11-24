@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
-import PostalAddressFields from '../components/PostalAddressFields'
+import ListingLocationsEditor from '../components/ListingLocationsEditor'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
 import { revokePhotoUrls } from '../lib/coverCrop'
@@ -50,6 +50,13 @@ import {
   saveSessionTypes,
   sessionTypeFieldHints,
 } from '../lib/sessionTypes'
+import {
+  datesByLocation,
+  loadLocationsForEditor,
+  locationFieldHints,
+  locationSaveMessage,
+  saveListingLocations,
+} from '../lib/listingLocations'
 import { useUnsavedChangesGuard } from '../lib/useUnsavedChangesGuard'
 import ListingDeleteDialog from '../components/ListingDeleteDialog'
 import {
@@ -59,10 +66,7 @@ import {
   upcomingSessionsFrom,
 } from '../lib/listingDelete'
 import { monthStartIso } from '../lib/hostingDashboard'
-import {
-  ArrivalInstructionsField,
-  BookingCutoffFields,
-} from '../components/BookingCutoffFields'
+import { BookingCutoffFields } from '../components/BookingCutoffFields'
 import {
   DEFAULT_BOOKING_CUTOFF_HOURS,
   bookingCutoffHours,
@@ -94,6 +98,7 @@ const LISTING_SELECT = `
   whats_provided,
   what_to_bring,
   booking_cutoff_hours,
+  multi_location,
   photo_urls,
   review_status,
   host_id
@@ -158,6 +163,14 @@ export default function EditListing() {
   const [savedSessionTypes, setSavedSessionTypes] = useState([])
   const [typesAvailable, setTypesAvailable] = useState(false)
   const [typesLoaded, setTypesLoaded] = useState(false)
+  // Listing locations (00059). Location 1 is area / fullAddress / arrivalInstructions.
+  const [multiLocation, setMultiLocation] = useState(false)
+  const [primaryLabel, setPrimaryLabel] = useState('')
+  const [extraLocations, setExtraLocations] = useState([])
+  const [savedExtraLocations, setSavedExtraLocations] = useState([])
+  const [primaryLocationId, setPrimaryLocationId] = useState(null)
+  const [locationsAvailable, setLocationsAvailable] = useState(false)
+  const [locationsLoaded, setLocationsLoaded] = useState(false)
   const photosRef = useRef(photos)
   const photoPickerRef = useRef(null)
   const [isFoundingHost, setIsFoundingHost] = useState(null)
@@ -200,6 +213,9 @@ export default function EditListing() {
     photos,
     addons,
     sessionTypes,
+    multiLocation,
+    primaryLabel,
+    extraLocations,
   }
 
   function applyValues(next) {
@@ -220,6 +236,9 @@ export default function EditListing() {
     setPhotos(next.photos)
     setAddons(next.addons)
     setSessionTypes(next.sessionTypes)
+    setMultiLocation(next.multiLocation)
+    setPrimaryLabel(next.primaryLabel)
+    setExtraLocations(next.extraLocations)
   }
 
   useEffect(() => {
@@ -231,15 +250,17 @@ export default function EditListing() {
       let listingResult = await withIssuedAtRetry(() =>
         supabase.from('listings').select(LISTING_SELECT).eq('id', id).eq('host_id', userId).single()
       )
-      if (listingResult.error && /what_to_bring|booking_cutoff_hours/.test(listingResult.error.message ?? '')) {
+      if (
+        listingResult.error &&
+        /what_to_bring|booking_cutoff_hours|multi_location/.test(listingResult.error.message ?? '')
+      ) {
         listingResult = await withIssuedAtRetry(() =>
           supabase
             .from('listings')
             .select(
-              LISTING_SELECT.replace(/\s*what_to_bring,\n/, '\n').replace(
-                /\s*booking_cutoff_hours,\n/,
-                '\n',
-              ),
+              LISTING_SELECT.replace(/\s*what_to_bring,\n/, '\n')
+                .replace(/\s*booking_cutoff_hours,\n/, '\n')
+                .replace(/\s*multi_location,\n/, '\n'),
             )
             .eq('id', id)
             .eq('host_id', userId)
@@ -291,6 +312,13 @@ export default function EditListing() {
       setTypesAvailable(typeResult.available)
       setTypesLoaded(typeResult.loaded)
       setSavedSessionTypes(typeResult.types)
+      const locationResult = await loadLocationsForEditor(supabase, id, {
+        multiLocation: data.multi_location,
+      })
+      setLocationsAvailable(locationResult.available)
+      setLocationsLoaded(locationResult.loaded)
+      setPrimaryLocationId(locationResult.primaryId)
+      setSavedExtraLocations(locationResult.extras)
 
       const loaded = {
         title: data.title,
@@ -310,6 +338,9 @@ export default function EditListing() {
         photos: photosFromUrls(data.photo_urls),
         addons: addonResult.addons,
         sessionTypes: typeResult.types,
+        multiLocation: locationResult.multiLocation,
+        primaryLabel: locationResult.primaryLabel,
+        extraLocations: locationResult.extras,
       }
       applyValues(loaded)
       setSaved(loaded)
@@ -357,6 +388,7 @@ export default function EditListing() {
     if (!fullAddress.trim()) hints.fullAddress = LISTING_FIELD_HINTS.fullAddress
     if (addonsAvailable) Object.assign(hints, addonFieldHints(addons))
     if (typesAvailable) Object.assign(hints, sessionTypeFieldHints(typesToCheck))
+    if (multiLocation) Object.assign(hints, locationFieldHints(extraLocations))
     return hints
   }
 
@@ -489,16 +521,62 @@ export default function EditListing() {
       }
     }
 
+    let nextExtras = extraLocations
+    if (locationsAvailable && locationsLoaded) {
+      const { error: locationsError, insertedIds } = await saveListingLocations({
+        client: supabase,
+        listingId: id,
+        multiLocation,
+        savedMultiLocation: saved?.multiLocation === true,
+        primaryId: primaryLocationId,
+        primaryLabel,
+        savedPrimaryLabel: saved?.primaryLabel ?? '',
+        extras: multiLocation ? extraLocations : [],
+        existing: savedExtraLocations,
+      })
+      nextExtras = extraLocations.map((location) =>
+        insertedIds?.[location.key] ? { ...location, id: insertedIds[location.key] } : location,
+      )
+      if (locationsError) {
+        // Keep what did save, so pressing Save again updates instead of duplicating.
+        setExtraLocations(nextExtras)
+        const { data: flag } = await supabase
+          .from('listings')
+          .select('multi_location')
+          .eq('id', id)
+          .eq('host_id', userId)
+          .single()
+        const fresh = await loadLocationsForEditor(supabase, id, { multiLocation: flag?.multi_location })
+        if (fresh.loaded) {
+          setSavedExtraLocations(fresh.extras)
+          setSaved((prev) => (prev ? { ...prev, multiLocation: fresh.multiLocation, primaryLabel: fresh.primaryLabel } : prev))
+        }
+        setLoading(false)
+        setError(locationSaveMessage(locationsError))
+        if (activeId !== 'location') openSection('location')
+        return false
+      }
+    }
+
     // Stay on the page: the saved photos are now the uploaded ones, and what
     // was inserted carries its id, so the next save updates rather than adds.
     const savedPhotos = photosFromUrls(photoUrls)
     photos.forEach(revokePhotoUrls)
-    const nextSaved = { ...values, ...overrides, photos: savedPhotos, addons: nextAddons, sessionTypes: nextTypes }
+    const nextSaved = {
+      ...values,
+      ...overrides,
+      photos: savedPhotos,
+      addons: nextAddons,
+      sessionTypes: nextTypes,
+      extraLocations: nextExtras,
+    }
     setPhotos(savedPhotos)
     setAddons(nextAddons)
     setSessionTypes(nextTypes)
     setSavedAddons(nextAddons)
     setSavedSessionTypes(nextTypes)
+    setExtraLocations(nextExtras)
+    setSavedExtraLocations(nextExtras)
     setSaved(nextSaved)
     setListingTitle(title.trim())
     setSavedNote(`Saved. ${formatListingSpotsMessage(spotsData)}`.trim())
@@ -903,18 +981,25 @@ export default function EditListing() {
     }
     if (sectionKey === 'location') {
       return (
-        <>
-          <PostalAddressFields
-            value={fullAddress}
-            onChange={setFullAddress}
-            area={area}
-            onAreaChange={setArea}
-            areaHint={<FieldHint>{fieldHints.area}</FieldHint>}
-            allowChangeAddress
-          />
-          <FieldHint>{fieldHints.fullAddress}</FieldHint>
-          <ArrivalInstructionsField value={arrivalInstructions} onChange={setArrivalInstructions} />
-        </>
+        <ListingLocationsEditor
+          area={area}
+          onAreaChange={setArea}
+          fullAddress={fullAddress}
+          onFullAddressChange={setFullAddress}
+          arrivalInstructions={arrivalInstructions}
+          onArrivalChange={setArrivalInstructions}
+          primaryId={primaryLocationId}
+          primaryLabel={primaryLabel}
+          onPrimaryLabelChange={setPrimaryLabel}
+          multiLocation={multiLocation}
+          onMultiLocationChange={setMultiLocation}
+          extras={extraLocations}
+          onExtrasChange={setExtraLocations}
+          fieldHints={fieldHints}
+          allowChangeAddress
+          datesByLocationId={datesByLocation(upcomingSessions)}
+          available={locationsAvailable && locationsLoaded}
+        />
       )
     }
     if (sectionKey === 'photos') {

@@ -179,6 +179,10 @@ function hasConfirmedBooking(session) {
  * exactly the same start is skipped as already on: spots come from the
  * listing and never stack (00057). Another class at that time is skipped,
  * named from `classNameById` ("Table centrepiece runs then").
+ *
+ * Locations (00059): with `locationId`, the batch is for that place only. The
+ * same listing's sessions at its other places are run by the host's team, so
+ * they never clash with it, never hold it, and are not "shared".
  */
 export function previewSessionBatch({
   timesByDate,
@@ -189,6 +193,7 @@ export function previewSessionBatch({
   listingId,
   typeId = null,
   classNameById = {},
+  locationId = null,
   now = Date.now(),
 } = {}) {
   const duration = Number(durationMins)
@@ -198,7 +203,16 @@ export function previewSessionBatch({
     return { ok: false, error: SESSION_BATCH_MAX_MESSAGE, accepted: [], skipped: [] }
   }
 
-  const existing = existingSessions.filter((session) => session.status !== 'cancelled')
+  const existing = existingSessions.filter(
+    (session) =>
+      session.status !== 'cancelled' &&
+      !(
+        locationId &&
+        session.listing_id === listingId &&
+        session.location_id &&
+        session.location_id !== locationId
+      ),
+  )
   const accepted = []
   const skipped = []
 
@@ -294,6 +308,7 @@ export function skipReasonFromRpcMessage(message) {
   if (/in the future/i.test(text)) return SKIP_PAST
   if (/already on/i.test(text)) return SKIP_ALREADY_ON
   if (/another type/i.test(text)) return 'another class runs then'
+  if (/pick a location|this listing's locations/i.test(text)) return 'pick a location'
   return text || SKIP_EXISTING
 }
 
