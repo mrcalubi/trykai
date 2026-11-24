@@ -64,7 +64,16 @@ import Icon from '../components/ui/Icon'
 import { formatCents } from '../lib/cancellationPolicy'
 import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
-import { ClassCards, ClassDatePicker } from '../components/ListingClasses'
+import { ClassCards, ClassDatePicker, LocationChips } from '../components/ListingClasses'
+import {
+  areasLine,
+  isMissingListingLocations,
+  loadPublicLocations,
+  loadRevealedPlaces,
+  placeTitle,
+  sessionsAt,
+  teamNote,
+} from '../lib/listingLocations'
 import { datesInMonth, firstOfDay, isBookable, landingFor, sessionsOfClass } from '../lib/classCalendar'
 import { sessionDayLabel, sessionTimeRange } from '../lib/hostSessions'
 import { usePageTitle } from '../lib/pageTitle'
@@ -239,6 +248,11 @@ export default function ListingDetail() {
   // calendar sits on the first date they can book.
   const [classView, setClassView] = useState(null)
   const hasClasses = sessionTypes.active.length > 0
+  // Listing locations (00059): every place's dates show, each naming its place,
+  // until the guest picks one. `?location=<id>` opens on that place.
+  const [places, setPlaces] = useState({ active: [], byId: {}, several: false })
+  const [placeFilter, setPlaceFilter] = useState(null)
+  const [revealedPlaces, setRevealedPlaces] = useState({})
   const [addonsAvailable, setAddonsAvailable] = useState(false)
   const [addonQuantities, setAddonQuantities] = useState({})
   const [addonNote, setAddonNote] = useState('')
@@ -313,6 +327,15 @@ export default function ListingDetail() {
       setAddonsAvailable(addonsResult.available)
       setTypeFilter(null)
       loadPublicSessionTypes(supabase, listingData.id).then(setSessionTypes)
+      setPlaceFilter(null)
+      setRevealedPlaces({})
+      loadPublicLocations(supabase, listingData.id).then((loaded) => {
+        setPlaces(loaded)
+        const wanted = new URLSearchParams(window.location.search).get('location')
+        if (wanted && loaded.several && loaded.active.some((place) => place.id === wanted)) {
+          setPlaceFilter(wanted)
+        }
+      })
 
       // `is_id_verified` arrives with migration 00023; before that the column
       // is missing and the badge simply stays hidden.
@@ -374,6 +397,7 @@ export default function ListingDetail() {
         if (address) {
           setRevealedAddress(address)
         }
+        setRevealedPlaces(await loadRevealedPlaces(supabase, id))
       }
 
       setLoading(false)
@@ -397,10 +421,16 @@ export default function ListingDetail() {
             .lt('starts_at', endIso)
             .order('starts_at', { ascending: true })
         )
-      // type_id arrives with 00056; before that, read without it.
+      // type_id arrives with 00056 and location_id with 00059; before them,
+      // read without.
       let { data, error: fetchError } = await monthQuery(
-        'id, starts_at, duration_mins, spots_remaining, type_id'
+        'id, starts_at, duration_mins, spots_remaining, type_id, location_id'
       )
+      if (fetchError && isMissingListingLocations(fetchError)) {
+        ;({ data, error: fetchError } = await monthQuery(
+          'id, starts_at, duration_mins, spots_remaining, type_id'
+        ))
+      }
       if (fetchError && isMissingSessionTypes(fetchError)) {
         ;({ data, error: fetchError } = await monthQuery('id, starts_at, duration_mins, spots_remaining'))
       }
@@ -419,14 +449,22 @@ export default function ListingDetail() {
   useEffect(() => {
     if (!hasClasses) return undefined
     let cancelled = false
-    void withIssuedAtRetry(() =>
-      upcomingSessions(id, 'id, starts_at, duration_mins, spots_remaining, type_id')
-        .order('starts_at', { ascending: true })
-        .limit(200)
-    ).then(({ data, error: fetchError }) => {
-      if (cancelled) return
-      setClassSessions(fetchError ? [] : (data ?? []))
-    })
+    const classQuery = (columns) =>
+      withIssuedAtRetry(() =>
+        upcomingSessions(id, columns)
+          .order('starts_at', { ascending: true })
+          .limit(200)
+      )
+    void classQuery('id, starts_at, duration_mins, spots_remaining, type_id, location_id')
+      .then((result) =>
+        result.error && isMissingListingLocations(result.error)
+          ? classQuery('id, starts_at, duration_mins, spots_remaining, type_id')
+          : result
+      )
+      .then(({ data, error: fetchError }) => {
+        if (cancelled) return
+        setClassSessions(fetchError ? [] : (data ?? []))
+      })
     return () => {
       cancelled = true
     }
@@ -700,6 +738,8 @@ export default function ListingDetail() {
 
   const host = listing.users
   const areaLabel = visibleAreaLabel(revealedAddress, listing.area)
+  // Several locations (00059): "Tampines + 1 more"; addresses live in Where you'll be.
+  const factsArea = places.several ? areasLine(places.active) : areaLabel
   const photos = listing.photo_urls?.length ? listing.photo_urls : []
   const groupPricing = listing.group_pricing !== false
   const pickedAddons = pickedAddonLines(listingAddons, addonQuantities)
@@ -728,8 +768,15 @@ export default function ListingDetail() {
   const monthSessions = monthCacheKey ? sessionsByMonth[monthCacheKey] : undefined
   const activeTypes = sessionTypes.active
   const filterType = activeTypes.find((type) => type.id === typeFilter) ?? null
+  const multiPlace = places.several
+  const shownPlace = multiPlace ? (places.active.find((place) => place.id === placeFilter) ?? null) : null
+  /** A session's place, only when the listing runs at several. */
+  const placeOf = (session) => (multiPlace ? (places.byId[session?.location_id]?.name ?? '') : '')
   const sessionsByDay = monthSessions
-    ? groupSessionsByDay(sessionsOfType(monthSessions, filterType?.id), visibleMonth)
+    ? groupSessionsByDay(
+        sessionsAt(sessionsOfType(monthSessions, filterType?.id), shownPlace?.id),
+        visibleMonth,
+      )
     : {}
   const countsByDay = Object.fromEntries(
     Object.entries(sessionsByDay).map(([dateKey, daySessions]) => [dateKey, daySessions.length])
@@ -743,7 +790,8 @@ export default function ListingDetail() {
     (classSessions ?? []).find((session) => session.id === checkoutSessionId) ??
     null
   const cutoffHours = listing.booking_cutoff_hours
-  const landing = classSessions ? landingFor(classSessions, typeFilter, { cutoffHours }) : null
+  const placeSessions = classSessions ? sessionsAt(classSessions, shownPlace?.id) : null
+  const landing = placeSessions ? landingFor(placeSessions, typeFilter, { cutoffHours }) : null
   const classCalendar = classView ?? {
     monthKey: landing?.monthKey ?? null,
     dateKey: landing?.dateKey ?? null,
@@ -751,21 +799,33 @@ export default function ListingDetail() {
   }
   const pickedSession = (classSessions ?? []).find((session) => session.id === classCalendar.pickedId) ?? null
   const pickedClassName = sessionTypes.byId[pickedSession?.type_id]?.name ?? ''
+  const pickedPlaceName = placeOf(pickedSession)
 
   /** Cards and chips: show a class's dates, keeping a picked time that fits. */
   function filterClass(nextId) {
     setTypeFilter(nextId)
-    const land = landingFor(classSessions ?? [], nextId, { keepId: pickedSession?.id, cutoffHours })
+    const land = landingFor(placeSessions ?? [], nextId, { keepId: pickedSession?.id, cutoffHours })
+    setClassView({ monthKey: land.monthKey, dateKey: land.dateKey, pickedId: land.session?.id ?? null })
+  }
+
+  /** Location chips: show one place's dates, keeping a picked time there. */
+  function filterPlace(nextId) {
+    setPlaceFilter(nextId)
+    if (!classSessions) return
+    const land = landingFor(sessionsAt(classSessions, nextId), typeFilter, {
+      keepId: pickedSession?.id,
+      cutoffHours,
+    })
     setClassView({ monthKey: land.monthKey, dateKey: land.dateKey, pickedId: land.session?.id ?? null })
   }
 
   function pickClassDay(dateKey) {
-    const day = datesInMonth(sessionsOfClass(classSessions, typeFilter), classCalendar.monthKey)[dateKey]
+    const day = datesInMonth(sessionsOfClass(placeSessions, typeFilter), classCalendar.monthKey)[dateKey]
     setClassView({ ...classCalendar, dateKey, pickedId: firstOfDay(day, cutoffHours)?.id ?? null })
   }
 
   function showClassMonth(monthKey) {
-    const byDay = datesInMonth(sessionsOfClass(classSessions, typeFilter), monthKey)
+    const byDay = datesInMonth(sessionsOfClass(placeSessions, typeFilter), monthKey)
     const first = Object.keys(byDay).sort()[0] ?? null
     setClassView({
       monthKey,
@@ -774,6 +834,7 @@ export default function ListingDetail() {
     })
   }
   const checkoutTypeName = sessionTypes.byId[checkoutSession?.type_id]?.name ?? ''
+  const checkoutPlaceName = placeOf(checkoutSession)
   const paynowBlocked =
     payNowBlockedByServer || isPayNowTooFarAhead(checkoutSession?.starts_at)
   const displayRail = paynowBlocked || checkoutRail !== 'paynow' ? 'card' : 'paynow'
@@ -818,7 +879,8 @@ export default function ListingDetail() {
     if (!activeDateKey) {
       return (
         <p className="empty-state">
-          No {filterType ? `${filterType.name} ` : ''}sessions in {formatMonthTitle(visibleMonth)}.
+          No {filterType ? `${filterType.name} ` : ''}sessions{shownPlace ? ` at ${shownPlace.name}` : ''} in{' '}
+          {formatMonthTitle(visibleMonth)}.
         </p>
       )
     }
@@ -833,6 +895,12 @@ export default function ListingDetail() {
             <div className="session-card__info">
               {sessionTypes.byId[session.type_id] ? (
                 <p className="session-card__type">{sessionTypes.byId[session.type_id].name}</p>
+              ) : null}
+              {placeOf(session) ? (
+                <p className="session-card__place">
+                  <Icon name="pin" size={14} />
+                  {placeOf(session)}
+                </p>
               ) : null}
               <p id={`session-${session.id}-time`} className="session-card__date">
                 {formatSessionTime(session.starts_at)}
@@ -906,7 +974,7 @@ export default function ListingDetail() {
                 <p className="checkout-summary__title">{listing.title}</p>
                 <p className="checkout-summary__meta">
                   with {hostName}
-                  {listing.area ? ` · ${listing.area}` : ''}
+                  {checkoutPlaceName || listing.area ? ` · ${checkoutPlaceName || listing.area}` : ''}
                 </p>
                 {checkoutTypeName ? <p className="session-card__type">{checkoutTypeName}</p> : null}
                 <p className="session-card__date">{formatSessionDay(checkoutSession.starts_at)}</p>
@@ -1232,7 +1300,7 @@ export default function ListingDetail() {
         <div className="detail-main">
           {listing.category ? <span className="detail-category">{listing.category}</span> : null}
           <h1 className="detail-title">{listing.title}</h1>
-          {duration || maxGuests > 0 || areaLabel || listingRating ? (
+          {duration || maxGuests > 0 || factsArea || listingRating ? (
             <div className="detail-facts">
               {duration ? (
                 <p className="detail-fact">
@@ -1246,10 +1314,10 @@ export default function ListingDetail() {
                   Up to {maxGuests} guest{maxGuests === 1 ? '' : 's'}
                 </p>
               ) : null}
-              {areaLabel ? (
+              {factsArea ? (
                 <p className="detail-fact detail-area">
                   <Icon name="pin" size={17} />
-                  {areaLabel}
+                  {factsArea}
                 </p>
               ) : null}
               {listingRating ? (
@@ -1299,7 +1367,7 @@ export default function ListingDetail() {
           {hasClasses ? (
             <ClassCards
               classes={activeTypes}
-              sessions={classSessions ?? []}
+              sessions={placeSessions ?? []}
               filterId={typeFilter}
               onPick={(nextId) => {
                 filterClass(nextId)
@@ -1352,7 +1420,9 @@ export default function ListingDetail() {
               <p className="detail-booking-card__note">
                 {hasClasses
                   ? `Booking fee included. Same price for ${activeTypes.length === 2 ? 'both classes' : 'every class'}.`
-                  : 'Pick a date, then a time'}
+                  : multiPlace
+                    ? 'Pick a place, a date, then a time'
+                    : 'Pick a date, then a time'}
               </p>
             )}
             {!checkoutSessionId && publicSessionRange && canBringFriend && !isOwnListing && (
@@ -1378,6 +1448,10 @@ export default function ListingDetail() {
               <KeenPanel listingId={id} hostName={hostName} viewerId={viewerId} />
             )}
 
+            {publicSessionRange && !checkoutSessionId && multiPlace ? (
+              <LocationChips locations={places.active} filterId={shownPlace?.id ?? null} onFilter={filterPlace} />
+            ) : null}
+
             {publicSessionRange && !checkoutSessionId && hasClasses ? (
               classSessions ? (
                 <>
@@ -1385,7 +1459,8 @@ export default function ListingDetail() {
                     listing={listing}
                     classes={activeTypes}
                     classById={sessionTypes.byId}
-                    sessions={classSessions}
+                    placeById={multiPlace ? places.byId : {}}
+                    sessions={placeSessions}
                     filterId={typeFilter}
                     onFilter={filterClass}
                     monthKey={classCalendar.monthKey}
@@ -1409,7 +1484,9 @@ export default function ListingDetail() {
                           Book {sessionDayLabel(pickedSession.starts_at)}
                         </span>
                         <span className="class-dates__book-sub">
-                          {[pickedClassName, sessionTimeRange(pickedSession, listing)].filter(Boolean).join(' · ')}
+                          {[pickedClassName, pickedPlaceName, sessionTimeRange(pickedSession, listing)]
+                            .filter(Boolean)
+                            .join(' · ')}
                         </span>
                       </span>
                     ) : (
@@ -1497,7 +1574,45 @@ export default function ListingDetail() {
             </section>
           ) : null}
 
-          {areaLabel ? (
+          {places.several ? (
+            <section className="detail-section">
+              <h2 className="detail-section__title">Where you&apos;ll be</h2>
+              <p className="detail-location__team">{teamNote(hostName)}</p>
+              <div className="detail-location detail-location--several">
+                {places.active.map((place) => {
+                  const revealed = revealedPlaces[place.id]?.fullAddress ?? ''
+                  return (
+                    <div key={place.id} className="detail-location__row">
+                      <span className="detail-location__icon">
+                        <Icon name="pin" size={20} />
+                      </span>
+                      <div className="detail-location__copy">
+                        {revealed ? (
+                          <>
+                            <p className="detail-location__title">{revealed}</p>
+                            <p className="detail-location__note">{place.name} · from your confirmed booking.</p>
+                            <a
+                              href={googleMapsUrl(revealed)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="detail-location__link"
+                            >
+                              Open in Google Maps
+                            </a>
+                          </>
+                        ) : (
+                          <p className="detail-location__title">{placeTitle(place)}</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+                <p className="detail-location__note detail-location__note--all">
+                  Each place has its own dates. The exact address is sent once your booking is confirmed.
+                </p>
+              </div>
+            </section>
+          ) : areaLabel ? (
             <section className="detail-section">
               <h2 className="detail-section__title">Where you&apos;ll be</h2>
               <div className="detail-location">

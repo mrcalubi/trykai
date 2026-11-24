@@ -81,10 +81,37 @@ export function ClassCards({ classes, sessions, filterId, onPick }) {
  * calendar that only lets guests tap days with dates, and that day's times.
  * It stays the same height however many weeks of dates the host adds.
  */
+/**
+ * Listing locations (00059): "All locations" and one chip per place. It filters
+ * the dates below; with all locations, each time names its place.
+ */
+export function LocationChips({ locations, filterId, onFilter }) {
+  return (
+    <div className="class-dates__chips location-chips" role="group" aria-label="Location">
+      {[{ id: null, name: 'All locations' }, ...locations].map((place) => {
+        const on = (filterId ?? null) === place.id
+        return (
+          <button
+            key={place.id ?? 'all'}
+            type="button"
+            className={`class-dates__chip${on ? ' class-dates__chip--on' : ''}`}
+            aria-pressed={on}
+            onClick={() => onFilter(place.id)}
+          >
+            {place.id ? <Icon name="pin" size={14} /> : null}
+            {place.name}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function ClassDatePicker({
   listing,
   classes,
   classById,
+  placeById = {},
   sessions,
   filterId,
   onFilter,
@@ -209,6 +236,7 @@ export function ClassDatePicker({
               <legend className="class-times__title">{sessionDayLabel(daySessions[0].starts_at)}</legend>
               {daySessions.map((session) => {
                 const className = classById[session.type_id]?.name ?? ''
+                const placeName = placeById[session.location_id]?.name ?? ''
                 const bookable = isBookable(session, listing.booking_cutoff_hours)
                 const on = pickedId === session.id
                 return (
@@ -227,6 +255,7 @@ export function ClassDatePicker({
                     <span className="class-time__text">
                       <span className="class-time__range">{sessionTimeRange(session, listing)}</span>
                       {className ? <span className="class-time__class">{className}</span> : null}
+                      {placeName ? <span className="class-time__class class-time__place">{placeName}</span> : null}
                     </span>
                     <span
                       className={`class-time__spots${

@@ -319,3 +319,68 @@ export async function primaryLocationId(client, listingId) {
   if (error) return null
   return data?.[0]?.id ?? null
 }
+
+// ---------------------------------------------------------------------------
+// Guests (00059): pick a location, see where each session runs, and the
+// address of the place they booked once it is confirmed.
+// ---------------------------------------------------------------------------
+
+/** Sessions at one location; no location id means every location. */
+export function sessionsAt(sessions, locationId) {
+  if (!locationId) return sessions ?? []
+  return (sessions ?? []).filter((session) => session.location_id === locationId)
+}
+
+/**
+ * A listing's locations for its page: `active` in order for the chips and the
+ * Where section, `byId` including removed ones so an old session still names
+ * its place. `several` only when guests have a choice.
+ */
+export async function loadPublicLocations(client, listingId) {
+  const { rows } = await queryListingLocations(client, [listingId])
+  const all = [...rows].sort(byPosition).map(publicLocation)
+  const active = all.filter((location) => location.isActive)
+  return { active, byId: Object.fromEntries(all.map((location) => [location.id, location])), several: active.length > 1 }
+}
+
+/**
+ * The addresses this viewer may see, by location id: the host's, or the
+ * places a guest has a confirmed booking at. {} when signed out or on error.
+ */
+export async function loadRevealedPlaces(client, listingId) {
+  try {
+    const { data, error } = await client.rpc('listing_location_details', { p_listing_id: listingId })
+    if (error || !Array.isArray(data)) return {}
+    const revealed = {}
+    for (const row of data) {
+      const fullAddress = typeof row.full_address === 'string' ? row.full_address.trim() : ''
+      if (!fullAddress) continue
+      revealed[row.id] = {
+        fullAddress,
+        arrivalInstructions: typeof row.arrival_instructions === 'string' ? row.arrival_instructions.trim() : '',
+      }
+    }
+    return revealed
+  } catch {
+    return {}
+  }
+}
+
+/** The facts row: "Tampines + 1 more". */
+export function areasLine(locations) {
+  const areas = [...new Set((locations ?? []).map((location) => location.area).filter(Boolean))]
+  if (areas.length === 0) return ''
+  return areas.length === 1 ? areas[0] : `${areas[0]} + ${areas.length - 1} more`
+}
+
+/** "Jurong studio, Jurong East" or "Tampines, Singapore": public, never the address. */
+export function placeTitle(location) {
+  const label = String(location?.label ?? '').trim()
+  const area = String(location?.area ?? '').trim()
+  if (label && area && label.toLowerCase() !== area.toLowerCase()) return `${label}, ${area}`
+  return `${label || area || 'Singapore'}${label || !area ? '' : ', Singapore'}`
+}
+
+export function teamNote(hostName) {
+  return `${hostName || 'Your host'} runs this with a team, so your teacher may be a team member.`
+}

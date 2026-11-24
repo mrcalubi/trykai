@@ -24,10 +24,39 @@ export function filterNarrows(listings, matches) {
   return count > 0 && count < list.length
 }
 
+/**
+ * Every area a listing runs in. A listing with several locations (00059)
+ * carries `areas` from browse; otherwise its own area.
+ */
+export function listingAreas(listing) {
+  const several = Array.isArray(listing?.areas) ? listing.areas.filter(Boolean) : []
+  if (several.length > 1) return [...new Set(several)]
+  return listing?.area ? [listing.area] : []
+}
+
+/** The card's place: "Tampines +1" for a listing with several locations. */
+export function cardAreaLabel(listing) {
+  const areas = listingAreas(listing)
+  if (areas.length > 1) return `${areas[0]} +${areas.length - 1}`
+  return areas[0] ?? ''
+}
+
+/** The region and area filters match when one of a listing's places fits both. */
+export function matchesPlace(listing, region, area) {
+  const areas = listingAreas(listing)
+  // A listing with no area still shows when no place filter is on.
+  if (areas.length === 0) return region === 'All' && !area
+  return areas.some(
+    (name) => (region === 'All' || regionForPlanningArea(name) === region) && (!area || name === area),
+  )
+}
+
 export function showLocationFilter(listings) {
   const list = listings ?? []
   if (list.length < LOCATION_FILTER_MIN_LISTINGS) return false
-  const regions = new Set(list.map((listing) => regionForPlanningArea(listing.area)).filter(Boolean))
+  const regions = new Set(
+    list.flatMap((listing) => listingAreas(listing).map((name) => regionForPlanningArea(name))).filter(Boolean),
+  )
   return regions.size >= 2
 }
 
