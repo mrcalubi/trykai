@@ -137,7 +137,13 @@ begin
   if not has_column_privilege('authenticated', 'public.sessions', 'type_id', 'insert') then
     raise exception 'hosts should set the type when adding a session';
   end if;
-  if has_function_privilege('anon', 'public.add_listing_session(uuid, timestamptz, integer, uuid)', 'execute') then
+  -- Any signature: 00059 adds p_location_id.
+  if exists (
+    select 1 from pg_proc p
+    where p.pronamespace = 'public'::regnamespace
+      and p.proname = 'add_listing_session'
+      and has_function_privilege('anon', p.oid, 'execute')
+  ) then
     raise exception 'anon must not add sessions';
   end if;
 
