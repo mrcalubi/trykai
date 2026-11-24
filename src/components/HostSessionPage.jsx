@@ -36,6 +36,7 @@ function cancelCopy(cards, guestCount) {
 export default function HostSessionPage({
   session,
   listing,
+  locationName = '',
   guestRows = [],
   addonsByBooking = {},
   notesByBooking = {},
@@ -58,19 +59,28 @@ export default function HostSessionPage({
   }, [session?.id])
 
   // Guests ask about parking and directions; the answer belongs in the listing.
+  // With several locations (00059), the answer for this session's own place.
+  const locationId = session?.location_id ?? null
   useEffect(() => {
     if (!listingId) return undefined
     let cancelled = false
-    void supabase
-      .rpc('listing_arrival_instructions', { listing_id: listingId })
-      .then(({ data, error }) => {
-        if (cancelled) return
-        setHasDirections(!error && typeof data === 'string' && data.trim().length > 0)
-      })
+    async function checkDirections() {
+      if (locationId) {
+        const { data, error } = await supabase.rpc('listing_location_details', { p_listing_id: listingId })
+        const row = !error && Array.isArray(data) ? data.find((item) => item.id === locationId) : null
+        if (row) {
+          if (!cancelled) setHasDirections(Boolean(String(row.arrival_instructions ?? '').trim()))
+          return
+        }
+      }
+      const { data, error } = await supabase.rpc('listing_arrival_instructions', { listing_id: listingId })
+      if (!cancelled) setHasDirections(!error && typeof data === 'string' && data.trim().length > 0)
+    }
+    void checkDirections()
     return () => {
       cancelled = true
     }
-  }, [listingId])
+  }, [listingId, locationId])
 
   if (!session) {
     return (
@@ -100,7 +110,9 @@ export default function HostSessionPage({
           <Icon name="chevron-left" size={22} strokeWidth={2.2} />
         </Link>
         <div className="host-session__heading">
-          {title ? <p className="host-session__listing">{title}</p> : null}
+          {title ? (
+            <p className="host-session__listing">{[title, locationName].filter(Boolean).join(' · ')}</p>
+          ) : null}
           <TitleTag className="host-session__title">
             {sessionDayLabel(session.starts_at)} · {formatSessionTime(session.starts_at)}
           </TitleTag>

@@ -142,6 +142,11 @@ export default function AdminListings() {
         {listing.what_to_bring?.length > 0 ? (
           <p className="dashboard-card__meta">What to bring: {listing.what_to_bring.join(', ')}</p>
         ) : null}
+        {listing.locations?.length > 1 ? (
+          <p className="dashboard-card__meta">
+            Locations: {listing.locations.join(' · ')}. Run at the same time with a team.
+          </p>
+        ) : null}
 
         {listing.addons?.length > 0 ? (
           <div className="listing-review__addons">

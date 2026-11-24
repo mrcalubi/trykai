@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthedUserId } from '../lib/authedUser'
 import { CancellationPolicyInfo } from '../components/CancellationPolicy'
-import PostalAddressFields from '../components/PostalAddressFields'
+import ListingLocationsEditor from '../components/ListingLocationsEditor'
 import PhotoTips from '../components/PhotoTips'
 import PhotoSkipDialog from '../components/PhotoSkipDialog'
 import ListingPhotosEditor from '../components/ListingPhotosEditor'
@@ -54,9 +54,13 @@ import {
 } from '../lib/listingAddons'
 import { notifyListingSubmitted } from '../lib/listingReview'
 import {
-  ArrivalInstructionsField,
-  BookingCutoffFields,
-} from '../components/BookingCutoffFields'
+  LOCATIONS_NOT_SAVED_ON_CREATE,
+  listingLocationsAvailable,
+  locationFieldHints,
+  primaryLocationId,
+  saveListingLocations,
+} from '../lib/listingLocations'
+import { BookingCutoffFields } from '../components/BookingCutoffFields'
 import { arrivalInstructionsForSave, bookingCutoffHours } from '../lib/bookingCutoff'
 
 const DRAFT_RESTORED = 'Draft restored. Photos are not kept in drafts, so add them again.'
@@ -99,6 +103,11 @@ export default function CreateListing() {
   const [groupPricing, setGroupPricing] = useState(start.groupPricing)
   const [addons, setAddons] = useState(start.addons)
   const [addonsAvailable, setAddonsAvailable] = useState(false)
+  // Listing locations (00059): location 1 is area / fullAddress / arrivalInstructions.
+  const [multiLocation, setMultiLocation] = useState(start.multiLocation)
+  const [primaryLabel, setPrimaryLabel] = useState(start.primaryLabel)
+  const [extraLocations, setExtraLocations] = useState(start.extraLocations)
+  const [locationsAvailable, setLocationsAvailable] = useState(false)
   const [acceptedHostTerms, setAcceptedHostTerms] = useState(false)
   const [isFoundingHost, setIsFoundingHost] = useState(null)
   const [fieldHints, setFieldHints] = useState({})
@@ -151,6 +160,7 @@ export default function CreateListing() {
       const founding = await supabase.rpc('my_is_founding_host')
       setIsFoundingHost(foundingHostFromRpc(founding.data, founding.error))
       setAddonsAvailable(await probeListingAddonsTable(supabase))
+      setLocationsAvailable(await listingLocationsAvailable(supabase))
     }
 
     checkVerification()
@@ -179,6 +189,9 @@ export default function CreateListing() {
     setGroupPricing(values.groupPricing)
     setArea(values.area)
     setFullAddress(values.fullAddress)
+    setMultiLocation(values.multiLocation)
+    setPrimaryLabel(values.primaryLabel)
+    setExtraLocations(values.extraLocations)
     setWhatsProvided(values.whatsProvided)
     setWhatToBring(values.whatToBring)
     setAddons(values.addons)
@@ -222,6 +235,9 @@ export default function CreateListing() {
       whatsProvided,
       whatToBring,
       addons,
+      multiLocation,
+      primaryLabel,
+      extraLocations,
       ...pendingDraft.current,
     }
     if (isBlankDraft(values)) {
@@ -261,6 +277,7 @@ export default function CreateListing() {
     if (stepId === 'location') {
       if (!area) hints.area = LISTING_FIELD_HINTS.area
       if (!fullAddress.trim()) hints.fullAddress = LISTING_FIELD_HINTS.fullAddress
+      if (multiLocation) Object.assign(hints, locationFieldHints(extraLocations))
     }
     if (stepId === 'finish' && !acceptedHostTerms) hints.hostTerms = LISTING_FIELD_HINTS.hostTerms
     return hints
@@ -399,6 +416,24 @@ export default function CreateListing() {
       }
     }
 
+    // Locations 2 to 4 (00059). The database made location 1 from the listing's
+    // own area and address; like add-ons, a failure here keeps the listing.
+    let locationsFailed = false
+    if (locationsAvailable && multiLocation && created?.id) {
+      const { error: locationsError } = await saveListingLocations({
+        client: supabase,
+        listingId: created.id,
+        multiLocation: true,
+        primaryId: await primaryLocationId(supabase, created.id),
+        primaryLabel,
+        extras: extraLocations,
+      })
+      if (locationsError) {
+        console.error('CreateListing: locations did not save', locationsError)
+        locationsFailed = true
+      }
+    }
+
     const { error: hostError } = await supabase
       .from('users')
       .update({ is_host: true })
@@ -416,7 +451,14 @@ export default function CreateListing() {
     void notifyListingSubmitted()
     navigate('/hosting', {
       replace: true,
-      state: addonsFailed ? { message: ADDONS_NOT_SAVED_MESSAGE } : undefined,
+      state:
+        addonsFailed || locationsFailed
+          ? {
+              message: [addonsFailed && ADDONS_NOT_SAVED_MESSAGE, locationsFailed && LOCATIONS_NOT_SAVED_ON_CREATE]
+                .filter(Boolean)
+                .join(' '),
+            }
+          : undefined,
     })
   }
 
@@ -661,29 +703,40 @@ export default function CreateListing() {
 
     if (current.id === 'location') {
       return (
-        <>
-          <PostalAddressFields
-            value={fullAddress}
-            onChange={(next) => {
-              setFullAddress(next)
-              persistDraft({ fullAddress: next })
-            }}
-            area={area}
-            onAreaChange={(next) => {
-              setArea(next)
-              persistDraft({ area: next })
-            }}
-            areaHint={<FieldHint>{fieldHints.area}</FieldHint>}
-          />
-          <FieldHint>{fieldHints.fullAddress}</FieldHint>
-          <ArrivalInstructionsField
-            value={arrivalInstructions}
-            onChange={(next) => {
-              setArrivalInstructions(next)
-              persistDraft({ arrivalInstructions: next })
-            }}
-          />
-        </>
+        <ListingLocationsEditor
+          area={area}
+          onAreaChange={(next) => {
+            setArea(next)
+            persistDraft({ area: next })
+          }}
+          fullAddress={fullAddress}
+          onFullAddressChange={(next) => {
+            setFullAddress(next)
+            persistDraft({ fullAddress: next })
+          }}
+          arrivalInstructions={arrivalInstructions}
+          onArrivalChange={(next) => {
+            setArrivalInstructions(next)
+            persistDraft({ arrivalInstructions: next })
+          }}
+          primaryLabel={primaryLabel}
+          onPrimaryLabelChange={(next) => {
+            setPrimaryLabel(next)
+            persistDraft({ primaryLabel: next })
+          }}
+          multiLocation={multiLocation}
+          onMultiLocationChange={(next) => {
+            setMultiLocation(next)
+            persistDraft({ multiLocation: next })
+          }}
+          extras={extraLocations}
+          onExtrasChange={(next) => {
+            setExtraLocations(next)
+            persistDraft({ extraLocations: next })
+          }}
+          fieldHints={fieldHints}
+          available={locationsAvailable}
+        />
       )
     }
 

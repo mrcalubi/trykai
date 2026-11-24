@@ -124,6 +124,7 @@ export default function AddSessionsForm({
   classesAvailable = false,
   initialTypeId = null,
   onTypeCreated,
+  locations = [],
   subtitle = '',
   onCancel,
   onCreated,
@@ -178,6 +179,16 @@ export default function AddSessionsForm({
   const [newClassError, setNewClassError] = useState('')
   const [newClassSaving, setNewClassSaving] = useState(false)
   const chosenType = sessionTypes.find((type) => type.id === typeId) ?? null
+  // Listing locations (00059): every location is ticked to start with. Each
+  // gets its own session at each time, so the same time never clashes across
+  // places. An × removes one place's session, not the time everywhere.
+  const multiPlace = locations.length > 1
+  const [locationIds, setLocationIds] = useState(() => locations.map((location) => location.id))
+  const [removedPlaceSlots, setRemovedPlaceSlots] = useState([])
+  const chosenLocations = useMemo(
+    () => (multiPlace ? locations.filter((location) => locationIds.includes(location.id)) : []),
+    [multiPlace, locations, locationIds],
+  )
   const dateRowRefs = useRef({})
   const closeRef = useRef(null)
   const listRef = useRef(null)
@@ -253,20 +264,46 @@ export default function AddSessionsForm({
     return map
   }, [selectedDateKeys, perDateTimes, timesByDate, times, removedSlots])
 
-  const startCount = useMemo(() => buildSessionStarts(timesMap).length, [timesMap])
+  const slotCount = useMemo(() => buildSessionStarts(timesMap).length, [timesMap])
+  const startCount = multiPlace ? slotCount * chosenLocations.length : slotCount
   const overLimit = startCount > SESSION_BATCH_MAX
 
   const preview = useMemo(() => {
     if (!durationOk || overLimit) return null
-    return previewSessionBatch({
+    const batch = {
       timesByDate: timesMap,
       durationMins: duration,
       existingSessions,
       listingId: listing.id,
       typeId: chosenType?.id ?? null,
       classNameById,
-    })
-  }, [durationOk, overLimit, timesMap, duration, existingSessions, listing.id, chosenType, classNameById])
+    }
+    if (!multiPlace) return previewSessionBatch(batch)
+    const removed = new Set(removedPlaceSlots)
+    const accepted = []
+    const skipped = []
+    for (const location of chosenLocations) {
+      const result = previewSessionBatch({ ...batch, locationId: location.id })
+      const tag = (item) => ({ ...item, locationId: location.id, locationName: location.name })
+      for (const item of result.accepted) {
+        if (!removed.has(`${slotKey(item.dateKey, item.time)}@${location.id}`)) accepted.push(tag(item))
+      }
+      skipped.push(...result.skipped.map(tag))
+    }
+    return { ok: true, error: null, accepted, skipped }
+  }, [
+    durationOk,
+    overLimit,
+    timesMap,
+    duration,
+    existingSessions,
+    listing.id,
+    chosenType,
+    classNameById,
+    multiPlace,
+    chosenLocations,
+    removedPlaceSlots,
+  ])
 
   const accepted = useMemo(
     () => [...(preview?.accepted ?? [])].sort((a, b) => a.startsAt - b.startsAt),
@@ -371,6 +408,10 @@ export default function AddSessionsForm({
   function removeSession(item, index) {
     edited()
     focusRemoveRef.current = index
+    if (multiPlace && item.locationId) {
+      setRemovedPlaceSlots((prev) => [...prev, `${slotKey(item.dateKey, item.time)}@${item.locationId}`])
+      return
+    }
     const left = (timesMap[item.dateKey] ?? []).filter((time) => time !== item.time)
     if (left.length === 0) {
       unpickDate(item.dateKey)
@@ -477,6 +518,10 @@ export default function AddSessionsForm({
       setError('Pick a class for these dates.')
       return
     }
+    if (multiPlace && chosenLocations.length === 0) {
+      setError('Pick at least one location.')
+      return
+    }
     if (perDateTimes) {
       const missing = selectedDateKeys.filter((key) => filledTimes(timesByDate[key]).length === 0)
       if (missing.length > 0) {
@@ -511,7 +556,7 @@ export default function AddSessionsForm({
       spots,
       duration,
       usesListingDuration,
-      alsoListingIds,
+      alsoListingIds: multiPlace ? [] : alsoListingIds,
       typeId: chosenType?.id ?? null,
     })
     setSaving(false)
@@ -692,6 +737,69 @@ export default function AddSessionsForm({
               <span>Teach more than one class here?</span>
               <Link to={`/edit-listing/${listing.id}?section=types`}>Set up classes</Link>
             </p>
+          ) : null}
+
+          {multiPlace ? (
+            <fieldset className="add-dates__section add-dates__classes add-dates__places">
+              <legend className="add-dates__h add-dates__legend">
+                Where?
+                <span className="add-dates__count" aria-hidden="true">
+                  {chosenLocations.length} of {locations.length}
+                </span>
+              </legend>
+              <div className="add-dates__class-list">
+                {locations.map((location) => {
+                  const on = locationIds.includes(location.id)
+                  const count = existingSessions.filter(
+                    (session) =>
+                      session.listing_id === listing.id &&
+                      session.location_id === location.id &&
+                      new Date(session.starts_at).getTime() > Date.now(),
+                  ).length
+                  return (
+                    <label
+                      key={location.id}
+                      className={`add-dates__class${on ? ' add-dates__class--on' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        aria-labelledby={`${titleId}-place-${location.id}`}
+                        aria-describedby={`${titleId}-place-${location.id}-detail`}
+                        onChange={() => {
+                          setLocationIds((ids) =>
+                            ids.includes(location.id)
+                              ? ids.filter((id) => id !== location.id)
+                              : [...ids, location.id],
+                          )
+                          edited()
+                        }}
+                        className="visually-hidden"
+                      />
+                      <span className="add-dates__class-thumb add-dates__class-thumb--empty" aria-hidden="true">
+                        <Icon name="pin" size={20} />
+                      </span>
+                      <span className="add-dates__class-text">
+                        <span id={`${titleId}-place-${location.id}`} className="add-dates__class-name">
+                          {location.name}
+                        </span>
+                        <span id={`${titleId}-place-${location.id}-detail`} className="add-dates__class-detail">
+                          {datesLabel(count)}
+                        </span>
+                      </span>
+                      <span className="add-dates__class-mark" aria-hidden="true">
+                        {on ? <Icon name="check" size={14} strokeWidth={3} /> : null}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="add-dates__hint">
+                {spotsOk
+                  ? `Each place gets its own session with ${spots} ${spots === 1 ? 'spot' : 'spots'} at every time, so they fill up separately.`
+                  : 'Each place gets its own session at every time, so they fill up separately.'}
+              </p>
+            </fieldset>
           ) : null}
 
           <section className="add-dates__section" aria-labelledby={`${titleId}-days`}>
@@ -905,7 +1013,7 @@ export default function AddSessionsForm({
             </button>
           </section>
 
-          {otherListings.length > 0 ? (
+          {otherListings.length > 0 && !multiPlace ? (
             <div className="add-dates__also">
               {oneOther ? null : <p className="add-dates__also-title">Also offer these times on</p>}
               {otherListings.map((other) => (
@@ -967,13 +1075,15 @@ export default function AddSessionsForm({
                     const day = dayLabel(item.dateKey)
                     const start = formatSessionTime(item.startsAt)
                     const range = `${start} – ${formatSessionTime(sessionEnd(item))}`
+                    const place = item.locationName ?? ''
+                    const rowKey = `${item.dateKey}-${item.time}${item.locationId ? `-${item.locationId}` : ''}`
                     if (isSkipped) {
                       return (
-                        <li key={`skip-${item.dateKey}-${item.time}`} className="add-dates__row add-dates__row--skipped">
+                        <li key={`skip-${rowKey}`} className="add-dates__row add-dates__row--skipped">
                           <span className="add-dates__row-day">{day}</span>
                           <span className="add-dates__row-time">{range}</span>
                           <span className="add-dates__row-note add-dates__row-note--skip">
-                            Skipped: {item.reason}
+                            {place ? `${place} · ` : ''}Skipped: {item.reason}
                           </span>
                         </li>
                       )
@@ -981,17 +1091,18 @@ export default function AddSessionsForm({
                     removeIndex += 1
                     const index = removeIndex
                     return (
-                      <li key={`${item.dateKey}-${item.time}`} className="add-dates__row">
+                      <li key={rowKey} className="add-dates__row">
                         <span className="add-dates__row-day">{day}</span>
                         <span className="add-dates__row-time">{range}</span>
                         <button
                           type="button"
                           className="add-dates__remove"
-                          aria-label={`Remove ${day}, ${start}`}
+                          aria-label={`Remove ${day}, ${start}${place ? `, ${place}` : ''}`}
                           onClick={() => removeSession(item, index)}
                         >
                           <Icon name="close" size={18} />
                         </button>
+                        {place ? <span className="add-dates__row-note">{place}</span> : null}
                         {item.sharedWith?.length ? (
                           <span className="add-dates__row-note">
                             Shared with {item.sharedWith.join(', ')}

@@ -16,6 +16,7 @@ import {
 } from '../_shared/email.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
 import { prepareListingReview } from '../_shared/listingReview.ts'
+import { loadListingPlaceNames } from '../_shared/locations.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -104,6 +105,9 @@ async function listQueue() {
     }
   }
 
+  // Every active location of a multi-location listing (00059). Empty on failure.
+  const placeNames = await loadListingPlaceNames(adminClient(), listingIds)
+
   const listings = (rows ?? []).map((row) => {
     const host = (asRecord(row.users) ?? {}) as HostRow
     return {
@@ -118,6 +122,7 @@ async function listQueue() {
       whats_provided: Array.isArray(row.whats_provided) ? row.whats_provided : [],
       what_to_bring: Array.isArray(row.what_to_bring) ? row.what_to_bring : [],
       addons: addonsByListing.get(String(row.id)) ?? [],
+      locations: placeNames.get(String(row.id)) ?? [],
       review_status: row.review_status,
       review_note: row.review_note,
       review_requested_at: row.review_requested_at,

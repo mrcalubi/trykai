@@ -51,7 +51,7 @@ export function editSection(id) {
 export function sectionForHint(key) {
   if (['title', 'description', 'category'].includes(key)) return 'basics'
   if (['price', 'spots', 'duration'].includes(key)) return 'price'
-  if (['area', 'fullAddress'].includes(key)) return 'location'
+  if (['area', 'fullAddress'].includes(key) || key.startsWith('location-')) return 'location'
   if (key.startsWith('addon-')) return 'addons'
   if (key.startsWith('type-')) return 'types'
   return 'basics'
@@ -83,7 +83,11 @@ export function sectionSummaries(values) {
   ].filter(Boolean)
 
   const area = String(values.area ?? '').trim()
-  const hasDirections = Boolean(String(values.arrivalInstructions ?? '').trim())
+  // Several locations (00059): "Tampines + 2 more"; every one should say how to find it.
+  const extras = values.multiLocation ? (values.extraLocations ?? []) : []
+  const where = area && extras.length ? `${area} + ${extras.length} more` : area
+  const hasDirections = [values.arrivalInstructions, ...extras.map((location) => location.arrivalInstructions)]
+    .every((text) => Boolean(String(text ?? '').trim()))
   const photoCount = values.photos?.length ?? 0
   const missingPhotos = Math.max(RECOMMENDED_PHOTOS - photoCount, 0)
   const provided = providedItems(values.whatsProvided ?? [])
@@ -106,8 +110,8 @@ export function sectionSummaries(values) {
     ),
     notice: { text: `Guests can book until ${bookingCutoffLabel(values.bookingCutoffHours)} before` },
     location: hasDirections
-      ? { text: area || 'Add the address' }
-      : { text: `${area ? `${area} · ` : ''}add directions for guests`, needsWork: true },
+      ? { text: where || 'Add the address' }
+      : { text: `${where ? `${where} · ` : ''}add directions for guests`, needsWork: true },
     photos: missingPhotos
       ? {
           text: `${plural(photoCount, 'photo')} · add ${missingPhotos} more`,
