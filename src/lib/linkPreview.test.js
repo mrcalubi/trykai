@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  areasLabel,
   cardPriceForOneGuestCents,
   escapeHtml,
   formatDuration as previewFormatDuration,
@@ -18,6 +19,7 @@ import {
   previewTags,
   spotsLabel as previewSpotsLabel,
   textExcerpt,
+  withLocationAreas,
 } from '../../api/_lib/linkPreview.js'
 import { formatDuration } from './duration'
 import { spotsLabel } from './listingSpots'
@@ -384,5 +386,45 @@ describe('crawler page from the real index.html', () => {
 
   it('leaves HTML without an empty #root alone', () => {
     expect(injectRootContent('<div id="app"></div>', '<p>x</p>')).toBe('<div id="app"></div>')
+  })
+})
+
+describe('listings with several locations (00059)', () => {
+  it('joins areas the way people say them, each once', () => {
+    expect(areasLabel(['Tampines'])).toBe('Tampines')
+    expect(areasLabel(['Tampines', 'Jurong East'])).toBe('Tampines & Jurong East')
+    expect(areasLabel(['Bedok', 'Bishan', 'Bedok', ' ', 'Tampines'])).toBe('Bedok, Bishan & Tampines')
+    expect(areasLabel([])).toBe('')
+  })
+
+  it('gives the listing every area and each session its own, only with two or more', () => {
+    const rows = [
+      { starts_at: '2027-03-20T06:00:00Z', location_id: 'loc-t' },
+      { starts_at: '2027-03-20T06:00:00Z', location_id: 'loc-j' },
+    ]
+    const locations = [
+      { id: 'loc-t', area: 'Tampines' },
+      { id: 'loc-j', area: 'Jurong East' },
+    ]
+    const both = withLocationAreas(listing, rows, locations)
+    expect(both.listing.areas).toEqual(['Tampines', 'Jurong East'])
+    expect(both.sessions.map((row) => row.area)).toEqual(['Tampines', 'Jurong East'])
+    expect(listingPreviewDescription(both.listing)).toMatch(/ · Tampines & Jurong East$/)
+
+    const one = withLocationAreas(listing, rows, [locations[0]])
+    expect(one.listing).toBe(listing)
+    expect(one.sessions).toBe(rows)
+    expect(listingPreviewDescription(one.listing)).toMatch(/ · Bukit Merah$/)
+  })
+
+  it('serves every area and puts each session at its own', () => {
+    const data = listingStructuredData(
+      { ...fullListing, areas: ['Tampines', 'Jurong East'] },
+      { ...page, sessions: [{ starts_at: '2027-03-20T06:00:00Z', spots_remaining: 2, area: 'Jurong East' }] },
+    )
+    const [service, event] = data['@graph']
+    expect(service.areaServed.map((place) => place.name)).toEqual(['Tampines, Singapore', 'Jurong East, Singapore'])
+    expect(event.location.address.addressLocality).toBe('Jurong East')
+    expect(JSON.stringify(data)).not.toMatch(/streetAddress|postalCode/)
   })
 })

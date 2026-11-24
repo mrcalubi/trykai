@@ -15,7 +15,12 @@ import {
   publicDisplayName,
   sendResendEmail,
 } from '../_shared/email.ts'
-import { INTEREST_OPEN_DAYS, keenNotifySkip } from '../_shared/interest.ts'
+import {
+  INTEREST_OPEN_DAYS,
+  keenNotifySkip,
+  OPENED_DATES_SHOWN,
+  openedDateStarts,
+} from '../_shared/interest.ts'
 
 const MAX_PER_CALL = 200
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -73,8 +78,10 @@ Deno.serve(async (req) => {
       .gt('spots_remaining', 0)
       .gt('starts_at', new Date().toISOString())
       .order('starts_at', { ascending: true })
-      .limit(4)
-    if (!sessions?.length) return jsonResponse({ notified: 0, reason: 'no_open_sessions' })
+      // Room for the same time at each of up to 4 locations (00059).
+      .limit(OPENED_DATES_SHOWN * 4)
+    const openedStarts = openedDateStarts(sessions)
+    if (!openedStarts.length) return jsonResponse({ notified: 0, reason: 'no_open_sessions' })
 
     const since = new Date(Date.now() - INTEREST_OPEN_DAYS * 24 * 60 * 60 * 1000).toISOString()
     const { data: interests } = await admin
@@ -101,7 +108,7 @@ Deno.serve(async (req) => {
       .in('id', claimed.map((row) => row.guest_id))
 
     const hostName = publicDisplayName(listing.users as { full_name?: string; display_name?: string })
-    const sessionDates = sessions.map((session) => formatSessionDate(session.starts_at))
+    const sessionDates = openedStarts.map((start) => formatSessionDate(start))
     const apiKey = Deno.env.get('RESEND_API_KEY')
     const siteUrl = Deno.env.get('SITE_URL')
 

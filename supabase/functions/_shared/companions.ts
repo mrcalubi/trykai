@@ -79,6 +79,8 @@ export async function emailCompanionsMoved(
     bookerName: string
     listingTitle: string
     newSessionDate: string
+    /** The new session's location, when the listing has several (00059). */
+    newLocationName?: string
     apiKey: string | undefined
     siteUrl?: string
     send?: typeof sendResendEmail
@@ -99,6 +101,7 @@ export async function emailCompanionsMoved(
           newSessionDate: options.newSessionDate,
           bookingId: options.bookingId,
           siteUrl: options.siteUrl,
+          newLocationName: options.newLocationName,
         }),
       send: options.send,
     })

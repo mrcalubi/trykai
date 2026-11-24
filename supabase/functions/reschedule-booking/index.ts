@@ -10,6 +10,7 @@ import {
 import { emailCompanionsMoved } from '../_shared/companions.ts'
 import { notifyUserTelegram, telegramBookingMoved } from '../_shared/telegram.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
+import { loadSessionPlaces, locationLine } from '../_shared/locations.ts'
 
 function adminClient() {
   return createClient(
@@ -96,6 +97,15 @@ Deno.serve(async (req) => {
     const guestName = publicDisplayName(guestResult.data)
     const newStartsAt = typeof newSession?.starts_at === 'string' ? newSession.starts_at : ''
 
+    // Where each session runs (00059). Only a listing with several locations
+    // names them; the guest gets the new address only when the place changed.
+    const places = await loadSessionPlaces(admin, [booking.session_id, body.session_id])
+    const oldPlace = places.get(booking.session_id) ?? null
+    const newPlace = places.get(body.session_id) ?? null
+    const placeChanged = Boolean(
+      newPlace?.multiLocation && oldPlace && newPlace.locationId !== oldPlace.locationId,
+    )
+
     await sendRescheduleEmails({
       apiKey: Deno.env.get('RESEND_API_KEY'),
       guestEmail: guestResult.data?.email,
@@ -109,12 +119,17 @@ Deno.serve(async (req) => {
       bookingId: booking.id,
       addons: addons ?? [],
       siteUrl: Deno.env.get('SITE_URL'),
+      oldLocationName: locationLine(oldPlace),
+      newLocationName: locationLine(newPlace),
+      newFullAddress: placeChanged ? newPlace?.fullAddress : '',
+      newArrivalInstructions: placeChanged ? newPlace?.arrivalInstructions : '',
     })
     await emailCompanionsMoved(admin, {
       bookingId: booking.id,
       bookerName: guestName || 'The person who booked',
       listingTitle: typeof listing?.title === 'string' ? listing.title : 'your session',
       newSessionDate: newStartsAt ? formatSessionDate(newStartsAt) : '',
+      newLocationName: locationLine(newPlace),
       apiKey: Deno.env.get('RESEND_API_KEY'),
       siteUrl: Deno.env.get('SITE_URL'),
     })
@@ -125,6 +140,7 @@ Deno.serve(async (req) => {
       listingTitle: typeof listing?.title === 'string' ? listing.title : 'your session',
       newWhen: newStartsAt ? formatReminderSessionDate(newStartsAt) : '',
       siteUrl: Deno.env.get('SITE_URL'),
+      place: locationLine(newPlace),
     }))
 
     return jsonResponse({

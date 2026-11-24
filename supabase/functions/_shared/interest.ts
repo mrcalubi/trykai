@@ -178,3 +178,25 @@ export function keenBadge(count: number | null | undefined): string {
   const n = Math.floor(Number(count) || 0)
   return n >= KEEN_COUNT_MIN_SHOWN ? `${n} keen` : ''
 }
+
+/** How many dates the "a date opened" mail lists. */
+export const OPENED_DATES_SHOWN = 4
+
+/**
+ * Start times for the "a date opened" mail, soonest first, each once. A
+ * listing with several locations (00059) runs the same time at each place, so
+ * the sessions list can repeat a time; the guest only needs it once.
+ */
+export function openedDateStarts(
+  sessions: Array<{ starts_at?: unknown }> | null | undefined,
+  max = OPENED_DATES_SHOWN,
+): string[] {
+  const starts: string[] = []
+  for (const session of sessions ?? []) {
+    const start = session?.starts_at
+    if (typeof start !== 'string' || !start || starts.includes(start)) continue
+    starts.push(start)
+    if (starts.length >= max) break
+  }
+  return starts
+}

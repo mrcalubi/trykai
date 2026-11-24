@@ -510,6 +510,10 @@ export function bookingConfirmedGuestHtml(options: {
   duration?: string
   fullAddress?: string
   arrivalInstructions?: string | null
+  /** Which of several locations (00059). Empty for a one-location listing. */
+  locationName?: string
+  /** The listing runs at several places with a team: say a team member may teach. */
+  runsWithTeam?: boolean
   guestsCount: number
   pricePerPersonCents: number
   groupPricing?: boolean
@@ -530,6 +534,7 @@ export function bookingConfirmedGuestHtml(options: {
   const bring = whatsProvidedCopy(options.whatToBring)
   const duration = options.duration ? escapeHtml(options.duration) : ''
   const address = options.fullAddress ? escapeHtml(options.fullAddress) : ''
+  const location = options.locationName ? escapeHtml(options.locationName) : ''
   const calendar = googleCalendarUrl({
     title: options.listingTitle,
     startsAt: options.sessionStartsAt,
@@ -554,6 +559,7 @@ export function bookingConfirmedGuestHtml(options: {
     ${detailRows([
       ['Date and time', escapeHtml(options.sessionDate)],
       ['Duration', duration],
+      ['Location', location],
       ['Address', address],
       ['How to find it', options.arrivalInstructions ? escapeHtml(options.arrivalInstructions) : ''],
       ['Guests', guestCountLabel(options.guestsCount)],
@@ -561,6 +567,7 @@ export function bookingConfirmedGuestHtml(options: {
       ['What to bring', bring ? escapeHtml(bring) : ''],
       ['Booking reference', escapeHtml(options.bookingReference)],
     ])}
+    ${options.runsWithTeam ? `<p style="margin:0 0 16px;font-size:14px;color:${EMAIL_COLORS.muted};">${hostName} runs this with a team, so your teacher may be a team member.</p>` : ''}
     ${receiptBlock(receipt, options.paymentMethod)}
     ${options.paymentRail === 'paynow' ? `<p style="margin:0 0 16px;font-size:14px;color:${EMAIL_COLORS.muted};">Your bank will show this payment as Stripe Payments Singapore.</p>` : ''}
     ${calendar ? `<p style="margin:0 0 8px;"><a href="${escapeHtml(calendar)}" style="${LINK_STYLE}">Add to Google Calendar</a></p>` : ''}
@@ -613,6 +620,8 @@ export function bookingConfirmedHostHtml(options: {
   guestName: string
   listingTitle: string
   sessionDate: string
+  /** Which of several locations (00059). Empty for a one-location listing. */
+  locationName?: string
   guestsCount: number
   hostPayoutCents: number
   siteUrl?: string
@@ -635,6 +644,7 @@ export function bookingConfirmedHostHtml(options: {
     <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
     <p style="margin:0 0 8px;"><strong>Listing:</strong> ${escapeHtml(options.listingTitle)}</p>
     <p style="margin:0 0 8px;"><strong>Date and time:</strong> ${escapeHtml(options.sessionDate)}</p>
+    ${options.locationName ? `<p style="margin:0 0 8px;"><strong>Location:</strong> ${escapeHtml(options.locationName)}</p>` : ''}
     <p style="margin:0 0 ${prepare || note ? '8' : '16'}px;"><strong>Guests:</strong> ${guestCountLabel(options.guestsCount)}</p>
     ${prepare ? `<p style="margin:0 0 ${note ? '8' : '16'}px;">${escapeHtml(prepare)}</p>` : ''}
     ${note ? `<p style="margin:0 0 16px;">Note from ${escapeHtml(noteFrom)}: ${escapeHtml(note)}</p>` : ''}
@@ -665,6 +675,10 @@ export function guestSessionReminderHtml(options: {
   duration?: string
   fullAddress?: string
   arrivalInstructions?: string | null
+  /** Which of several locations (00059). Empty for a one-location listing. */
+  locationName?: string
+  /** A team member may teach, so the guest is not told to look for the host. */
+  runsWithTeam?: boolean
   whatsProvided?: string[] | null
   whatToBring?: string[] | null
   hostName: string
@@ -677,7 +691,11 @@ export function guestSessionReminderHtml(options: {
   const bring = whatsProvidedCopy(options.whatToBring)
   const duration = options.duration ? escapeHtml(options.duration) : ''
   const address = options.fullAddress ? escapeHtml(options.fullAddress) : ''
+  const location = options.locationName ? escapeHtml(options.locationName) : ''
   const hostName = escapeHtml(options.hostName || 'your host')
+  const arrive = options.runsWithTeam
+    ? `Try to arrive a few minutes early, and say hi when you get there. ${hostName}'s team is looking forward to meeting you.`
+    : `Try to arrive a few minutes early, and say hi to ${hostName} when you get there. They're looking forward to meeting you.`
   return wrapEmail(
     `
     <p style="margin:0 0 16px;">${reminderGreeting(options.guestName)}</p>
@@ -686,13 +704,14 @@ export function guestSessionReminderHtml(options: {
     ${detailRows([
       ['Day and time', escapeHtml(options.sessionDate)],
       ['Duration', duration],
+      ['Location', location],
       ['Address', address],
       ['How to find it', options.arrivalInstructions ? escapeHtml(options.arrivalInstructions) : ''],
       ["What's provided", provided ? escapeHtml(provided) : ''],
       ['Host', hostName],
     ])}
     ${bring ? detailRows([["Don't forget to bring", escapeHtml(bring)]]) : ''}
-    <p style="margin:0 0 16px;">Try to arrive a few minutes early, and say hi to ${hostName} when you get there. They're looking forward to meeting you.</p>
+    <p style="margin:0 0 16px;">${arrive}</p>
     ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
     <p style="margin:0 0 8px;">Plans changed? You can manage your booking from the booking page.</p>
     <p style="margin:16px 0 0;">Have a great time!</p>
@@ -722,6 +741,8 @@ export function hostSessionReminderHtml(options: {
   sentAt?: string | Date | number
   guests: Array<{ name: string; guestsCount: number }>
   totalGuests: number
+  /** Which of several locations (00059). Empty for a one-location listing. */
+  locationName?: string
   siteUrl?: string
   addons?: Array<{ name: string; quantity: number }>
   notes?: Array<{ name: string; note: string }>
@@ -752,6 +773,7 @@ export function hostSessionReminderHtml(options: {
       ["Who's coming", who],
       showTotal ? ['Total', escapeHtml(totalLabel)] : null,
       ['Day and time', escapeHtml(options.sessionDate)],
+      options.locationName ? ['Location', escapeHtml(options.locationName)] : null,
       prepare ? ['Add-ons to prepare', escapeHtml(prepare.replace(/^Add-ons to prepare: /, '').replace(/\.$/, ''))] : null,
       notes ? ['Notes', notes] : null,
     ])}
@@ -814,6 +836,8 @@ export function listingSubmittedOpsHtml(options: {
   verifiedName: string | null
   verificationMethod: string | null
   resubmitted: boolean
+  /** Every active location, when the host turned on several (00059). Replaces Area. */
+  locationNames?: string[]
 }): string {
   const base = emailSiteUrl(options.siteUrl)
   const price = Number.isInteger(options.priceCents) && (options.priceCents as number) > 0
@@ -823,6 +847,10 @@ export function listingSubmittedOpsHtml(options: {
     ? `${escapeHtml(options.hostName)} (Singpass: ${escapeHtml(options.verifiedName)})`
     : escapeHtml(options.hostName)
   const bring = whatsProvidedCopy(options.whatToBring)
+  const places = (options.locationNames ?? []).filter(Boolean)
+  const where: [string, string] = places.length > 1
+    ? ['Locations', `${places.map(escapeHtml).join('<br>')}<br>Run at the same time with a team`]
+    : ['Area', escapeHtml(options.area ?? '')]
   return wrapEmail(
     `${emailHeading(options.resubmitted ? 'A listing was updated for review' : 'A new listing needs a look')}
     <p style="margin:0 0 16px;">It stays hidden from guests until you approve it. The host can already add dates.</p>
@@ -830,7 +858,7 @@ export function listingSubmittedOpsHtml(options: {
       ['Listing', `<strong>${escapeHtml(options.title)}</strong>`],
       ['Host', `${who}<br>${escapeHtml(options.hostEmail)}`],
       ['Category', escapeHtml(options.category ?? '')],
-      ['Area', escapeHtml(options.area ?? '')],
+      where,
       ['Price', escapeHtml(price)],
       ['Photos', String(options.photoCount)],
       ['What to bring', bring ? escapeHtml(bring) : ''],
@@ -1064,6 +1092,8 @@ export function bookingCancelledHostHtml(options: {
   guestsCount: number
   hostPayoutCents: number
   siteUrl?: string
+  /** Which of several locations (00059). Empty for a one-location listing. */
+  locationName?: string
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
   return wrapEmail(
@@ -1072,6 +1102,7 @@ export function bookingCancelledHostHtml(options: {
     <p style="margin:0 0 16px;"><strong>${escapeHtml(options.guestName)}</strong> cancelled their booking for <strong>${escapeHtml(options.listingTitle)}</strong>.</p>
     <p style="margin:0 0 16px;"><strong>Booking reference:</strong> ${escapeHtml(options.bookingReference)}</p>
     <p style="margin:0 0 8px;"><strong>Date and time:</strong> ${escapeHtml(options.sessionDate)}</p>
+    ${options.locationName ? `<p style="margin:0 0 8px;"><strong>Location:</strong> ${escapeHtml(options.locationName)}</p>` : ''}
     <p style="margin:0 0 16px;"><strong>Guests:</strong> ${guestCountLabel(options.guestsCount)}</p>
     <p style="margin:0 0 8px;">${hostPayoutLine(options.hostPayoutCents)}</p>
     <p style="margin:0;">The spot is available again.</p>
@@ -1415,13 +1446,23 @@ export function bookingMovedGuestHtml(options: {
   sessionDate: string
   bookingId: string
   siteUrl?: string
+  /** The new session's location, when the listing has several (00059). */
+  locationName?: string
+  /** Set only when the move changed the location: the new place's details. */
+  fullAddress?: string
+  arrivalInstructions?: string | null
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
+  const at = options.locationName ? ` at ${escapeHtml(options.locationName)}` : ''
   return wrapEmail(
     `
     <p style="margin:0 0 16px;">${emailGreeting(options.guestName)}</p>
     ${emailHeading(`You've moved your booking to ${options.sessionDate}`)}
-    <p style="margin:0 0 16px;">${escapeHtml(options.listingTitle)} is now on ${escapeHtml(options.sessionDate)}.</p>
+    <p style="margin:0 0 16px;">${escapeHtml(options.listingTitle)} is now on ${escapeHtml(options.sessionDate)}${at}.</p>
+    ${detailRows([
+      ['Address', options.fullAddress ? escapeHtml(options.fullAddress) : ''],
+      ['How to find it', options.arrivalInstructions ? escapeHtml(options.arrivalInstructions) : ''],
+    ])}
     ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
     ${emailSignOff('see-you')}
     `,
@@ -1436,17 +1477,24 @@ export function bookingMovedHostHtml(options: {
   listingTitle: string
   oldSessionDate: string
   newSessionDate: string
+  /** Each session's location, when the listing has several (00059). */
+  oldLocationName?: string
+  newLocationName?: string
   addons?: Array<{ name: string; quantity: number }>
   siteUrl?: string
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
   const prepare = addonPrepareLine(options.addons)
   const guest = escapeHtml(options.guestFirstName || 'A guest')
+  const from = escapeHtml(options.oldSessionDate) +
+    (options.oldLocationName ? ` at ${escapeHtml(options.oldLocationName)}` : '')
+  const to = escapeHtml(options.newSessionDate) +
+    (options.newLocationName ? ` at ${escapeHtml(options.newLocationName)}` : '')
   return wrapEmail(
     `
     <p style="margin:0 0 16px;">${emailGreeting(options.hostName)}</p>
     ${emailHeading(`${options.guestFirstName || 'A guest'} moved their booking`)}
-    <p style="margin:0 0 16px;">${guest} moved their booking for ${escapeHtml(options.listingTitle)} from ${escapeHtml(options.oldSessionDate)} to ${escapeHtml(options.newSessionDate)}.</p>
+    <p style="margin:0 0 16px;">${guest} moved their booking for ${escapeHtml(options.listingTitle)} from ${from} to ${to}.</p>
     ${detailRows([
       prepare
         ? [
@@ -1476,6 +1524,11 @@ export async function sendRescheduleEmails(options: {
   bookingId: string
   addons?: Array<{ name: string; quantity: number }>
   siteUrl?: string
+  oldLocationName?: string
+  newLocationName?: string
+  /** Only when the move changed the location: the new place's details for the guest. */
+  newFullAddress?: string
+  newArrivalInstructions?: string
 }): Promise<void> {
   try {
     await sendResendEmail({
@@ -1489,6 +1542,9 @@ export async function sendRescheduleEmails(options: {
         sessionDate: options.newSessionDate,
         bookingId: options.bookingId,
         siteUrl: options.siteUrl,
+        locationName: options.newLocationName,
+        fullAddress: options.newFullAddress,
+        arrivalInstructions: options.newArrivalInstructions,
       }),
     })
     await sendResendEmail({
@@ -1505,6 +1561,8 @@ export async function sendRescheduleEmails(options: {
         listingTitle: options.listingTitle,
         oldSessionDate: options.oldSessionDate,
         newSessionDate: options.newSessionDate,
+        oldLocationName: options.oldLocationName,
+        newLocationName: options.newLocationName,
         addons: options.addons,
         siteUrl: options.siteUrl,
       }),
@@ -1533,6 +1591,8 @@ export async function sendCancellationEmails(options: {
   paymentMethod: string
   hostPayoutCents?: number
   siteUrl?: string
+  /** For the host's copy: which of several locations (00059). */
+  locationName?: string
 }): Promise<void> {
   try {
     const guestSubject = bookingCancelledGuestSubject({
@@ -1577,6 +1637,7 @@ export async function sendCancellationEmails(options: {
           guestsCount: options.guestsCount,
           hostPayoutCents: options.hostPayoutCents ?? 0,
           siteUrl: options.siteUrl,
+          locationName: options.locationName,
         }),
       })
     }
@@ -1727,13 +1788,16 @@ export function companionMovedHtml(options: {
   newSessionDate: string
   bookingId: string
   siteUrl?: string
+  /** The new session's location, when the listing has several (00059). */
+  newLocationName?: string
 }): string {
   const siteUrl = emailSiteUrl(options.siteUrl)
+  const at = options.newLocationName ? ` at ${escapeHtml(options.newLocationName)}` : ''
   return wrapEmail(
     `
     <p style="margin:0 0 16px;">${emailGreeting(options.companionName)}</p>
     ${emailHeading(`${options.bookerName} moved your booking`)}
-    <p style="margin:0 0 16px;">${escapeHtml(options.listingTitle)} is now on ${escapeHtml(options.newSessionDate)}.</p>
+    <p style="margin:0 0 16px;">${escapeHtml(options.listingTitle)} is now on ${escapeHtml(options.newSessionDate)}${at}.</p>
     ${primaryButton(`${siteUrl}/bookings/${encodeURIComponent(options.bookingId)}`, 'View booking')}
     ${emailSignOff('see-you')}
     `,

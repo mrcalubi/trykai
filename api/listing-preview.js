@@ -11,8 +11,8 @@
  *
  * Reads public listing columns with the anon key, so RLS still applies: an
  * inactive listing or a suspended host's listing gets the default preview.
- * Upcoming sessions and the rating are extras: if either read fails, the page
- * goes out without it.
+ * Upcoming sessions, the rating and the locations are extras: if a read
+ * fails, the page goes out without it.
  */
 
 import {
@@ -22,6 +22,7 @@ import {
   listingPageBody,
   listingPreviewMeta,
   listingStructuredData,
+  withLocationAreas,
 } from './_lib/linkPreview.js'
 
 const BASE_COLUMNS = 'title,area,price_per_person,photo_urls'
@@ -29,6 +30,9 @@ const LISTING_COLUMNS =
   `${BASE_COLUMNS},description,category,duration_mins,max_guests,whats_provided,what_to_bring,created_at,` +
   'host_id,users!host_id(display_name,is_id_verified)'
 const SESSION_COLUMNS = 'starts_at,duration_mins,spots_remaining,created_at'
+// 00059: which location each session runs at. Public columns only, never the address.
+const SESSION_LOCATION_COLUMNS = `${SESSION_COLUMNS},location_id`
+const LOCATION_COLUMNS = 'id,area,position,created_at'
 const MAX_SESSIONS = 10
 
 const FALLBACK_HTML = `<!doctype html>
@@ -93,10 +97,22 @@ async function fetchListing(config, id) {
 
 async function fetchSessions(config, id) {
   const now = encodeURIComponent(new Date().toISOString())
+  const filters =
+    `&listing_id=eq.${encodeURIComponent(id)}` +
+    `&status=eq.open&starts_at=gt.${now}&order=starts_at.asc&limit=${MAX_SESSIONS}`
+  // A database before 00059 has no location_id: read the sessions without it.
+  const rows =
+    (await restGet(config, `sessions?select=${SESSION_LOCATION_COLUMNS}${filters}`)) ??
+    (await restGet(config, `sessions?select=${SESSION_COLUMNS}${filters}`))
+  return Array.isArray(rows) ? rows : []
+}
+
+/** Active locations, first one first (00059). */
+async function fetchLocations(config, id) {
   const rows = await restGet(
     config,
-    `sessions?select=${SESSION_COLUMNS}&listing_id=eq.${encodeURIComponent(id)}` +
-      `&status=eq.open&starts_at=gt.${now}&order=starts_at.asc&limit=${MAX_SESSIONS}`,
+    `listing_locations?select=${LOCATION_COLUMNS}&listing_id=eq.${encodeURIComponent(id)}` +
+      '&is_active=eq.true&order=position.asc,created_at.asc',
   )
   return Array.isArray(rows) ? rows : []
 }
@@ -139,12 +155,14 @@ export default async function handler(req, res) {
   const config = status === 200 ? supabaseConfig() : null
   if (config) {
     try {
-      const [listing, sessions, rating] = await Promise.all([
+      const [found, foundSessions, rating, locations] = await Promise.all([
         fetchListing(config, id),
         optional(fetchSessions(config, id), []),
         optional(fetchRating(config, id), null),
+        optional(fetchLocations(config, id), []),
       ])
-      if (listing === null) status = 404
+      if (found === null) status = 404
+      const { listing, sessions } = withLocationAreas(found, foundSessions, locations)
       const pageUrl = `${origin}/listings/${id}`
       const meta = listing ? listingPreviewMeta(listing, pageUrl) : null
       if (meta) {

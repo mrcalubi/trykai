@@ -87,11 +87,43 @@ export function escapeHtml(value) {
     .replace(/'/g, '&#39;')
 }
 
+/** "Tampines & Jurong East", "Bedok, Bishan & Tampines". Each area once. */
+export function areasLabel(areas) {
+  const list = [...new Set((areas ?? []).filter((area) => typeof area === 'string' && area.trim()).map((a) => a.trim()))]
+  if (list.length <= 1) return list[0] ?? ''
+  return `${list.slice(0, -1).join(', ')} & ${list[list.length - 1]}`
+}
+
+/**
+ * Where the listing runs, by area only. A listing with several locations
+ * (00059) carries `areas` from the handler; otherwise its own area.
+ */
+export function listingAreaLabel(listing) {
+  const several = Array.isArray(listing?.areas) ? areasLabel(listing.areas) : ''
+  return several || (typeof listing?.area === 'string' ? listing.area : '')
+}
+
+/**
+ * With several locations, give the listing every area and each session its
+ * own. With one, change nothing: the listing's area already says where.
+ */
+export function withLocationAreas(listing, sessions, locations) {
+  if (!listing || !Array.isArray(locations) || locations.length < 2) return { listing, sessions }
+  const areaById = new Map(locations.map((row) => [row.id, row.area]))
+  return {
+    listing: { ...listing, areas: locations.map((row) => row.area).filter(Boolean) },
+    sessions: sessions.map((session) =>
+      areaById.get(session.location_id) ? { ...session, area: areaById.get(session.location_id) } : session,
+    ),
+  }
+}
+
 /** "S$28 per person · Tiong Bahru". Area is left off when the listing has none. */
 export function listingPreviewDescription(listing) {
   const price = formatDollars(cardPriceForOneGuestCents(listing.price_per_person))
   const parts = [`S${price} per person`]
-  if (listing.area) parts.push(listing.area)
+  const area = listingAreaLabel(listing)
+  if (area) parts.push(area)
   return parts.join(' · ')
 }
 
@@ -182,7 +214,8 @@ export function listingPageBody(listing, { pageUrl, origin, sessions = [], ratin
   const host = hostName(listing)
   const reviews = ratingSummary(rating)
   const image = firstHttpsPhoto(listing.photo_urls)
-  const where = [listing.category, listing.area ? `${listing.area}, Singapore` : 'Singapore']
+  const area = listingAreaLabel(listing)
+  const where = [listing.category, area ? `${area}, Singapore` : 'Singapore']
     .filter(Boolean)
     .join(' · ')
 
@@ -255,15 +288,20 @@ export function listingStructuredData(listing, { pageUrl, origin, sessions = [],
   const description = textExcerpt(listing.description, 500) || listingPreviewDescription(listing)
   const host = hostName(listing)
   const reviews = ratingSummary(rating)
-  const place = {
+  const placeFor = (area) => ({
     '@type': 'Place',
-    name: listing.area ? `${listing.area}, Singapore` : 'Singapore',
+    name: area ? `${area}, Singapore` : 'Singapore',
     address: {
       '@type': 'PostalAddress',
-      ...(listing.area ? { addressLocality: listing.area } : {}),
+      ...(area ? { addressLocality: area } : {}),
       addressCountry: 'SG',
     },
-  }
+  })
+  const place = placeFor(listing.area)
+  // Several locations (00059): the listing serves each area, and each session
+  // event is at its own location's area when the handler knows it.
+  const areas = Array.isArray(listing.areas) ? [...new Set(listing.areas.filter(Boolean))] : []
+  const areaServed = areas.length > 1 ? areas.map(placeFor) : place
   const provider = host
     ? {
         '@type': 'Person',
@@ -280,7 +318,7 @@ export function listingStructuredData(listing, { pageUrl, origin, sessions = [],
     url: pageUrl,
     ...(image ? { image } : {}),
     ...(listing.category ? { category: listing.category } : {}),
-    areaServed: place,
+    areaServed,
     ...(provider ? { provider } : {}),
     offers: { '@type': 'Offer', price, priceCurrency: 'SGD', url: pageUrl },
     ...(reviews
@@ -309,7 +347,7 @@ export function listingStructuredData(listing, { pageUrl, origin, sessions = [],
         ...(endDate ? { endDate } : {}),
         eventStatus: 'https://schema.org/EventScheduled',
         eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
-        location: place,
+        location: session.area ? placeFor(session.area) : place,
         ...(image ? { image } : {}),
         ...(provider ? { organizer: provider, performer: provider } : {}),
         ...(Number.isInteger(listing.max_guests) && listing.max_guests > 0

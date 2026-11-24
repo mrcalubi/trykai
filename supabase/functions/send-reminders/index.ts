@@ -31,6 +31,7 @@ import {
   telegramReviewPrompt,
   telegramSessionReminder,
 } from '../_shared/telegram.ts'
+import { loadSessionPlaces, locationLine, sessionAddress } from '../_shared/locations.ts'
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -187,6 +188,10 @@ Deno.serve(async (req) => {
       return jsonResponse(summary)
     }
 
+    // Each session's own location (00059). Empty on any failure, which falls
+    // back to the listing's address and no location line, as before.
+    const places = await loadSessionPlaces(admin, sessionIds)
+
     const bookingSelect = `
         id,
         session_id,
@@ -245,6 +250,8 @@ Deno.serve(async (req) => {
       const listing = asRecord(session.listings)
       const host = userFields(listing?.users)
       const guest = userFields(row.users)
+      const place = places.get(row.session_id) ?? null
+      const where = sessionAddress(place, listing)
       const email = guest?.email
       const title = typeof listing?.title === 'string' ? listing.title : ''
       const startsAt = typeof session.starts_at === 'string' ? session.starts_at : ''
@@ -267,9 +274,10 @@ Deno.serve(async (req) => {
           duration: formatDuration(
             typeof session.duration_mins === 'number' ? session.duration_mins : null,
           ),
-          fullAddress: typeof listing?.full_address === 'string' ? listing.full_address : '',
-          arrivalInstructions:
-            typeof listing?.arrival_instructions === 'string' ? listing.arrival_instructions : '',
+          fullAddress: where.fullAddress,
+          arrivalInstructions: where.arrivalInstructions,
+          locationName: locationLine(place),
+          runsWithTeam: Boolean(place?.multiLocation),
           whatsProvided: Array.isArray(listing?.whats_provided)
             ? (listing.whats_provided as string[])
             : null,
@@ -364,6 +372,7 @@ Deno.serve(async (req) => {
           sentAt,
           guests: group.guests,
           totalGuests: group.totalGuests,
+          locationName: locationLine(places.get(row.id)),
           siteUrl,
           addons: sumAddonRows(extrasBySession.get(row.id)?.addons),
           notes: extrasBySession.get(row.id)?.notes,
@@ -380,6 +389,7 @@ Deno.serve(async (req) => {
           time: formatSessionTime(startsAt),
           guestsCount: group.totalGuests,
           siteUrl,
+          place: locationLine(places.get(row.id)),
         }))
       }
     }
