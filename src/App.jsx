@@ -33,6 +33,7 @@ import Settings from './pages/Settings'
 import Logout from './pages/Logout'
 import AdminVerifications from './pages/AdminVerifications'
 import AdminListings from './pages/AdminListings'
+import AdminBookings from './pages/AdminBookings'
 import AdminSingpassKeys from './pages/AdminSingpassKeys'
 import SingpassReturn from './pages/SingpassReturn'
 import RefundPolicy from './pages/RefundPolicy'
@@ -166,6 +167,16 @@ function appRoutes() {
             <RequireAuth>
               <RequireAdmin>
                 <AdminSingpassKeys />
+              </RequireAdmin>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/bookings" handle={{ title: 'Bookings' }}
+          element={
+            <RequireAuth>
+              <RequireAdmin>
+                <AdminBookings />
               </RequireAdmin>
             </RequireAuth>
           }
