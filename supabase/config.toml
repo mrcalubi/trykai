@@ -586,6 +586,12 @@ verify_jwt = false
 import_map = "./functions/review-emails/deno.json"
 entrypoint = "./functions/review-emails/index.ts"
 
+[functions.admin-bookings]
+enabled = true
+verify_jwt = false
+import_map = "./functions/admin-bookings/deno.json"
+entrypoint = "./functions/admin-bookings/index.ts"
+
 [functions.admin-listings]
 enabled = true
 verify_jwt = false

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cardAreaLabel,
   filterNarrows,
+  listingAreas,
+  matchesPlace,
   LOCATION_FILTER_MIN_LISTINGS,
   locationLabel,
   showLocationFilter,
@@ -63,5 +66,32 @@ describe('locationLabel', () => {
     expect(locationLabel('East', '')).toBe('East')
     expect(locationLabel('All', '')).toBe('Anywhere')
     expect(locationLabel(undefined, undefined)).toBe('Anywhere')
+  })
+})
+
+describe('listings with several locations (00059)', () => {
+  const team = { area: 'Tampines', areas: ['Tampines', 'Jurong East'] }
+
+  it('reads every area, and labels the card with the first plus a count', () => {
+    expect(listingAreas(team)).toEqual(['Tampines', 'Jurong East'])
+    expect(listingAreas({ area: 'Bedok', areas: ['Bedok'] })).toEqual(['Bedok'])
+    expect(listingAreas({ area: null })).toEqual([])
+    expect(cardAreaLabel(team)).toBe('Tampines +1')
+    expect(cardAreaLabel({ area: 'Bedok' })).toBe('Bedok')
+  })
+
+  it('matches the region and area filters on any of its places', () => {
+    expect(matchesPlace(team, 'West', '')).toBe(true)
+    expect(matchesPlace(team, 'East', 'Jurong East')).toBe(false)
+    expect(matchesPlace(team, 'All', 'Jurong East')).toBe(true)
+    expect(matchesPlace({ area: 'Bedok' }, 'West', '')).toBe(false)
+    expect(matchesPlace({ area: null }, 'All', '')).toBe(true)
+    expect(matchesPlace({ area: null }, 'East', '')).toBe(false)
+  })
+
+  it('counts every place when deciding whether to show the location filter', () => {
+    const east = Array.from({ length: LOCATION_FILTER_MIN_LISTINGS - 1 }, () => ({ area: 'Tampines' }))
+    expect(showLocationFilter([...east, { area: 'Tampines' }])).toBe(false)
+    expect(showLocationFilter([...east, team])).toBe(true)
   })
 })

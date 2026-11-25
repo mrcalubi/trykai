@@ -135,15 +135,21 @@ function people(count: number): string {
   return n === 1 ? '1 guest' : `${n} guests`
 }
 
+/** "Pottery (Jurong East)" for a listing with several locations (00059). */
+function titleAt(listingTitle: string, place?: string): string {
+  return place ? `${listingTitle} (${place})` : listingTitle
+}
+
 export function telegramNewBooking(o: {
   guestName: string
   listingTitle: string
   when: string
   guestsCount: number
   siteUrl?: string
+  place?: string
 }): TelegramMessage {
   return {
-    text: `New booking: ${o.guestName} booked ${o.listingTitle} for ${o.when} (${people(o.guestsCount)}).`,
+    text: `New booking: ${o.guestName} booked ${titleAt(o.listingTitle, o.place)} for ${o.when} (${people(o.guestsCount)}).`,
     url: `${siteBase(o.siteUrl)}/hosting`,
     label: 'Open Hosting',
   }
@@ -154,9 +160,10 @@ export function telegramGuestCancelled(o: {
   listingTitle: string
   when: string
   siteUrl?: string
+  place?: string
 }): TelegramMessage {
   return {
-    text: `Cancelled: ${o.guestName} cancelled ${o.listingTitle} on ${o.when}.`,
+    text: `Cancelled: ${o.guestName} cancelled ${titleAt(o.listingTitle, o.place)} on ${o.when}.`,
     url: `${siteBase(o.siteUrl)}/hosting`,
     label: 'Open Hosting',
   }
@@ -167,9 +174,11 @@ export function telegramBookingMoved(o: {
   listingTitle: string
   newWhen: string
   siteUrl?: string
+  /** The new session's location. */
+  place?: string
 }): TelegramMessage {
   return {
-    text: `Moved: ${o.guestName} moved ${o.listingTitle} to ${o.newWhen}.`,
+    text: `Moved: ${o.guestName} moved ${o.listingTitle} to ${o.newWhen}${o.place ? ` at ${o.place}` : ''}.`,
     url: `${siteBase(o.siteUrl)}/hosting`,
     label: 'Open Hosting',
   }
@@ -181,9 +190,10 @@ export function telegramSessionReminder(o: {
   time: string
   guestsCount: number
   siteUrl?: string
+  place?: string
 }): TelegramMessage {
   return {
-    text: `${o.dayWord}: ${people(o.guestsCount)} coming to ${o.listingTitle} at ${o.time}.`,
+    text: `${o.dayWord}: ${people(o.guestsCount)} coming to ${titleAt(o.listingTitle, o.place)} at ${o.time}.`,
     url: `${siteBase(o.siteUrl)}/hosting`,
     label: 'Open Hosting',
   }

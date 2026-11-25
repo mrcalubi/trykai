@@ -156,3 +156,24 @@ describe('address display', () => {
     expect(tidyAddressForDisplay(null)).toBe('')
   })
 })
+
+describe('location summary with several locations (00059)', () => {
+  it('counts the other places and wants directions for every one', () => {
+    const several = { ...base, arrivalInstructions: 'Level 2', multiLocation: true }
+    expect(
+      sectionSummaries({ ...several, extraLocations: [{ arrivalInstructions: 'Unit 5' }, { arrivalInstructions: 'Gate B' }] })
+        .location,
+    ).toEqual({ text: 'Ang Mo Kio + 2 more' })
+    expect(sectionSummaries({ ...several, extraLocations: [{ arrivalInstructions: '' }] }).location).toEqual({
+      text: 'Ang Mo Kio + 1 more · add directions for guests',
+      needsWork: true,
+    })
+  })
+
+  it('ignores leftover locations when multiple locations is off, and opens Location for their hints', () => {
+    expect(
+      sectionSummaries({ ...base, arrivalInstructions: 'Level 2', extraLocations: [{ arrivalInstructions: '' }] }).location,
+    ).toEqual({ text: 'Ang Mo Kio' })
+    expect(sectionForHint('location-0-area')).toBe('location')
+  })
+})

@@ -12,9 +12,18 @@ import { formatGuestFacingPrice, guestFacingPriceCents } from '../lib/pricing'
 import { formatDuration } from '../lib/duration'
 import { formatCents } from '../lib/cancellationPolicy'
 import { listingsForGuestBrowse, sortListingsForBrowse } from '../lib/listingSort'
-import { filterNarrows, locationLabel, showLocationFilter, showNewFlags, visibleCategories } from '../lib/browseUi'
+import {
+  cardAreaLabel,
+  filterNarrows,
+  locationLabel,
+  matchesPlace,
+  showLocationFilter,
+  showNewFlags,
+  visibleCategories,
+} from '../lib/browseUi'
+import { locationsByListing, queryListingLocations } from '../lib/listingLocations'
 import PlanningAreaSelect from '../components/PlanningAreaSelect'
-import { REGIONS, regionForPlanningArea } from '../lib/planningAreas'
+import { REGIONS } from '../lib/planningAreas'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { publicName } from '../lib/publicName'
 import {
@@ -197,15 +206,27 @@ export default function Home() {
         setKeenCounts({})
         return
       }
-      const [ratingResult, keenResult] = await Promise.all([
+      const [ratingResult, keenResult, placeResult] = await Promise.all([
         supabase.rpc('listing_ratings', { listing_ids: listingIds }),
         noDateIds.length > 0
           ? supabase.rpc('listing_keen_counts', { p_listing_ids: noDateIds })
           : Promise.resolve({ data: [] }),
+        // Listing locations (00059): areas only, never an address.
+        queryListingLocations(supabase, listingIds, { activeOnly: true }),
       ])
       if (cancelled) return
       setRatings(ratingsByListingId(ratingResult.data ?? []))
       setKeenCounts(keenCountsById(keenResult.data ?? []))
+      const placesById = locationsByListing(placeResult.rows)
+      if (Object.values(placesById).some((list) => list.length > 1)) {
+        setListings((prev) =>
+          prev.map((listing) =>
+            (placesById[listing.id]?.length ?? 0) > 1
+              ? { ...listing, areas: placesById[listing.id].map((place) => place.area).filter(Boolean) }
+              : listing,
+          ),
+        )
+      }
     }
 
     fetchListings()
@@ -278,11 +299,8 @@ export default function Home() {
     return listings.filter((listing) => {
       const matchesCategory =
         activeCategory === 'All' || listing.category === activeCategory
-      const matchesRegion =
-        regionFilter === 'All' || regionForPlanningArea(listing.area) === regionFilter
-      const matchesArea = !areaFilter || listing.area === areaFilter
       const matchesQuick = !activeQuick || activeQuick.matches(listing)
-      return matchesCategory && matchesRegion && matchesArea && matchesQuick
+      return matchesCategory && matchesPlace(listing, regionFilter, areaFilter) && matchesQuick
     })
   }, [listings, activeCategory, regionFilter, areaFilter, activeQuick])
 
@@ -488,7 +506,7 @@ export default function Home() {
                     titleLevel={3}
                     // No "No dates yet" here: a card with no dates should still invite a
                     // tap, and the listing page asks for interest instead.
-                    metaItems={[listing.area, nextSessionLabel(listing)]}
+                    metaItems={[cardAreaLabel(listing), nextSessionLabel(listing)]}
                     host={listingHost(listing)}
                     price={`S${formatGuestFacingPrice(listing.price_per_person)}`}
                     priceUnit="/person"

@@ -18,6 +18,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const STAGING_REF = 'hzgybclfvpuxkmytdoos'
 const FUNCTIONS = [
   'abandon-checkout',
+  'admin-bookings',
   'admin-cancel-booking',
   'admin-dispute-booking',
   'admin-listings',

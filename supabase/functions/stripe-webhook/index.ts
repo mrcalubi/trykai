@@ -23,6 +23,8 @@ import {
 } from '../_shared/email.ts'
 import { identityEventOutcome } from '../_shared/verification.ts'
 import { notifyUserTelegram, telegramNewBooking } from '../_shared/telegram.ts'
+import { notifyAdminsOfBooking } from '../_shared/adminBookings.ts'
+import { loadSessionPlace, locationLine, sessionAddress } from '../_shared/locations.ts'
 import {
   asRecord,
   chargeIdFromPaymentIntent,
@@ -209,6 +211,11 @@ async function confirmSucceededPayment(paymentIntent: {
   const guestName = publicDisplayName(guestProfile)
   const hostName = publicDisplayName(host) || 'your host'
   const durationMins = session?.duration_mins ?? listing?.duration_mins
+  // The session's own location (00059), read after confirming so it can never
+  // stop a booking. Null falls back to the listing's address, as before.
+  const place = await loadSessionPlace(admin, booking.session_id)
+  const where = sessionAddress(place, listing)
+  const locationName = locationLine(place)
   const { data: addonRows } = await admin
     .from('booking_addons')
     .select('name, quantity, unit_guest_cents')
@@ -235,9 +242,10 @@ async function confirmSucceededPayment(paymentIntent: {
       guestName,
       sessionDate,
       duration,
-      fullAddress: listing?.full_address ?? '',
-      arrivalInstructions:
-        typeof listing?.arrival_instructions === 'string' ? listing.arrival_instructions : '',
+      fullAddress: where.fullAddress,
+      arrivalInstructions: where.arrivalInstructions,
+      locationName,
+      runsWithTeam: Boolean(place?.multiLocation),
       guestsCount: booking.guests_count,
       pricePerPersonCents: listing?.price_per_person ?? 0,
       groupPricing: listing?.group_pricing !== false,
@@ -264,6 +272,7 @@ async function confirmSucceededPayment(paymentIntent: {
       guestName: guestName || 'A guest',
       listingTitle,
       sessionDate,
+      locationName,
       guestsCount: booking.guests_count,
       hostPayoutCents: hostPayout,
       siteUrl,
@@ -282,8 +291,27 @@ async function confirmSucceededPayment(paymentIntent: {
       when: session?.starts_at ? formatReminderSessionDate(session.starts_at) : '',
       guestsCount: booking.guests_count,
       siteUrl,
+      place: locationName,
     }))
   }
+
+  // The team's alert (Telegram to admins who connected it, email to
+  // ADMIN_NOTIFY_EMAIL). Never throws, so it cannot undo the booking.
+  await notifyAdminsOfBooking(admin, {
+    bookingId: booking.id,
+    guestName: guestName || 'A guest',
+    guestEmail: guestProfile?.email ?? null,
+    listingTitle,
+    hostName,
+    startsAt: session?.starts_at ?? '',
+    guestsCount: booking.guests_count,
+    paidCents: booking.total_amount,
+    place: locationName,
+    siteUrl,
+  }, {
+    opsEmail: opsEmail(),
+    sendEmail: (email) => sendResendEmail({ apiKey, ...email }),
+  })
 }
 
 async function cancelPendingPayment(paymentIntent: { id: string; metadata?: Record<string, string> }) {

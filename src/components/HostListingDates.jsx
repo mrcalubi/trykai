@@ -46,6 +46,7 @@ export default function HostListingDates({
   listing,
   sessions: unsorted,
   typeNameById = {},
+  locationNameById = {},
   heldByTitles = {},
   guestsBySession = {},
   sessionHref,
@@ -123,6 +124,7 @@ export default function HostListingDates({
             const day = sessionDayLabel(session.starts_at)
             const time = sessionTimeRange(session, listing)
             const typeName = typeNameById[session.type_id] ?? ''
+            const placeName = locationNameById[session.location_id] ?? ''
             const editing = editingSessionId === session.id
             const canSelect = selecting && status.kind !== 'booked'
             const names = status.kind === 'booked' ? sessionGuestsLine(guestsBySession[session.id]) : ''
@@ -157,6 +159,7 @@ export default function HostListingDates({
                   <p className="host-date__day">{day}</p>
                   <p className="host-date__time">{time}</p>
                   {typeName ? <p className="host-date__type">{typeName}</p> : null}
+                  {placeName ? <p className="host-date__type host-date__place">{placeName}</p> : null}
                 </div>
 
                 {editing ? (

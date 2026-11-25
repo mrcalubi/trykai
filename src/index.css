@@ -13520,6 +13520,71 @@ body.add-dates-open {
   min-height: 48px;
 }
 
+/* The place of a multi-location session (00059): under the time on one
+   session, a row heading when several places run at once. */
+.next-up__place {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.next-up__card--group {
+  grid-template-areas:
+    'tile body'
+    'places places';
+}
+
+.next-up__places {
+  grid-area: places;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.next-up__place-row {
+  display: grid;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.next-up__place-row:last-child {
+  padding-bottom: 0;
+}
+
+.next-up__place-info {
+  min-width: 0;
+}
+
+.next-up__place-row .next-up__place {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.next-up__place-time {
+  margin: 2px 0 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.next-up__place-row .next-up__guests {
+  margin-top: 6px;
+}
+
+.next-up__row-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 18px;
+  font-size: 15px;
+}
+
 .guest-avatar {
   display: inline-grid;
   flex-shrink: 0;
@@ -14013,6 +14078,19 @@ body.add-dates-open {
 
   .next-up__open {
     padding: 0 20px;
+  }
+
+  .next-up__card--group {
+    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-areas:
+      'tile body'
+      '. places';
+  }
+
+  .next-up__place-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
   }
 }
 
@@ -14916,252 +14994,71 @@ body.add-dates-open {
   background: var(--navy);
 }
 
-/* Booking card: every upcoming date of the listing, by month. */
-.class-dates__chips {
+/* Listing locations (00059): Create listing's Location step and Edit listing's Location section */
+.locations-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.locations-editor .hint {
+  margin: 0;
+}
+
+.locations-offer {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0 16px;
-}
-
-.class-dates__chip {
-  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 14px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--navy);
-  background: transparent;
-  border: 1.5px solid var(--border-strong);
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.class-dates__chip--on {
-  color: var(--cream);
-  background: var(--navy);
-  border-color: var(--navy);
-}
-
-.class-dates__chip-count {
-  font-family: var(--mono);
-  font-size: 12px;
-  opacity: 0.75;
-}
-
-.class-dates__empty {
-  margin: 0;
-  font-size: 14px;
-  color: var(--muted);
-}
-
-.class-dates__all {
-  padding: 0;
-  font: inherit;
-  font-weight: 700;
-  color: var(--navy);
-  text-decoration: underline;
-  background: none;
-  border: 0;
-  cursor: pointer;
-}
-
-.class-dates__book {
-  width: 100%;
-  min-height: 52px;
-  margin-top: 16px;
-  font-size: 15px;
-}
-
-.class-dates__next {
-  margin: 8px 0 0;
-  font-size: 12px;
-  text-align: center;
-  color: var(--muted);
-}
-
-/* The class calendar: only days with dates can be tapped; a dot marks a day
-   with more than one class. That day's times sit underneath. */
-.class-cal {
-  padding: 12px 12px 14px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
 
-.class-cal__head {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 44px;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.class-cal__nav {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  color: var(--navy);
-  background: none;
-  border: 0;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.class-cal__nav:hover:not(:disabled) {
-  background: var(--sand);
-}
-
-.class-cal__nav:disabled {
-  color: var(--disabled);
-  cursor: default;
-}
-
-.class-cal__title {
-  text-align: center;
-}
-
-.class-cal__month {
-  margin: 0;
-  font-family: var(--display);
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--navy);
-}
-
-.class-cal__count {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.class-cal__weekdays,
-.class-cal__grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 4px;
-}
-
-.class-cal__weekdays {
-  margin-bottom: 4px;
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 700;
-  text-align: center;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.class-cal__day {
-  position: relative;
-  display: grid;
-  place-items: center;
+.locations-offer__text {
+  flex: 1 1 220px;
   min-width: 0;
-  min-height: 44px;
-  font: inherit;
-  font-size: 14px;
+}
+
+.locations-offer__title,
+.locations-confirm__title {
+  margin: 0 0 2px;
   font-weight: 700;
   color: var(--navy);
-  background: #fff;
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  cursor: pointer;
 }
 
-.class-cal__day:hover {
-  border-color: var(--navy);
-}
-
-.class-cal__day--on,
-.class-cal__day--on:hover {
-  color: var(--cream);
-  background: var(--navy);
-  border-color: var(--navy);
-}
-
-.class-cal__day:focus-visible,
-.class-cal__nav:focus-visible {
-  outline: 2px solid var(--navy);
-  outline-offset: 2px;
-}
-
-.class-cal__day--off {
-  font-weight: 400;
-  color: var(--disabled);
-  background: none;
-  border-color: transparent;
-  cursor: default;
-}
-
-.class-cal__day--off:hover {
-  border-color: transparent;
-}
-
-.class-cal__dot {
-  position: absolute;
-  bottom: 5px;
-  left: 50%;
-  width: 4px;
-  height: 4px;
-  background: currentColor;
-  border-radius: 50%;
-  transform: translateX(-50%);
-}
-
-.class-times {
+.locations-confirm {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  margin: 16px 0 0;
-  padding: 0;
-  border: 0;
+  gap: 10px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1.5px solid var(--navy);
+  border-radius: var(--radius-lg);
 }
 
-.class-times__title {
-  margin-bottom: 8px;
-  padding: 0;
-  font-size: 15px;
-  font-weight: 700;
+.locations-confirm__text {
+  margin: 0;
+  font-size: 14px;
   color: var(--navy);
 }
 
-.class-time {
+.locations-confirm__check {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 60px;
-  padding: 10px 14px;
-  background: var(--surface);
-  border: 1.5px solid var(--border);
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  background: var(--sand);
   border-radius: var(--radius);
   cursor: pointer;
 }
 
-.class-time:hover {
-  border-color: var(--border-strong);
-}
-
-.class-time--on,
-.class-time--on:hover {
-  border-color: var(--navy);
-  box-shadow: inset 0 0 0 1px var(--navy);
-}
-
-.class-time--off {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.class-time:has(.class-time__radio:focus-visible) {
-  outline: 2px solid var(--navy);
-  outline-offset: 2px;
-}
-
-.class-time__radio {
+.locations-confirm__check input {
   flex-shrink: 0;
   width: 20px;
   height: 20px;
@@ -15169,106 +15066,503 @@ body.add-dates-open {
   accent-color: var(--navy);
 }
 
-.class-time__text {
+.locations-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.locations-editor__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.locations-editor__intro {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.locations-editor__count {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.locations-editor__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.location-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.location-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.location-card__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.location-card__dates {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.location-card__remove {
+  min-height: 44px;
+  padding: 0 4px;
+}
+
+.location-card .postal-address {
+  min-width: 0;
+}
+
+.locations-editor__add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+  background: transparent;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.locations-editor__add:hover {
+  background: var(--surface);
+}
+
+.locations-editor__off .link-button {
+  min-height: 44px;
+}
+
+.locations-editor__off .link-button:disabled {
+  color: var(--disabled);
+  text-decoration: none;
+  cursor: not-allowed;
+}
+
+.locations-editor__off .hint {
+  margin-top: 4px;
+}
+
+/* Listing locations (00059), guest side */
+.session-card__place {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.session-card__place .icon,
+.session-card__place svg {
+  flex-shrink: 0;
+  color: var(--coral);
+}
+
+.detail-location__team {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.detail-location__note--all {
+  margin: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* One time on the chosen day: "9:00 – 10:30 am  4 spots left", then only what
+   the guest hasn't picked yet: "Wheel-thrown mug · Bishan". */
+.session-card__when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  margin: 0;
+}
+
+.session-card__when .session-card__meta {
+  margin: 0;
+}
+
+.session-card__what {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.session-card__what .session-card__type {
+  margin: 0;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* Booking card: one price line, then the friend saving as a plain line. */
+.detail-booking-card__same {
+  display: block;
+}
+
+.detail-booking-card__phone-title {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .detail-booking-card__phone-title {
+    display: inline;
+  }
+
+  .detail-booking-card__fees {
+    display: none;
+  }
+}
+
+.detail-booking-card .bring-friend--line {
+  padding: 0;
+  background: none;
+}
+
+/* Booking card: "Where" and "What you'll make" (DECISIONS.md, 26 Nov 2026).
+   Each opens a short list; on phones it is a sheet from the bottom. */
+.pick-box {
+  margin: 0 0 16px;
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.pick-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: calc(var(--radius-lg) - 2px);
+}
+
+.pick-field + .pick-field {
+  border-top: 1px solid var(--border);
+}
+
+.pick-field--open {
+  box-shadow: inset 0 0 0 2px var(--navy);
+}
+
+.pick-field__button {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 60px;
+  padding: 10px 14px;
+  font: inherit;
+  text-align: left;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  border-radius: inherit;
+  cursor: pointer;
+}
+
+.pick-field__icon,
+.pick-field__chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.pick-field--picked .pick-field__icon {
+  color: var(--coral);
+}
+
+.pick-field__text {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-width: 0;
 }
 
-.class-time__range {
-  font-family: var(--mono);
-  font-size: 14px;
+.pick-field__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pick-field__value {
+  overflow: hidden;
+  font-size: 15px;
   font-weight: 700;
-  text-transform: uppercase;
-  color: var(--navy);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.class-time__class {
-  font-size: 13px;
-  color: var(--navy);
-}
-
-.class-time__spots {
+.pick-field__clear {
+  display: inline-grid;
   flex-shrink: 0;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-right: 10px;
+  padding: 0;
+  color: var(--navy);
+  background: var(--sand);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.pick-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 330;
+}
+
+.pick-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  z-index: 340;
+  max-height: 440px;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.pick-panel__sheet-head {
+  display: none;
+}
+
+.pick-panel__label {
+  margin: 0;
+  padding: 6px 8px 8px;
   font-size: 12px;
   font-weight: 700;
   color: var(--muted);
 }
 
-.class-time__spots--low {
-  color: var(--coral-ink);
+.pick-panel__list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.class-dates__book-text {
+.pick-option {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  line-height: 1.25;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px;
+  font: inherit;
+  text-align: left;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
 }
 
-.class-dates__book-main {
-  font-size: 16px;
+.pick-option:hover {
+  background: var(--surface);
+}
+
+.pick-option[aria-pressed='true'] {
+  background: var(--sand);
+}
+
+.pick-option__thumb {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--navy);
+  background: var(--sand);
+  border-radius: 10px;
+}
+
+.pick-option__thumb--place {
+  color: var(--coral-ink);
+  background: var(--coral-soft);
+}
+
+.pick-option__thumb--photo {
+  object-fit: cover;
+}
+
+.pick-option[aria-pressed='true'] .pick-option__thumb--any {
+  background: var(--surface);
+}
+
+.pick-option__copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pick-option__name {
+  font-size: 15px;
   font-weight: 700;
 }
 
-.class-dates__book-sub {
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.85;
+.pick-option__meta {
+  font-size: 13px;
+  color: var(--muted);
 }
 
-/* Beside the page, with a mouse: a tighter calendar so the whole panel,
-   Book included, fits a laptop screen. */
-@media (min-width: 1024px) {
-  .detail-sidebar .class-dates__chips {
-    margin: 10px 0 12px;
+.pick-option--greyed .pick-option__thumb,
+.pick-option--greyed .pick-option__copy {
+  opacity: 0.5;
+}
+
+.pick-option__check {
+  flex-shrink: 0;
+}
+
+.pick-panel__note {
+  margin: 6px 0 0;
+  padding: 10px 8px 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 1023px) {
+  .pick-backdrop {
+    background: rgba(22, 38, 75, 0.45);
   }
 
-  .detail-sidebar .class-dates__chip {
-    min-height: 36px;
-    padding: 0 12px;
-    font-size: 13px;
+  .pick-panel {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    max-height: 82vh;
+    padding: 10px 16px calc(16px + env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 24px 24px 0 0;
   }
 
-  .detail-sidebar .class-cal {
-    padding: 8px 10px 10px;
+  .pick-panel::before {
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 0 auto 6px;
+    content: '';
+    background: var(--border-strong);
+    border-radius: 999px;
   }
 
-  .detail-sidebar .class-cal__head {
-    grid-template-columns: 36px minmax(0, 1fr) 36px;
-    margin-bottom: 4px;
+  .pick-panel__sheet-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0 12px;
   }
 
-  .detail-sidebar .class-cal__nav {
-    width: 36px;
-    height: 36px;
+  .pick-panel__sheet-title {
+    margin: 0;
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--navy);
   }
 
-  .detail-sidebar .class-cal__day {
-    min-height: 34px;
-    font-size: 13px;
+  .pick-panel__sheet-sub {
+    margin: 2px 0 0;
+    font-size: 14px;
+    color: var(--muted);
   }
 
-  .detail-sidebar .class-cal__grid {
-    gap: 3px;
+  .pick-panel__close {
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    color: var(--navy);
+    background: var(--sand);
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
   }
 
-  .detail-sidebar .class-times {
-    margin-top: 12px;
+  .pick-panel__label {
+    display: none;
   }
+}
 
-  .detail-sidebar .class-times__title {
-    margin-bottom: 6px;
-  }
+/* Where you'll be, with several places: dates and "See dates" per place. */
+.detail-location--several .detail-location__row {
+  align-items: center;
+}
 
-  .detail-sidebar .class-time {
-    min-height: 50px;
-    padding: 8px 12px;
-  }
+.detail-location--several .detail-location__copy {
+  flex: 1;
+}
 
-  .detail-sidebar .class-dates__book {
-    min-height: 50px;
-    margin-top: 12px;
-  }
+.detail-location__meta {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.detail-location__see {
+  flex-shrink: 0;
+  margin-top: 0;
+}
+
+/* Admin bookings (/admin/bookings) */
+.admin-bookings {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.admin-booking__guest {
+  margin: 6px 0;
+}
+
+.admin-booking--cancelled {
+  opacity: 0.6;
 }

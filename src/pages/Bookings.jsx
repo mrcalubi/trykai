@@ -26,6 +26,12 @@ import { singaporeDateKey } from '../lib/sessionCalendar'
 import { addonLineLabel, loadBookingAddonRows } from '../lib/bookingAddons'
 import { isMissingRescheduleColumn } from '../lib/bookingPage'
 import { isMissingSessionTypes, sessionTypeNamesById } from '../lib/sessionTypes'
+import {
+  isMissingListingLocations,
+  loadRevealedPlaces,
+  locationNamesById,
+  queryListingLocations,
+} from '../lib/listingLocations'
 
 const POLL_ATTEMPTS = 20
 const POLL_INTERVAL_MS = 2000
@@ -47,6 +53,7 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
 
   const [bookings, setBookings] = useState([])
   const [typeNames, setTypeNames] = useState({})
+  const [placeNames, setPlaceNames] = useState({})
   const [bookingAddonsById, setBookingAddonsById] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -87,6 +94,7 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
             duration_mins,
             spots_remaining,
             type_id,
+            location_id,
             listings (
               id,
               title,
@@ -98,12 +106,15 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
     const bookingsSelectFallback = bookingsSelect
       .replace(/\s*rescheduled_at,\s*rescheduled_from_session_id,/, '')
       .replace(/\s*type_id,/, '')
+      .replace(/\s*location_id,/, '')
     let bookingsResult = await withIssuedAtRetry(() =>
       supabase.from('bookings').select(bookingsSelect).eq('guest_id', userId).order('created_at', { ascending: false }),
     )
     if (
       bookingsResult.error &&
-      (isMissingRescheduleColumn(bookingsResult.error) || isMissingSessionTypes(bookingsResult.error))
+      (isMissingRescheduleColumn(bookingsResult.error) ||
+        isMissingSessionTypes(bookingsResult.error) ||
+        isMissingListingLocations(bookingsResult.error))
     ) {
       bookingsResult = await withIssuedAtRetry(() =>
         supabase
@@ -144,21 +155,37 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
       }
       setBookingAddonsById(byId)
 
+      // Listing locations (00059): each booking names its place when its
+      // listing has several, and shows that place's address, not the listing's.
+      const bookedListingIds = [
+        ...new Set((bookingsResult.data ?? []).map((booking) => booking.sessions?.listings?.id).filter(Boolean)),
+      ]
+      queryListingLocations(supabase, bookedListingIds).then(({ rows }) => setPlaceNames(locationNamesById(rows)))
+
+      const upcomingConfirmed = (bookingsResult.data ?? []).filter(
+        (booking) =>
+          booking.status === 'confirmed' &&
+          booking.sessions?.starts_at &&
+          new Date(booking.sessions.starts_at) > new Date() &&
+          booking.sessions?.listings?.id
+      )
+      const revealedByListing = Object.fromEntries(
+        await Promise.all(
+          [...new Set(upcomingConfirmed.map((booking) => booking.sessions.listings.id))].map(async (listingId) => [
+            listingId,
+            await loadRevealedPlaces(supabase, listingId),
+          ]),
+        ),
+      )
       const addressEntries = await Promise.all(
-        (bookingsResult.data ?? [])
-          .filter(
-            (booking) =>
-              booking.status === 'confirmed' &&
-              booking.sessions?.starts_at &&
-              new Date(booking.sessions.starts_at) > new Date() &&
-              booking.sessions?.listings?.id
-          )
-          .map(async (booking) => {
-            const { data: address } = await supabase.rpc('listing_address', {
-              listing_id: booking.sessions.listings.id,
-            })
-            return address ? [booking.id, address] : null
+        upcomingConfirmed.map(async (booking) => {
+          const own = revealedByListing[booking.sessions.listings.id]?.[booking.sessions.location_id]
+          if (own?.fullAddress) return [booking.id, own.fullAddress]
+          const { data: address } = await supabase.rpc('listing_address', {
+            listing_id: booking.sessions.listings.id,
           })
+          return address ? [booking.id, address] : null
+        })
       )
 
       setBookingAddresses(Object.fromEntries(addressEntries.filter(Boolean)))
@@ -398,6 +425,9 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
           </p>
           {typeNames[booking.sessions?.type_id] ? (
             <p className="session-card__type">{typeNames[booking.sessions.type_id]}</p>
+          ) : null}
+          {placeNames[booking.sessions?.location_id] ? (
+            <p className="session-card__place">{placeNames[booking.sessions.location_id]}</p>
           ) : null}
           <p className="dashboard-card__meta">
             {booking.sessions?.starts_at

@@ -1,5 +1,6 @@
 import { addonDraftFingerprint } from './listingAddons'
 import { sessionTypeDraftFingerprint } from './sessionTypes'
+import { locationDraftFingerprint } from './listingLocations'
 
 export function settingsDraft({
   fullName,
@@ -53,6 +54,9 @@ export function listingEditorDraft({
   photos,
   addons,
   sessionTypes,
+  multiLocation = false,
+  primaryLabel = '',
+  extraLocations = [],
 }) {
   return JSON.stringify({
     title,
@@ -71,5 +75,8 @@ export function listingEditorDraft({
     photos: (photos ?? []).map(photoFingerprint),
     addons: (addons ?? []).map(addonDraftFingerprint),
     sessionTypes: (sessionTypes ?? []).map(sessionTypeDraftFingerprint),
+    multiLocation,
+    primaryLabel,
+    extraLocations: (extraLocations ?? []).map(locationDraftFingerprint),
   })
 }

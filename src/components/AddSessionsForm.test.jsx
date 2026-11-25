@@ -423,3 +423,91 @@ describe('Add dates session types', () => {
     expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ typeId: null }))
   })
 })
+
+describe('Where? (listing locations)', () => {
+  const PLACES = [
+    { id: 'loc-t', listingId: 'listing-1', label: '', area: 'Tampines', name: 'Tampines', isActive: true },
+    { id: 'loc-j', listingId: 'listing-1', label: 'Jurong studio', area: 'Jurong East', name: 'Jurong studio · Jurong East', isActive: true },
+  ]
+
+  it('adds the same time at every location, each its own session', async () => {
+    const { user, onCreated } = renderForm({ locations: PLACES })
+    const where = screen.getByRole('group', { name: /Where\?/ })
+    expect(within(where).getByRole('checkbox', { name: 'Tampines' })).toBeChecked()
+    expect(within(where).getByRole('checkbox', { name: 'Jurong studio · Jurong East' })).toBeChecked()
+    expect(within(where).getByText(/Each place gets its own session with 4 spots/)).toBeInTheDocument()
+
+    const day = dateKeyFromToday(1)
+    await pickDates(user, day)
+    await user.click(screen.getByRole('button', { name: '10:00 am' }))
+    expect(addButton()).toHaveTextContent('Add 2 sessions')
+    expect(screen.getByRole('button', { name: `Remove ${dayLabel(day)}, 10:00 am, Tampines` })).toBeInTheDocument()
+
+    await user.click(addButton())
+    const { accepted, alsoListingIds } = onCreated.mock.calls[0][0]
+    expect(accepted.map((item) => item.locationId)).toEqual(['loc-t', 'loc-j'])
+    expect(alsoListingIds).toEqual([])
+  })
+
+  it('lets one place go, by unticking it or by its ×', async () => {
+    const { user, onCreated } = renderForm({ locations: PLACES })
+    const day = dateKeyFromToday(1)
+    await pickDates(user, day)
+    await user.click(screen.getByRole('button', { name: '10:00 am' }))
+    await user.click(screen.getByRole('button', { name: '2:00 pm' }))
+    expect(addButton()).toHaveTextContent('Add 4 sessions')
+
+    await user.click(screen.getByRole('button', { name: `Remove ${dayLabel(day)}, 2:00 pm, Jurong studio · Jurong East` }))
+    expect(addButton()).toHaveTextContent('Add 3 sessions')
+
+    await user.click(screen.getByRole('checkbox', { name: 'Tampines' }))
+    expect(addButton()).toHaveTextContent('Add 1 session')
+    await user.click(addButton())
+    const [only] = onCreated.mock.calls[0][0].accepted
+    expect(only).toMatchObject({ locationId: 'loc-j', time: '10:00' })
+  })
+
+  it('never counts the same time at another place as a clash', async () => {
+    const day = dateKeyFromToday(1)
+    const startsAt = new Date(`${day}T10:00:00+08:00`).toISOString()
+    const { user, onCreated } = renderForm({
+      locations: PLACES,
+      existingSessions: [
+        {
+          id: 's1',
+          listing_id: 'listing-1',
+          location_id: 'loc-t',
+          starts_at: startsAt,
+          duration_mins: 90,
+          status: 'open',
+          bookings: [{ status: 'confirmed', guests_count: 2 }],
+        },
+      ],
+    })
+    await pickDates(user, day)
+    await user.click(screen.getByRole('button', { name: '10:00 am' }))
+    expect(screen.getByText('Tampines · Skipped: already on at this time')).toBeInTheDocument()
+    await user.click(addButton())
+    expect(onCreated.mock.calls[0][0].accepted.map((item) => item.locationId)).toEqual(['loc-j'])
+  })
+
+  it('asks for a place when none is ticked, and hides sharing with other listings', async () => {
+    const { user, onCreated } = renderForm({
+      locations: PLACES,
+      otherListings: [{ id: 'listing-2', title: 'Pottery taster' }],
+    })
+    expect(screen.queryByRole('switch', { name: /Also offer/ })).not.toBeInTheDocument()
+    await pickDates(user, dateKeyFromToday(1))
+    await user.click(screen.getByRole('button', { name: '10:00 am' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Tampines' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Jurong studio · Jurong East' }))
+    await user.click(addButton())
+    expect(screen.getByRole('alert')).toHaveTextContent('Pick at least one location.')
+    expect(onCreated).not.toHaveBeenCalled()
+  })
+
+  it('shows no picker for a listing with one location', () => {
+    renderForm({ locations: [PLACES[0]] })
+    expect(screen.queryByRole('group', { name: /Where\?/ })).not.toBeInTheDocument()
+  })
+})

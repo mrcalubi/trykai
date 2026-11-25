@@ -56,6 +56,7 @@ import { publicName } from '../lib/publicName'
 import { PAGE_LOAD_ERROR, withIssuedAtRetry } from '../lib/pageLoad'
 import { listingReportSubject, reportMailto } from '../lib/reportMailto'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
+import { sessionTimeRange } from '../lib/hostSessions'
 import { SHARE_NOTES, shareOrCopy } from '../lib/share'
 import { BackRowActions } from '../components/BackButton'
 import ViewableAvatar from '../components/ViewableAvatar'
@@ -64,9 +65,19 @@ import Icon from '../components/ui/Icon'
 import { formatCents } from '../lib/cancellationPolicy'
 import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
-import { ClassCards, ClassDatePicker } from '../components/ListingClasses'
-import { datesInMonth, firstOfDay, isBookable, landingFor, sessionsOfClass } from '../lib/classCalendar'
-import { sessionDayLabel, sessionTimeRange } from '../lib/hostSessions'
+import { ClassCards } from '../components/ListingClasses'
+import BookingPickers from '../components/BookingPickers'
+import { datesMeta, matching, samePriceLine, upcoming } from '../lib/bookingPickers'
+import {
+  areasLine,
+  isMissingListingLocations,
+  loadPublicLocations,
+  loadRevealedPlaces,
+  placeTitle,
+  sessionsAt,
+  teamNote,
+} from '../lib/listingLocations'
+import { landingFor, sessionsOfClass } from '../lib/classCalendar'
 import { usePageTitle } from '../lib/pageTitle'
 import { MOSAIC_VISIBLE_PHOTOS } from '../lib/listingPhotos'
 import { hostRatingFromRpc } from '../lib/twoWayReviews'
@@ -232,13 +243,16 @@ export default function ListingDetail() {
   const [listingAddons, setListingAddons] = useState([])
   const [sessionTypes, setSessionTypes] = useState({ active: [], byId: {} })
   const [typeFilter, setTypeFilter] = useState(null)
-  // A listing with classes loads every upcoming date, so its calendar opens on
-  // a real date and the class filter can jump to that class's next one.
-  const [classSessions, setClassSessions] = useState(null)
-  // { monthKey, dateKey, pickedId } once the guest moves; until then the
-  // calendar sits on the first date they can book.
-  const [classView, setClassView] = useState(null)
+  // A listing with classes or several places also loads every upcoming date,
+  // so the pickers can count them and picking one can jump the calendar to its
+  // next date.
+  const [allSessions, setAllSessions] = useState(null)
   const hasClasses = sessionTypes.active.length > 0
+  // Listing locations (00059): every place's dates show, each naming its place,
+  // until the guest picks one. `?location=<id>` opens on that place.
+  const [places, setPlaces] = useState({ active: [], byId: {}, several: false })
+  const [placeFilter, setPlaceFilter] = useState(null)
+  const [revealedPlaces, setRevealedPlaces] = useState({})
   const [addonsAvailable, setAddonsAvailable] = useState(false)
   const [addonQuantities, setAddonQuantities] = useState({})
   const [addonNote, setAddonNote] = useState('')
@@ -313,6 +327,15 @@ export default function ListingDetail() {
       setAddonsAvailable(addonsResult.available)
       setTypeFilter(null)
       loadPublicSessionTypes(supabase, listingData.id).then(setSessionTypes)
+      setPlaceFilter(null)
+      setRevealedPlaces({})
+      loadPublicLocations(supabase, listingData.id).then((loaded) => {
+        setPlaces(loaded)
+        const wanted = new URLSearchParams(window.location.search).get('location')
+        if (wanted && loaded.several && loaded.active.some((place) => place.id === wanted)) {
+          setPlaceFilter(wanted)
+        }
+      })
 
       // `is_id_verified` arrives with migration 00023; before that the column
       // is missing and the badge simply stays hidden.
@@ -374,6 +397,7 @@ export default function ListingDetail() {
         if (address) {
           setRevealedAddress(address)
         }
+        setRevealedPlaces(await loadRevealedPlaces(supabase, id))
       }
 
       setLoading(false)
@@ -397,10 +421,16 @@ export default function ListingDetail() {
             .lt('starts_at', endIso)
             .order('starts_at', { ascending: true })
         )
-      // type_id arrives with 00056; before that, read without it.
+      // type_id arrives with 00056 and location_id with 00059; before them,
+      // read without.
       let { data, error: fetchError } = await monthQuery(
-        'id, starts_at, duration_mins, spots_remaining, type_id'
+        'id, starts_at, duration_mins, spots_remaining, type_id, location_id'
       )
+      if (fetchError && isMissingListingLocations(fetchError)) {
+        ;({ data, error: fetchError } = await monthQuery(
+          'id, starts_at, duration_mins, spots_remaining, type_id'
+        ))
+      }
       if (fetchError && isMissingSessionTypes(fetchError)) {
         ;({ data, error: fetchError } = await monthQuery('id, starts_at, duration_mins, spots_remaining'))
       }
@@ -416,21 +446,30 @@ export default function ListingDetail() {
     fetchMonth()
   }, [id, visibleMonth])
 
+  const severalPlaces = places.several
   useEffect(() => {
-    if (!hasClasses) return undefined
+    if (!hasClasses && !severalPlaces) return undefined
     let cancelled = false
-    void withIssuedAtRetry(() =>
-      upcomingSessions(id, 'id, starts_at, duration_mins, spots_remaining, type_id')
-        .order('starts_at', { ascending: true })
-        .limit(200)
-    ).then(({ data, error: fetchError }) => {
-      if (cancelled) return
-      setClassSessions(fetchError ? [] : (data ?? []))
-    })
+    const classQuery = (columns) =>
+      withIssuedAtRetry(() =>
+        upcomingSessions(id, columns)
+          .order('starts_at', { ascending: true })
+          .limit(200)
+      )
+    void classQuery('id, starts_at, duration_mins, spots_remaining, type_id, location_id')
+      .then((result) =>
+        result.error && isMissingListingLocations(result.error)
+          ? classQuery('id, starts_at, duration_mins, spots_remaining, type_id')
+          : result
+      )
+      .then(({ data, error: fetchError }) => {
+        if (cancelled) return
+        setAllSessions(fetchError ? [] : (data ?? []))
+      })
     return () => {
       cancelled = true
     }
-  }, [id, hasClasses])
+  }, [id, hasClasses, severalPlaces])
 
   // On phones checkout covers the screen, so the page behind it must not scroll.
   useEffect(() => {
@@ -557,7 +596,7 @@ export default function ListingDetail() {
 
     const chosen =
       (monthSessions ?? []).find((row) => row.id === sessionId) ??
-      (classSessions ?? []).find((row) => row.id === sessionId)
+      (allSessions ?? []).find((row) => row.id === sessionId)
     if (chosen && isBookingClosed(chosen.starts_at, listing?.booking_cutoff_hours)) {
       setPaymentError(bookingClosedMessage(listing?.booking_cutoff_hours))
       return
@@ -598,7 +637,7 @@ export default function ListingDetail() {
 
   function findCachedSession(sessionId) {
     if (!sessionId) return null
-    const fromList = (classSessions ?? []).find((row) => row.id === sessionId)
+    const fromList = (allSessions ?? []).find((row) => row.id === sessionId)
     if (fromList) return fromList
     for (const rows of Object.values(sessionsByMonth)) {
       const found = rows?.find((row) => row.id === sessionId)
@@ -700,6 +739,8 @@ export default function ListingDetail() {
 
   const host = listing.users
   const areaLabel = visibleAreaLabel(revealedAddress, listing.area)
+  // Several locations (00059): "Tampines + 1 more"; addresses live in Where you'll be.
+  const factsArea = places.several ? areasLine(places.active) : areaLabel
   const photos = listing.photo_urls?.length ? listing.photo_urls : []
   const groupPricing = listing.group_pricing !== false
   const pickedAddons = pickedAddonLines(listingAddons, addonQuantities)
@@ -728,8 +769,16 @@ export default function ListingDetail() {
   const monthSessions = monthCacheKey ? sessionsByMonth[monthCacheKey] : undefined
   const activeTypes = sessionTypes.active
   const filterType = activeTypes.find((type) => type.id === typeFilter) ?? null
+  const multiPlace = places.several
+  const hasPickers = multiPlace || activeTypes.length > 1
+  const shownPlace = multiPlace ? (places.active.find((place) => place.id === placeFilter) ?? null) : null
+  /** A session's place, only when the listing runs at several. */
+  const placeOf = (session) => (multiPlace ? (places.byId[session?.location_id]?.name ?? '') : '')
   const sessionsByDay = monthSessions
-    ? groupSessionsByDay(sessionsOfType(monthSessions, filterType?.id), visibleMonth)
+    ? groupSessionsByDay(
+        sessionsAt(sessionsOfType(monthSessions, filterType?.id), shownPlace?.id),
+        visibleMonth,
+      )
     : {}
   const countsByDay = Object.fromEntries(
     Object.entries(sessionsByDay).map(([dateKey, daySessions]) => [dateKey, daySessions.length])
@@ -740,40 +789,60 @@ export default function ListingDetail() {
   const daySessions = activeDateKey ? sessionsByDay[activeDateKey] : []
   const checkoutSession =
     daySessions.find((session) => session.id === checkoutSessionId) ??
-    (classSessions ?? []).find((session) => session.id === checkoutSessionId) ??
+    (allSessions ?? []).find((session) => session.id === checkoutSessionId) ??
     null
   const cutoffHours = listing.booking_cutoff_hours
-  const landing = classSessions ? landingFor(classSessions, typeFilter, { cutoffHours }) : null
-  const classCalendar = classView ?? {
-    monthKey: landing?.monthKey ?? null,
-    dateKey: landing?.dateKey ?? null,
-    pickedId: landing?.session?.id ?? null,
-  }
-  const pickedSession = (classSessions ?? []).find((session) => session.id === classCalendar.pickedId) ?? null
-  const pickedClassName = sessionTypes.byId[pickedSession?.type_id]?.name ?? ''
 
-  /** Cards and chips: show a class's dates, keeping a picked time that fits. */
-  function filterClass(nextId) {
+  /**
+   * After a class or place filter: stay on this month when it still has a
+   * matching date, otherwise jump to the first one the guest can book.
+   */
+  function landOn(sessions, classId) {
+    const shown = sessionsOfClass(sessions, classId)
+    if (shown.some((session) => singaporeMonthKey(session.starts_at) === visibleMonth)) return
+    const land = landingFor(sessions, classId, { cutoffHours })
+    if (!land.monthKey) return
+    setVisibleMonth(land.monthKey)
+    setSelectedDateKey(land.dateKey)
+  }
+
+  /** Does this class run at this place (either may be "any")? */
+  function runsAt(classId, placeId) {
+    if (!classId || !placeId || !allSessions) return true
+    return upcoming(matching(allSessions, { classId, placeId })).length > 0
+  }
+
+  /**
+   * The Where field and the place list on the left are one choice. A place
+   * without the chosen class shows every class again.
+   */
+  function choosePlace(nextId) {
+    const classId = runsAt(typeFilter, nextId) ? typeFilter : null
+    setPlaceFilter(nextId)
+    setTypeFilter(classId)
+    if (allSessions) landOn(sessionsAt(allSessions, nextId), classId)
+  }
+
+  /**
+   * The What you'll make field and the class cards are one choice. A class
+   * that doesn't run at the chosen place shows every place again.
+   */
+  function chooseClass(nextId) {
+    const placeId = runsAt(nextId, shownPlace?.id ?? null) ? (shownPlace?.id ?? null) : null
     setTypeFilter(nextId)
-    const land = landingFor(classSessions ?? [], nextId, { keepId: pickedSession?.id, cutoffHours })
-    setClassView({ monthKey: land.monthKey, dateKey: land.dateKey, pickedId: land.session?.id ?? null })
+    setPlaceFilter(placeId)
+    if (allSessions) landOn(sessionsAt(allSessions, placeId), nextId)
   }
 
-  function pickClassDay(dateKey) {
-    const day = datesInMonth(sessionsOfClass(classSessions, typeFilter), classCalendar.monthKey)[dateKey]
-    setClassView({ ...classCalendar, dateKey, pickedId: firstOfDay(day, cutoffHours)?.id ?? null })
-  }
-
-  function showClassMonth(monthKey) {
-    const byDay = datesInMonth(sessionsOfClass(classSessions, typeFilter), monthKey)
-    const first = Object.keys(byDay).sort()[0] ?? null
-    setClassView({
-      monthKey,
-      dateKey: first,
-      pickedId: first ? (firstOfDay(byDay[first], cutoffHours)?.id ?? null) : null,
-    })
+  /** Left-side "See dates": pick, and bring the booking card into view on phones. */
+  function seeDates(pick) {
+    pick()
+    if (window.matchMedia?.('(max-width: 1023px)').matches) {
+      bookingRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+    }
   }
   const checkoutTypeName = sessionTypes.byId[checkoutSession?.type_id]?.name ?? ''
+  const checkoutPlaceName = placeOf(checkoutSession)
   const paynowBlocked =
     payNowBlockedByServer || isPayNowTooFarAhead(checkoutSession?.starts_at)
   const displayRail = paynowBlocked || checkoutRail !== 'paynow' ? 'card' : 'paynow'
@@ -818,7 +887,8 @@ export default function ListingDetail() {
     if (!activeDateKey) {
       return (
         <p className="empty-state">
-          No {filterType ? `${filterType.name} ` : ''}sessions in {formatMonthTitle(visibleMonth)}.
+          No {filterType ? `${filterType.name} ` : ''}sessions{shownPlace ? ` at ${shownPlace.name}` : ''} in{' '}
+          {formatMonthTitle(visibleMonth)}.
         </p>
       )
     }
@@ -828,22 +898,37 @@ export default function ListingDetail() {
         <h3 className="session-day__title">
           {formatDayTitle(activeDateKey)} · {sessionCountLabel(daySessions.length)}
         </h3>
-        {daySessions.map((session) => (
+        {daySessions.map((session) => {
+          // A time names only what the guest hasn't picked yet.
+          const className = filterType || activeTypes.length < 2 ? '' : (sessionTypes.byId[session.type_id]?.name ?? '')
+          const placeName = shownPlace ? '' : placeOf(session)
+          return (
           <div key={session.id} className="session-card">
             <div className="session-card__info">
-              {sessionTypes.byId[session.type_id] ? (
-                <p className="session-card__type">{sessionTypes.byId[session.type_id].name}</p>
+              <p className="session-card__when">
+                <span id={`session-${session.id}-time`} className="session-card__date">
+                  {sessionTimeRange(session, listing)}
+                </span>
+                <span
+                  className={`session-card__meta${
+                    isLowSpots(session.spots_remaining) ? ' session-card__meta--low' : ''
+                  }`}
+                >
+                  {spotsLabel(session.spots_remaining)}
+                </span>
+              </p>
+              {className || placeName ? (
+                <p className="session-card__what">
+                  {className ? <span className="session-card__type">{className}</span> : null}
+                  {className && placeName ? <span aria-hidden="true"> · </span> : null}
+                  {placeName ? (
+                    <span className="session-card__place">
+                      <Icon name="pin" size={14} />
+                      {placeName}
+                    </span>
+                  ) : null}
+                </p>
               ) : null}
-              <p id={`session-${session.id}-time`} className="session-card__date">
-                {formatSessionTime(session.starts_at)}
-              </p>
-              <p
-                className={`session-card__meta${
-                  isLowSpots(session.spots_remaining) ? ' session-card__meta--low' : ''
-                }`}
-              >
-                {formatDuration(session.duration_mins)} · {spotsLabel(session.spots_remaining)}
-              </p>
             </div>
             <div className="session-card__actions">
               {isBookingClosed(session.starts_at, listing.booking_cutoff_hours) ? (
@@ -861,7 +946,8 @@ export default function ListingDetail() {
               )}
             </div>
           </div>
-        ))}
+          )
+        })}
       </>
     )
   }
@@ -906,7 +992,7 @@ export default function ListingDetail() {
                 <p className="checkout-summary__title">{listing.title}</p>
                 <p className="checkout-summary__meta">
                   with {hostName}
-                  {listing.area ? ` · ${listing.area}` : ''}
+                  {checkoutPlaceName || listing.area ? ` · ${checkoutPlaceName || listing.area}` : ''}
                 </p>
                 {checkoutTypeName ? <p className="session-card__type">{checkoutTypeName}</p> : null}
                 <p className="session-card__date">{formatSessionDay(checkoutSession.starts_at)}</p>
@@ -1232,7 +1318,7 @@ export default function ListingDetail() {
         <div className="detail-main">
           {listing.category ? <span className="detail-category">{listing.category}</span> : null}
           <h1 className="detail-title">{listing.title}</h1>
-          {duration || maxGuests > 0 || areaLabel || listingRating ? (
+          {duration || maxGuests > 0 || factsArea || listingRating ? (
             <div className="detail-facts">
               {duration ? (
                 <p className="detail-fact">
@@ -1246,10 +1332,10 @@ export default function ListingDetail() {
                   Up to {maxGuests} guest{maxGuests === 1 ? '' : 's'}
                 </p>
               ) : null}
-              {areaLabel ? (
+              {factsArea ? (
                 <p className="detail-fact detail-area">
                   <Icon name="pin" size={17} />
-                  {areaLabel}
+                  {factsArea}
                 </p>
               ) : null}
               {listingRating ? (
@@ -1299,14 +1385,10 @@ export default function ListingDetail() {
           {hasClasses ? (
             <ClassCards
               classes={activeTypes}
-              sessions={classSessions ?? []}
+              sessions={allSessions ?? []}
+              places={multiPlace ? places.active : []}
               filterId={typeFilter}
-              onPick={(nextId) => {
-                filterClass(nextId)
-                if (window.matchMedia?.('(max-width: 1023px)').matches) {
-                  bookingRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
-                }
-              }}
+              onPick={(nextId) => seeDates(() => chooseClass(nextId))}
             />
           ) : null}
 
@@ -1350,13 +1432,24 @@ export default function ListingDetail() {
             </p>
             {!checkoutSessionId && publicSessionRange && (
               <p className="detail-booking-card__note">
-                {hasClasses
-                  ? `Booking fee included. Same price for ${activeTypes.length === 2 ? 'both classes' : 'every class'}.`
-                  : 'Pick a date, then a time'}
+                {hasPickers ? (
+                  <>
+                    {/* Phones show the price in the bottom bar, so this reads as the section title. */}
+                    <span className="detail-booking-card__phone-title">Pick a date</span>
+                    <span className="detail-booking-card__fees">
+                      Booking fee included.
+                      <span className="detail-booking-card__same">
+                        {samePriceLine({ places: multiPlace, classes: activeTypes.length > 1 })}
+                      </span>
+                    </span>
+                  </>
+                ) : (
+                  'Pick a date, then a time'
+                )}
               </p>
             )}
             {!checkoutSessionId && publicSessionRange && canBringFriend && !isOwnListing && (
-              <p className="bring-friend">
+              <p className="bring-friend bring-friend--line">
                 <Icon name="users" size={16} strokeWidth={2} className="bring-friend__icon" />
                 <span>
                   <strong>Bring a friend, save {formatCents(friendSavingCents)}.</strong> Their seat skips
@@ -1378,55 +1471,19 @@ export default function ListingDetail() {
               <KeenPanel listingId={id} hostName={hostName} viewerId={viewerId} />
             )}
 
-            {publicSessionRange && !checkoutSessionId && hasClasses ? (
-              classSessions ? (
-                <>
-                  <ClassDatePicker
-                    listing={listing}
-                    classes={activeTypes}
-                    classById={sessionTypes.byId}
-                    sessions={classSessions}
-                    filterId={typeFilter}
-                    onFilter={filterClass}
-                    monthKey={classCalendar.monthKey}
-                    onMonth={showClassMonth}
-                    dateKey={classCalendar.dateKey}
-                    onDate={pickClassDay}
-                    pickedId={classCalendar.pickedId}
-                    onPick={(sessionId) => setClassView({ ...classCalendar, pickedId: sessionId })}
-                    disabled={!canTakePayments || isOwnListing}
-                  />
-                  <Button
-                    className="class-dates__book"
-                    disabled={
-                      !pickedSession || !isBookable(pickedSession, cutoffHours) || !canTakePayments || isOwnListing
-                    }
-                    onClick={() => handleBook(pickedSession.id)}
-                  >
-                    {pickedSession ? (
-                      <span className="class-dates__book-text">
-                        <span className="class-dates__book-main">
-                          Book {sessionDayLabel(pickedSession.starts_at)}
-                        </span>
-                        <span className="class-dates__book-sub">
-                          {[pickedClassName, sessionTimeRange(pickedSession, listing)].filter(Boolean).join(' · ')}
-                        </span>
-                      </span>
-                    ) : (
-                      'Pick a date'
-                    )}
-                  </Button>
-                  <p className="class-dates__next">
-                    You&apos;ll choose guests and extras next. Move your booking once, free, up to 48 hours
-                    before.
-                  </p>
-                </>
-              ) : (
-                <p className="hint">Loading dates…</p>
-              )
+            {publicSessionRange && !checkoutSessionId && hasPickers ? (
+              <BookingPickers
+                sessions={allSessions}
+                places={multiPlace ? places.active : []}
+                classes={activeTypes}
+                placeId={shownPlace?.id ?? null}
+                classId={filterType?.id ?? null}
+                onPlace={choosePlace}
+                onClass={chooseClass}
+              />
             ) : null}
 
-            {publicSessionRange && !checkoutSessionId && !hasClasses && (
+            {publicSessionRange && !checkoutSessionId && (
               <>
                 <div className="detail-calendar">
                   <SessionCalendar
@@ -1497,7 +1554,69 @@ export default function ListingDetail() {
             </section>
           ) : null}
 
-          {areaLabel ? (
+          {places.several ? (
+            <section className="detail-section">
+              <h2 className="detail-section__title">Where you&apos;ll be</h2>
+              <p className="detail-location__team">{teamNote(hostName)}</p>
+              <div className="detail-location detail-location--several">
+                {places.active.map((place) => {
+                  const revealed = revealedPlaces[place.id]?.fullAddress ?? ''
+                  const on = shownPlace?.id === place.id
+                  const dates = allSessions ? datesMeta(matching(allSessions, { placeId: place.id })) : ''
+                  const placeMeta = [place.label && place.area ? place.area : '', dates].filter(Boolean).join(' · ')
+                  return (
+                    <div key={place.id} className={`detail-location__row${on ? ' detail-location__row--on' : ''}`}>
+                      <span className="detail-location__icon">
+                        <Icon name="pin" size={20} />
+                      </span>
+                      <div className="detail-location__copy">
+                        {revealed ? (
+                          <>
+                            <p className="detail-location__title">{revealed}</p>
+                            <p className="detail-location__note">{place.name} · from your confirmed booking.</p>
+                            <a
+                              href={googleMapsUrl(revealed)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="detail-location__link"
+                            >
+                              Open in Google Maps
+                            </a>
+                          </>
+                        ) : (
+                          <>
+                            <p className="detail-location__title">{place.label || placeTitle(place)}</p>
+                            {placeMeta ? <p className="detail-location__meta">{placeMeta}</p> : null}
+                          </>
+                        )}
+                      </div>
+                      {publicSessionRange && !checkoutSessionId ? (
+                        <button
+                          type="button"
+                          className="class-pick__see detail-location__see"
+                          aria-pressed={on}
+                          aria-label={on ? `Showing dates at ${place.name}` : `See dates at ${place.name}`}
+                          onClick={() => seeDates(() => choosePlace(on ? null : place.id))}
+                        >
+                          {on ? (
+                            <>
+                              <Icon name="check" size={14} strokeWidth={2.6} />
+                              Showing
+                            </>
+                          ) : (
+                            'See dates'
+                          )}
+                        </button>
+                      ) : null}
+                    </div>
+                  )
+                })}
+                <p className="detail-location__note detail-location__note--all">
+                  Each place has its own dates. The exact address is sent once your booking is confirmed.
+                </p>
+              </div>
+            </section>
+          ) : areaLabel ? (
             <section className="detail-section">
               <h2 className="detail-section__title">Where you&apos;ll be</h2>
               <div className="detail-location">

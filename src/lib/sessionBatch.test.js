@@ -426,3 +426,58 @@ describe('previewSessionBatch with classes', () => {
     )
   })
 })
+
+describe('previewSessionBatch with locations (00059)', () => {
+  const durationMins = 90
+  const booked = (location_id) => ({
+    starts_at: '2026-10-18T02:00:00.000Z',
+    duration_mins: 90,
+    listing_id: 'team-listing',
+    location_id,
+    status: 'open',
+    bookings: [{ status: 'confirmed', guests_count: 2 }],
+  })
+
+  it('lets the same time run at another place of the same listing, booked or not', () => {
+    const preview = previewSessionBatch({
+      dateKeys: ['2026-10-18'],
+      times: ['10:00'],
+      durationMins,
+      now: NOW,
+      listingId: 'team-listing',
+      locationId: 'loc-j',
+      existingSessions: [booked('loc-t')],
+    })
+    expect(preview.accepted).toHaveLength(1)
+    expect(preview.accepted[0].sharedWith).toBeUndefined()
+    expect(preview.skipped).toEqual([])
+  })
+
+  it('still skips the time at its own place, and a booking on another listing', () => {
+    const own = previewSessionBatch({
+      dateKeys: ['2026-10-18'],
+      times: ['10:00'],
+      durationMins,
+      now: NOW,
+      listingId: 'team-listing',
+      locationId: 'loc-t',
+      existingSessions: [booked('loc-t')],
+    })
+    expect(own.skipped[0].reason).toBe(SKIP_ALREADY_ON)
+
+    const elsewhere = previewSessionBatch({
+      dateKeys: ['2026-10-18'],
+      times: ['10:00'],
+      durationMins,
+      now: NOW,
+      listingId: 'team-listing',
+      locationId: 'loc-j',
+      existingSessions: [{ ...booked('loc-x'), listing_id: 'solo-listing' }],
+    })
+    expect(elsewhere.skipped[0].reason).toBe(SKIP_BOOKED)
+  })
+
+  it('reads the database refusal for a missing location', () => {
+    expect(skipReasonFromRpcMessage('Pick a location for these dates.')).toBe('pick a location')
+  })
+})

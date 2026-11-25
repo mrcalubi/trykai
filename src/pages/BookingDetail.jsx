@@ -66,6 +66,7 @@ import { companionSeats } from '../lib/companions'
 import { sessionEndAt } from '../lib/reviewGate'
 import WhosComing from '../components/WhosComing'
 import { isMissingSessionTypes, sessionTypeNamesById } from '../lib/sessionTypes'
+import { isMissingListingLocations, loadPublicLocations, loadRevealedPlaces } from '../lib/listingLocations'
 
 const BOOKING_SELECT = `
   id,
@@ -86,6 +87,7 @@ const BOOKING_SELECT = `
     starts_at,
     duration_mins,
     type_id,
+    location_id,
     listings (
       id,
       title,
@@ -269,6 +271,9 @@ export default function BookingDetail() {
   const [leaving, setLeaving] = useState(false)
   const [leaveError, setLeaveError] = useState('')
   const [typeName, setTypeName] = useState('')
+  // Listing locations (00059): only a listing with several names its places.
+  const [placeName, setPlaceName] = useState('')
+  const [places, setPlaces] = useState(null)
 
   const loadBooking = useCallback(async () => {
     const run = (columns) =>
@@ -309,6 +314,11 @@ export default function BookingDetail() {
     setNotGuest(false)
     const typeId = data.sessions?.type_id
     setTypeName(typeId ? ((await sessionTypeNamesById(supabase, [typeId]))[typeId] ?? '') : '')
+    const locationId = data.sessions?.location_id ?? null
+    const placesListingId = data.sessions?.listings?.id
+    const loadedPlaces = placesListingId ? await loadPublicLocations(supabase, placesListingId) : null
+    setPlaces(loadedPlaces?.several ? loadedPlaces : null)
+    setPlaceName(loadedPlaces?.several ? (loadedPlaces.byId[locationId]?.name ?? '') : '')
     setBringChecked(readBringChecks(data.id))
     if (companionView) {
       setBookingAddons([])
@@ -332,13 +342,17 @@ export default function BookingDetail() {
     const listingId = listing?.id
     const hostId = listing?.host_id
     if (data.status === 'confirmed' && listingId) {
-      const [{ data: revealed }, { data: arrival }, { data: contact }] = await Promise.all([
+      const [{ data: revealed }, { data: arrival }, { data: contact }, revealedPlaces] = await Promise.all([
         supabase.rpc('listing_address', { listing_id: listingId }),
         supabase.rpc('listing_arrival_instructions', { listing_id: listingId }),
         supabase.rpc('booking_host_contact', { p_booking_id: data.id }),
+        loadRevealedPlaces(supabase, listingId),
       ])
-      setAddress(typeof revealed === 'string' ? revealed : '')
-      setArrivalInstructions(typeof arrival === 'string' ? arrival : '')
+      // This booking's own place (00059). listing_address gives a guest their
+      // next booking's place, which can be another booking at another place.
+      const own = locationId ? revealedPlaces[locationId] : null
+      setAddress(own?.fullAddress || (typeof revealed === 'string' ? revealed : ''))
+      setArrivalInstructions(own ? own.arrivalInstructions : typeof arrival === 'string' ? arrival : '')
       setHostPhone(typeof contact === 'string' ? contact : '')
     } else {
       setAddress('')
@@ -443,13 +457,18 @@ export default function BookingDetail() {
       setMoveList([])
       return
     }
-    const { data } = await supabase
-      .from('sessions')
-      .select('id, starts_at, duration_mins, spots_remaining, status')
-      .eq('listing_id', listingId)
-      .eq('status', 'open')
-      .gt('starts_at', new Date().toISOString())
-      .order('starts_at')
+    const openDates = (columns) =>
+      supabase
+        .from('sessions')
+        .select(columns)
+        .eq('listing_id', listingId)
+        .eq('status', 'open')
+        .gt('starts_at', new Date().toISOString())
+        .order('starts_at')
+    let { data, error: openError } = await openDates('id, starts_at, duration_mins, spots_remaining, status, location_id')
+    if (openError && isMissingListingLocations(openError)) {
+      ;({ data } = await openDates('id, starts_at, duration_mins, spots_remaining, status'))
+    }
     setMoveList((data ?? []).filter((session) => isEligibleRescheduleSession(session, booking, nowMs)))
   }
 
@@ -608,9 +627,17 @@ export default function BookingDetail() {
     </section>
   )
 
+  /** A date to move to: its place, and whether that is somewhere else (00059). */
+  function movePlace(row) {
+    const name = places?.byId[row?.location_id]?.name ?? ''
+    const different = Boolean(places && row?.location_id && row.location_id !== booking?.sessions?.location_id)
+    return { name, different }
+  }
+
   const whereCard = address ? (
     <section className="booking-card booking-where">
       <h2 className="booking-card__title">Where</h2>
+      {placeName ? <p className="booking-where__place">{placeName}</p> : null}
       <p className="booking-where__address">{address}</p>
       {arrivalInstructions ? (
         <div className="booking-where__find">
@@ -810,7 +837,9 @@ export default function BookingDetail() {
           )}
           {typeName ? <p className="session-card__type booking-page__type">{typeName}</p> : null}
           {isCompanion ? <span className="booking-pill booking-pill--booked-by">Booked by {bookedBy}</span> : null}
-          <p className="booking-page__with">{withHostLine(hostLabel, listing?.area, booking.guests_count)}</p>
+          <p className="booking-page__with">
+            {withHostLine(hostLabel, placeName || listing?.area, booking.guests_count)}
+          </p>
 
           {dayOf && !cancelled ? (
             <div className="booking-banner">
@@ -966,7 +995,9 @@ export default function BookingDetail() {
               ) : confirmMove ? (
                 <>
                   <p>
-                    Move to {formatSessionDay(confirmMove.starts_at)}? You can only move a booking once.
+                    Move to {formatSessionDay(confirmMove.starts_at)}
+                    {movePlace(confirmMove).different ? ` at ${movePlace(confirmMove).name}` : ''}? You can only
+                    move a booking once.
                   </p>
                   {moveError ? <p className="error-message">{moveError}</p> : null}
                   <Button
@@ -991,6 +1022,10 @@ export default function BookingDetail() {
                         <li key={row.id}>
                           <button type="button" className="btn btn--secondary booking-page__wrap-btn" onClick={() => setConfirmMove(row)}>
                             {formatSessionDay(row.starts_at)} · {formatSessionTime(row.starts_at)}
+                            {movePlace(row).name ? ` · ${movePlace(row).name}` : ''}
+                            {movePlace(row).different ? (
+                              <span className="booking-move-list__other">Different place</span>
+                            ) : null}
                           </button>
                         </li>
                       ))}

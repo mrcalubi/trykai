@@ -174,7 +174,7 @@ describe('ListingDetail content', () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Latte art', level: 1 })).toBeInTheDocument()
-    expect(document.title).toBe('Latte art · TryKai')
+    await waitFor(() => expect(document.title).toBe('Latte art · TryKai'))
     expect(screen.getByText('Food')).toBeInTheDocument()
     expect(screen.getByText('Tiong Bahru')).toBeInTheDocument()
     expect(screen.getByText('Pull your first rosetta in ninety minutes.')).toBeInTheDocument()
@@ -821,12 +821,13 @@ describe('ListingDetail sessions', () => {
     expect(screen.queryByText(/Listing is automatically deactivated/)).not.toBeInTheDocument()
   })
 
-  it('shows the duration and remaining spots for each session', async () => {
+  it('shows the start and end time and remaining spots for each session', async () => {
     givenListing()
     givenSessions([makeSession({ duration_mins: 90, spots_remaining: 3 })])
     renderPage()
 
-    expect(await screen.findByText(/1\.5 hr · 3 spots left/)).toBeInTheDocument()
+    expect(await screen.findByText('3 spots left')).toBeInTheDocument()
+    expect(screen.getByText(/^\d{1,2}:\d{2}( am| pm)? – \d{1,2}:\d{2} (am|pm)$/)).toBeInTheDocument()
     expect(screen.getByText('Pick a date, then a time')).toBeInTheDocument()
   })
 
@@ -885,10 +886,10 @@ describe('ListingDetail sessions', () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: /9 Oct · 2 sessions/ })).toBeInTheDocument()
-    expect(screen.getByText('11:00 am')).toBeInTheDocument()
-    expect(screen.getByText(/0\.55 hr · 2 spots left/)).toBeInTheDocument()
-    expect(screen.getByText('11:00 pm')).toBeInTheDocument()
-    expect(screen.queryByText(/1\.85 hr/)).not.toBeInTheDocument()
+    expect(screen.getByText('11:00 – 11:33 am')).toBeInTheDocument()
+    expect(screen.getByText('2 spots left')).toBeInTheDocument()
+    expect(screen.getByText('11:00 – 11:45 pm')).toBeInTheDocument()
+    expect(screen.queryByText('11:00 am – 12:51 pm')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /9 October, 2 sessions/ })).toHaveAttribute(
       'aria-pressed',
       'true'
@@ -908,8 +909,8 @@ describe('ListingDetail sessions', () => {
     await user.click(screen.getByRole('button', { name: /27 October, 1 session/ }))
 
     expect(screen.getByRole('heading', { name: /27 Oct · 1 session/ })).toBeInTheDocument()
-    expect(screen.getByText(/1\.85 hr/)).toBeInTheDocument()
-    expect(screen.queryByText(/0\.55 hr/)).not.toBeInTheDocument()
+    expect(screen.getByText('11:00 am – 12:51 pm')).toBeInTheDocument()
+    expect(screen.queryByText('11:00 – 11:33 am')).not.toBeInTheDocument()
   })
 
   it('loads each month once, bounded by Singapore midnights', async () => {
@@ -938,7 +939,7 @@ describe('ListingDetail sessions', () => {
 
     await user.click(screen.getByRole('button', { name: 'Next month' }))
     expect(await screen.findByRole('heading', { name: /2 Nov · 1 session/ })).toBeInTheDocument()
-    expect(screen.getByText(/1 hr · 3 spots left/)).toBeInTheDocument()
+    expect(screen.getByText('11:00 am – 12:00 pm')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Previous month' }))
     expect(await screen.findByRole('heading', { name: /9 Oct · 1 session/ })).toBeInTheDocument()
@@ -1003,7 +1004,7 @@ describe('ListingDetail sessions', () => {
     await user.click(screen.getByRole('button', { name: 'Next month' }))
 
     expect(await screen.findByRole('heading', { name: /2 Dec · 1 session/ })).toBeInTheDocument()
-    expect(screen.getByText(/0\.67 hr · 3 spots left/)).toBeInTheDocument()
+    expect(screen.getByText('11:00 – 11:40 am')).toBeInTheDocument()
   })
 
   it('keeps the listing on screen when a month fails to load', async () => {
@@ -2063,32 +2064,26 @@ describe('ListingDetail session types', () => {
     vi.useRealTimers()
   })
 
-  const times = () => screen.queryAllByRole('radio')
-  const timeNames = () => times().map((radio) => radio.closest('label').querySelector('.class-time__class')?.textContent)
-  const datedDays = () => [...document.querySelectorAll('.class-cal__grid button')]
+  const classNames = () => [...document.querySelectorAll('.session-card__type')].map((node) => node.textContent)
 
-  it('shows the classes as cards and opens the calendar on the first date, already picked', async () => {
+  it('shows the classes as cards and books them on the same calendar as any listing', async () => {
     renderPage()
     expect(await screen.findByRole('heading', { name: "Pick what you'll make" })).toBeInTheDocument()
     expect(screen.getByText('2 classes · same price')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Hand-tied bouquet' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Old wreath' })).not.toBeInTheDocument()
-    expect(screen.getByText('Booking fee included. Same price for both classes.')).toBeInTheDocument()
+    expect(screen.queryByText('Pick a date, then a time')).not.toBeInTheDocument()
+    expect(screen.getByText('Same price for every class.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: "What you'll make: Any of 2 classes" })).toBeInTheDocument()
 
-    await waitFor(() => expect(times()).toHaveLength(3))
+    expect(await screen.findByRole('heading', { name: 'Thu, 12 Nov · 3 sessions' })).toBeInTheDocument()
+    expect(document.querySelector('.detail-calendar')).toBeInTheDocument()
     expect(screen.getByText('November 2026')).toBeInTheDocument()
-    expect(screen.getByText('3 dates this month')).toBeInTheDocument()
-    // Only a day with dates can be tapped, and it says it has several classes.
-    expect(datedDays()).toHaveLength(1)
-    expect(datedDays()[0]).toHaveAccessibleName('Thu 12 Nov, 3 times, more than one class')
-    expect(datedDays()[0]).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Previous month' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Next month' })).toBeDisabled()
-    // Removed classes still name their dates.
-    expect(timeNames()).toEqual(['Hand-tied bouquet', 'Table centrepiece', 'Old wreath'])
-    expect(times()[0]).toBeChecked()
-    expect(screen.getByRole('button', { name: /^Book Thu 12 Nov\s*Hand-tied bouquet · / })).toBeEnabled()
-    expect(document.querySelector('.detail-calendar')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /12 Nov.*3 sessions/ })).toHaveAttribute('aria-pressed', 'true')
+    // Removed classes still name their dates, and every time has its own Book.
+    expect(classNames()).toEqual(['Hand-tied bouquet', 'Table centrepiece', 'Old wreath'])
+    expect(screen.getAllByRole('button', { name: 'Book' })).toHaveLength(3)
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
   })
 
   it('opens on the next month that has dates, never an empty one', async () => {
@@ -2096,41 +2091,84 @@ describe('ListingDetail session types', () => {
     renderPage()
 
     expect(await screen.findByText('December 2026')).toBeInTheDocument()
-    expect(screen.getByText('1 date this month')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Book' })).toBeInTheDocument()
     expect(screen.queryByText(/No .*sessions in/)).not.toBeInTheDocument()
   })
 
-  it('keeps the class cards and the chips as one filter, and keeps a picked time that fits', async () => {
-    const { user } = renderPage()
-    await waitFor(() => expect(times()).toHaveLength(3))
-    const chips = screen.getByRole('group', { name: 'Class' })
+  const times = () => document.querySelectorAll('.session-card').length
+  const classField = () => screen.getByRole('button', { name: /^What you'll make/ })
 
-    await user.click(within(chips).getByRole('button', { name: 'Table centrepiece' }))
-    expect(timeNames()).toEqual(['Table centrepiece'])
-    expect(times()[0]).toBeChecked()
+  it("keeps the class cards and the What you'll make field as one choice", async () => {
+    const { user } = renderPage()
+    await waitFor(() => expect(classNames()).toHaveLength(3))
+
+    await user.click(classField())
+    const list = screen.getByRole('dialog', { name: "What you'll make" })
+    expect(within(list).getByRole('button', { name: /^Any class/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(list).getByRole('button', { name: /^Table centrepiece/ })).toHaveTextContent('1 date · next Thu 12 Nov')
+    await user.click(within(list).getByRole('button', { name: /^Table centrepiece/ }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(classField()).toHaveAccessibleName("What you'll make: Table centrepiece")
+    expect(classField()).toHaveFocus()
+    // A picked class isn't repeated on its times.
+    expect(times()).toBe(1)
+    expect(classNames()).toEqual([])
     expect(screen.getByRole('button', { name: 'Showing Table centrepiece dates' })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
 
-    await user.click(within(chips).getByRole('button', { name: 'All classes' }))
-    expect(times()).toHaveLength(3)
-    expect(times()[1]).toBeChecked()
+    await user.click(screen.getByRole('button', { name: 'Show every class' }))
+    expect(times()).toBe(3)
+    expect(classField()).toHaveFocus()
 
     await user.click(screen.getByRole('button', { name: 'See Hand-tied bouquet dates' }))
-    expect(timeNames()).toEqual(['Hand-tied bouquet'])
-    expect(within(chips).getByRole('button', { name: 'Hand-tied bouquet' })).toHaveAttribute('aria-pressed', 'true')
+    expect(times()).toBe(1)
+    expect(classField()).toHaveAccessibleName("What you'll make: Hand-tied bouquet")
   })
 
-  it('names the picked day and class on the button, then opens checkout', async () => {
+  it('closes the list with Escape or a tap outside, keeping the choice', async () => {
+    const { user } = renderPage()
+    await waitFor(() => expect(classNames()).toHaveLength(3))
+
+    await user.click(classField())
+    expect(screen.getByRole('dialog', { name: "What you'll make" })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(classField()).toHaveFocus()
+
+    await user.click(classField())
+    await user.click(document.querySelector('.pick-backdrop'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await user.click(classField())
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(times()).toBe(3)
+  })
+
+  it("jumps to a class's next month when this month has none of its dates", async () => {
+    givenSessions([
+      makeSession({ id: 's1', starts_at: hoursFromNow(48), spots_remaining: 4, type_id: 't1' }),
+      makeSession({ id: 's2', starts_at: hoursFromNow(24 * 30), spots_remaining: 4, type_id: 't2' }),
+    ])
+    const { user } = renderPage()
+    expect(await screen.findByText('November 2026')).toBeInTheDocument()
+    await waitFor(() => expect(classNames()).toEqual(['Hand-tied bouquet']))
+
+    await user.click(classField())
+    await user.click(screen.getByRole('button', { name: /^Table centrepiece/ }))
+    expect(await screen.findByText('December 2026')).toBeInTheDocument()
+    await waitFor(() => expect(times()).toBe(1))
+  })
+
+  it("books one of the day's times from its own Book button", async () => {
     givenSignedIn()
     const { user } = renderPage()
-    await waitFor(() => expect(times()).toHaveLength(3))
+    await waitFor(() => expect(classNames()).toHaveLength(3))
 
-    await user.click(times()[1])
-    const book = screen.getByRole('button', { name: /^Book Thu 12 Nov\s*Table centrepiece · / })
-    expect(book).toBeEnabled()
-    await user.click(book)
+    await user.click(screen.getAllByRole('button', { name: 'Book' })[1])
     expect(await screen.findByRole('button', { name: 'Add a note for Mei' })).toBeInTheDocument()
   })
 
@@ -2152,5 +2190,120 @@ describe('ListingDetail session types', () => {
     renderPage()
     expect(await screen.findByRole('button', { name: 'Book' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: "Pick what you'll make" })).not.toBeInTheDocument()
+  })
+})
+
+describe('ListingDetail with several places and classes (00059)', () => {
+  const PLACES = [
+    { id: 'loc-a', listing_id: 'listing-1', label: 'Thomson studio', area: 'Bishan', position: 0, is_active: true },
+    { id: 'loc-b', listing_id: 'listing-1', label: 'Bedok North studio', area: 'Bedok', position: 1, is_active: true },
+  ]
+  const TYPES = [
+    { id: 't1', listing_id: 'listing-1', name: 'Wheel-thrown mug', description: '', photo_url: null, position: 0, is_active: true },
+    { id: 't2', listing_id: 'listing-1', name: 'Hand-built plate', description: '', photo_url: null, position: 1, is_active: true },
+  ]
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-10T02:00:00Z'))
+    givenListing(makeListing({ users: { display_name: 'Rachel', stripe_payouts_enabled: true } }))
+    givenSessions([
+      makeSession({ id: 's1', starts_at: hoursFromNow(48), spots_remaining: 4, type_id: 't1', location_id: 'loc-a' }),
+      makeSession({ id: 's2', starts_at: hoursFromNow(50), spots_remaining: 4, type_id: 't1', location_id: 'loc-b' }),
+      makeSession({ id: 's3', starts_at: hoursFromNow(52), spots_remaining: 1, type_id: 't2', location_id: 'loc-b' }),
+    ])
+    givenReviews([])
+    supabase.__on('listing_session_types', 'select', { data: TYPES, error: null })
+    supabase.__on('listing_locations', 'select', { data: PLACES, error: null })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const times = () => document.querySelectorAll('.session-card').length
+  const placeLines = () => [...document.querySelectorAll('.session-card__place')].map((node) => node.textContent)
+  const whereField = () => screen.getByRole('button', { name: /^Where:/ })
+  const classField = () => screen.getByRole('button', { name: /^What you'll make:/ })
+
+  it('starts on every place and class, each time naming both', async () => {
+    renderPage()
+    expect(await screen.findByRole('button', { name: 'Where: Any place · Bishan or Bedok' })).toBeInTheDocument()
+    expect(classField()).toHaveAccessibleName("What you'll make: Any of 2 classes")
+    expect(screen.getByText('Same price at every place and class.')).toBeInTheDocument()
+    await waitFor(() => expect(times()).toBe(3))
+    expect(placeLines()).toEqual(['Thomson studio · Bishan', 'Bedok North studio · Bedok', 'Bedok North studio · Bedok'])
+    expect(screen.getByText('10:00 – 11:30 am')).toBeInTheDocument()
+  })
+
+  it('greys classes that run elsewhere, and picking one shows every place again', async () => {
+    const { user } = renderPage()
+    await waitFor(() => expect(times()).toBe(3))
+
+    await user.click(whereField())
+    const places = screen.getByRole('dialog', { name: 'Where' })
+    expect(within(places).getByRole('button', { name: /^Any place/ })).toHaveTextContent('3 dates · next Thu 12 Nov')
+    expect(within(places).getByRole('button', { name: /^Bedok North studio/ })).toHaveTextContent(
+      'Bedok · 2 dates · next Thu 12 Nov',
+    )
+    expect(within(places).getByText("Same price at every place. You get the exact address once you've booked.")).toBeInTheDocument()
+    await user.click(within(places).getByRole('button', { name: /^Thomson studio/ }))
+
+    expect(whereField()).toHaveAccessibleName('Where: Thomson studio, Bishan')
+    expect(times()).toBe(1)
+    expect(placeLines()).toEqual([])
+    expect([...document.querySelectorAll('.session-card__type')].map((node) => node.textContent)).toEqual([
+      'Wheel-thrown mug',
+    ])
+
+    await user.click(classField())
+    const classes = screen.getByRole('dialog', { name: "What you'll make" })
+    expect(within(classes).getByText('Classes at Bishan')).toBeInTheDocument()
+    const plate = within(classes).getByRole('button', { name: /^Hand-built plate/ })
+    expect(plate).toHaveClass('pick-option--greyed')
+    expect(plate).toHaveTextContent('Only at Bedok')
+    expect(
+      within(classes).getByText("Greyed classes don't run at Bishan. Picking one shows every place again."),
+    ).toBeInTheDocument()
+    await user.click(plate)
+
+    expect(whereField()).toHaveAccessibleName('Where: Any place · Bishan or Bedok')
+    expect(classField()).toHaveAccessibleName("What you'll make: Hand-built plate")
+    expect(times()).toBe(1)
+    expect(placeLines()).toEqual(['Bedok North studio · Bedok'])
+
+    await user.click(whereField())
+    const again = screen.getByRole('dialog', { name: 'Where' })
+    expect(within(again).getByRole('button', { name: /^Thomson studio/ })).toHaveTextContent('No Hand-built plate here')
+    expect(
+      within(again).getByText("Greyed places don't run Hand-built plate. Picking one shows every class again."),
+    ).toBeInTheDocument()
+    await user.click(within(again).getByRole('button', { name: /^Thomson studio/ }))
+    expect(classField()).toHaveAccessibleName("What you'll make: Any of 2 classes")
+    expect(times()).toBe(1)
+  })
+
+  it('fills the same fields from the class cards and the places list', async () => {
+    const { user } = renderPage()
+    await waitFor(() => expect(times()).toBe(3))
+    expect(screen.getByText('2 dates · next Thu 12 Nov · Bishan and Bedok')).toBeInTheDocument()
+    expect(screen.getByText('1 date · next Thu 12 Nov · Bedok only')).toBeInTheDocument()
+    expect(screen.getByText('Bedok · 2 dates · next Thu 12 Nov')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'See dates at Bedok North studio · Bedok' }))
+    expect(whereField()).toHaveAccessibleName('Where: Bedok North studio, Bedok')
+    expect(screen.getByRole('button', { name: 'Showing dates at Bedok North studio · Bedok' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(times()).toBe(2)
+
+    await user.click(screen.getByRole('button', { name: 'Show every place' }))
+    expect(times()).toBe(3)
+    expect(whereField()).toHaveFocus()
+
+    await user.click(screen.getByRole('button', { name: 'See Hand-built plate dates' }))
+    expect(classField()).toHaveAccessibleName("What you'll make: Hand-built plate")
+    expect(times()).toBe(1)
   })
 })

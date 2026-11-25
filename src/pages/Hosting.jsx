@@ -8,6 +8,7 @@ import HostListingDates from '../components/HostListingDates'
 import HostNextUp from '../components/HostNextUp'
 import HostSessionPage from '../components/HostSessionPage'
 import { querySessionTypes, typesByListing } from '../lib/sessionTypes'
+import { locationNamesById, locationsByListing, queryListingLocations } from '../lib/listingLocations'
 import {
   clearSessionDraft,
   readOpenSessionForm,
@@ -63,7 +64,13 @@ import { loadBookingAddonRows, loadBookingNotes } from '../lib/bookingAddons'
 import { HostReviewsDueList } from '../components/HostReviewForm'
 import { fetchMyReviews } from '../lib/twoWayReviews'
 import { groupGuestsBySession } from '../lib/companions'
-import { bookedSeats, confirmedBookings, sessionDayLabel, sessionTimeRange } from '../lib/hostSessions'
+import {
+  bookedSeats,
+  confirmedBookings,
+  nextUpSessions,
+  sessionDayLabel,
+  sessionTimeRange,
+} from '../lib/hostSessions'
 
 // Pending rows are unpaid checkouts, not guests the host has to refund.
 const activeBookingsOn = confirmedBookings
@@ -83,6 +90,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
   const [listings, setListings] = useState([])
   const [hostSessions, setHostSessions] = useState([])
   const [sessionTypeRows, setSessionTypeRows] = useState([])
+  const [locationRows, setLocationRows] = useState([])
   const [classesAvailable, setClassesAvailable] = useState(false)
   // Which class Add dates opens on, and the next class to offer after adding.
   const [activeFormTypeId, setActiveFormTypeId] = useState(() =>
@@ -247,6 +255,9 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
     const { rows: typeRows, available: typesOn } = await querySessionTypes(supabase, listingIds)
     setSessionTypeRows(typeRows)
     setClassesAvailable(typesOn)
+    // Listing locations (00059); none until it is applied.
+    const { rows: placeRows } = await queryListingLocations(supabase, listingIds)
+    setLocationRows(placeRows)
     // 00032. Until it is applied the RPC errors; the page simply shows no banner.
     const { data: interestRows } = await supabase.rpc('host_listing_interest')
     const interest = hostInterestById(interestRows)
@@ -478,6 +489,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
           p_starts_at: item.startsAt.toISOString(),
           p_spots: spots,
           ...(typeId ? { p_type_id: typeId } : {}),
+          ...(item.locationId ? { p_location_id: item.locationId } : {}),
         })
         rpcError = result.error
       } else {
@@ -489,6 +501,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
           spots_remaining: spots,
           status: 'open',
           ...(typeId ? { type_id: typeId } : {}),
+          ...(item.locationId ? { location_id: item.locationId } : {}),
         })
         rpcError = result.error
       }
@@ -800,6 +813,9 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
     : null
   const activeTypesByListing = typesByListing(sessionTypeRows)
   const typeNameById = Object.fromEntries(sessionTypeRows.map((row) => [row.id, row.name]))
+  const activeLocationsByListing = locationsByListing(locationRows)
+  // Only multi-location listings name a session's location.
+  const locationNameById = locationNamesById(locationRows)
   const removingIds = new Set(pendingRemoval?.sessions.map((session) => session.id) ?? [])
   const visibleSessions = hostSessions.filter((session) => !removingIds.has(session.id))
   const bookedHostSessions = visibleSessions
@@ -823,6 +839,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
         <HostSessionPage
           session={session}
           listing={listings.find((listing) => listing.id === session?.listing_id)}
+          locationName={locationNameById[session?.location_id] ?? ''}
           guestRows={guestsBySession[sessionParam] ?? []}
           addonsByBooking={addonsByBooking}
           notesByBooking={notesByBooking}
@@ -842,12 +859,25 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
     )
   }
 
-  const nextUp = bookedHostSessions[0] ?? null
-  const nextUpNote = nextUp
-    ? activeBookingsOn(nextUp)
+  // A multi-location listing can run its places at once, so Next up shows each
+  // one booked at that time, location 1 first.
+  const placeRank = {}
+  for (const rows of Object.values(activeLocationsByListing)) {
+    rows.forEach((row, index) => {
+      placeRank[row.id] = index
+    })
+  }
+  const nextUpListing = listings.find((listing) => listing.id === bookedHostSessions[0]?.listing_id)
+  const nextUpItems = nextUpSessions(bookedHostSessions, nextUpListing, placeRank).map((session) => ({
+    session,
+    guestRows: guestsBySession[session.id] ?? [],
+    note:
+      activeBookingsOn(session)
         .map((booking) => notesByBooking[booking.id]?.note)
-        .find(Boolean) ?? ''
-    : ''
+        .find(Boolean) ?? '',
+    placeName: locationNameById[session.location_id] ?? '',
+    href: sessionHref(session.id),
+  }))
 
   const setupSteps = [
     verificationStatus === 'approved'
@@ -1034,15 +1064,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
           </section>
         )}
 
-        {nextUp ? (
-          <HostNextUp
-            session={nextUp}
-            listing={listings.find((listing) => listing.id === nextUp.listing_id)}
-            guestRows={guestsBySession[nextUp.id] ?? []}
-            note={nextUpNote}
-            href={sessionHref(nextUp.id)}
-          />
-        ) : null}
+        {nextUpItems.length ? <HostNextUp items={nextUpItems} listing={nextUpListing} /> : null}
 
         <section className="hosting-month" aria-labelledby="hosting-month-title">
           <h2 id="hosting-month-title" className="hosting__section-title">
@@ -1192,7 +1214,11 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                       <AddSessionsForm
                         listing={listing}
                         existingSessions={hostSessions}
-                        otherListings={listings.filter((other) => other.id !== listing.id)}
+                        otherListings={listings.filter(
+                          // A team listing's places never share a time with other listings.
+                          (other) => other.id !== listing.id && (activeLocationsByListing[other.id]?.length ?? 0) <= 1,
+                        )}
+                        locations={activeLocationsByListing[listing.id] ?? []}
                         sessionTypes={activeTypesByListing[listing.id] ?? []}
                         classNameById={typeNameById}
                         classesAvailable={classesAvailable}
@@ -1208,6 +1234,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
                       listing={listing}
                       sessions={upcoming}
                       typeNameById={typeNameById}
+                      locationNameById={locationNameById}
                       heldByTitles={heldByTitles}
                       guestsBySession={guestsBySession}
                       sessionHref={sessionHref}

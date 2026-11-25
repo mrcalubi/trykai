@@ -37,9 +37,11 @@ function routeFetch({
   listings = () => Response.json([listing]),
   sessions = () => Response.json([]),
   rating = () => Response.json([]),
+  locations = () => Response.json([]),
 } = {}) {
   return vi.fn(async (url) => {
     const target = String(url)
+    if (target.includes('/rest/v1/listing_locations')) return locations(target)
     if (target.includes('/rest/v1/listings')) return listings(target)
     if (target.includes('/rest/v1/sessions')) return sessions(target)
     if (target.includes('/rest/v1/rpc/listing_ratings')) return rating(target)
@@ -139,6 +141,50 @@ describe('api/listing-preview', () => {
     expect(res.body).toContain('<p>No sessions are scheduled right now.</p>')
     expect(res.body).not.toContain('Rating:')
     expect(res.body).not.toContain('"@type":"Event"')
+  })
+
+  it('names every area of a listing with several locations, never an address', async () => {
+    const fetchMock = routeFetch({
+      listings: () => Response.json([fullListing]),
+      sessions: () =>
+        Response.json([
+          { starts_at: '2027-03-20T06:00:00Z', duration_mins: 90, spots_remaining: 3, location_id: 'loc-t' },
+          { starts_at: '2027-03-20T06:00:00Z', duration_mins: 90, spots_remaining: 4, location_id: 'loc-j' },
+        ]),
+      locations: () =>
+        Response.json([
+          { id: 'loc-t', area: 'Tampines', position: 0 },
+          { id: 'loc-j', area: 'Jurong East', position: 1 },
+        ]),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = mockRes()
+    await handler(req(), res)
+
+    expect(res.body).toContain('· Tampines &amp; Jurong East"')
+    expect(res.body).toContain('Food &amp; Drink · Tampines &amp; Jurong East, Singapore')
+    expect(res.body).toContain('"addressLocality":"Jurong East"')
+    const urls = fetchMock.mock.calls.map(([u]) => String(u))
+    const locationsUrl = urls.find((u) => u.includes('/rest/v1/listing_locations'))
+    expect(locationsUrl).toContain('select=id,area,position,created_at&')
+    expect(locationsUrl).toContain('is_active=eq.true')
+    expect(locationsUrl).not.toMatch(/address|arrival/)
+    expect(urls.find((u) => u.includes('/rest/v1/sessions'))).toContain(',location_id&')
+  })
+
+  it('reads sessions without location_id on a database before 00059', async () => {
+    const sessions = vi.fn((url) =>
+      url.includes('location_id')
+        ? Response.json({ message: 'column sessions.location_id does not exist' }, { status: 400 })
+        : Response.json([{ starts_at: '2027-03-20T06:00:00Z', duration_mins: 90, spots_remaining: 3 }]),
+    )
+    vi.stubGlobal('fetch', routeFetch({ listings: () => Response.json([fullListing]), sessions }))
+    const res = mockRes()
+    await handler(req(), res)
+
+    expect(sessions).toHaveBeenCalledTimes(2)
+    expect(res.body).toContain('· 3 spots left</li>')
+    expect(res.body).toContain('Food &amp; Drink · Bukit Merah, Singapore')
   })
 
   it('retries with the basic columns when the full select fails', async () => {
