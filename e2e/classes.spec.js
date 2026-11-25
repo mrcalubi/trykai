@@ -86,11 +86,9 @@ test.describe('classes', () => {
     await expect(page.getByRole('button', { name: 'Book', exact: true }).first()).toBeEnabled()
 
     await page.getByRole('button', { name: 'See Table centrepiece dates' }).click()
-    await expect(page.getByRole('group', { name: 'Class' }).getByRole('button', { name: 'Table centrepiece' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
-    await expect(page.locator('.session-card__type')).toHaveText(['Table centrepiece'])
+    await expect(page.getByRole('button', { name: "What you'll make: Table centrepiece" })).toBeVisible()
+    // A picked class isn't repeated on each time.
+    await expect(page.locator('.session-card__type')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Book', exact: true })).toBeEnabled()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       page.viewportSize().width,

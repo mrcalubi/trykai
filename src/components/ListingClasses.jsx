@@ -1,13 +1,14 @@
 import Icon from './ui/Icon'
 import { sessionDayLabel } from '../lib/hostSessions'
 import { classDates, datesLabel } from '../lib/sessionTypes'
-import { sessionsOfClass } from '../lib/classCalendar'
+import { classPlacesLine } from '../lib/bookingPickers'
 
 /**
- * "Pick what you'll make": one card per class. The cards and the chips above
- * the dates are the same filter, so picking either highlights both.
+ * "Pick what you'll make": one card per class. "See dates" fills the booking
+ * card's What you'll make field, so the two are one choice. With several
+ * places (00059), each card says where it runs: "Bedok only".
  */
-export function ClassCards({ classes, sessions, filterId, onPick }) {
+export function ClassCards({ classes, sessions, places = [], filterId, onPick }) {
   return (
     <section className="detail-section class-pick" aria-labelledby="class-pick-title">
       <div className="class-pick__head">
@@ -21,6 +22,7 @@ export function ClassCards({ classes, sessions, filterId, onPick }) {
       <ul className="class-pick__list">
         {classes.map((type) => {
           const { count, next } = classDates(sessions, type.id)
+          const where = places.length > 1 ? classPlacesLine(sessions, type.id, places) : ''
           const on = filterId === type.id
           return (
             <li key={type.id} className={`class-pick__card${on ? ' class-pick__card--on' : ''}`}>
@@ -35,7 +37,9 @@ export function ClassCards({ classes, sessions, filterId, onPick }) {
                 <h3 className="class-pick__name">{type.name}</h3>
                 {type.description ? <p className="class-pick__desc">{type.description}</p> : null}
                 <p className="class-pick__dates">
-                  {count > 0 ? `${datesLabel(count)} · next ${sessionDayLabel(next.starts_at)}` : 'No dates yet'}
+                  {count > 0
+                    ? [datesLabel(count), `next ${sessionDayLabel(next.starts_at)}`, where].filter(Boolean).join(' · ')
+                    : 'No dates yet'}
                 </p>
                 {classes.length > 1 ? (
                   <button
@@ -61,61 +65,5 @@ export function ClassCards({ classes, sessions, filterId, onPick }) {
         })}
       </ul>
     </section>
-  )
-}
-
-/**
- * Listing locations (00059): "All locations" and one chip per place. It filters
- * the dates below; with all locations, each time names its place.
- */
-export function LocationChips({ locations, filterId, onFilter }) {
-  return (
-    <div className="class-dates__chips location-chips" role="group" aria-label="Location">
-      {[{ id: null, name: 'All locations' }, ...locations].map((place) => {
-        const on = (filterId ?? null) === place.id
-        return (
-          <button
-            key={place.id ?? 'all'}
-            type="button"
-            className={`class-dates__chip${on ? ' class-dates__chip--on' : ''}`}
-            aria-pressed={on}
-            onClick={() => onFilter(place.id)}
-          >
-            {place.id ? <Icon name="pin" size={14} /> : null}
-            {place.name}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-/**
- * "All classes" and one chip per class, each with its number of dates. Above
- * the booking calendar; the same filter as the class cards.
- */
-export function ClassChips({ classes, sessions, filterId, onFilter }) {
-  return (
-    <div className="class-dates__chips" role="group" aria-label="Class">
-      {[{ id: null, name: 'All classes' }, ...classes].map((type) => {
-        const on = (filterId ?? null) === type.id
-        return (
-          <button
-            key={type.id ?? 'all'}
-            type="button"
-            className={`class-dates__chip${on ? ' class-dates__chip--on' : ''}`}
-            aria-pressed={on}
-            onClick={() => onFilter(type.id)}
-          >
-            {type.name}
-            {sessions ? (
-              <span className="class-dates__chip-count" aria-hidden="true">
-                {sessionsOfClass(sessions, type.id).length}
-              </span>
-            ) : null}
-          </button>
-        )
-      })}
-    </div>
   )
 }

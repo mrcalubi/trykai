@@ -14994,55 +14994,6 @@ body.add-dates-open {
   background: var(--navy);
 }
 
-/* Booking card: class and location filter chips above the calendar. */
-.class-dates__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0 16px;
-}
-
-.class-dates__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 14px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--navy);
-  background: transparent;
-  border: 1.5px solid var(--border-strong);
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.class-dates__chip--on {
-  color: var(--cream);
-  background: var(--navy);
-  border-color: var(--navy);
-}
-
-.class-dates__chip-count {
-  font-family: var(--mono);
-  font-size: 12px;
-  opacity: 0.75;
-}
-
-/* Beside the page, with a mouse: smaller filter chips. */
-@media (min-width: 1024px) {
-  .detail-sidebar .class-dates__chips {
-    margin: 10px 0 12px;
-  }
-
-  .detail-sidebar .class-dates__chip {
-    min-height: 36px;
-    padding: 0 12px;
-    font-size: 13px;
-  }
-}
-
 /* Listing locations (00059): Create listing's Location step and Edit listing's Location section */
 .locations-editor {
   display: flex;
@@ -15229,31 +15180,15 @@ body.add-dates-open {
 
 /* Listing locations (00059), guest side */
 .session-card__place {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin: 0 0 2px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--navy);
+  gap: 3px;
 }
 
 .session-card__place .icon,
 .session-card__place svg {
   flex-shrink: 0;
   color: var(--coral);
-}
-
-.location-chips {
-  margin: 12px 0 4px;
-}
-
-.location-chips .class-dates__chip svg {
-  color: var(--coral);
-}
-
-.location-chips .class-dates__chip--on svg {
-  color: var(--cream);
 }
 
 .detail-location__team {
@@ -15266,6 +15201,355 @@ body.add-dates-open {
   margin: 0;
   padding: 12px 16px;
   border-top: 1px solid var(--border);
+}
+
+/* One time on the chosen day: "9:00 – 10:30 am  4 spots left", then only what
+   the guest hasn't picked yet: "Wheel-thrown mug · Bishan". */
+.session-card__when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  margin: 0;
+}
+
+.session-card__when .session-card__meta {
+  margin: 0;
+}
+
+.session-card__what {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.session-card__what .session-card__type {
+  margin: 0;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* Booking card: one price line, then the friend saving as a plain line. */
+.detail-booking-card__same {
+  display: block;
+}
+
+.detail-booking-card__phone-title {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .detail-booking-card__phone-title {
+    display: inline;
+  }
+
+  .detail-booking-card__fees {
+    display: none;
+  }
+}
+
+.detail-booking-card .bring-friend--line {
+  padding: 0;
+  background: none;
+}
+
+/* Booking card: "Where" and "What you'll make" (DECISIONS.md, 26 Nov 2026).
+   Each opens a short list; on phones it is a sheet from the bottom. */
+.pick-box {
+  margin: 0 0 16px;
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.pick-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: calc(var(--radius-lg) - 2px);
+}
+
+.pick-field + .pick-field {
+  border-top: 1px solid var(--border);
+}
+
+.pick-field--open {
+  box-shadow: inset 0 0 0 2px var(--navy);
+}
+
+.pick-field__button {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 60px;
+  padding: 10px 14px;
+  font: inherit;
+  text-align: left;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  border-radius: inherit;
+  cursor: pointer;
+}
+
+.pick-field__icon,
+.pick-field__chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.pick-field--picked .pick-field__icon {
+  color: var(--coral);
+}
+
+.pick-field__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pick-field__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pick-field__value {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pick-field__clear {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-right: 10px;
+  padding: 0;
+  color: var(--navy);
+  background: var(--sand);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.pick-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 330;
+}
+
+.pick-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  z-index: 340;
+  max-height: 440px;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.pick-panel__sheet-head {
+  display: none;
+}
+
+.pick-panel__label {
+  margin: 0;
+  padding: 6px 8px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.pick-panel__list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pick-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px;
+  font: inherit;
+  text-align: left;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.pick-option:hover {
+  background: var(--surface);
+}
+
+.pick-option[aria-pressed='true'] {
+  background: var(--sand);
+}
+
+.pick-option__thumb {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--navy);
+  background: var(--sand);
+  border-radius: 10px;
+}
+
+.pick-option__thumb--place {
+  color: var(--coral-ink);
+  background: var(--coral-soft);
+}
+
+.pick-option__thumb--photo {
+  object-fit: cover;
+}
+
+.pick-option[aria-pressed='true'] .pick-option__thumb--any {
+  background: var(--surface);
+}
+
+.pick-option__copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pick-option__name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.pick-option__meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pick-option--greyed .pick-option__thumb,
+.pick-option--greyed .pick-option__copy {
+  opacity: 0.5;
+}
+
+.pick-option__check {
+  flex-shrink: 0;
+}
+
+.pick-panel__note {
+  margin: 6px 0 0;
+  padding: 10px 8px 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 1023px) {
+  .pick-backdrop {
+    background: rgba(22, 38, 75, 0.45);
+  }
+
+  .pick-panel {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    max-height: 82vh;
+    padding: 10px 16px calc(16px + env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .pick-panel::before {
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 0 auto 6px;
+    content: '';
+    background: var(--border-strong);
+    border-radius: 999px;
+  }
+
+  .pick-panel__sheet-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0 12px;
+  }
+
+  .pick-panel__sheet-title {
+    margin: 0;
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--navy);
+  }
+
+  .pick-panel__sheet-sub {
+    margin: 2px 0 0;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .pick-panel__close {
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    color: var(--navy);
+    background: var(--sand);
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .pick-panel__label {
+    display: none;
+  }
+}
+
+/* Where you'll be, with several places: dates and "See dates" per place. */
+.detail-location--several .detail-location__row {
+  align-items: center;
+}
+
+.detail-location--several .detail-location__copy {
+  flex: 1;
+}
+
+.detail-location__meta {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.detail-location__see {
+  flex-shrink: 0;
+  margin-top: 0;
 }
 
 /* Admin bookings (/admin/bookings) */
