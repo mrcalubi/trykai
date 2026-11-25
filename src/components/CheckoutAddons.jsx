@@ -4,6 +4,7 @@ import FormattedPrice from './FormattedPrice'
 import Icon from './ui/Icon'
 import { addonGuestUnitCents } from '../lib/pricing'
 import {
+  addonTileIcon,
   checkoutExtrasSummary,
   guestAddonPriceParts,
   maxAddonQuantity,
@@ -147,7 +148,7 @@ function ExtrasSheet({ addons, draft, guestsCount, remainingById, onDraft, onClo
                     <img src={addon.photo.remoteUrl} alt="" className="extras-card__thumb" />
                   ) : (
                     <span className="extras-card__thumb extras-card__thumb--empty" aria-hidden="true">
-                      <Icon name="sparkle" size={22} />
+                      <Icon name={addonTileIcon(addon)} size={22} />
                     </span>
                   )}
                   <div className="extras-card__copy">
