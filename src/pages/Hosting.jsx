@@ -64,7 +64,13 @@ import { loadBookingAddonRows, loadBookingNotes } from '../lib/bookingAddons'
 import { HostReviewsDueList } from '../components/HostReviewForm'
 import { fetchMyReviews } from '../lib/twoWayReviews'
 import { groupGuestsBySession } from '../lib/companions'
-import { bookedSeats, confirmedBookings, sessionDayLabel, sessionTimeRange } from '../lib/hostSessions'
+import {
+  bookedSeats,
+  confirmedBookings,
+  nextUpSessions,
+  sessionDayLabel,
+  sessionTimeRange,
+} from '../lib/hostSessions'
 
 // Pending rows are unpaid checkouts, not guests the host has to refund.
 const activeBookingsOn = confirmedBookings
@@ -853,12 +859,25 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
     )
   }
 
-  const nextUp = bookedHostSessions[0] ?? null
-  const nextUpNote = nextUp
-    ? activeBookingsOn(nextUp)
+  // A multi-location listing can run its places at once, so Next up shows each
+  // one booked at that time, location 1 first.
+  const placeRank = {}
+  for (const rows of Object.values(activeLocationsByListing)) {
+    rows.forEach((row, index) => {
+      placeRank[row.id] = index
+    })
+  }
+  const nextUpListing = listings.find((listing) => listing.id === bookedHostSessions[0]?.listing_id)
+  const nextUpItems = nextUpSessions(bookedHostSessions, nextUpListing, placeRank).map((session) => ({
+    session,
+    guestRows: guestsBySession[session.id] ?? [],
+    note:
+      activeBookingsOn(session)
         .map((booking) => notesByBooking[booking.id]?.note)
-        .find(Boolean) ?? ''
-    : ''
+        .find(Boolean) ?? '',
+    placeName: locationNameById[session.location_id] ?? '',
+    href: sessionHref(session.id),
+  }))
 
   const setupSteps = [
     verificationStatus === 'approved'
@@ -1045,15 +1064,7 @@ export default function Hosting({ embedded = false, onListingDeleted, onSessions
           </section>
         )}
 
-        {nextUp ? (
-          <HostNextUp
-            session={nextUp}
-            listing={listings.find((listing) => listing.id === nextUp.listing_id)}
-            guestRows={guestsBySession[nextUp.id] ?? []}
-            note={nextUpNote}
-            href={sessionHref(nextUp.id)}
-          />
-        ) : null}
+        {nextUpItems.length ? <HostNextUp items={nextUpItems} listing={nextUpListing} /> : null}
 
         <section className="hosting-month" aria-labelledby="hosting-month-title">
           <h2 id="hosting-month-title" className="hosting__section-title">

@@ -56,6 +56,28 @@ export function sessionTimeRange(session, listing) {
   return fromHalf && fromHalf === toHalf ? `${fromClock} – ${to}` : `${from} – ${to}`
 }
 
+/**
+ * What Next up shows: the soonest booked session, plus every other booked
+ * session of the same listing that overlaps it. Only a multi-location listing
+ * (00059) can run sessions at once, each at its own place, and its team runs
+ * them all. Takes booked sessions sorted soonest first; places tie by
+ * `placeRank` (location id → position), so location 1 leads.
+ */
+export function nextUpSessions(bookedSessions, listing, placeRank = {}) {
+  const [first] = bookedSessions ?? []
+  if (!first) return []
+  const startsAt = (session) => new Date(session.starts_at).getTime()
+  const endsAt = startsAt(first) + sessionDurationMins(first, listing) * 60_000
+  const rank = (session) => placeRank[session.location_id] ?? Number.MAX_SAFE_INTEGER
+  return bookedSessions
+    .filter(
+      (session) =>
+        session === first ||
+        (session.listing_id === first.listing_id && startsAt(session) < endsAt),
+    )
+    .sort((a, b) => startsAt(a) - startsAt(b) || rank(a) - rank(b))
+}
+
 /** The date tile on Next up: SAT / 21 / NOV. */
 export function sessionDateTile(iso) {
   const date = new Date(iso)
