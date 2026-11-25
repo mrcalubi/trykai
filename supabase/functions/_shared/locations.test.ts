@@ -386,3 +386,51 @@ describe('functions read the location after their main work', () => {
     expect(source).not.toMatch(/listing_locations|location_id/)
   })
 })
+
+describe('odd rows and failures', () => {
+  it('skips sessions and locations it cannot use', async () => {
+    const { admin } = adminWith({
+      sessions: {
+        data: [
+          { id: 's1', location_id: 'loc-a' },
+          { id: 's2', location_id: null },
+          { id: 's3', location_id: 'loc-gone' },
+          { location_id: 'loc-a' },
+        ],
+      },
+      listing_locations: {
+        data: [{ id: 'loc-a', listing_id: null, label: null, area: 'Bedok' }, { label: 'no id' }],
+      },
+    })
+    const places = await loadSessionPlaces(admin, ['s1', 's2', 's3'])
+    expect([...places.keys()]).toEqual(['s1'])
+    expect(places.get('s1')).toMatchObject({ area: 'Bedok', multiLocation: false })
+  })
+
+  it('reads nothing more when no session has a location', async () => {
+    const { admin, calls } = adminWith({ sessions: { data: [{ id: 's1', location_id: null }] } })
+    expect((await loadSessionPlaces(admin, ['s1'])).size).toBe(0)
+    expect(calls).toHaveLength(1)
+  })
+
+  it('leaves out rows without a name, inactive or listing-less ones, and orders by position then date', async () => {
+    const { admin } = adminWith({
+      listing_locations: {
+        data: [
+          { listing_id: 'l1', label: '', area: '', position: 0, is_active: true },
+          { listing_id: null, label: '', area: 'Bedok', position: 0, is_active: true },
+          { listing_id: 'l1', label: '', area: 'Bishan', created_at: '2026-11-26', is_active: true },
+          { listing_id: 'l1', label: '', area: 'Bedok', created_at: '2026-11-25', is_active: true },
+        ],
+      },
+    })
+    expect((await loadListingPlaceNames(admin, ['l1'])).get('l1')).toEqual(['Bedok', 'Bishan'])
+    expect((await loadListingPlaceNames(admin, [])).size).toBe(0)
+  })
+
+  it('returns nothing when the listing names read throws', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { admin } = adminWith({ listing_locations: { throws: true } })
+    expect((await loadListingPlaceNames(admin, ['l1'])).size).toBe(0)
+  })
+})
