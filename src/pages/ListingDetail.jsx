@@ -64,7 +64,7 @@ import Icon from '../components/ui/Icon'
 import { formatCents } from '../lib/cancellationPolicy'
 import VerifiedBadge from '../components/VerifiedBadge'
 import KeenPanel from '../components/KeenPanel'
-import { ClassCards, ClassDatePicker, LocationChips } from '../components/ListingClasses'
+import { ClassCards, ClassChips, LocationChips } from '../components/ListingClasses'
 import {
   areasLine,
   isMissingListingLocations,
@@ -74,8 +74,7 @@ import {
   sessionsAt,
   teamNote,
 } from '../lib/listingLocations'
-import { datesInMonth, firstOfDay, isBookable, landingFor, sessionsOfClass } from '../lib/classCalendar'
-import { sessionDayLabel, sessionTimeRange } from '../lib/hostSessions'
+import { landingFor, sessionsOfClass } from '../lib/classCalendar'
 import { usePageTitle } from '../lib/pageTitle'
 import { MOSAIC_VISIBLE_PHOTOS } from '../lib/listingPhotos'
 import { hostRatingFromRpc } from '../lib/twoWayReviews'
@@ -241,12 +240,9 @@ export default function ListingDetail() {
   const [listingAddons, setListingAddons] = useState([])
   const [sessionTypes, setSessionTypes] = useState({ active: [], byId: {} })
   const [typeFilter, setTypeFilter] = useState(null)
-  // A listing with classes loads every upcoming date, so its calendar opens on
-  // a real date and the class filter can jump to that class's next one.
+  // A listing with classes also loads every upcoming date, so the class cards
+  // can count them and picking a class can jump the calendar to its next one.
   const [classSessions, setClassSessions] = useState(null)
-  // { monthKey, dateKey, pickedId } once the guest moves; until then the
-  // calendar sits on the first date they can book.
-  const [classView, setClassView] = useState(null)
   const hasClasses = sessionTypes.active.length > 0
   // Listing locations (00059): every place's dates show, each naming its place,
   // until the guest picks one. `?location=<id>` opens on that place.
@@ -791,47 +787,29 @@ export default function ListingDetail() {
     null
   const cutoffHours = listing.booking_cutoff_hours
   const placeSessions = classSessions ? sessionsAt(classSessions, shownPlace?.id) : null
-  const landing = placeSessions ? landingFor(placeSessions, typeFilter, { cutoffHours }) : null
-  const classCalendar = classView ?? {
-    monthKey: landing?.monthKey ?? null,
-    dateKey: landing?.dateKey ?? null,
-    pickedId: landing?.session?.id ?? null,
-  }
-  const pickedSession = (classSessions ?? []).find((session) => session.id === classCalendar.pickedId) ?? null
-  const pickedClassName = sessionTypes.byId[pickedSession?.type_id]?.name ?? ''
-  const pickedPlaceName = placeOf(pickedSession)
 
-  /** Cards and chips: show a class's dates, keeping a picked time that fits. */
+  /**
+   * After a class or place filter: stay on this month when it still has a
+   * matching date, otherwise jump to the first one the guest can book.
+   */
+  function landOn(sessions, classId) {
+    const shown = sessionsOfClass(sessions, classId)
+    if (shown.some((session) => singaporeMonthKey(session.starts_at) === visibleMonth)) return
+    const land = landingFor(sessions, classId, { cutoffHours })
+    if (!land.monthKey) return
+    setVisibleMonth(land.monthKey)
+    setSelectedDateKey(land.dateKey)
+  }
+
+  /** Class cards and chips are one filter. */
   function filterClass(nextId) {
     setTypeFilter(nextId)
-    const land = landingFor(placeSessions ?? [], nextId, { keepId: pickedSession?.id, cutoffHours })
-    setClassView({ monthKey: land.monthKey, dateKey: land.dateKey, pickedId: land.session?.id ?? null })
+    if (placeSessions) landOn(placeSessions, nextId)
   }
 
-  /** Location chips: show one place's dates, keeping a picked time there. */
   function filterPlace(nextId) {
     setPlaceFilter(nextId)
-    if (!classSessions) return
-    const land = landingFor(sessionsAt(classSessions, nextId), typeFilter, {
-      keepId: pickedSession?.id,
-      cutoffHours,
-    })
-    setClassView({ monthKey: land.monthKey, dateKey: land.dateKey, pickedId: land.session?.id ?? null })
-  }
-
-  function pickClassDay(dateKey) {
-    const day = datesInMonth(sessionsOfClass(placeSessions, typeFilter), classCalendar.monthKey)[dateKey]
-    setClassView({ ...classCalendar, dateKey, pickedId: firstOfDay(day, cutoffHours)?.id ?? null })
-  }
-
-  function showClassMonth(monthKey) {
-    const byDay = datesInMonth(sessionsOfClass(placeSessions, typeFilter), monthKey)
-    const first = Object.keys(byDay).sort()[0] ?? null
-    setClassView({
-      monthKey,
-      dateKey: first,
-      pickedId: first ? (firstOfDay(byDay[first], cutoffHours)?.id ?? null) : null,
-    })
+    if (classSessions) landOn(sessionsAt(classSessions, nextId), typeFilter)
   }
   const checkoutTypeName = sessionTypes.byId[checkoutSession?.type_id]?.name ?? ''
   const checkoutPlaceName = placeOf(checkoutSession)
@@ -1418,11 +1396,7 @@ export default function ListingDetail() {
             </p>
             {!checkoutSessionId && publicSessionRange && (
               <p className="detail-booking-card__note">
-                {hasClasses
-                  ? `Booking fee included. Same price for ${activeTypes.length === 2 ? 'both classes' : 'every class'}.`
-                  : multiPlace
-                    ? 'Pick a place, a date, then a time'
-                    : 'Pick a date, then a time'}
+                {multiPlace ? 'Pick a place, a date, then a time' : 'Pick a date, then a time'}
               </p>
             )}
             {!checkoutSessionId && publicSessionRange && canBringFriend && !isOwnListing && (
@@ -1452,58 +1426,16 @@ export default function ListingDetail() {
               <LocationChips locations={places.active} filterId={shownPlace?.id ?? null} onFilter={filterPlace} />
             ) : null}
 
-            {publicSessionRange && !checkoutSessionId && hasClasses ? (
-              classSessions ? (
-                <>
-                  <ClassDatePicker
-                    listing={listing}
-                    classes={activeTypes}
-                    classById={sessionTypes.byId}
-                    placeById={multiPlace ? places.byId : {}}
-                    sessions={placeSessions}
-                    filterId={typeFilter}
-                    onFilter={filterClass}
-                    monthKey={classCalendar.monthKey}
-                    onMonth={showClassMonth}
-                    dateKey={classCalendar.dateKey}
-                    onDate={pickClassDay}
-                    pickedId={classCalendar.pickedId}
-                    onPick={(sessionId) => setClassView({ ...classCalendar, pickedId: sessionId })}
-                    disabled={!canTakePayments || isOwnListing}
-                  />
-                  <Button
-                    className="class-dates__book"
-                    disabled={
-                      !pickedSession || !isBookable(pickedSession, cutoffHours) || !canTakePayments || isOwnListing
-                    }
-                    onClick={() => handleBook(pickedSession.id)}
-                  >
-                    {pickedSession ? (
-                      <span className="class-dates__book-text">
-                        <span className="class-dates__book-main">
-                          Book {sessionDayLabel(pickedSession.starts_at)}
-                        </span>
-                        <span className="class-dates__book-sub">
-                          {[pickedClassName, pickedPlaceName, sessionTimeRange(pickedSession, listing)]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </span>
-                      </span>
-                    ) : (
-                      'Pick a date'
-                    )}
-                  </Button>
-                  <p className="class-dates__next">
-                    You&apos;ll choose guests and extras next. Move your booking once, free, up to 48 hours
-                    before.
-                  </p>
-                </>
-              ) : (
-                <p className="hint">Loading dates…</p>
-              )
+            {publicSessionRange && !checkoutSessionId && activeTypes.length > 1 ? (
+              <ClassChips
+                classes={activeTypes}
+                sessions={placeSessions}
+                filterId={typeFilter}
+                onFilter={filterClass}
+              />
             ) : null}
 
-            {publicSessionRange && !checkoutSessionId && !hasClasses && (
+            {publicSessionRange && !checkoutSessionId && (
               <>
                 <div className="detail-calendar">
                   <SessionCalendar

@@ -2063,32 +2063,25 @@ describe('ListingDetail session types', () => {
     vi.useRealTimers()
   })
 
-  const times = () => screen.queryAllByRole('radio')
-  const timeNames = () => times().map((radio) => radio.closest('label').querySelector('.class-time__class')?.textContent)
-  const datedDays = () => [...document.querySelectorAll('.class-cal__grid button')]
+  const classNames = () => [...document.querySelectorAll('.session-card__type')].map((node) => node.textContent)
 
-  it('shows the classes as cards and opens the calendar on the first date, already picked', async () => {
+  it('shows the classes as cards and books them on the same calendar as any listing', async () => {
     renderPage()
     expect(await screen.findByRole('heading', { name: "Pick what you'll make" })).toBeInTheDocument()
     expect(screen.getByText('2 classes · same price')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Hand-tied bouquet' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Old wreath' })).not.toBeInTheDocument()
-    expect(screen.getByText('Booking fee included. Same price for both classes.')).toBeInTheDocument()
+    expect(screen.getByText('Pick a date, then a time')).toBeInTheDocument()
+    expect(screen.queryByText(/Same price for/)).not.toBeInTheDocument()
 
-    await waitFor(() => expect(times()).toHaveLength(3))
+    expect(await screen.findByRole('heading', { name: 'Thu, 12 Nov · 3 sessions' })).toBeInTheDocument()
+    expect(document.querySelector('.detail-calendar')).toBeInTheDocument()
     expect(screen.getByText('November 2026')).toBeInTheDocument()
-    expect(screen.getByText('3 dates this month')).toBeInTheDocument()
-    // Only a day with dates can be tapped, and it says it has several classes.
-    expect(datedDays()).toHaveLength(1)
-    expect(datedDays()[0]).toHaveAccessibleName('Thu 12 Nov, 3 times, more than one class')
-    expect(datedDays()[0]).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Previous month' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Next month' })).toBeDisabled()
-    // Removed classes still name their dates.
-    expect(timeNames()).toEqual(['Hand-tied bouquet', 'Table centrepiece', 'Old wreath'])
-    expect(times()[0]).toBeChecked()
-    expect(screen.getByRole('button', { name: /^Book Thu 12 Nov\s*Hand-tied bouquet · / })).toBeEnabled()
-    expect(document.querySelector('.detail-calendar')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /12 Nov.*3 sessions/ })).toHaveAttribute('aria-pressed', 'true')
+    // Removed classes still name their dates, and every time has its own Book.
+    expect(classNames()).toEqual(['Hand-tied bouquet', 'Table centrepiece', 'Old wreath'])
+    expect(screen.getAllByRole('button', { name: 'Book' })).toHaveLength(3)
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
   })
 
   it('opens on the next month that has dates, never an empty one', async () => {
@@ -2096,41 +2089,50 @@ describe('ListingDetail session types', () => {
     renderPage()
 
     expect(await screen.findByText('December 2026')).toBeInTheDocument()
-    expect(screen.getByText('1 date this month')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Book' })).toBeInTheDocument()
     expect(screen.queryByText(/No .*sessions in/)).not.toBeInTheDocument()
   })
 
-  it('keeps the class cards and the chips as one filter, and keeps a picked time that fits', async () => {
+  it('keeps the class cards and the chips as one filter', async () => {
     const { user } = renderPage()
-    await waitFor(() => expect(times()).toHaveLength(3))
+    await waitFor(() => expect(classNames()).toHaveLength(3))
     const chips = screen.getByRole('group', { name: 'Class' })
 
     await user.click(within(chips).getByRole('button', { name: 'Table centrepiece' }))
-    expect(timeNames()).toEqual(['Table centrepiece'])
-    expect(times()[0]).toBeChecked()
+    expect(classNames()).toEqual(['Table centrepiece'])
     expect(screen.getByRole('button', { name: 'Showing Table centrepiece dates' })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
 
     await user.click(within(chips).getByRole('button', { name: 'All classes' }))
-    expect(times()).toHaveLength(3)
-    expect(times()[1]).toBeChecked()
+    expect(classNames()).toHaveLength(3)
 
     await user.click(screen.getByRole('button', { name: 'See Hand-tied bouquet dates' }))
-    expect(timeNames()).toEqual(['Hand-tied bouquet'])
+    expect(classNames()).toEqual(['Hand-tied bouquet'])
     expect(within(chips).getByRole('button', { name: 'Hand-tied bouquet' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('names the picked day and class on the button, then opens checkout', async () => {
+  it("jumps to a class's next month when this month has none of its dates", async () => {
+    givenSessions([
+      makeSession({ id: 's1', starts_at: hoursFromNow(48), spots_remaining: 4, type_id: 't1' }),
+      makeSession({ id: 's2', starts_at: hoursFromNow(24 * 30), spots_remaining: 4, type_id: 't2' }),
+    ])
+    const { user } = renderPage()
+    expect(await screen.findByText('November 2026')).toBeInTheDocument()
+    await waitFor(() => expect(classNames()).toEqual(['Hand-tied bouquet']))
+
+    await user.click(within(screen.getByRole('group', { name: 'Class' })).getByRole('button', { name: 'Table centrepiece' }))
+    expect(await screen.findByText('December 2026')).toBeInTheDocument()
+    await waitFor(() => expect(classNames()).toEqual(['Table centrepiece']))
+  })
+
+  it("books one of the day's times from its own Book button", async () => {
     givenSignedIn()
     const { user } = renderPage()
-    await waitFor(() => expect(times()).toHaveLength(3))
+    await waitFor(() => expect(classNames()).toHaveLength(3))
 
-    await user.click(times()[1])
-    const book = screen.getByRole('button', { name: /^Book Thu 12 Nov\s*Table centrepiece · / })
-    expect(book).toBeEnabled()
-    await user.click(book)
+    await user.click(screen.getAllByRole('button', { name: 'Book' })[1])
     expect(await screen.findByRole('button', { name: 'Add a note for Mei' })).toBeInTheDocument()
   })
 
