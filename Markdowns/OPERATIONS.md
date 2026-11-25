@@ -427,6 +427,12 @@ Deliberately held as buffer. If everything is on track, use it for final polish,
 
 Who does what: Caleb applies migrations and sets secrets. Claude and Cursor never hold a Supabase access token, and nobody pastes secrets into chat. `SUPABASE_ACCESS_TOKEN` lives only in GitHub Actions secrets.
 
+## Bookings view and new-booking alerts
+
+**Who booked what:** `/admin/bookings` on the site (signed in as an admin; "Bookings" in the menu). Upcoming classes, or latest bookings including cancellations. No SQL needed.
+
+**New-booking alerts:** every confirmed booking emails `ADMIN_NOTIFY_EMAIL`. For an instant phone alert as well, each admin connects Telegram once in **Settings** (the same TryKai bot hosts use). Admins who never connect get email only. Deploy after merging: `supabase functions deploy admin-bookings` and `supabase functions deploy stripe-webhook` on staging, then production.
+
 ## Production SQL
 
 Every migration, and any other SQL that writes on production.

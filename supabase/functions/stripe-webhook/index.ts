@@ -23,6 +23,7 @@ import {
 } from '../_shared/email.ts'
 import { identityEventOutcome } from '../_shared/verification.ts'
 import { notifyUserTelegram, telegramNewBooking } from '../_shared/telegram.ts'
+import { notifyAdminsOfBooking } from '../_shared/adminBookings.ts'
 import { loadSessionPlace, locationLine, sessionAddress } from '../_shared/locations.ts'
 import {
   asRecord,
@@ -293,6 +294,24 @@ async function confirmSucceededPayment(paymentIntent: {
       place: locationName,
     }))
   }
+
+  // The team's alert (Telegram to admins who connected it, email to
+  // ADMIN_NOTIFY_EMAIL). Never throws, so it cannot undo the booking.
+  await notifyAdminsOfBooking(admin, {
+    bookingId: booking.id,
+    guestName: guestName || 'A guest',
+    guestEmail: guestProfile?.email ?? null,
+    listingTitle,
+    hostName,
+    startsAt: session?.starts_at ?? '',
+    guestsCount: booking.guests_count,
+    paidCents: booking.total_amount,
+    place: locationName,
+    siteUrl,
+  }, {
+    opsEmail: opsEmail(),
+    sendEmail: (email) => sendResendEmail({ apiKey, ...email }),
+  })
 }
 
 async function cancelPendingPayment(paymentIntent: { id: string; metadata?: Record<string, string> }) {
