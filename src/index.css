@@ -11036,10 +11036,11 @@ body.extras-sheet-open {
   background: var(--bg-subtle);
 }
 
+/* Same icon and colour as the listing page's add-on rows (addonTileIcon). */
 .extras-card__thumb--empty {
   display: grid;
   place-items: center;
-  color: var(--coral-ink);
+  color: var(--navy);
   background: var(--sand);
 }
 

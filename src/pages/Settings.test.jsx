@@ -379,7 +379,9 @@ describe('Settings profile form', () => {
 
   it('focuses About you when opened at #bio', async () => {
     await renderSettings({ route: '/settings#bio' })
-    expect(screen.getByLabelText('About you')).toHaveFocus()
+    // Focus moves in an effect after the form renders; wait for it rather
+    // than assert on the first frame, which flaked on a slow CI runner.
+    await waitFor(() => expect(screen.getByLabelText('About you')).toHaveFocus())
   })
 
   it('shows an update error from the database', async () => {
