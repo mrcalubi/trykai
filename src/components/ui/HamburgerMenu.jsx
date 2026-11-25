@@ -25,7 +25,8 @@ function loggedInItems({ isAdmin, verificationStatus, userId }) {
     { ...host, promo: HOST_BLURB[host.label], divided: true },
     ...(isAdmin
       ? [
-          { label: 'Listing review', to: '/admin/listings', icon: 'document', divided: true },
+          { label: 'Bookings', to: '/admin/bookings', icon: 'calendar', divided: true },
+          { label: 'Listing review', to: '/admin/listings', icon: 'document' },
           { label: 'Verification review', to: '/admin/verifications', icon: 'shield' },
         ]
       : []),
