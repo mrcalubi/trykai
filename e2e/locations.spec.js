@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { stubAllExternalCalls } from './support/network'
-import { LATTE_ART, hoursFromNow } from './support/fixtures'
+import { LATTE_ART, SIGNED_IN_USER, hoursFromNow, makeAuthSession, makeMyAccount } from './support/fixtures'
 
 // A team listing (00059): the same Saturday time at two places, each its own session.
 const LISTING = {
@@ -97,5 +97,68 @@ test.describe('listing locations, for guests', () => {
     await stub(page)
     await page.goto('/')
     await expect(page.getByRole('link', { name: /Pottery with the studio team/ })).toContainText('Tampines +1')
+  })
+})
+
+test.describe('listing locations, for the host', () => {
+  test('Next up shows each place running at that time', async ({ page }, testInfo) => {
+    const mine = { ...LISTING, host_id: SIGNED_IN_USER.id, multi_location: true }
+    const booked = (id, locationId, guests) => ({
+      ...session(id, locationId, 4 - guests),
+      spots_total: 4,
+      listings: { title: mine.title },
+      bookings: [{ id: `b-${id}`, status: 'confirmed', guests_count: guests, total_amount: 3700 * guests }],
+    })
+    await stubAllExternalCalls(
+      page,
+      {
+        listings: [mine],
+        sessions: [booked('s-j', 'loc-j', 1), booked('s-t', 'loc-t', 2)],
+        listing_locations: PLACES,
+        bookings: [
+          { id: 'b-s-t', guest_id: 'guest-1', addon_note: null },
+          { id: 'b-s-j', guest_id: 'guest-2', addon_note: 'Is there a lift?' },
+        ],
+        booking_addons: [],
+        listing_addons: [],
+        listing_session_types: [],
+        reviews: [],
+        users: [
+          { id: SIGNED_IN_USER.id, display_name: 'Kai', avatar_url: null, is_host: true, is_id_verified: true, stripe_payouts_enabled: true },
+        ],
+        'rpc/my_account': [
+          makeMyAccount({ is_host: true, stripe_payouts_enabled: true, verification_status: 'approved' }),
+        ],
+        'rpc/host_session_guests': [
+          { session_id: 's-t', booking_id: 'b-s-t', user_id: 'guest-1', display_name: 'Wei Ling T.', is_companion: false, guests_count: 2 },
+          { session_id: 's-j', booking_id: 'b-s-j', user_id: 'guest-2', display_name: 'Arjun', is_companion: false, guests_count: 1 },
+        ],
+      },
+      { session: makeAuthSession() },
+    )
+    await page.goto('/login')
+    await page.getByLabel('Email').fill(SIGNED_IN_USER.email)
+    await page.getByLabel('Password', { exact: true }).fill(SIGNED_IN_USER.password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+    await expect(page).toHaveURL(/\/$/)
+    await page.goto('/hosting')
+
+    const next = page.locator('.next-up')
+    const rows = next.locator('.next-up__place-row')
+    await expect(rows).toHaveCount(2)
+    await expect(rows.nth(0)).toContainText('Tampines')
+    await expect(rows.nth(0)).toContainText('2 of 4 spots booked')
+    await expect(rows.nth(1)).toContainText('Jurong studio · Jurong East')
+    await expect(rows.nth(1)).toContainText('Is there a lift?')
+    for (const link of await next.getByRole('link', { name: /^View session at / }).all()) {
+      expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44)
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      page.viewportSize().width,
+    )
+    await next.screenshot({ path: testInfo.outputPath('next-up-places.png') })
+
+    await next.getByRole('link', { name: 'View session at Jurong studio · Jurong East' }).click()
+    await expect(page).toHaveURL(/session=s-j/)
   })
 })

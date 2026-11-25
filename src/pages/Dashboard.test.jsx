@@ -1603,6 +1603,88 @@ describe('Hosting Next up', () => {
     expect(within(next).getByText('“Is there parking nearby?”')).toBeInTheDocument()
     expect(supabase.rpc).toHaveBeenCalledWith('host_session_guests', { p_session_ids: ['s-group'] })
   })
+
+  describe('with multiple locations (00059)', () => {
+    const PLACES = [
+      { id: 'loc-1', listing_id: 'listing-1', label: 'Studio', area: 'Bishan', position: 0, is_active: true },
+      { id: 'loc-2', listing_id: 'listing-1', label: 'Annex', area: 'Bedok', position: 1, is_active: true },
+    ]
+
+    it('shows every place running at that time, location 1 first, each with its own guests', async () => {
+      const startsAt = hoursFromNow(30)
+      givenData({
+        listings: [makeMyListing({ multi_location: true })],
+        hostSessions: [
+          makeHostSession({
+            id: 's-bedok',
+            location_id: 'loc-2',
+            starts_at: startsAt,
+            bookings: [{ id: 'b-bedok', status: 'confirmed', guests_count: 1 }],
+          }),
+          makeHostSession({
+            id: 's-bishan',
+            location_id: 'loc-1',
+            starts_at: startsAt,
+            bookings: [{ id: 'b-bishan', status: 'confirmed', guests_count: 2 }],
+          }),
+          makeHostSession({
+            id: 's-later',
+            location_id: 'loc-1',
+            starts_at: hoursFromNow(80),
+            bookings: [{ id: 'b-later', status: 'confirmed', guests_count: 1 }],
+          }),
+        ],
+        bookings: [{ id: 'b-bedok', guest_id: 'g2', addon_note: 'Gate code?' }],
+        sessionGuests: [
+          { session_id: 's-bishan', booking_id: 'b-bishan', user_id: 'g1', display_name: 'Kai', is_companion: false, guests_count: 2 },
+          { session_id: 's-bedok', booking_id: 'b-bedok', user_id: 'g2', display_name: 'Mei', is_companion: false, guests_count: 1 },
+        ],
+      })
+      supabase.__on('listing_locations', 'select', { data: PLACES, error: null })
+      await renderHosting()
+
+      const next = sectionFor('Next up')
+      const rows = await within(next).findAllByRole('listitem')
+      expect(rows).toHaveLength(2)
+      expect(within(rows[0]).getByText('Studio · Bishan')).toBeInTheDocument()
+      expect(within(rows[0]).getByText(/2 of 4 spots booked/)).toBeInTheDocument()
+      expect(await within(rows[0]).findByText(/^Kai/)).toBeInTheDocument()
+      expect(within(rows[1]).getByText('Annex · Bedok')).toBeInTheDocument()
+      expect(within(rows[1]).getByText(/1 of 4 spots booked/)).toBeInTheDocument()
+      expect(within(rows[1]).getByText('“Gate code?”')).toBeInTheDocument()
+      expect(within(next).getByRole('link', { name: 'View session at Studio · Bishan' })).toHaveAttribute(
+        'href',
+        '/hosting?session=s-bishan',
+      )
+      expect(within(next).getByRole('link', { name: 'View session at Annex · Bedok' })).toHaveAttribute(
+        'href',
+        '/hosting?session=s-bedok',
+      )
+      // One title for the pair, and the later date stays out.
+      expect(within(next).getAllByText('Latte art')).toHaveLength(1)
+      expect(within(next).getAllByRole('link')).toHaveLength(2)
+    })
+
+    it('names the place when only one of them is booked at that time', async () => {
+      givenData({
+        listings: [makeMyListing({ multi_location: true })],
+        hostSessions: [
+          makeHostSession({ id: 's-bedok', location_id: 'loc-2' }),
+          makeHostSession({ id: 's-open', location_id: 'loc-1', bookings: [] }),
+        ],
+      })
+      supabase.__on('listing_locations', 'select', { data: PLACES, error: null })
+      await renderHosting()
+
+      const next = sectionFor('Next up')
+      expect(await within(next).findByText('Annex · Bedok')).toBeInTheDocument()
+      expect(within(next).queryByRole('listitem')).not.toBeInTheDocument()
+      expect(within(next).getByRole('link', { name: 'View session at Annex · Bedok' })).toHaveAttribute(
+        'href',
+        '/hosting?session=s-bedok',
+      )
+    })
+  })
 })
 
 describe('Hosting session page', () => {

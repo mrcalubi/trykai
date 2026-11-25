@@ -4,6 +4,7 @@ import {
   bookedSeats,
   guestInitials,
   hasBlockingBookings,
+  nextUpSessions,
   relativeDayLabel,
   sessionCapacity,
   sessionDateTile,
@@ -127,5 +128,44 @@ describe('host session helpers', () => {
     expect(
       sessionSpotsLine(session({ bookings: [{ status: 'confirmed', guests_count: 3 }] }), listing, NOW),
     ).toMatch(/^1 spot still open\./)
+  })
+})
+
+describe('nextUpSessions (multiple locations, 00059)', () => {
+  const at = (iso, overrides = {}) =>
+    session({ listing_id: 'l1', starts_at: iso, ...overrides })
+
+  it('is empty with nothing booked, and one session on its own', () => {
+    expect(nextUpSessions([], listing)).toEqual([])
+    expect(nextUpSessions(undefined, listing)).toEqual([])
+    const only = at('2026-11-21T06:00:00Z')
+    expect(nextUpSessions([only, at('2026-11-22T06:00:00Z', { id: 's-2' })], listing)).toEqual([only])
+  })
+
+  it("adds the listing's other places running at the same time, location 1 first", () => {
+    const bedok = at('2026-11-21T06:00:00Z', { id: 'bedok', location_id: 'loc-2' })
+    const bishan = at('2026-11-21T06:00:00Z', { id: 'bishan', location_id: 'loc-1' })
+    const later = at('2026-11-21T09:00:00Z', { id: 'later', location_id: 'loc-1' })
+    const rank = { 'loc-1': 0, 'loc-2': 1 }
+    expect(nextUpSessions([bedok, bishan, later], listing, rank).map((s) => s.id)).toEqual(['bishan', 'bedok'])
+    // Places it can't rank go last.
+    const removed = at('2026-11-21T06:00:00Z', { id: 'removed', location_id: 'loc-gone' })
+    expect(nextUpSessions([removed, bedok], listing, rank).map((s) => s.id)).toEqual(['bedok', 'removed'])
+  })
+
+  it('counts a session that starts before the first one ends, but not one that starts as it ends', () => {
+    const first = at('2026-11-21T06:00:00Z', { id: 'first' })
+    const overlapping = at('2026-11-21T07:00:00Z', { id: 'overlapping' })
+    const after = at('2026-11-21T07:30:00Z', { id: 'after' }) // 90 minutes on
+    expect(nextUpSessions([first, overlapping, after], listing).map((s) => s.id)).toEqual(['first', 'overlapping'])
+    // A session's own length wins over the listing's.
+    const short = at('2026-11-21T06:00:00Z', { id: 'short', duration_mins: 30 })
+    expect(nextUpSessions([short, overlapping], listing).map((s) => s.id)).toEqual(['short'])
+  })
+
+  it("leaves out another listing's session, even at the same time", () => {
+    const mine = at('2026-11-21T06:00:00Z', { id: 'mine' })
+    const other = at('2026-11-21T06:00:00Z', { id: 'other', listing_id: 'l2' })
+    expect(nextUpSessions([mine, other], listing).map((s) => s.id)).toEqual(['mine'])
   })
 })
