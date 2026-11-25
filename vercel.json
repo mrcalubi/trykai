@@ -18,7 +18,7 @@
     },
     { "source": "/(listings|u|edit-listing|bookings|join)/:id", "destination": "/index.html" },
     { "source": "/verify-identity/singpass", "destination": "/index.html" },
-    { "source": "/admin/(singpass-keys|listings|verifications)", "destination": "/index.html" }
+    { "source": "/admin/(singpass-keys|listings|verifications|bookings)", "destination": "/index.html" }
   ],
   "headers": [
     {
