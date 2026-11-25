@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  areasLine,
   datesByLocation,
   draftLocations,
   emptyLocation,
@@ -14,6 +15,11 @@ import {
   MAX_LOCATIONS,
   queryListingLocations,
   saveListingLocations,
+  loadPublicLocations,
+  loadRevealedPlaces,
+  placeTitle,
+  sessionsAt,
+  teamNote,
 } from './listingLocations'
 
 /** Records every write in order; `fail` makes the matching write return an error. */
@@ -283,5 +289,51 @@ describe('saveListingLocations', () => {
     })
     expect(error).toEqual({ message: 'boom' })
     expect(insertedIds).toEqual({ a: 'new-1' })
+  })
+})
+
+describe('guest side', () => {
+  it('filters sessions to one place, or keeps them all', () => {
+    const sessions = [{ id: 'a', location_id: 'loc-t' }, { id: 'b', location_id: 'loc-j' }]
+    expect(sessionsAt(sessions, 'loc-j').map((s) => s.id)).toEqual(['b'])
+    expect(sessionsAt(sessions, null)).toBe(sessions)
+    expect(sessionsAt(null, 'loc-j')).toEqual([])
+  })
+
+  it('names places for the facts row and the Where section, never with an address', () => {
+    expect(areasLine([{ area: 'Tampines' }, { area: 'Jurong East' }, { area: 'Tampines' }])).toBe('Tampines + 1 more')
+    expect(areasLine([{ area: 'Bedok' }])).toBe('Bedok')
+    expect(placeTitle({ label: 'Jurong studio', area: 'Jurong East' })).toBe('Jurong studio, Jurong East')
+    expect(placeTitle({ label: '', area: 'Tampines' })).toBe('Tampines, Singapore')
+    expect(teamNote('Mei')).toBe('Mei runs this with a team, so your teacher may be a team member.')
+  })
+
+  it('loads a listing page’s places, removed ones only by id', async () => {
+    const rows = [JURONG_ROW, TAMPINES_ROW, { ...JURONG_ROW, id: 'loc-old', is_active: false, position: 2 }]
+    const query = {
+      select: () => query,
+      in: () => query,
+      eq: () => query,
+      order: async () => ({ data: rows, error: null }),
+    }
+    const places = await loadPublicLocations({ from: () => query }, 'l1')
+    expect(places.several).toBe(true)
+    expect(places.active.map((place) => place.id)).toEqual(['loc-t', 'loc-j'])
+    expect(places.byId['loc-old'].name).toBe('Jurong studio · Jurong East')
+  })
+
+  it('keeps only the addresses this viewer may see', async () => {
+    const rpc = vi.fn(async () => ({
+      data: [
+        { id: 'loc-t', full_address: ' Blk 1 ', arrival_instructions: 'Lift B' },
+        { id: 'loc-j', full_address: null, arrival_instructions: null },
+      ],
+      error: null,
+    }))
+    expect(await loadRevealedPlaces({ rpc }, 'l1')).toEqual({
+      'loc-t': { fullAddress: 'Blk 1', arrivalInstructions: 'Lift B' },
+    })
+    expect(rpc).toHaveBeenCalledWith('listing_location_details', { p_listing_id: 'l1' })
+    expect(await loadRevealedPlaces({ rpc: async () => ({ data: null, error: { message: 'x' } }) }, 'l1')).toEqual({})
   })
 })

@@ -15456,3 +15456,48 @@ body.add-dates-open {
 .locations-editor__off .hint {
   margin-top: 4px;
 }
+
+/* Listing locations (00059), guest side */
+.session-card__place {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.session-card__place .icon,
+.session-card__place svg {
+  flex-shrink: 0;
+  color: var(--coral);
+}
+
+.class-time__place {
+  color: var(--muted);
+}
+
+.location-chips {
+  margin: 12px 0 4px;
+}
+
+.location-chips .class-dates__chip svg {
+  color: var(--coral);
+}
+
+.location-chips .class-dates__chip--on svg {
+  color: var(--cream);
+}
+
+.detail-location__team {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.detail-location__note--all {
+  margin: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
