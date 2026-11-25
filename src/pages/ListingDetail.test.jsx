@@ -1849,6 +1849,26 @@ describe('ListingDetail add-ons', () => {
 
   const extrasRow = () => screen.getByRole('button', { name: /^Make it extra/ })
 
+  it('draws the same add-on icon on the page and in the checkout panel', async () => {
+    givenAddons([BLOOMS, WRAP])
+    const { user } = renderPage()
+    const section = (
+      await screen.findByRole('heading', { name: 'Add a little extra' })
+    ).closest('section')
+    const pageIcons = [...section.querySelectorAll('.extras-menu__thumb--empty svg')].map(
+      (svg) => svg.innerHTML,
+    )
+    expect(pageIcons).toHaveLength(2)
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(extrasRow())
+    const panel = screen.getByRole('dialog', { name: 'Make it extra' })
+    const panelIcons = [...panel.querySelectorAll('.extras-card__thumb--empty svg')].map(
+      (svg) => svg.innerHTML,
+    )
+    expect(panelIcons).toEqual(pageIcons)
+  })
+
   it('shows the extras as one row that opens a panel', async () => {
     givenAddons([BLOOMS, WRAP], [{ addon_id: 'addon-blooms', remaining: 2 }])
     const { user } = renderPage()

@@ -692,6 +692,12 @@ test('books with an add-on and shows it on the confirmation', async ({ page }) =
   await extrasRow.click()
   const panel = page.getByRole('dialog', { name: 'Make it extra' })
   await expect(panel).toBeVisible()
+  // The same icon as on the page for each add-on without a photo.
+  const iconsIn = (scope, selector) =>
+    scope.locator(selector).evaluateAll((svgs) => svgs.map((svg) => svg.innerHTML))
+  expect(await iconsIn(panel, '.extras-card__thumb--empty svg')).toEqual(
+    await iconsIn(page.locator('.extras-menu__list'), '.extras-menu__thumb--empty svg'),
+  )
   await panel.getByRole('button', { name: 'Add Premium blooms' }).click()
   await expect(panel.getByText('For how many of you?')).toBeVisible()
   // The panel stays inside the screen and its button is reachable.
