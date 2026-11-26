@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { EVENTS, track } from '../lib/analytics'
 import { companionBookingsFromRpc } from '../lib/companions'
 import { publicName } from '../lib/publicName'
 import { useAuthedUserId } from '../lib/authedUser'
@@ -323,6 +324,10 @@ export default function Bookings({ embedded = false, hostCta = null, withCalenda
 
         if (data.status === 'confirmed' || data.status === 'cancelled') {
           remember(data.status)
+          // Only the Stripe webhook sets confirmed, so this is a real payment.
+          if (data.status === 'confirmed') {
+            track(EVENTS.bookingPaid, { booking_id: pendingBookingId, ...signals })
+          }
           setBookingNotice(bookingStatusMessage({ bookingStatus: data.status, ...signals }))
           await loadData()
           if (!cancelled) clearPaymentQuery()

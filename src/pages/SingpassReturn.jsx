@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { EVENTS, track } from '../lib/analytics'
 import { functionReasonOrDefault } from '../lib/edgeFunctionError'
 import { formatSingpassDob } from '../lib/singpass'
 import { normalizeHostMobile } from '../../supabase/functions/_shared/singpass.ts'
@@ -82,6 +83,7 @@ export default function SingpassReturn() {
       setView({ phase: 'error', error: await functionReasonOrDefault(error, data, GENERIC_ERROR) })
       return
     }
+    if (data.status === 'approved') track(EVENTS.hostVerified, { method: 'singpass' })
     setView({ phase: 'done', approved: data.status === 'approved' })
   }
 

@@ -12,6 +12,7 @@ import {
   rejectPayNowIfTooFarAhead,
 } from '../_shared/booking.ts'
 import { asRecord, jsonResponse, textResponse } from '../_shared/http.ts'
+import { bookingAttribution, isMissingAttributionColumn } from '../_shared/attribution.ts'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
   apiVersion: '2023-10-16',
@@ -38,7 +39,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json()
-    const { session_id, guests_count, payment_rail, addons, addon_note } = body ?? {}
+    const { session_id, guests_count, payment_rail, addons, addon_note, attribution } = body ?? {}
 
     const authHeader = req.headers.get('Authorization')
     const supabaseAuth = createClient(
@@ -171,7 +172,8 @@ Deno.serve(async (req) => {
     const { totalAmount, platformFee, addonsAmount } = charge
     const addonNote = parseAddonNote(addon_note)
 
-    const bookingRow = {
+    const source = bookingAttribution(attribution)
+    let bookingRow: Record<string, unknown> = {
       session_id,
       guest_id: user.id,
       guests_count: guestsCount,
@@ -181,6 +183,7 @@ Deno.serve(async (req) => {
       status: 'pending',
       addons_amount: addonsAmount,
       addon_note: addonNote,
+      ...source,
     }
 
     let { data: booking, error: bookingError } = await admin
@@ -188,6 +191,18 @@ Deno.serve(async (req) => {
       .insert(bookingRow)
       .select('id')
       .single()
+
+    // Before 00061 is applied the utm_ columns are missing. The source is
+    // nice to have; the booking is not, so retry without it.
+    if (bookingError && isMissingAttributionColumn(bookingError.message)) {
+      const { utm_source: _s, utm_medium: _m, utm_campaign: _c, ...withoutSource } = bookingRow
+      bookingRow = withoutSource
+      ;({ data: booking, error: bookingError } = await admin
+        .from('bookings')
+        .insert(bookingRow)
+        .select('id')
+        .single())
+    }
 
     if (bookingError && /addons_amount|addon_note/.test(bookingError.message ?? '')) {
       const { addons_amount: _ignoredAmount, addon_note: _ignoredNote, ...withoutAddons } = bookingRow

@@ -5,11 +5,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ListingDetail from './ListingDetail'
 import BackButton, { BackSlotProvider } from '../components/BackButton'
 import { supabase } from '../lib/supabase'
+import { currentAttribution, track } from '../lib/analytics'
 import { renderWithRouter } from '../test/render'
 import { hoursFromNow, makeAuthSession, makeListing, makeReview, makeSession } from '../test/fixtures'
 import { monthBounds } from '../lib/sessionCalendar'
 
 vi.mock('../lib/supabase')
+vi.mock('../lib/analytics', async (importOriginal) => ({
+  ...(await importOriginal()),
+  currentAttribution: vi.fn(() => null),
+  track: vi.fn(),
+}))
+
+// clearMocks keeps return values, so put the "no source" default back each time.
+beforeEach(() => {
+  currentAttribution.mockReturnValue(null)
+})
 
 const stripe = vi.hoisted(() => ({
   instance: { confirmPayment: vi.fn(async () => ({ error: null })) },
@@ -1224,6 +1235,35 @@ describe('ListingDetail booking', () => {
       },
       headers: { Authorization: 'Bearer test-access-token' },
     })
+  })
+
+  it('tracks the funnel and sends the first-touch source with the payment intent', async () => {
+    currentAttribution.mockReturnValue({ source: 'instagram', medium: 'story', campaign: null })
+    givenSignedIn()
+    supabase.functions.invoke.mockResolvedValue({
+      data: { clientSecret: 'cs_test_1', booking_id: 'booking-1', total_amount: 5100 },
+      error: null,
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Book' }))
+    await user.click(cardRail())
+    await user.click(continueToPayment())
+
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalledOnce())
+    expect(supabase.functions.invoke.mock.calls[0][1].body.attribution).toEqual({
+      source: 'instagram',
+      medium: 'story',
+      campaign: null,
+    })
+    const events = track.mock.calls.map(([name]) => name)
+    expect(events).toEqual(
+      expect.arrayContaining(['listing_viewed', 'checkout_started', 'payment_method_chosen']),
+    )
+    expect(track).toHaveBeenCalledWith(
+      'payment_method_chosen',
+      expect.objectContaining({ rail: 'card', guests: 1, total_cents: 5100 }),
+    )
   })
 
   it('opens the payment panel with the amount returned by the server', async () => {

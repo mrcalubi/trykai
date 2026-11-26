@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { SHARE_NOTES, shareOrCopy } from '../lib/share'
+import { EVENTS, track } from '../lib/analytics'
 import { COMPANION_SEND_HINT, companionSeats, joinUrl, seatsLabel } from '../lib/companions'
 import Avatar from './ui/Avatar'
 import Button from './ui/Button'
@@ -32,6 +33,9 @@ export default function WhosComing({ booking, bookerName, companions, canRemove,
     })
     setSending(false)
     setNote(SHARE_NOTES[result] ?? '')
+    if (result === 'shared' || result === 'copied') {
+      track(EVENTS.inviteFriendShared, { from: 'join_link', method: result })
+    }
   }
 
   async function remove(userId) {
