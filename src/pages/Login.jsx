@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { EVENTS, track } from '../lib/analytics'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import {
@@ -157,6 +158,7 @@ export default function Login() {
     }
 
     if (data.session) {
+      track(EVENTS.signupCompleted, { method: 'email' })
       navigate(redirectTo, { replace: true })
       return
     }
@@ -190,6 +192,7 @@ export default function Login() {
       return
     }
 
+    track(EVENTS.signupCompleted, { method: 'email' })
     navigate(redirectTo, { replace: true })
   }
 
