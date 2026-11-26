@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { EVENTS, track } from '../lib/analytics'
 import {
   INTEREST_DAY_LABELS,
   INTEREST_DAYS,
@@ -76,7 +77,10 @@ export default function KeenPanel({ listingId, hostName, viewerId }) {
       setError(KEEN_ERROR)
       return
     }
-    if (!keen) setCount((value) => value + 1)
+    if (!keen) {
+      setCount((value) => value + 1)
+      track(EVENTS.imKeen, { listing_id: listingId, group_size: groupSize })
+    }
     setKeen(true)
   }
 

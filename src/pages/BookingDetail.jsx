@@ -65,6 +65,7 @@ import MyHiddenReview from '../components/MyHiddenReview'
 import { companionSeats } from '../lib/companions'
 import { sessionEndAt } from '../lib/reviewGate'
 import WhosComing from '../components/WhosComing'
+import { EVENTS, track } from '../lib/analytics'
 import { isMissingSessionTypes, sessionTypeNamesById } from '../lib/sessionTypes'
 import { isMissingListingLocations, loadPublicLocations, loadRevealedPlaces } from '../lib/listingLocations'
 
@@ -505,6 +506,9 @@ export default function BookingDetail() {
       title: booking.sessions?.listings?.title || 'TryKai',
     })
     setNote(SHARE_NOTES[result] ?? '')
+    if (result === 'shared' || result === 'copied') {
+      track(EVENTS.inviteFriendShared, { from: 'booking', listing_id: listingId, method: result })
+    }
   }
 
   async function onCopy(text, success) {

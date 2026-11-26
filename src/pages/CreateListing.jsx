@@ -53,6 +53,7 @@ import {
   saveListingAddons,
 } from '../lib/listingAddons'
 import { notifyListingSubmitted } from '../lib/listingReview'
+import { EVENTS, track } from '../lib/analytics'
 import {
   LOCATIONS_NOT_SAVED_ON_CREATE,
   listingLocationsAvailable,
@@ -122,6 +123,7 @@ export default function CreateListing() {
   const headingRef = useRef(null)
   const photoPickerRef = useRef(null)
   const movedStep = useRef(false)
+  const trackedStart = useRef(false)
   const pendingDraft = useRef({})
   const wroteDraftThisSession = useRef(false)
 
@@ -284,6 +286,10 @@ export default function CreateListing() {
   }
 
   function goTo(index) {
+    if (step === 0 && index > 0 && !trackedStart.current) {
+      trackedStart.current = true
+      track(EVENTS.listingStarted, { category: category || null })
+    }
     persistDraft({ step: index })
     movedStep.current = true
     setError('')
@@ -448,6 +454,7 @@ export default function CreateListing() {
 
     clearDraft(userId)
     photosRef.current.forEach(revokePhotoUrls)
+    track(EVENTS.listingSubmitted, { category: category || null })
     void notifyListingSubmitted()
     navigate('/hosting', {
       replace: true,
