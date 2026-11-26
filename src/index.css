@@ -2950,7 +2950,8 @@ input[type='password']::-webkit-password-reveal-button {
 
 /* The session length on the photo's bottom-right corner, like a video's running
    time. Centred on the host's face (bottom-left), so the two read as one row.
-   Clicks pass through to the photo. */
+   Same colours as the category tag (top-left): navy on cream with a soft
+   shadow. Clicks pass through to the photo. */
 .ui-card__length {
   position: absolute;
   right: 10px;
@@ -2965,11 +2966,12 @@ input[type='password']::-webkit-password-reveal-button {
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
-  color: var(--cream);
+  color: var(--navy);
   white-space: nowrap;
   pointer-events: none;
-  background: rgb(22 38 75 / 0.82);
+  background: var(--cream);
   border-radius: 6px;
+  box-shadow: var(--shadow-sm);
 }
 
 .ui-card--browse .ui-card__rating {

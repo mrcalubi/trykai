@@ -245,6 +245,13 @@ describe('Card', () => {
     expect(length).toMatch(/right:\s*10px/)
     expect(length).toMatch(/bottom:\s*\d+px/)
     expect(length).toMatch(/pointer-events:\s*none/)
+    // Same colours as the category tag on the top-left corner.
+    const badge = rule('.ui-card__badge')
+    for (const prop of ['color', 'background', 'box-shadow']) {
+      const value = (r) => r.match(new RegExp(`[\\s;{]${prop}:\\s*([^;]+);`))?.[1]
+      expect(value(length)).toBeTruthy()
+      expect(value(length)).toBe(value(badge))
+    }
     expect(rule('.ui-card__price-row')).toMatch(/justify-content:\s*space-between/)
     expect(rule('.ui-card__price-row')).toMatch(/flex-wrap:\s*wrap/)
   })
