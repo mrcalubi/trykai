@@ -12,6 +12,9 @@
  *   person typed or a name on screen is never sent.
  * - URLs are cleaned before sending: no #fragment (Supabase puts auth tokens
  *   there), no query string except utm_*, and no /join/ invite code.
+ * - Events go to /ingest on our own domain; vercel.json forwards them to
+ *   PostHog's EU region. Ad and tracking blockers drop requests to
+ *   *.posthog.com, so a direct connection would miss many real visitors.
  * - posthog-js is loaded after first paint, so it costs nothing up front.
  *
  * `track()` never throws and never waits; call it and move on.
@@ -33,6 +36,9 @@ export const EVENTS = Object.freeze({
 })
 
 const KNOWN_EVENTS = new Set(Object.values(EVENTS))
+/** Same-origin path that vercel.json and vite.config.js forward to PostHog. */
+export const POSTHOG_PROXY_PATH = '/ingest'
+const POSTHOG_UI_HOST = 'https://eu.posthog.com'
 const URL_PROPERTIES = ['$current_url', '$referrer', '$initial_current_url', '$prev_pageview_pathname', '$pathname']
 
 let client = null // Promise<PostHog> once started
@@ -41,13 +47,11 @@ let touch = null
 export function analyticsOptions(env = import.meta.env) {
   const key = typeof env?.VITE_POSTHOG_KEY === 'string' ? env.VITE_POSTHOG_KEY.trim() : ''
   if (!key) return null
-  const host = typeof env.VITE_POSTHOG_HOST === 'string' && env.VITE_POSTHOG_HOST.trim()
-    ? env.VITE_POSTHOG_HOST.trim()
-    : 'https://us.i.posthog.com'
   return {
     key,
     config: {
-      api_host: host,
+      api_host: POSTHOG_PROXY_PATH,
+      ui_host: POSTHOG_UI_HOST,
       defaults: '2026-08-30',
       cookieless_mode: 'always',
       person_profiles: 'never',

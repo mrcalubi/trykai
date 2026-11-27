@@ -12,6 +12,9 @@
       "destination": "/api/listing-preview?id=:id"
     },
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/ingest/static/:path*", "destination": "https://eu-assets.i.posthog.com/static/:path*" },
+    { "source": "/ingest/array/:path*", "destination": "https://eu-assets.i.posthog.com/array/:path*" },
+    { "source": "/ingest/:path*", "destination": "https://eu.i.posthog.com/:path*" },
     {
       "source": "/(login|logout|forgot-password|reset-password|create-listing|verify-identity|bookings|hosting|dashboard|settings|refund-policy|cancellation-policy|dispute-policy|terms|privacy|style-guide|unsubscribe)",
       "destination": "/index.html"

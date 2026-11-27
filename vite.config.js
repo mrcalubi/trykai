@@ -43,6 +43,27 @@ export default defineConfig(({ command, mode }) => {
     && Boolean(sentryOrg && sentryProject && sentryAuthToken)
 
   return {
+    server: {
+      // Same as the /ingest rewrites in vercel.json, for a local build with
+      // VITE_POSTHOG_KEY set.
+      proxy: {
+        '/ingest/static': {
+          target: 'https://eu-assets.i.posthog.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/ingest/, ''),
+        },
+        '/ingest/array': {
+          target: 'https://eu-assets.i.posthog.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/ingest/, ''),
+        },
+        '/ingest': {
+          target: 'https://eu.i.posthog.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/ingest/, ''),
+        },
+      },
+    },
     build: {
       // Hidden maps are uploaded, then deleted, so they are not deployed.
       sourcemap: uploadSourcemaps ? 'hidden' : false,

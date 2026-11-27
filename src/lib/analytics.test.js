@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   EVENTS,
+  POSTHOG_PROXY_PATH,
   analyticsOptions,
   cleanEvent,
   cleanUrl,
@@ -51,7 +52,8 @@ describe('analyticsOptions', () => {
     const options = analyticsOptions({ VITE_POSTHOG_KEY: ' phc_test ' })
     expect(options.key).toBe('phc_test')
     expect(options.config).toMatchObject({
-      api_host: 'https://us.i.posthog.com',
+      api_host: '/ingest',
+      ui_host: 'https://eu.posthog.com',
       cookieless_mode: 'always',
       autocapture: false,
       disable_session_recording: true,
@@ -61,9 +63,9 @@ describe('analyticsOptions', () => {
     })
   })
 
-  it('takes a host override', () => {
+  it('always sends through our own /ingest proxy', () => {
     const options = analyticsOptions({ VITE_POSTHOG_KEY: 'k', VITE_POSTHOG_HOST: 'https://eu.i.posthog.com' })
-    expect(options.config.api_host).toBe('https://eu.i.posthog.com')
+    expect(options.config.api_host).toBe(POSTHOG_PROXY_PATH)
   })
 })
 
