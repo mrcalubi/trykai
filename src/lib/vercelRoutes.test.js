@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest'
 const root = resolve(import.meta.dirname, '../..')
 const vercel = JSON.parse(readFileSync(resolve(root, 'vercel.json'), 'utf8'))
 const appSource = readFileSync(resolve(root, 'src/App.jsx'), 'utf8')
+const analyticsSource = readFileSync(resolve(root, 'src/lib/analytics.js'), 'utf8')
 const robots = readFileSync(resolve(root, 'public/robots.txt'), 'utf8')
 
 const appPaths = [...appSource.matchAll(/path="([^"]+)"/g)].map(([, path]) => path).filter((path) => path !== '*')
@@ -19,7 +20,11 @@ const UUID = '0b6c2f1e-8d1a-4f43-9a7e-2c5d8e9f1a2b'
 
 /** Vercel route source (path-to-regexp style) as an anchored RegExp. */
 function sourcePattern(source) {
-  return new RegExp(`^${source.replace(/\./g, '\\.').replace(/:[A-Za-z]+/g, '[^/]+')}$`)
+  const pattern = source
+    .replace(/\./g, '\\.')
+    .replace(/:[A-Za-z]+\*/g, '.*')
+    .replace(/:[A-Za-z]+/g, '[^/]+')
+  return new RegExp(`^${pattern}$`)
 }
 
 /** Where Vercel sends a path: a rewrite destination, a static file, or 404. */
@@ -51,6 +56,19 @@ describe('vercel.json app routes', () => {
 
   it('serves the sitemap from its function', () => {
     expect(destinationFor('/sitemap.xml')).toBe('/api/sitemap')
+  })
+})
+
+describe('PostHog proxy', () => {
+  it('forwards /ingest to PostHog EU, static files first', () => {
+    expect(destinationFor('/ingest/static/array.js')).toBe('https://eu-assets.i.posthog.com/static/:path*')
+    expect(destinationFor('/ingest/array/phc_x/config.js')).toBe('https://eu-assets.i.posthog.com/array/:path*')
+    expect(destinationFor('/ingest/e/')).toBe('https://eu.i.posthog.com/:path*')
+    expect(destinationFor('/ingest/i/v0/e/')).toBe('https://eu.i.posthog.com/:path*')
+  })
+
+  it('matches the path analytics.js sends to', () => {
+    expect(analyticsSource).toContain("POSTHOG_PROXY_PATH = '/ingest'")
   })
 })
 
