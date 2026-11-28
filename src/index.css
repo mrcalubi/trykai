@@ -3299,6 +3299,12 @@ input[type='password']::-webkit-password-reveal-button {
   padding-bottom: 120px;
 }
 
+/* The footer sits below the page, so it needs its own room under the fixed bar
+   or its last row ends up hidden behind it. */
+body:has(.book-bar) .site-footer {
+  padding-bottom: calc(28px + 80px + env(safe-area-inset-bottom, 0px));
+}
+
 @media (min-width: 1024px) {
   .book-bar {
     display: none;
@@ -3306,6 +3312,10 @@ input[type='password']::-webkit-password-reveal-button {
 
   .page--with-book-bar {
     padding-bottom: 80px;
+  }
+
+  body:has(.book-bar) .site-footer {
+    padding-bottom: 28px;
   }
 }
 

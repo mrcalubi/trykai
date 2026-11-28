@@ -58,6 +58,7 @@ import { listingReportSubject, reportMailto } from '../lib/reportMailto'
 import { formatSessionDay, formatSessionTime } from '../lib/sessionDate'
 import { sessionTimeRange } from '../lib/hostSessions'
 import { SHARE_NOTES, shareOrCopy } from '../lib/share'
+import { EVENTS, currentAttribution, track } from '../lib/analytics'
 import { BackRowActions } from '../components/BackButton'
 import ViewableAvatar from '../components/ViewableAvatar'
 import Button from '../components/ui/Button'
@@ -321,6 +322,11 @@ export default function ListingDetail() {
       }
 
       setListing(listingData)
+      track(EVENTS.listingViewed, {
+        listing_id: listingData.id,
+        category: listingData.category,
+        price_cents: listingData.price_per_person,
+      })
 
       const addonsResult = await loadPublicListingAddons(supabase, listingData.id)
       setListingAddons(addonsResult.addons)
@@ -490,6 +496,9 @@ export default function ListingDetail() {
       title: listing?.title ?? 'TryKai',
     })
     if (SHARE_NOTES[result]) setShareNote(SHARE_NOTES[result])
+    if (result === 'shared' || result === 'copied') {
+      track(EVENTS.inviteFriendShared, { from: 'listing', listing_id: id, method: result })
+    }
   }
 
   // The phone booking bar steps aside once the booking card itself is on screen.
@@ -615,6 +624,7 @@ export default function ListingDetail() {
     setBreakdownOpen(false)
     setAddonRemaining({})
     setCheckoutSessionId(sessionId)
+    track(EVENTS.checkoutStarted, { listing_id: listing?.id, session_id: sessionId })
   }
 
   function changeGuests(next) {
@@ -672,6 +682,12 @@ export default function ListingDetail() {
 
     setCheckoutRail(paymentRail)
     setBookingLoading(true)
+    track(EVENTS.paymentMethodChosen, {
+      listing_id: listing?.id,
+      rail: paymentRail,
+      guests: guestsCount,
+      total_cents: shownAmount,
+    })
     setPaymentError('')
 
     const picked = pickedAddonLines(listingAddons, addonQuantities)
@@ -682,6 +698,7 @@ export default function ListingDetail() {
         payment_rail: paymentRail,
         addons: checkoutAddonPayload(picked),
         addon_note: addonNote.trim() || null,
+        ...(currentAttribution() ? { attribution: currentAttribution() } : {}),
       },
       headers: {
         Authorization: `Bearer ${session.access_token}`,

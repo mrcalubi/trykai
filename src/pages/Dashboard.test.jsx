@@ -9,6 +9,7 @@ import Dashboard from './Dashboard'
 import RedirectToOwnProfile from './RedirectToOwnProfile'
 import RequireAuth from '../components/RequireAuth'
 import { supabase } from '../lib/supabase'
+import { track } from '../lib/analytics'
 import { formatDayLabel, formatDayTitle } from '../lib/sessionCalendar'
 import { addSingaporeDays, singaporeDateKey } from '../lib/sessionBatch'
 import { sessionDayLabel, sessionTimeRange } from '../lib/hostSessions'
@@ -27,6 +28,10 @@ import {
 } from '../lib/listingDelete'
 
 vi.mock('../lib/supabase')
+vi.mock('../lib/analytics', async (importOriginal) => ({
+  ...(await importOriginal()),
+  track: vi.fn(),
+}))
 
 const HOST_ID = 'host-1'
 const USER_ID = 'user-1'
@@ -2770,6 +2775,27 @@ describe('Dashboard post-payment status', () => {
     expect(
       await screen.findByText('Booking confirmed! Your payment was successful.')
     ).toBeInTheDocument()
+  })
+
+  it('sends booking_paid only once the webhook has confirmed the booking', async () => {
+    givenData({ bookings: [makeBooking()] })
+    supabase.__on('bookings', 'select', (call) =>
+      call.single ? { data: { status: 'confirmed' }, error: null } : { data: [], error: null }
+    )
+    renderReturningFromPayment()
+
+    await screen.findByText('Booking confirmed! Your payment was successful.')
+    expect(track).toHaveBeenCalledWith('booking_paid', expect.objectContaining({ booking_id: 'booking-1' }))
+  })
+
+  it('does not send booking_paid for an abandoned payment', async () => {
+    supabase.__on('bookings', 'select', (call) =>
+      call.single ? { data: { status: 'cancelled' }, error: null } : { data: [], error: null }
+    )
+    renderReturningFromPayment()
+
+    await screen.findByText('This booking was not completed. You can try booking again.')
+    expect(track).not.toHaveBeenCalledWith('booking_paid', expect.anything())
   })
 
   it('explains an abandoned payment', async () => {
